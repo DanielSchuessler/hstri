@@ -263,7 +263,7 @@ renderTriangleSD vs = {-# CORE "renderTriangle" #-} renderPrimitive Triangles $ 
 --         (\sampleLine -> 
 --             cylinderStrip mat (fmap (second (theEmb time)) sampleLine))
 
-theComplex = bary3 AbstractTet
+theComplex = bary3 abstractTet
 
 theComplexFaceSubdivided = bary2 . bary2 $ theComplex
 

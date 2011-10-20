@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
-{-# LANGUAGE NoMonomorphismRestriction #-} 
+{-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
 module Blender where
 
 import Control.Arrow
@@ -17,65 +17,86 @@ import System.Process
 import Text.Printf.TH
 import DeltaSet
 import TypeLevel.NaturalNumber hiding(NaturalNumber)
+import Control.Arrow
+import SimplicialComplex
+import MathUtil
+import HomogenousTuples
+import Data.Function
+import TupleTH
+import ToPython
 
-parens x = "("++x++")"
-showTuple = parens . intercalate ", "
+#include "macros.h"
 
-class BlenderLabel a where
-    blenderLabel :: a -> String
+default(Int)
+
+class Coordinates a => Blenderable a where
+    faceInfo0 :: a -> Vert a -> FaceInfo 
+    faceInfo1 :: a -> Delta1 a -> FaceInfo 
+    faceInfo2 :: a -> Delta2 a -> FaceInfo 
+
+    materials :: a -> [Material]
+
+
 
 -- instance (BlenderLabel a, BlenderLabel b) => BlenderLabel (DisjointUnion a b) where
 --     blenderLabel (DisjointUnion a b) n = blenderLabel a n ||| blenderLabel b n 
 
-data MaterialKind = TriangulationMat | NormalSurfMat
-    deriving (Show,Enum,Bounded)
+type MatName = String
 
-data VertexInfo = VertexInfo {
-    vertexInfoCoords :: Vec3
+data FaceInfo = FaceInfo {
+    faceLabel :: String,
+    faceMat :: Material,
+    faceThickness :: Double
 }
 
 
-data Scene t = Scene {
-    sceneTriang :: t
+data Scene a = Scene {
+    sceneTriang :: a,
+    worldProps :: Props
 }
 
-class VertexInfoClass v where
-    vertexInfo :: v -> VertexInfo
+defaultScene a = Scene a defaultWorldProps
 
-coords = vertexInfoCoords . vertexInfo 
+x & y = (x, toPython y)
 
-instance (VertexInfoClass v1, VertexInfoClass v2) => VertexInfoClass (Either v1 v2) where
-    vertexInfo = vertexInfo ||| vertexInfo 
+defaultWorldProps = ["use_sky_blend" & False,
+                     "use_sky_real" & False,
+                     "horizon_color" & (1,1,1)
+                     ]
 
-matName :: MaterialKind -> Int -> String
-matName k i = show k ++ "Mat"++show i 
+instance (Blenderable a, Blenderable b) => Blenderable (DisjointUnion a b) where
+    materials = nubBy ((==) `on` ma_name) . foldMapDJ (++) materials materials
+#define MK_FI(X) X = deriveDJ X X
+    MK_FI(faceInfo0)
+    MK_FI(faceInfo1)
+    MK_FI(faceInfo2)
+#undef MK_FI
 
-setProp :: String -> String -> String -> Blender ()
-setProp obj p v = ln $ $(printf "%s.%s = %s") obj p v 
+instance Blenderable a => Blenderable (WithVertexCoordFunc a) where
+    materials = materials . cp_complex
+#define MK_FI(X) X = X . cp_complex
+    MK_FI(faceInfo0)
+    MK_FI(faceInfo1)
+    MK_FI(faceInfo2)
+#undef MK_FI
 
--- | Add a line to the blender script
-ln :: String -> Blender ()
-ln x = tell (x++"\n")
-
-lns :: [String] -> Blender ()
-lns = mapM_ ln
-
-type Blender = Writer String
-
-matSetDiffuseColor :: String -> (Double,Double,Double) -> Blender ()
-matSetDiffuseColor m (r, g, b) = setProp m "diffuse_color" ($(printf "(%f,%f,%f)") r g b)
+sceneVar = py "scene"
+worldVar = py "world"
+camVar = py "cam"
+objVar = py "obj"
+lightVar = py "light"
 
 
-matSetTransp mat alpha spec_alpha =
-             mapM_ (uncurry $ setProp mat) [
-                ("use_transparency","True"),
-                ("transparency_method","'RAYTRACE'"),
-                -- ("transparency_method","'Z_TRANSPARENCY'"),
-                ("alpha",show alpha),
-                ("specular_alpha",show spec_alpha),
-                ("translucency","0.8"),
-                ("raytrace_transparency.fresnel","1")
-                ]
+
+objSetName x = objVar <.> "name" .= str x
+
+objSetMaterial x = objVar <.> "active_material" .= x 
+
+ops x = py "ops" <.> x
+dat x = py "data" <.> x
+context x = py "context" <.> x
+
+ma_var = py . ma_name
 
 -- toBlender :: forall a. (BlenderLabel a, 
 --                         VertexInfoClass (Vertex a),
@@ -84,90 +105,107 @@ matSetTransp mat alpha spec_alpha =
 --                         Show (Triangle a), 
 --                         DeltaSet a) => 
 --        Scene a
---     -> Blender ()
+--     -> Python ()
 toBlender Scene{..} = result
     where
         result = do
             ln "from bpy import *"
             ln "from pprint import pprint"
+
+            -- Make a new scene
+            sceneVar .= methodCallExpr1 (dat "scenes") "new" (str "TheScene")
+            -- Remove all other scenes
+            ln $ $(printf "for s in data.scenes:\n  if (s != %s):\n    data.scenes.remove(s)") (renderPython sceneVar)
+
+            -- Make a new world, assign it to the scene, set world properties
+            worldVar .= methodCallExpr1 (dat "worlds") "new" (str "TheWorld")
+            mapM_ (setProp' worldVar) worldProps
+            setProp sceneVar "world" worldVar
+
+            camVar .= methodCallExpr1 (dat "cameras") "new" (str "TheCam")
+            newObj "TheCam" camVar
+            objVar <.> "location" .= Vec3 0 (-5) 0
+            objVar <.> "rotation_euler" .= Vec3 (pi/2) 0 0 -- point at positive y dir
+            setProp sceneVar "camera" objVar
+
+            lightVar .= methodCallExpr (dat "lamps") "new" (str "TheLamp", str "SUN") 
+            lightVar <.> "shadow_method" .= str "RAY_SHADOW"
+
+            newObj "TheLamp" lightVar
+            objVar <.> "rotation_euler" .= Vec3 (5*pi/12) 0 (-pi/6)
+            objVar <.> "location" .= Vec3 (-5) (-10) 8
+            
+
+
+
+
             materialDefs
-            mapM_ handleV (allVertices sceneTriang)
-            mapM_ handleE (allEdges sceneTriang)
-            mapM_ handleT (allTriangles sceneTriang)
+            mapM_ handleV (s0 sceneTriang)
+            mapM_ handleE (s1 sceneTriang)
+            mapM_ handleT (s2 sceneTriang)
+
+        
 
 
-        facMatVar = matName TriangulationMat 2
+        materialDefs = mapM_ materialToBlender (materials sceneTriang) 
+
+
 
         dims = [0..2]
 
 
-        materialDefs :: Blender ()
-        materialDefs = do
-             sequence_ [ newMaterial name name | k <- [minBound .. maxBound], i <- dims, 
-                                            let name = matName k i ]
-
-
-             matSetTransp facMatVar 0.1 0.3 
-             matSetTransp (matName NormalSurfMat 2) 0.2 0.35
-
-             sequence_ [ matSetDiffuseColor (matName NormalSurfMat i) 
-                            (0,0.2,1)
-             
-                            | i <- dims ]
+        coords' = coords sceneTriang
 
 
 
         handleV v = do
-                sphere coords vertexRadius
-                objSetName (blenderLabel v)
-                objSetMaterial (matName vertexInfoKind 0)
+                sphere (coords' v) faceThickness
+                objSetName faceLabel
+                objSetMaterial (ma_var faceMat)
             
             where
-                VertexInfo {..} = vertexInfo v 
+                FaceInfo {..} = faceInfo0 sceneTriang v 
 
         handleE e = do
-                cylinder (coords v0) (coords v1) edgeRadius
-                objSetName (blenderLabel e)
-                objSetMaterial (matName (vertexInfoKind v0)1)
+                cylinder (coords' v0) (coords' v1) faceThickness
+                objSetName faceLabel
+                objSetMaterial (ma_var faceMat)
             
 
             where
-                (v1,v0) = edgeVertices sceneTriang e
+                (v1,v0) = faces10 sceneTriang e
+                FaceInfo {..} = faceInfo1 sceneTriang e
 
 
         handleT t = do
-                    triangle (coords v0) (coords v1) (coords v2)
-                    objSetName (blenderLabel t)
-                    objSetMaterial (matName (vertexInfoKind v0) 2)
-                    objSetProp "show_transparent" "True"
+                    triangle (coords' v0) (coords' v1) (coords' v2)
+                    objSetName faceLabel
+                    objSetMaterial (ma_var faceMat)
+                    objVar <.> "show_transparent" .= True
 
             where
-                (v2,v1,v0) = triangleVertices sceneTriang t
+                (v2,v1,v0) = faces20 sceneTriang t
+                FaceInfo {..} = faceInfo2 sceneTriang t
         
-        objSetName :: String -> Blender ()
-        objSetName = objSetProp "name" . show
 
-        objSetMaterial = objSetProp "active_material"
-
-        objSetProp = setProp "obj"
 
         
         sphere loc radius = do
-            ln $ $(printf "ops.surface.primitive_nurbs_surface_sphere_add(location=%s)")
-                (pyVec3 loc)
+            methodCall1 (ops "surface") "primitive_nurbs_surface_sphere_add" 
+                (namedArg "location" loc)
 
             assignObjFromContext
 
-            ln $ $(printf "obj.scale = %s") (pyVec3 (Vec3 radius radius radius))
+            objVar <.> "scale" .= (Vec3 radius radius radius)
 
 
-        cylinder :: Vec3 -> Vec3 -> Double -> Blender ()
+        cylinder :: Vec3 -> Vec3 -> Double -> Python ()
         cylinder from to radius = do
-            ln "ops.surface.primitive_nurbs_surface_cylinder_add()"
+            methodCall (ops "surface") "primitive_nurbs_surface_cylinder_add" ()
 
             assignObjFromContext
 
-            ln $ $(printf "obj.matrix_basis = %s") (pyProj4 m)
+            objVar <.> "matrix_basis" .= m
 
             where
                 m :: Proj4
@@ -184,7 +222,7 @@ toBlender Scene{..} = result
                 y' = normalize (crossprod x' z')
                 z' = to &- from
 
-        triangle p0 p1 p2 = mesh [p0,p1,p2] "(0,1,2)"
+        triangle p0 p1 p2 = mesh [p0,p1,p2] [(0,1,2)]
 
 
 
@@ -193,50 +231,142 @@ toBlender Scene{..} = result
 
 
 
-        vertexRadius = 0.5
-        edgeRadius = 0.12
         
-        assignObjFromContext = assignObj "context.object"
-        assignObj x = ln $ "obj = " ++ x
+        assignObjFromContext = objVar .= (context "object")
 
-        newMaterial :: String -> String -> Blender ()
-        newMaterial varName name = do
-                ln $ $(printf "%s = data.materials.new(%H)") varName name 
-                ln $ $(printf "%s.use_transparent_shadows = True") varName
 
 
 testBlender s = do
     let fn = "/tmp/foo.py"
-    writeFile fn (execWriter $ toBlender s)
+    writeFile fn (renderPython $ toBlender s)
     putStrLn fn
     args <- getArgs
     rawSystem "blender" ("-P":fn:args)
 
 
-anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
-anyOrth (Vec3 x y _) = Vec3 (-y) x 0
+meshVar = py "me"
 
+emptyList = [] :: [()]
+
+mesh :: [Vec3] -> [(Int,Int,Int)] -> Python ()
 mesh verts faces = 
             do 
-            ln "me = data.meshes.new(\"TriMesh\")"         
+            meshVar .= (methodCallExpr1 (dat "meshes") "new" (str "SomeMesh"))
 
-            ln $ $(printf "me.from_pydata([%s],[],[%s])") 
-
-                (intercalate ", " $ [ pyVec3 p | p <- verts ])
-                faces
+            methodCall meshVar "from_pydata" (verts,emptyList,faces)
 
 
 --             "print('vertices:')",
 --             "for x in me.vertices:",
 --             "   pprint(x.co)",
 
-            ln "me.update()"
-            ln "obj = data.objects.new(\"Tri\",me)"
-            ln "scene = context.scene"
-            ln "scene.objects.link(obj)"
+            methodCall meshVar "update" ()
+            newObj "SomeMesh" meshVar 
+
+-- | Returns the object in the 'objVar' \"register\" :-)
+newObj name objData = do
+            objVar .= (methodCallExpr (dat "objects") "new" (str name,objData))
+            methodCall1 (sceneVar <.> "objects") "link" objVar
 
 
-pyVec3 (Vec3 x y z) = show (x,y,z)
-pyVec4 (Vec4 x y z h) = show (x,y,z,h)
-pyMat4 (Mat4 a b c d) = showTuple (fmap pyVec4 [a,b,c,d]) 
-pyProj4 = pyMat4 . fromProjective
+
+--linkObjToScene =
+
+
+data Material = Material {
+    ma_name :: MatName,
+    ma_props :: Props
+}
+
+materialToBlender :: Material -> Python ()
+materialToBlender m@Material{..} = do
+
+    let var = ma_var m
+
+    var .= methodCallExpr1 (dat "materials") "new" (str ma_name)
+
+    let ma_props' = ("use_transparent_shadows" & True)
+                        : ma_props
+    mapM_ (setProp' var) ma_props'
+
+
+diffuseColor :: Triple Double -> MatProp
+diffuseColor rgb = "diffuse_color" & rgb
+
+
+type MatProp = (String,Python ())
+type Props = [MatProp]
+
+
+specular :: 
+       Int -- ^ [1,511]
+    -> Double -- ^ [0,1]
+    -> Props
+specular hardness intensity = ["specular_hardness" & hardness,
+                               "specular_intensity" & intensity]
+
+transparency alpha spec_alpha fresnel =
+                [
+                "use_transparency" & True,
+                "transparency_method" & str "RAYTRACE",
+                -- "transparency_method" & "'Z_TRANSPARENCY'",
+                "alpha" & (alpha::Double),
+                "specular_alpha" & (spec_alpha::Double),
+                "translucency" & (1-alpha),
+                "raytrace_transparency.fresnel_factor" & 1,
+                "raytrace_transparency.fresnel" & (fresnel::Double),
+                "raytrace_transparency.depth" & 5
+                ]
+
+newtype Pseudomanifold a = Pseudomanifold { unPseudomanifold :: a }
+    deriving(Coordinates)
+
+DERIVE_DELTA_SET(Pseudomanifold a, unPseudomanifold)
+
+pmMat0 = Material "pmMat0" (let r=0.3 in diffuseColor (r, r, r):[])
+pmMat1 = Material "pmMat1" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8)
+pmMat2 = Material "pmMat2" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8++transparency 0.25 0.3 1)
+
+
+pmVertThickness = 0.04
+edgeThicknessFactor = 0.4
+nsurfVertThickness = 0.03
+
+instance Coordinates a => Blenderable (Pseudomanifold a) where
+    faceInfo0 _ _ = (FaceInfo "pm0" pmMat0 pmVertThickness)
+    faceInfo1 _ _ = (FaceInfo "pm1" pmMat1 (edgeThicknessFactor*pmVertThickness))
+    faceInfo2 _ _ = (FaceInfo "pm2" pmMat2 0)
+    materials _ = [pmMat0,pmMat1,pmMat2]
+
+newtype NormalSurface a = NormalSurface { unNormalSurface :: a }
+    deriving(Coordinates)
+
+DERIVE_DELTA_SET(NormalSurface a, unNormalSurface)
+
+nsurfMat0 = Material "nsurfMat0" (diffuseColor (0, 0.4, 1):[])
+nsurfMat1 = Material "nsurfMat1" (diffuseColor (0, 0.2, 1):specular 100 0.8)
+nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++transparency 0.55 0.7 1)
+
+
+instance Coordinates a => Blenderable (NormalSurface a) where
+    faceInfo0 _ _ = (FaceInfo "nsurf0" nsurfMat0 nsurfVertThickness)
+    faceInfo1 _ _ = (FaceInfo "nsurf1" nsurfMat1 (edgeThicknessFactor * nsurfVertThickness))
+    faceInfo2 _ _ = (FaceInfo "nsurf2" nsurfMat2 0)
+    materials _ = [nsurfMat0,nsurfMat1,nsurfMat2]
+
+
+
+-- materialDefs :: Python ()
+-- materialDefs = do
+--         sequence_ [ newMaterial name name | k <- [minBound .. maxBound], i <- dims, 
+--                                     let name = faceMat k i ]
+-- 
+-- 
+--         matSetTransp facMatVar 0.1 0.3 
+--         matSetTransp (faceMat NormalSurfMat 2) 0.2 0.35
+-- 
+--         sequence_ [ matSetDiffuseColor (faceMat NormalSurfMat i) 
+--                     (0,0.2,1)
+--         
+--                     | i <- dims ]
+
