@@ -1,12 +1,10 @@
 {-# LANGUAGE FlexibleContexts, GeneralizedNewtypeDeriving, TypeFamilies, GADTs #-}
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving, NoMonomorphismRestriction, ScopedTypeVariables #-} 
 module Simplicial where
-import TypeLevel.NaturalNumber hiding(NaturalNumber)
 import Test.QuickCheck
 import Data.Set as Set
 import Data.Sequence as Seq
 import Text.XML.Generator
-import Data.NaturalNumber
 import Data.Vect.Double
 import Data.Map as Map
 import Data.ByteString.Lazy as B
@@ -17,6 +15,7 @@ import Data.Foldable as Fold
 import List
 import Text.Printf
 import Control.Arrow
+import Nat
 
 
 type family Simplex a n
@@ -28,17 +27,17 @@ class DeltaSet a where
 type Vertex a = Simplex a Zero
 
 vertices :: DeltaSet a => a -> [Vertex a]
-vertices = flip simplices NZero 
+vertices = flip simplices n0 
 
 type Edge a = Simplex a One
 
 edges :: DeltaSet a => a -> [Edge a]
-edges = flip simplices (NSuccessorTo NZero) 
+edges = flip simplices n1
                                   
 type Triangle a = Simplex a Two
 
 triangles :: DeltaSet a => a -> [Triangle a]
-triangles = flip simplices (NSuccessorTo (NSuccessorTo NZero))
+triangles = flip simplices n2
 
 class DeltaSet a => SimplicialSet a where
     degeneracyMap :: a -> N n -> Int -> Simplex a n -> Simplex a (SuccessorTo n)  
@@ -112,12 +111,6 @@ nub' = Set.toList . Set.fromList
 type instance Simplex (ByTetrahedra v) Zero = v
 type instance Simplex (ByTetrahedra v) (SuccessorTo n) = List v (SuccessorTo (SuccessorTo n))
 
-data NaturalNumberDict n = NaturalNumber n => NaturalNumberDict
-
-mkNaturalNumberDict :: N n -> NaturalNumberDict n
-mkNaturalNumberDict NZero = NaturalNumberDict
-mkNaturalNumberDict (NSuccessorTo n) = case mkNaturalNumberDict n of
-                                            NaturalNumberDict -> NaturalNumberDict
 
 btFaceMap :: N n -> Int -> Simplex (ByTetrahedra v) (SuccessorTo n) -> Simplex (ByTetrahedra v) n 
 btFaceMap n = case n of                                               
