@@ -26,17 +26,17 @@ class DeltaSet a where
 
 type Vertex a = Simplex a Zero
 
-vertices :: DeltaSet a => a -> [Vertex a]
+vertices :: DeltaSet a -> [Vertex a]
 vertices = flip simplices n0 
 
 type Edge a = Simplex a One
 
-edges :: DeltaSet a => a -> [Edge a]
+edges :: DeltaSet a -> [Edge a]
 edges = flip simplices n1
                                   
 type Triangle a = Simplex a Two
 
-triangles :: DeltaSet a => a -> [Triangle a]
+triangles :: DeltaSet a -> [Triangle a]
 triangles = flip simplices n2
 
 class DeltaSet a => SimplicialSet a where

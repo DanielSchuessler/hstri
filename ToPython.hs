@@ -11,6 +11,10 @@ import Data.Functor
 newtype Python a = Python { unPython :: Writer String a }
     deriving (Functor,Monad,MonadWriter String)
 
+instance Show (Python ()) where
+    show = execWriter . unPython
+
+
 renderPython = execWriter . unPython
 
 parens x = "("++x++")"

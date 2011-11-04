@@ -1,15 +1,23 @@
-{-# LANGUAGE NoMonomorphismRestriction, GADTs, ScopedTypeVariables, TemplateHaskell, StandaloneDeriving #-} 
-import DeltaSet
-import SimplicialComplex
-import Data.Vect.Double
-import Blender
-import Data.NaturalNumber
-import TupleTH
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, GADTs, ScopedTypeVariables, TemplateHaskell, StandaloneDeriving #-} 
 import AbstractTetrahedron
-import HomogenousTuples
-import Data.Function
+import Blender
+import Blenderable
 import Control.Applicative
+import Data.Function
 import Data.List
+import Data.NaturalNumber
+import Data.Vect.Double
+import DeltaSet
+import DisjointUnion
+import HomogenousTuples
+import Layout
+import SimplexLabels
+import SimplicialComplex
+import System.Exit
+import TupleTH
+import TypeLevel.TF
+import GraphComplex
+import ExampleComplexes
 
 data V = P0' | P0 | PL' | PL | PR' | PR | P1' | P1
     deriving (Eq,Ord,Show,Enum)
@@ -22,7 +30,6 @@ list4 = (,,,)
 prism a' a b' b c' c = [ list4 a' a b c, list4 a' b' b c, list4 a' b' c' c ] 
 
 x = 
-    Pseudomanifold $
     addCoordFunc coordFunc $
 
 
@@ -45,14 +52,6 @@ coordFunc v = case v of
 --         blenderLabel _ (NSuccessorTo _) = show . lToList 
 
 --main = testBlender (defaultScene x)
-main = testBlender . 
-       defaultScene .
-       transformCoords ((&+ Vec3 (-0.66) (-2.7) (-0.52)) . rot) $
-       (Pseudomanifold abstractTet
-        `DisjointUnion`
-        abnormalCurve)
-
-rot = withOrigin (Vec3 0.5 0.5 0.5) (rotate3 (pi*0.42) vec3Z)
 
 deriving instance Ord Vec3
 
@@ -60,7 +59,8 @@ sort2 = $(tupleFromList 2) . sort . $(tupleToList 2)
 sort3 :: (Vec3, Vec3, Vec3) -> (Vec3, Vec3, Vec3)
 sort3 = $(tupleFromList 3) . sort . $(tupleToList 3)
 
-normalTris = NormalSurface $
+normalTris :: Blenderable (OTuple Vec3)
+normalTris = normalSurface' $
     let
         f v = (inter 0.4 v v0, inter 0.4 v v1, inter 0.4 v v2)
             where
@@ -68,10 +68,14 @@ normalTris = NormalSurface $
     in
         fromTris (sort3 . f <$> allVertices)
 
-co = coords abstractTet
-inter p = interpolate p `on` co
 
-abnormalCurve = NormalSurface $ fromEdges (sort2 <$> [(u,v),(v,w)])
+inter :: Double -> Vertex -> Vertex -> Vec3
+inter p = interpolate p `on` co
+    where
+        co :: Vertex -> Vec3
+        co = vertlbl tet3d
+
+abnormalCurve = normalSurface' $ fromEdges (sort2 <$> [(u,v),(v,w)])
     where
         u = inter 0.25 a b
         v = inter 0.4 a c
@@ -81,7 +85,22 @@ abnormalCurve = NormalSurface $ fromEdges (sort2 <$> [(u,v),(v,w)])
         b = vA
         c = vB
 
+withOrigin :: AbelianGroup b => b -> (b -> b) -> b -> b
 withOrigin o f = (&+ o) . f . (&- o)
 
 
 
+main = testBlender . 
+       defaultScene .
+       transformCoords ((&+ Vec3 (-0.66) (-2.7) (-0.52)) . rot) $
+       (pseudomanifold (baryFlat tet3d)
+        --`disjointUnion` abnormalCurve
+        )
+  where
+    rot = withOrigin (Vec3 0.5 0.5 0.5) (rotate3 (pi*0.42) vec3Z)
+
+
+--testLayout :: (Show (Vert a), ShowN a) => DeltaSet a -> IO ExitCode
+testLayout ds = do
+    wc <- layoutDebug ds
+    testBlender . defaultScene . pseudomanifold $ wc

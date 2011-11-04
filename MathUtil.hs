@@ -1,15 +1,27 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, RecordWildCards, ViewPatterns #-}
 {-# LANGUAGE NoMonomorphismRestriction #-} 
 {-# LANGUAGE FlexibleInstances, BangPatterns #-} 
 module MathUtil where
 
-import Data.Vect.Double
+import Data.Vect.Double as Vect
 import Data.Complex
 import Test.QuickCheck
 import Control.Monad
 import TupleTH
 import Data.Vect.Double.Instances
 import Data.Vect.Double.Util.Dim4
+import Control.Monad.LPMonad
+import Data.Algebra
+import Data.LinearProgram
+import Control.Applicative
+import Control.Exception
+import System.Directory
+import System.FilePath
+import Test.QuickCheck.Gen
+import System.Random
+import System.Process
+import System.Exit
+import Data.Word
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -36,7 +48,7 @@ arb01 = frequency [(10,return 0),(30,choose (0,1)) ]
 
 arbsimp :: Gen Vec4
 arbsimp = do
-    xs <- gen4 arb01 `suchThat` (/=zero)
+    xs <- gen4 arb01 `suchThat` (/= Vect.zero)
     return (xs &/ (xs `dotprod` 1))
     
 
@@ -73,7 +85,4 @@ cScalarMul r (a :+ b) = r*a :+ r*b
 
 -- prop_g1 = forAll arbsimp (\x -> let y = to3Sphere x
 --                                 in abs (1-normsqr y) < 1E-14) 
-
-
-
-
+                                

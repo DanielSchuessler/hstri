@@ -1,13 +1,12 @@
-{-# LANGUAGE MultiParamTypeClasses, UndecidableInstances, FlexibleContexts, TypeFamilies, FlexibleInstances, StandaloneDeriving, GADTs, ScopedTypeVariables, DeriveDataTypeable, NoMonomorphismRestriction #-}
+{-# LANGUAGE BangPatterns, MultiParamTypeClasses, UndecidableInstances, FlexibleContexts, TypeFamilies, FlexibleInstances, StandaloneDeriving, GADTs, ScopedTypeVariables, DeriveDataTypeable, NoMonomorphismRestriction #-}
 module List where
-import TypeLevel.NaturalNumber
 import Data.Typeable
 import Control.Exception
-import Data.NaturalNumber(N(..))
+import TypeLevel.TF
 
 data List v n where
-    Nil :: List v Zero 
-    (:::) :: v -> List v n -> List v (SuccessorTo n) 
+    Nil :: List v Z 
+    (:::) :: v -> List v n -> List v (S n) 
 
 
 infixr 5 :::
@@ -21,7 +20,7 @@ lsingle v = v ::: Nil
 -- class MakeList a where 
 --     list :: a
 -- 
--- instance MakeList (List v Zero) where
+-- instance MakeList (List v Z) where
 --     list = Nil
 -- 
 -- instance (MakeList' v b One) => MakeList (v -> b) where
@@ -44,11 +43,12 @@ instance MakeList' (List v n) where
     list' = id
 
 type family Pred n
-type instance Pred (SuccessorTo n) = n
+type instance Pred (S n) = n
 
 instance (MakeList' d, 
+
           MakeListElement d ~ v,
-          SuccessorTo (Pred (MakeListN d)) ~ MakeListN d) => 
+          S (Pred (MakeListN d)) ~ MakeListN d) => 
           
           MakeList' (v -> d) where
 
@@ -58,17 +58,17 @@ instance (MakeList' d,
     list' vs v = list' (lsnoc vs v)
 
 
-lsnoc :: List v n -> v -> List v (SuccessorTo n)
+lsnoc :: List v n -> v -> List v (S n)
 lsnoc Nil v = v ::: Nil
 lsnoc (v0 ::: vs) v = v0 ::: lsnoc vs v
 
--- type instance LowerCodomain v (List v (SuccessorTo n)) = List v n 
+-- type instance LowerCodomain v (List v (S n)) = List v n 
 -- type instance LowerCodomain v (v -> d) = v -> LowerCodomain v d
 
 
 
 
-data NegativeIndex = NegativeIndex Int
+data NegativeIndex = NegativeIndex Int String
     deriving (Show,Typeable)
 
 instance Exception NegativeIndex
@@ -78,13 +78,13 @@ data IndexTooLarge = IndexTooLarge Int Int
 
 instance Exception IndexTooLarge
 
-ldelete :: forall n v. NaturalNumber n => Int -> List v (SuccessorTo n) -> List v n
-ldelete i | i < 0 = throw (NegativeIndex i)
-          | len <- naturalNumberAsInt (undefined :: n), i > len =
+ldelete :: forall n v. Nat n => Int -> List v (S n) -> List v n
+ldelete i | i < 0 = throw (NegativeIndex i "in ldelete")
+          | len <- natToInt (undefined :: n), i > len =
                 throw (IndexTooLarge i len)
           | otherwise = 
               let
-                f :: forall n'. Int -> List v (SuccessorTo n') -> List v n'
+                f :: forall n'. Int -> List v (S n') -> List v n'
                 f i (v ::: vs) 
                         | i == 0 = vs
                         | otherwise = case vs of
@@ -105,10 +105,44 @@ list2 a b = a ::: list1 b
 list3 a b c = a ::: list2 b c
 list4 a b c d = a ::: list3 b c d
 
-mapList :: (a -> b) -> List a n -> List b n
-mapList f Nil = Nil
-mapList f (x ::: xs) = f x ::: mapList f xs
+lmap :: (a -> b) -> List a n -> List b n
+lmap f Nil = Nil
+lmap f (x ::: xs) = f x ::: lmap f xs
 
-range :: Enum a => a -> N n -> List a n
-range start NZero = Nil
-range start (NSuccessorTo n) = start ::: range (succ start) n
+range :: (Enum a, Nat n) => a -> n -> List a n
+range start n = caseNat n Nil (\n' -> start ::: range (succ start) n')
+
+lhead :: List v (S n) -> v
+lhead (x ::: _) = x
+
+ltail :: List v (S n) -> List v n
+ltail (_ ::: xs) = xs
+
+-- lappend :: NatPair n n' => List v n -> List v n' -> List v (Plus n n')
+-- lappend Nil ys = ys
+-- lappend (x ::: xs) ys = x ::: (lappend xs ys)
+--
+
+lToTriple :: List t N3 -> (t, t, t)
+lToTriple (x1 ::: x2 ::: x3 ::: Nil) = (x1,x2,x3)
+
+lToQuadruple :: List t N4 -> (t, t, t, t)
+lToQuadruple (x1 ::: x2 ::: x3 ::: x4 ::: Nil) = (x1,x2,x3,x4)
+
+
+lfoldl' :: forall r v n. (r -> v -> r) -> r -> List v n -> r
+lfoldl' c z = go z
+    where
+        go :: forall n. r -> List v n -> r
+        go !acc Nil = acc
+        go !acc (x:::xs) = go (acc `c` x) xs 
+
+
+lfoldl1' :: forall r v n. (r -> r -> r) -> List r (S n) -> r
+lfoldl1' c (z ::: xs) = go z xs
+    where
+        go :: forall n. r -> List r n -> r
+        go !acc Nil = acc
+        go !acc (x:::xs) = go (acc `c` x) xs 
+
+
