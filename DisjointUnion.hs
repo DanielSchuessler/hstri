@@ -10,8 +10,9 @@ import Control.Monad
 import GraphUtil
 import DeltaSet
 import TypeLevel.TF
+import Indexing
+import AnySimplex
 
-#include "macros.h"
 
 
 data EitherSequence a b
@@ -27,6 +28,8 @@ instance DisjointUnionable (DeltaSet a) (DeltaSet b) where
     type (DisjointUnion (DeltaSet a) (DeltaSet b)) = DeltaSet (EitherSequence a b)
 
     disjointUnion a b = DeltaSet face' simps' supers' dimension' faceGraph' nodeMap'
+        (\n -> simpsIndexing a n `disjointUnionIndexing` simpsIndexing b n)
+                            
      where
 
         dimension' =

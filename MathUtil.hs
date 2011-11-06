@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, RecordWildCards, ViewPatterns #-}
+{-# LANGUAGE StandaloneDeriving, TemplateHaskell, RecordWildCards, ViewPatterns #-}
 {-# LANGUAGE NoMonomorphismRestriction #-} 
 {-# LANGUAGE FlexibleInstances, BangPatterns #-} 
 module MathUtil where
@@ -80,6 +80,18 @@ to3Sphere (Vec4 x0 x1 x2 x3) = c2_to_r4 g1 g2
 
 cScalarMul :: Double -> Complex Double -> Complex Double
 cScalarMul r (a :+ b) = r*a :+ r*b
+
+withOrigin :: AbelianGroup b => b -> (b -> b) -> b -> b
+withOrigin o f = (&+ o) . f . (&- o)
+
+deriving instance Ord Vec3
+
+
+-- | 'vec3Z' * @pointZTo z'@ = @z'@ 
+pointZTo z' = Mat3 x' y' z'
+    where
+                x' = normalize (anyOrth z')
+                y' = normalize (crossprod x' z')
 
 
 

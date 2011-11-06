@@ -28,6 +28,7 @@ import Data.Char
 import Numeric
 import qualified Data.Set as S
 import qualified Data.Map as M
+import Control.Exception
 
 
 cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
@@ -382,4 +383,8 @@ instance (Ord a, Pretty a) => Pretty (Set a) where
 
 instance (Ord a, Pretty a, Pretty b) => Pretty (Map a b) where
     pretty = prettyAssocs . M.assocs 
+
+wrapException :: String -> a -> a
+wrapException msg = mapException (\(SomeException e) -> 
+    ErrorCall (unlines[msg,"Inner Exception:",show e]))
 

@@ -15,6 +15,10 @@ import Text.Printf.TH
 import ToPython
 import Blenderable
 import TypeLevel.TF
+import Debug.Trace
+import SimplexLabels
+import HomogenousTuples
+import qualified Util
 
 
 
@@ -41,17 +45,18 @@ types x = py "types" <.> x
 
 ma_var = py . ma_name
 
+triLabelMat = Material "triLbl" [ let r = 0.015 in diffuseColor (r,r,r) ]
 
 -- toBlender :: forall a. (BlenderLabel a, 
 --                         VertexInfoClass (Vertex a),
 --                         Show (Vertex a), 
 --                         Show (Edge a), 
---                         Show (Triangle a), 
+--                         Show (blenderTriangle a), 
 --                         DeltaSet a) => 
 --        Scene a
 --     -> Python ()
 toBlender :: Scene a -> Python ()
-toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
+toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable} = result
     where
         deltaSet = ba_ds blenderable        
 
@@ -72,8 +77,8 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
             -- camera
             camVar .= methodCallExpr1 (dat "cameras") "new" (str "TheCam")
             newObj "TheCam" camVar
-            objVar <.> "location" .= Vec3 0 (-5) 0
-            objVar <.> "rotation_euler" .= Vec3 (pi/2) 0 0 -- point at positive y dir
+            objVar <.> "location" .= scene_camPos scene
+            objVar <.> "rotation_euler" .= scene_camEuler scene
             setProp sceneVar "camera" objVar
 
             -- light
@@ -89,6 +94,7 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
             grp0 <- newGroup "grp0" "Vertices" 
             grp1 <- newGroup "grp1" "Edges" 
             grp2 <- newGroup "grp2" "Triangles" 
+            grpTriLabels <- newGroup "grpTriLabels" "Triangle labels" 
 
             (types "Object" <.> "simplexlabel") .= 
                 methodCallExpr1 bpy_props "StringProperty" (str "Simplex label")
@@ -96,12 +102,12 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
 
             mapM_ (handleV grp0) (s0 deltaSet)
             mapM_ (handleE grp1) (s1 deltaSet)
-            mapM_ (handleT grp2) (s2 deltaSet)
+            mapM_ (handleT grp2 grpTriLabels) (s2 deltaSet)
 
         
 
 
-        materialDefs = mapM_ materialToBlender (ba_materials blenderable) 
+        materialDefs = mapM_ materialToBlender (triLabelMat : ba_materials blenderable) 
 
 
 
@@ -122,8 +128,7 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
                 objCommon grp faceLabel faceMat
             
             where
-                BSI0 {..} = ba_simplbl blenderable n0 v 
-                FaceInfo {..} = faceInfo0
+                BSI0 { faceInfo0 = FaceInfo{..}, vertexThickness } = ba_simplbl blenderable n0 v 
 
         handleE grp e = do
                 cylinder (coords' v0) (coords' v1) edgeThickness
@@ -132,19 +137,45 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
 
             where
                 (v1,v0) = faces10 deltaSet e
-                BSI1 {..} = ba_simplbl blenderable n1 e
-                FaceInfo {..} = faceInfo1
+                BSI1 { faceInfo1 = FaceInfo{..}, edgeThickness } = ba_simplbl blenderable n1 e
 
 
-        handleT grp t = do
-                    triangle (coords' v0) (coords' v1) (coords' v2)
+        handleT grp grpTriLabels t = do
+                    blenderTriangle cv0 cv1 cv2 
                     objVar <.> "show_transparent" .= True
                     objCommon grp faceLabel faceMat
 
+                    case triangleLabel of
+                        Just (TriangleLabel str g) -> 
+                            let (cu2,cu1,cu0) = g Util..* cvs 
+                                right_ = normalize (cu1 &- cu0)
+                                basepoint = interpolate 0.5 cu0 cu1
+                                up0 = (cu2 &- basepoint)
+                                height = norm up0
+                                up_ = up0 &* recip height 
+                                m = 
+                                    scalingUniformProj4 (0.4 * height)
+                                    .*.
+                                    linear (Mat3 right_ up_ (crossprod right_ up_)) 
+                                    .*.
+                                    translation (basepoint &+ 0.2 *& up0)
+
+
+
+                            in do
+                             newTextObj str
+                             objVar <.> matrix_basis .= m
+                             objCommon grpTriLabels (str ++ " on "++faceLabel) triLabelMat 
+
+                        Nothing -> return ()
+
             where
-                (v2,v1,v0) = faces20 deltaSet t
-                BSI2 {..} = ba_simplbl blenderable n2 t
-                FaceInfo {..} = faceInfo2
+                vs@(v2,v1,v0) = faces20 deltaSet t
+                cvs@(cv2,cv1,cv0) = map3 coords' vs
+
+                BSI2 { faceInfo2 = FaceInfo{..}, 
+                       triangleLabel
+                     } = ba_simplbl blenderable n2 t
 
         
 
@@ -165,7 +196,7 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
 
             assignObjFromContext
 
-            objVar <.> "matrix_basis" .= m
+            objVar <.> matrix_basis .= m
 
             where
                 m :: Proj4
@@ -173,18 +204,8 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
                     
                     scaling (Vec3 radius radius (1/2)) .*. 
                     translation ((1/2) *& vec3Z) .*.
-                    linear (Mat3 x' y' z') .*.
+                    linear (pointZTo (to &- from)) .*.
                     translation from
-
-                x',y',z' :: Vec3
-
-                x' = normalize (anyOrth z')
-                y' = normalize (crossprod x' z')
-                z' = to &- from
-
-        triangle p0 p1 p2 = mesh [p0,p1,p2] [(0,1,2)]
-
-
 
 
 
@@ -193,6 +214,13 @@ toBlender Scene{scene_worldProps,scene_blenderable=blenderable} = result
 
         
         assignObjFromContext = objVar .= (context "object")
+
+matrix_basis = "matrix_basis"
+
+blenderTriangle p0 p1 p2 =
+    mesh [p0,p1,p2] [(0,1,2)]
+
+
 
 
 newGroup :: String -> String -> Python (Python ())
@@ -228,6 +256,18 @@ mesh verts faceList =
 
             methodCall meshVar "update" ()
             newObj "SomeMesh" meshVar 
+
+txtVar = py "txt"
+
+textThickness = 1E-6
+
+newTextObj txt = do
+    txtVar .= methodCallExpr (dat "curves") "new" (str "T", str "FONT")
+    txtVar <.> "body" .= str txt
+    txtVar <.> "extrude" .= textThickness
+    txtVar <.> "align" .= str "CENTER"
+    newObj "T" txtVar
+
 
 -- | Returns the object in the 'objVar' \"register\" :-)
 newObj name objData = do

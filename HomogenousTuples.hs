@@ -1,8 +1,9 @@
-{-# LANGUAGE DeriveFoldable, DeriveFunctor, GeneralizedNewtypeDeriving, TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE NoMonomorphismRestriction, DeriveFoldable, DeriveFunctor, GeneralizedNewtypeDeriving, TemplateHaskell, TypeFamilies #-}
 {-# OPTIONS -Wall #-}
 module HomogenousTuples where
 
 import TupleTH
+import Data.List
 
 type Pair a = (a,a)
 type Triple a = (a,a,a)
@@ -14,6 +15,22 @@ toList3 ::  (t, t, t) -> [t]
 toList3 (x1,x2,x3) = [x1,x2,x3]
 toList4 ::  (t, t, t, t) -> [t]
 toList4 (x1,x2,x3,x4) = [x1,x2,x3,x4]
+toList6 :: (a,a,a,a,a,a) -> [a]
+toList6 = $(tupleToList 6)
+
+
+isOrdered2 :: Ord a => (a, a) -> Bool
+isOrdered2 (v0,v1) = v0 < v1
+isOrdered3 :: Ord a => (a, a, a) -> Bool
+isOrdered3 (v0,v1,v2) = v0 < v1 && v1 < v2 
+isOrdered4 :: Ord a => (a, a, a, a) -> Bool
+isOrdered4 (v0,v1,v2,v3) = isOrdered3 (v0,v1,v2) && v2 < v3
+
+list4 :: a -> b -> c -> d -> (a, b, c, d)
+list4 = (,,,) 
+
+
+
 
 map2 :: (a -> b) -> Pair a -> Pair b
 map2 = $(mapTuple 2)
@@ -67,4 +84,9 @@ fromList3 = $(tupleFromList 3)
 fromList4 ::  [t2] -> (t2, t2, t2, t2)
 fromList4 = $(tupleFromList 4)
 
+sort2 :: Ord t1 => (t1, t1) -> (t1, t1)
+sort2 = $(tupleFromList 2) . sort . $(tupleToList 2)
+
+sort3 :: Ord t => (t, t, t) -> (t, t, t)
+sort3 = $(tupleFromList 3) . sort . $(tupleToList 3)
 

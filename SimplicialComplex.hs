@@ -21,13 +21,9 @@ import SimplexLabels
 import TupleTH
 import TypeLevel.TF
 import FaceIx
+import AnySimplex
+import Debug.Trace
 
-isOrdered2 (v0,v1) = v0 < v1
-isOrdered3 (v0,v1,v2) = v0 < v1 && v1 < v2 
-isOrdered4 (v0,v1,v2,v3) = isOrdered3 (v0,v1,v2) && v2 < v3
-
-toList6 :: (a,a,a,a,a,a) -> [a]
-toList6 = $(tupleToList 6)
 
 
 
@@ -115,7 +111,7 @@ abstractTet = fromTets [allVertices']
 
 
 tet3d :: WithCoords (OTuple Vertex)
-tet3d = addCoordFunc (f . fromEnum) abstractTet
+tet3d = addCoordFunc (f . fromEnum) (const Nothing) abstractTet
     where
         f 0 = vec3X
         f 1 = vec3Y
@@ -162,12 +158,16 @@ baryFlat :: forall v. Ord v =>
 baryFlat a = mapSimplexLabels f b
     where
         f :: forall n. Nat n => 
-            n -> BCSFace' (OTuple Vec3) :$ n -> OneElSequence Vec3 N0 :$ n
+            n -> BCSFace' (OTuple Vec3) :$ n -> CoordLabelsF :$ n
 
-        f n x = caseNat n
+        f n x = caseNat3 n
                     (case x of
                           EP0 (_,x') -> anySimplexBarycenter x')
+                    ()
+                    (trace "TriangleLabels not yet supported for barycentric subdivision"
+                        Nothing)
                     (const ())
+                         
 
 
         b :: LabeledDeltaSet (BCSFace' (OTuple v)) (BCSFace' (OTuple Vec3))

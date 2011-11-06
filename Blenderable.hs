@@ -31,9 +31,11 @@ data BlenderSimplexInfo n where
         edgeThickness :: Double
      } -> BlenderSimplexInfo N1
     BSI2 :: { 
-        faceInfo2 :: FaceInfo
+        faceInfo2 :: FaceInfo,
+        triangleLabel :: Maybe TriangleLabel
      } -> BlenderSimplexInfo N2
     BSIOther :: BlenderSimplexInfo (S (S (S n)))
+
 
 instance Coords (BlenderSimplexInfo n) where
     transformCoords f b@BSI0{bsiCoords} = b { bsiCoords = f bsiCoords } 
@@ -56,7 +58,10 @@ type MatName = String
 
 data Scene a = Scene {
     scene_blenderable :: Blenderable a,
-    scene_worldProps :: Props
+    scene_worldProps :: Props,
+    scene_camPos :: Vec3,
+    -- | XYZ eulers
+    scene_camEuler :: Vec3
 }
     deriving Show
                         
@@ -117,12 +122,12 @@ nsurfVertThickness = 0.03
 
 
 pseudomanifold
-  :: (ShowN a, (l :$ Z) ~ Vec3) =>
+  :: (ShowN a, (l :$ Z) ~ Vec3, (l:$N2) ~ Maybe TriangleLabel) =>
      LabeledDeltaSet a l -> Blenderable a
 pseudomanifold = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
 
 mkBlenderable
-  :: forall a l. (ShowN a, (l :$ Z) ~ Vec3) =>
+  :: forall a l. (ShowN a, (l :$ Z) ~ Vec3, (l:$N2) ~ Maybe TriangleLabel) =>
      Material
      -> Material
      -> Material
@@ -134,12 +139,12 @@ mkBlenderable mat0 mat1 mat2 vertThick a = Blenderable {
         (\n s x -> caseNat3 n
                     (BSI0 x (FaceInfo (sh n0 s) mat0) vertThick)
                     (BSI1 (FaceInfo (sh n1 s) mat1) (edgeThicknessFactor*vertThick))
-                    (BSI2 (FaceInfo (sh n2 s) mat2))
+                    (BSI2 (FaceInfo (sh n2 s) mat2) x)
                     (const BSIOther))
     
         a
         ,
-    ba_materials = [pmMat0,pmMat1,pmMat2]
+    ba_materials = [mat0,mat1,mat2]
 }
     where
         sh :: forall n. Nat n => n -> a :$ n -> String
@@ -155,14 +160,14 @@ nsurfMat2 ::  Material
 nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++transparency 0.55 0.7 1)
 
 normalSurface
-  :: (ShowN a, (l :$ Z) ~ Vec3) =>
+  :: (ShowN a, (l :$ Z) ~ Vec3, (l :$ N2) ~ Maybe TriangleLabel) =>
      LabeledDeltaSet a l -> Blenderable a
 normalSurface = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
 
 
-
+-- | Points cam at positive y dir
 defaultScene ::  Blenderable a -> Scene a
-defaultScene a = Scene a defaultWorldProps
+defaultScene a = Scene a defaultWorldProps (Vec3 0.66 (-2.3) 0.52) (Vec3 (pi/2) 0 0)
 
 (&) ::  ToPython a => t -> a -> (t, Python ())
 x & y = (x, toPython y)
@@ -194,6 +199,6 @@ ba_coords a = bsiCoords . ba_simplbl a n0
 
 normalSurface'
   :: (ShowN a, (a :$ N0) ~ Vec3) => DeltaSet a -> Blenderable a
-normalSurface' a = normalSurface (addCoordFunc id a)
+normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
 
 

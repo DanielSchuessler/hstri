@@ -13,7 +13,7 @@ import Data.Maybe
 import HomogenousTuples
 import Text.XML.Light hiding(parseXMLDoc,strContent)
 import Text.XML.Monad
-import Triangulation hiding(Element)
+import Triangulation
 import TupleTH
 import qualified Data.ByteString as BS
 

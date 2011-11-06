@@ -26,6 +26,7 @@ import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import StrictlyIncreasingMap
 import FaceIx
+import AnySimplex
 
 -- | Node-and-edge-labelled paths of edge-length @n@ (thus, at least one node)
 data EPath a b n where

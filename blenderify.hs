@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, GADTs, ScopedTypeVariables, TemplateHaskell, StandaloneDeriving #-} 
+
 import AbstractTetrahedron
 import Blender
 import Blenderable
@@ -9,6 +10,8 @@ import Data.NaturalNumber
 import Data.Vect.Double
 import DeltaSet
 import DisjointUnion
+import ExampleComplexes
+import GraphComplex
 import HomogenousTuples
 import Layout
 import SimplexLabels
@@ -16,8 +19,6 @@ import SimplicialComplex
 import System.Exit
 import TupleTH
 import TypeLevel.TF
-import GraphComplex
-import ExampleComplexes
 
 data V = P0' | P0 | PL' | PL | PR' | PR | P1' | P1
     deriving (Eq,Ord,Show,Enum)
@@ -25,7 +26,6 @@ data V = P0' | P0 | PL' | PL | PR' | PR | P1' | P1
 aff :: Vector g => g -> g -> Double -> g
 aff a b p = p *& a &+ (1-p) *& b 
 
-list4 = (,,,) 
 
 prism a' a b' b c' c = [ list4 a' a b c, list4 a' b' b c, list4 a' b' c' c ] 
 
@@ -53,11 +53,7 @@ coordFunc v = case v of
 
 --main = testBlender (defaultScene x)
 
-deriving instance Ord Vec3
 
-sort2 = $(tupleFromList 2) . sort . $(tupleToList 2)
-sort3 :: (Vec3, Vec3, Vec3) -> (Vec3, Vec3, Vec3)
-sort3 = $(tupleFromList 3) . sort . $(tupleToList 3)
 
 normalTris :: Blenderable (OTuple Vec3)
 normalTris = normalSurface' $
@@ -92,7 +88,7 @@ withOrigin o f = (&+ o) . f . (&- o)
 
 main = testBlender . 
        defaultScene .
-       transformCoords ((&+ Vec3 (-0.66) (-2.7) (-0.52)) . rot) $
+       transformCoords rot $
        (pseudomanifold (baryFlat tet3d)
         --`disjointUnion` abnormalCurve
         )

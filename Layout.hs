@@ -18,6 +18,7 @@ import Control.Applicative
 import Control.Arrow
 import HomogenousTuples
 import Control.Monad
+import AnySimplex
 
 data LayoutMode n where
     LayoutDebug :: LayoutMode (NodeType,String)

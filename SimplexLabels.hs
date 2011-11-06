@@ -13,6 +13,9 @@ import Element
 import GraphComplex
 import HomogenousTuples
 import TypeLevel.TF
+import AnySimplex
+import S3
+import Data.Monoid
 
 
 newtype SimplexLabels a l = SimplexLabels { runSimplexLabels :: forall n. Nat n => n -> a:$n -> l:$n }
@@ -82,7 +85,14 @@ mapSimplexLabelsAt :: Nat n =>
     n -> (l :$ n -> l :$ n) 
     -> LabeledDeltaSet a l
     -> LabeledDeltaSet a l
-mapSimplexLabelsAt n f a = mapSimplexLabels (\n' x -> caseEqNat n n' (f x) x) a 
+mapSimplexLabelsAt n f a = mapSimplexLabels (\n' l -> caseEqNat n n' (f l) l) a 
+
+mapSimplexLabelsWithSimplicesAt :: Nat n =>
+    n -> (a :$ n -> l :$ n -> l :$ n) 
+    -> LabeledDeltaSet a l
+    -> LabeledDeltaSet a l
+mapSimplexLabelsWithSimplicesAt n f a = 
+    mapSimplexLabelsWithSimplices (\n' x l -> caseEqNat n n' (f x l) l) a 
 
 instance OrdN a => Subdivisible (LabeledDeltaSet a l) where
     type BarycentricSubdivision (LabeledDeltaSet a l) =
@@ -108,10 +118,29 @@ instance OrdN a => Subdivisible (LabeledDeltaSet a l) where
 -- 
 --
 
-type WithCoords a = LabeledDeltaSet a (OneElSequence Vec3 N0)
+data CoordLabelsF
 
-addCoordFunc :: (Vert a -> Vec3) -> DeltaSet a -> WithCoords a
-addCoordFunc f = addSimplexLabels n0 f 
+type instance CoordLabelsF :$ N0 = Vec3
+type instance CoordLabelsF :$ N1 = ()
+type instance CoordLabelsF :$ N2 = Maybe TriangleLabel
+type instance CoordLabelsF :$ (S (S (S n))) = ()
+
+data TriangleLabel = TriangleLabel {
+        tl_text :: String,
+        tl_transform :: S3
+}
+
+
+type WithCoords a = LabeledDeltaSet a CoordLabelsF
+
+addCoordFunc :: (Vert a -> Vec3) -> (Tri a -> Maybe TriangleLabel) -> DeltaSet a -> WithCoords a
+addCoordFunc f0 f2 a = LabeledDeltaSet a (SimplexLabels (\n x ->
+    caseNat3 n 
+        (f0 x)
+        ()
+        (f2 x)
+        (const ())))
+        
 
 vertlbl :: LabeledDeltaSet a l -> (a :$ Z) -> l :$ Z
 vertlbl a = simplbl a n0
@@ -124,5 +153,23 @@ instance Coords (WithCoords a) where
 
 mapOneElementSeqLabels :: (Nat n) => n -> (l -> l') -> LabeledDeltaSet a (OneElSequence l n) -> LabeledDeltaSet a (OneElSequence l' n)
 mapOneElementSeqLabels n f = mapSimplexLabels (\n' x -> caseEqNat n n' (f x) ())
+
+
+setGluing :: 
+        (Eq (Tri a)) =>
+       String
+    -> Tri a
+    -> Tri a
+    -> S3
+    -> WithCoords a
+    -> WithCoords a
+setGluing str tri1 tri2 g a = 
+    mapSimplexLabelsWithSimplicesAt n2 (\x l ->
+        case () of
+             _ | x == tri1 -> Just (TriangleLabel str mempty)
+               | x == tri2 -> Just (TriangleLabel str g)
+               | otherwise -> l)
+                             a
+
 
 

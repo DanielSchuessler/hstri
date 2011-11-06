@@ -134,7 +134,8 @@ runTriangulationBuilder tTetrahedra_ (TriangulationBuilder x)
 
 mkTriangulation :: [TIndex] -> [Gluing] -> Either String Triangulation
 mkTriangulation tTetrahedra_ tGluings_
-        =  assert (not . hasDuplicates $ tTetrahedra_) (do
+        =   
+            assert (not . hasDuplicates $ tTetrahedra_) (do
 
     let allIEdges :: [IEdge]
         allIEdges = concatMap edgeList tTetrahedra_
@@ -148,7 +149,9 @@ mkTriangulation tTetrahedra_ tGluings_
 
     let addGluing mrec (t,f1) = mrec >>= (\r -> case lookup t r of
                                                         Nothing -> return (mapInsert t f1 r)
-                                                        Just f2 -> err t f1 f2)
+                                                        Just f2 
+                                                            | f2==f1 -> return r
+                                                            | otherwise -> err t f1 f2)
 
         err t f1 f2 = Left 
                         (if t == forgetVertexOrder f1
