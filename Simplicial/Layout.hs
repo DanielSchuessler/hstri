@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeOperators, GADTs, ScopedTypeVariables, FlexibleContexts, TupleSections, NoMonomorphismRestriction #-}
-module Layout where
-import DeltaSet
-import SimplexLabels
+module Simplicial.Layout where
+
+import Simplicial.DeltaSet
+import Simplicial.Labels
 import GraphUtil
 import Data.GraphViz
 import Data.GraphViz.Attributes.Colors
@@ -18,7 +19,7 @@ import Control.Applicative
 import Control.Arrow
 import HomogenousTuples
 import Control.Monad
-import AnySimplex
+import Simplicial.AnySimplex
 
 data LayoutMode n where
     LayoutDebug :: LayoutMode (NodeType,String)
@@ -129,5 +130,5 @@ layoutG mode ds = do
 
 
 
-    return $ addCoordFunc (\v -> coordMap ! (nodeMapGet ds n0 v)) ds
+    return $ addCoordFunc (\v -> coordMap ! (nodeMapGet ds n0 v)) (const Nothing) ds
         

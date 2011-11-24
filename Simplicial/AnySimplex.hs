@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification, TypeOperators, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
-module AnySimplex(
+module Simplicial.AnySimplex(
     AnySimplex(..),anySimplex_dim,
     module TypeLevel.TF
 

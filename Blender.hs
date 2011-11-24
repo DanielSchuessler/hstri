@@ -1,25 +1,29 @@
 {-# LANGUAGE GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
 -- {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
-module Blender where
+module Blender(
+    module Blenderable,
+    module MathUtil,
+    testBlender,
+    toBlender) where
 
+import Blenderable
+import Control.Exception
+import Control.Monad(when)
 import Data.Foldable
 import Data.Function
 import Data.Vect.Double
-import DeltaSet
+import HomogenousTuples
 import MathUtil
 import Prelude hiding(catch,mapM_,sequence_) 
+import Simplicial.DeltaSet
+import Simplicial.Labels
 import System.Environment
 import System.Process
 import Text.Printf.TH
 import ToPython
-import Blenderable
 import TypeLevel.TF
-import Debug.Trace
-import SimplexLabels
-import HomogenousTuples
 import qualified Util
-
 
 
 
@@ -56,7 +60,7 @@ triLabelMat = Material "triLbl" [ let r = 0.015 in diffuseColor (r,r,r) ]
 --        Scene a
 --     -> Python ()
 toBlender :: Scene a -> Python ()
-toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable} = result
+toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams} = result
     where
         deltaSet = ba_ds blenderable        
 
@@ -74,12 +78,15 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable} = result
             mapM_ (setProp' worldVar) scene_worldProps
             setProp sceneVar "world" worldVar
 
-            -- camera
-            camVar .= methodCallExpr1 (dat "cameras") "new" (str "TheCam")
-            newObj "TheCam" camVar
-            objVar <.> "location" .= scene_camPos scene
-            objVar <.> "rotation_euler" .= scene_camEuler scene
-            setProp sceneVar "camera" objVar
+            -- cameras
+            forM_ (zip [0..] scene_cams) (\(i, (Cam pos eulers fov)) -> do
+                let nam = "cam"++show i
+                camVar .= methodCallExpr1 (dat "cameras") "new" (str nam)
+                camVar <.> "angle" .= fov
+                newObj nam camVar
+                objVar <.> "location" .= pos
+                objVar <.> "rotation_euler" .= eulers
+                when (i==0) (setProp sceneVar "camera" objVar))
 
             -- light
             lightVar .= methodCallExpr (dat "lamps") "new" (str "TheLamp", str "SUN") 
@@ -146,35 +153,36 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable} = result
                     objCommon grp faceLabel faceMat
 
                     case triangleLabel of
-                        Just (TriangleLabel str g) -> 
-                            let (cu2,cu1,cu0) = g Util..* cvs 
+                        Just (TriangleLabel lblstr g upDisplacementFactor) -> 
+                            let (cu0,cu1,cu2) = g Util..* cvs 
                                 right_ = normalize (cu1 &- cu0)
                                 basepoint = interpolate 0.5 cu0 cu1
-                                up0 = (cu2 &- basepoint)
-                                height = norm up0
-                                up_ = up0 &* recip height 
+                                up1 = let up0 = (cu2 &- basepoint) 
+                                      in up0 &- (dotprod right_ up0) *& right_
+                                height = norm up1
+                                up_ = up1 &* recip height 
                                 m = 
                                     scalingUniformProj4 (0.4 * height)
                                     .*.
-                                    linear (Mat3 right_ up_ (crossprod right_ up_)) 
+                                    safeOrthogonal (Mat3 right_ up_ (crossprod right_ up_)) 
                                     .*.
-                                    translation (basepoint &+ 0.2 *& up0)
+                                    translation (basepoint &+ upDisplacementFactor *& up1)
 
 
 
                             in do
-                             newTextObj str
+                             newTextObj lblstr
                              objVar <.> matrix_basis .= m
-                             objCommon grpTriLabels (str ++ " on "++faceLabel) triLabelMat 
+                             objCommon grpTriLabels (lblstr ++ " on "++show g ++" "++faceLabel) triLabelMat 
 
                         Nothing -> return ()
 
             where
-                vs@(v2,v1,v0) = faces20 deltaSet t
-                cvs@(cv2,cv1,cv0) = map3 coords' vs
+                vs = faces20Ascending deltaSet t
+                cvs@(cv0,cv1,cv2) = map3 coords' vs
 
-                BSI2 { faceInfo2 = FaceInfo{..}, 
-                       triangleLabel
+                BSI2 { faceInfo2 = FaceInfo{..} 
+                     , triangleLabel
                      } = ba_simplbl blenderable n2 t
 
         
@@ -221,6 +229,11 @@ blenderTriangle p0 p1 p2 =
     mesh [p0,p1,p2] [(0,1,2)]
 
 
+safeOrthogonal :: Mat3 -> Proj4
+safeOrthogonal m = 
+    assert (matrixApproxEq (m .*. transpose m) idmtx) $
+    assert (matrixApproxEq (transpose m .*. m) idmtx) $
+    linear m
 
 
 newGroup :: String -> String -> Python (Python ())
@@ -259,7 +272,8 @@ mesh verts faceList =
 
 txtVar = py "txt"
 
-textThickness = 1E-6
+textThickness :: Double
+textThickness = 1E-5
 
 newTextObj txt = do
     txtVar .= methodCallExpr (dat "curves") "new" (str "T", str "FONT")

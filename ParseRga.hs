@@ -86,7 +86,8 @@ translateGluings ntet gluingRows =
                                  fromIntegral tet' ./ otriangle us)
 
                     in
-                        Debug.Trace.trace (show res) (Just res)
+                       -- Debug.Trace.trace (show res) 
+                        (Just res)
             
 
 data RequiredAttributeNotPresentException = RequiredAttributeNotPresentException String

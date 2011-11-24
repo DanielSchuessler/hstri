@@ -1,32 +1,21 @@
 {-# LANGUAGE TypeOperators, GADTs, FlexibleInstances, TemplateHaskell, TypeFamilies, StandaloneDeriving, FlexibleContexts #-}
 {-# LANGUAGE Rank2Types, UndecidableInstances, NoMonomorphismRestriction, RecordWildCards, CPP, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, PolymorphicComponents, DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# OPTIONS -Wall -fno-warn-unused-imports #-}
-module GraphComplex where
+{-# OPTIONS -Wall #-}
+module Simplicial.GraphComplex where
 
-import Control.Applicative
-import Control.Arrow
 import Control.Exception
 import Control.Monad
 import Data.Graph.Inductive
-import Data.Map as Map
-import Data.IntMap as IntMap
-import Data.Maybe
-import Data.Typeable
-import Data.Vect.Double.Base hiding(dim)
-import DeltaSet
-import Element
-import GraphUtil
-import HomogenousTuples
-import TupleTH
-import TypeLevel.TF
-import Data.Semigroup
 import Data.List as List
-import qualified Data.Set as Set
-import qualified Data.Sequence as Seq
-import StrictlyIncreasingMap
+import Data.Maybe
+import Data.Semigroup
+import Data.Vect.Double.Base hiding(dim)
 import FaceIx
-import AnySimplex
+import GraphUtil
+import Simplicial.AnySimplex
+import Simplicial.DeltaSet
+import Simplicial.StrictlyIncreasingMap
 
 -- | Node-and-edge-labelled paths of edge-length @n@ (thus, at least one node)
 data EPath a b n where

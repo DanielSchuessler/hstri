@@ -98,3 +98,6 @@ pointZTo z' = Mat3 x' y' z'
 -- prop_g1 = forAll arbsimp (\x -> let y = to3Sphere x
 --                                 in abs (1-normsqr y) < 1E-14) 
                                 
+
+matrixApproxEq :: MatrixNorms m => m -> m -> Bool
+matrixApproxEq m1 m2 = matrixDistance m1 m2 < 1E-10

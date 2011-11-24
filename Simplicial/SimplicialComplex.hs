@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeOperators, GADTs, RecordWildCards, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, DeriveFunctor #-}
 {-# LANGUAGE Rank2Types, NoMonomorphismRestriction, ScopedTypeVariables, NamedFieldPuns, TypeFamilies, DefaultSignatures, FlexibleContexts, OverlappingInstances, StandaloneDeriving, UndecidableInstances, GeneralizedNewtypeDeriving, CPP #-} 
 -- | All 'Pair's, 'Triple's and 'Quadruple's are assumed to be strictly ascendingly ordered in this module.
-module SimplicialComplex where
+module Simplicial.SimplicialComplex where
+
 
 import AbstractTetrahedron
 import Control.Applicative
@@ -13,18 +14,16 @@ import Data.Map as Map
 import Data.Set as Set
 import Data.Vect.Double 
 import Data.Vect.Double.Instances
-import DeltaSet
-import GraphComplex
+import Debug.Trace
+import FaceIx
 import HomogenousTuples
 import List
-import SimplexLabels
+import Simplicial.AnySimplex
+import Simplicial.DeltaSet
+import Simplicial.GraphComplex
+import Simplicial.Labels
 import TupleTH
 import TypeLevel.TF
-import FaceIx
-import AnySimplex
-import Debug.Trace
-
-
 
 
 data OTuple v 

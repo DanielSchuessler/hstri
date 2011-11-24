@@ -1,8 +1,9 @@
-{-# LANGUAGE TypeOperators, GADTs, FlexibleInstances, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell, TypeOperators, GADTs, FlexibleInstances, TypeFamilies, FlexibleContexts #-}
 {-# LANGUAGE Rank2Types, UndecidableInstances, NoMonomorphismRestriction, RecordWildCards, CPP, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, PolymorphicComponents, DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, NoMonoLocalBinds #-}
 {-# OPTIONS -Wall -fwarn-missing-local-sigs #-}
-module DeltaSet where
+module Simplicial.DeltaSet where
+
 
 import Control.Applicative
 import Control.Exception
@@ -15,10 +16,11 @@ import Data.Typeable
 import FaceIx
 import HomogenousTuples
 import Indexing
-import StrictlyIncreasingMap
+import Simplicial.AnySimplex
+import Simplicial.StrictlyIncreasingMap
 import Test.QuickCheck
+import TupleTH
 import Util
-import AnySimplex
 import qualified Data.Vector as V
 
 -- data RightShift f
@@ -258,6 +260,9 @@ faces20 t tr = (v2,v1,v0)
         (e12,e02,_) = faces21 t tr
         (v2,v1) = faces10 t e12
         (_,v0) = faces10 t e02
+
+faces20Ascending :: DeltaSet a -> Tri a -> (Vert a, Vert a, Vert a)
+faces20Ascending t = $(reverseTuple 3) . faces20 t 
 
 faces31
   :: DeltaSet a

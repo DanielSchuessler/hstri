@@ -140,18 +140,18 @@ instance IsEquivalenceClass TEdge IEdge where
 
 instance IsEquivalenceClass TTriangle ITriangle where 
     canonicalRep x0@(viewT -> (_, !rep)) = {-# SCC "canonicalRep/TTriangle" #-} 
-                                 case lookupGluing x0 of
+                                 case lookupGluingOfTTriangle x0 of
                                     Just (forgetVertexOrder -> rep') | rep' < rep -> rep'
                                     _ -> rep
 
-    equivalents t@(viewT -> (_,rep)) = rep : maybeToList (fmap forgetVertexOrder $ lookupGluing t)
+    equivalents t@(viewT -> (_,rep)) = rep : maybeToList (fmap forgetVertexOrder $ lookupGluingOfTTriangle t)
 
-    ecSize x0 = case lookupGluing x0 of
+    ecSize x0 = case lookupGluingOfTTriangle x0 of
                                     Just _ -> 2
                                     _ -> 1
 
 
-    ecMember x ty@(viewT -> (_,y)) = x == y || case lookupGluing ty of
+    ecMember x ty@(viewT -> (_,y)) = x == y || case lookupGluingOfTTriangle ty of
                                           Just y' -> x == forgetVertexOrder y'
                                           _ -> False
                                   
@@ -189,14 +189,12 @@ instance  Pretty TEdge where
 instance  Pretty TTriangle where
     pretty t@(viewT -> (_,rep)) = encloseSep lbrace rbrace comma elts
         where
-            elts =  case lookupGluing t of
+            elts =  case lookupGluingOfTTriangle t of
                         Nothing -> [pretty rep]
                         Just rep' -> [pretty rep,pretty rep']
 
 
 
-lookupGluing :: TTriangle -> Maybe OITriangle
-lookupGluing (viewT -> (t,rep)) = lookup rep (tGlueMap_ t)
 
 
 
@@ -356,3 +354,7 @@ prop_TTrianglesToTEdges_surjective t = setEq (tEdges t) (concatMap edgeList (tTr
 
 prop_TEdgesToTVertices_surjective ::  Triangulation -> Property
 prop_TEdgesToTVertices_surjective t = setEq (tVertices t) (concatMap vertexList (tEdges t)) 
+
+lookupGluingOfTTriangle :: TTriangle -> Maybe OITriangle
+lookupGluingOfTTriangle (viewT -> (t,rep)) = lookup rep (tGlueMap_ t)
+

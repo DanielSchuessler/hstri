@@ -8,10 +8,10 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad
 import GraphUtil
-import DeltaSet
+import Simplicial.DeltaSet
 import TypeLevel.TF
 import Indexing
-import AnySimplex
+import Simplicial.AnySimplex
 
 
 

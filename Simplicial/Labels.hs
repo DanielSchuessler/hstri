@@ -1,22 +1,21 @@
 {-# LANGUAGE TypeOperators, GADTs, FlexibleInstances, TemplateHaskell, TypeFamilies, StandaloneDeriving, FlexibleContexts #-}
 {-# LANGUAGE Rank2Types, UndecidableInstances, NoMonomorphismRestriction, RecordWildCards, CPP, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, PolymorphicComponents, DeriveDataTypeable #-}
 {-# OPTIONS -Wall -fno-warn-unused-imports #-}
-module SimplexLabels where
+module Simplicial.Labels where
 
 import Control.Applicative
 import Control.Arrow
 import Data.Map as Map
+import Data.Monoid
 import Data.Vect.Double
-import DeltaSet
 import DisjointUnion
 import Element
-import GraphComplex
+import Simplicial.GraphComplex
 import HomogenousTuples
-import TypeLevel.TF
-import AnySimplex
 import S3
-import Data.Monoid
-
+import Simplicial.AnySimplex
+import Simplicial.DeltaSet
+import TypeLevel.TF
 
 newtype SimplexLabels a l = SimplexLabels { runSimplexLabels :: forall n. Nat n => n -> a:$n -> l:$n }
 
@@ -127,8 +126,19 @@ type instance CoordLabelsF :$ (S (S (S n))) = ()
 
 data TriangleLabel = TriangleLabel {
         tl_text :: String,
-        tl_transform :: S3
+
+        -- | This specifies how the *vertices* of the triangle should be permuted before
+        -- drawing the label with vertex 0 on the lower left, vertex 1 on the lower right,
+        -- and vertex 2 on top.
+        tl_transform :: S3,
+
+        -- | 
+        -- 0: Text sits on the base edge
+        --
+        -- 1: Text is on the same height as the top vertex
+        tl_up :: Double
 }
+    deriving(Show,Eq)
 
 
 type WithCoords a = LabeledDeltaSet a CoordLabelsF
@@ -155,19 +165,14 @@ mapOneElementSeqLabels :: (Nat n) => n -> (l -> l') -> LabeledDeltaSet a (OneElS
 mapOneElementSeqLabels n f = mapSimplexLabels (\n' x -> caseEqNat n n' (f x) ())
 
 
-setGluing :: 
-        (Eq (Tri a)) =>
-       String
-    -> Tri a
-    -> Tri a
-    -> S3
-    -> WithCoords a
-    -> WithCoords a
-setGluing str tri1 tri2 g a = 
+setTriangleLabel
+  :: (Eq (a :$ N2), (l :$ N2) ~ Maybe TriangleLabel) =>
+     (a :$ N2)
+     -> TriangleLabel -> LabeledDeltaSet a l -> LabeledDeltaSet a l
+setTriangleLabel tri (newlbl :: TriangleLabel) a = 
     mapSimplexLabelsWithSimplicesAt n2 (\x l ->
         case () of
-             _ | x == tri1 -> Just (TriangleLabel str mempty)
-               | x == tri2 -> Just (TriangleLabel str g)
+             _ | x == tri -> Just newlbl 
                | otherwise -> l)
                              a
 

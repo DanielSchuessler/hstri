@@ -10,11 +10,19 @@ module Triangulation(
     -- * Properties 
     tTetrahedra_,tGluings_, tGlueMap_, edgeEqv,oEdgeEqv,vertexEqv,triangTetCount,
     embedsEdges,
+    lookupGluingOfITriangle,
+    lookupGluingOfOITriangle,
+    tITriangles,
+    tOITriangles,
+    tOIEdgeEquivalents,
+    tOIEdgeDegree,
+    tGluingsIrredundant,
     -- * Construction 
     mkTriangulation,mkTriangulationG,triang,randomTriangulation,randT,
 
+
     -- * Testing
-    qc_Triangulation
+    qc_Triangulation,prop_tGluingsIrredundant
     
     ) where
 
@@ -48,9 +56,21 @@ forAllNonEmptyIntTriangulations f = property (\t ->
 genI ::  Arbitrary a => Triangulation -> Gen (I a)
 genI t = liftM2 I (genTet t) arbitrary
 
-triangGluingsIrredundant :: MonadReader Triangulation m => m [Gluing]
--- triangGluingsIrredundant = liftM (Prelude.filter (\(x,y) -> x <= forgetVertexOrder y) . Map.assocs) askGlueMap 
-triangGluingsIrredundant = asks tGluings_
+tGluingsIrredundant :: Triangulation -> [Gluing]
+tGluingsIrredundant tr = 
+    let
+        gluings = tGluings_ tr
+        gluingsFirstTris = setFromList (fst <$> gluings) 
+
+        isRedundant (tri,unpackOrderedFace -> (_,tri')) =
+            (tri > tri') && member tri' gluingsFirstTris 
+    in
+        filter (not . isRedundant) gluings
+
+
+prop_tGluingsIrredundant :: Triangulation -> Bool
+prop_tGluingsIrredundant tr = 
+    tGlueMap_ tr == tGlueMap_ (fromRight $ mkTriangulation (tTetrahedra_ tr) (tGluingsIrredundant tr)) 
 
 
 -- Note: All fields except the first two ('triangTets_', 'triangGluings_') are semantically redundant, 
@@ -358,3 +378,29 @@ instance Quote Triangulation where
                                                     ++ quotePrec 11 (tTetrahedra_ t)
                                                     ++ " "
                                                     ++ quotePrec 11 (tGluings_ t))
+
+
+
+
+lookupGluingOfITriangle :: Triangulation -> ITriangle -> Maybe OITriangle
+lookupGluingOfITriangle t tri =
+    lookup tri (tGlueMap_ t)
+
+lookupGluingOfOITriangle :: Triangulation -> OITriangle -> Maybe OITriangle
+lookupGluingOfOITriangle t (unpackOrderedFace -> (g,tri)) =
+    (g .*) <$> lookupGluingOfITriangle t tri
+
+
+tITriangles :: Triangulation -> [ITriangle]
+tITriangles tr = [ i ./ tri | i <- tTetrahedra_ tr, tri <- allTriangles ] 
+
+tOITriangles :: Triangulation -> [OITriangle]
+tOITriangles tr = [ packOrderedFace g it | it <- tITriangles tr, g <- allS3 ]
+
+
+tOIEdgeEquivalents :: Triangulation -> OIEdge -> [OIEdge]
+tOIEdgeEquivalents tr oiedge = eqv_equivalents (oEdgeEqv tr) oiedge
+
+tOIEdgeDegree :: Triangulation -> OIEdge -> Int
+tOIEdgeDegree tr = length . tOIEdgeEquivalents tr
+

@@ -8,14 +8,13 @@ import Data.Function
 import Data.List
 import Data.NaturalNumber
 import Data.Vect.Double
-import DeltaSet
+import Simplicial.DeltaSet
 import DisjointUnion
 import ExampleComplexes
-import GraphComplex
+import Simplicial.GraphComplex
 import HomogenousTuples
-import Layout
-import SimplexLabels
-import SimplicialComplex
+import Simplicial.Labels
+import Simplicial.SimplicialComplex
 import System.Exit
 import TupleTH
 import TypeLevel.TF
@@ -30,11 +29,11 @@ aff a b p = p *& a &+ (1-p) *& b
 prism a' a b' b c' c = [ list4 a' a b c, list4 a' b' b c, list4 a' b' c' c ] 
 
 x = 
-    addCoordFunc coordFunc $
-
+    addCoordFunc coordFunc (const Nothing) $
 
     fromTets (prism P0' P0 PL' PL P1' P1 ++
               prism P0' P0 PR' PR P1' P1)
+
 
 w = 6
 h = 4
@@ -81,8 +80,6 @@ abnormalCurve = normalSurface' $ fromEdges (sort2 <$> [(u,v),(v,w)])
         b = vA
         c = vB
 
-withOrigin :: AbelianGroup b => b -> (b -> b) -> b -> b
-withOrigin o f = (&+ o) . f . (&- o)
 
 
 
@@ -97,6 +94,6 @@ main = testBlender .
 
 
 --testLayout :: (Show (Vert a), ShowN a) => DeltaSet a -> IO ExitCode
-testLayout ds = do
-    wc <- layoutDebug ds
-    testBlender . defaultScene . pseudomanifold $ wc
+-- testLayout ds = do
+--     wc <- layoutDebug ds
+--     testBlender . defaultScene . pseudomanifold $ wc

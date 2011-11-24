@@ -6,11 +6,11 @@ module Blenderable where
 import Data.Function
 import Data.List
 import Data.Vect.Double
-import DeltaSet
 import DisjointUnion
 import HomogenousTuples
 import Prelude hiding(catch,mapM_,sequence_) 
-import SimplexLabels
+import Simplicial.DeltaSet
+import Simplicial.Labels
 import ToPython
 import TypeLevel.TF
 
@@ -55,15 +55,32 @@ data FaceInfo = FaceInfo {
 type MatName = String
 
 
+type EulerAnglesXYZ = Vec3
+
+eulerAnglesXYZ :: Double -> Double -> Double -> EulerAnglesXYZ
+eulerAnglesXYZ = Vec3
 
 data Scene a = Scene {
     scene_blenderable :: Blenderable a,
     scene_worldProps :: Props,
-    scene_camPos :: Vec3,
-    -- | XYZ eulers
-    scene_camEuler :: Vec3
+    scene_cams :: [Cam]
 }
     deriving Show
+
+
+data Cam = Cam {
+    cam_pos :: Vec3,
+    -- | XYZ eulers
+    cam_eulers :: EulerAnglesXYZ,
+    cam_FOV :: Double
+}
+    deriving(Show)
+
+defaultFOV :: Double
+defaultFOV = 0.8575560591178853
+
+setCams :: [Cam] -> Scene a -> Scene a
+setCams scene_cams s = s { scene_cams }
                         
 data Material = Material {
     ma_name :: MatName,
@@ -167,7 +184,10 @@ normalSurface = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
 
 -- | Points cam at positive y dir
 defaultScene ::  Blenderable a -> Scene a
-defaultScene a = Scene a defaultWorldProps (Vec3 0.66 (-2.3) 0.52) (Vec3 (pi/2) 0 0)
+defaultScene a = Scene a defaultWorldProps [defaultCam]
+
+defaultCam :: Cam
+defaultCam = Cam (Vec3 0.66 (-2.3) 0.52) (eulerAnglesXYZ (pi/2) 0 0) defaultFOV
 
 (&) ::  ToPython a => t -> a -> (t, Python ())
 x & y = (x, toPython y)

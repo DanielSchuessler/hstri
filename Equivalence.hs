@@ -10,7 +10,7 @@ module Equivalence(
     ec_singleton, ec_union, ec_join,
     -- * Equivalence relations
     Equivalence, eqv_classmap, eqv_classes, eqv_eq, mkEquivalence, eqv_classcount,
-    eqv_class_elements, eqv_reps, eqv_generators, 
+    eqv_class_elements, eqv_reps, eqv_generators, eqv_equivalents,
     -- * Testing
     qc_Equivalence, mkWellDefinednessProp, mkWellDefinednessProp2)   where
 
@@ -27,12 +27,6 @@ import Text.PrettyPrint.ANSI.Leijen
 import Text.Printf.TH
 import Util
 
-#ifdef USE_TRIEMAP
-import Data.TrieMap as Map
-import Data.TrieMap.Class
-import Data.TrieMap.Representation
-import Data.TrieSet as Set
-#endif
 
 #define KEYCLASS(A) Ord(A)
 
@@ -47,9 +41,6 @@ class IsEquivalenceClass cls elt => HasEquivalence t cls elt | cls -> elt, elt t
     -- | Throws an error if the element is not in the domain of the equivalence
     eqvClassOf :: t -> elt -> cls
 
-#ifdef USE_TRIEMAP
-{-# SPECIALIZE eqvRep :: KEYCLASS(a) => Equivalence a -> a -> a #-} 
-#endif
 eqvRep ::  HasEquivalence t cls elt => t -> elt -> elt
 eqvRep e x = canonicalRep $! eqvClassOf e x 
 
@@ -90,13 +81,6 @@ instance Eq a => Eq (EquivalenceClass a) where
 instance Ord a => Ord (EquivalenceClass a) where
     compare = compare `on` ec_rep
 
-#ifdef USE_TRIEMAP 
-instance Repr a => Repr (EquivalenceClass a) where 
-    type Rep (EquivalenceClass a) = Rep a
-    type RepList (EquivalenceClass a) = DRepList a
-    toRep = toRep . ec_rep
-    toRepList = dToRepList
-#endif
 
 
 ec_singleton :: KEYCLASS(a) => a -> EquivalenceClass a

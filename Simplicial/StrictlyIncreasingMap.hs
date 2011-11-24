@@ -1,18 +1,18 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS -Wall #-}
-module StrictlyIncreasingMap where
-import Test.QuickCheck
+module Simplicial.StrictlyIncreasingMap where
+
+import Control.Applicative
+import Control.Exception
 import Data.IntMap as IntMap
 import Data.IntSet as IntSet
-import Control.Exception
-import Data.Sequence as Seq
-import qualified Data.Foldable as Fold
-import Control.Applicative
 import Data.List as List
 import Data.Semigroup
-import qualified Data.List.NonEmpty as NonEmpty
+import Data.Sequence as Seq
 import FaceIx
-
+import Test.QuickCheck
+import qualified Data.Foldable as Fold
+import qualified Data.List.NonEmpty as NonEmpty
 
 -- | @StrictlyIncreasingMap dom cod im@ is the injective, monotonous finite map from @{0, .., dom}@ to @{0, .., cod}@ with image @im@
 data StrictlyIncreasingMap = StrictlyIncreasingMap Int Int [Int]

@@ -13,11 +13,11 @@ import Data.Graph.Inductive
 import Data.Map as Map
 import Data.Maybe
 import Data.Typeable
-import DeltaSet
+import Simplicial.DeltaSet
 import Element
-import GraphComplex
+import Simplicial.GraphComplex
 import HomogenousTuples
-import SimplicialComplex
+import Simplicial.SimplicialComplex
 import TypeLevel.TF
 import FaceIx
 import Test.QuickCheck
