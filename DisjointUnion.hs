@@ -2,22 +2,18 @@
 {-# LANGUAGE Rank2Types, UndecidableInstances, NoMonomorphismRestriction, RecordWildCards, CPP, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, PolymorphicComponents, DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
-module DisjointUnion where
+module DisjointUnion(module Either1, DisjointUnionable(..)) where
 
 import Control.Applicative
-import Control.Arrow
 import Control.Monad
 import GraphUtil
 import Simplicial.DeltaSet
-import TypeLevel.TF
 import Indexing
 import Simplicial.AnySimplex
+import Either1
 
 
 
-data EitherSequence a b
-
-type instance (EitherSequence a b) :$ n = Either (a :$ n) (b :$ n)
 
 class DisjointUnionable a b where
     type DisjointUnion a b
@@ -25,10 +21,10 @@ class DisjointUnionable a b where
 
 
 instance DisjointUnionable (DeltaSet a) (DeltaSet b) where
-    type (DisjointUnion (DeltaSet a) (DeltaSet b)) = DeltaSet (EitherSequence a b)
+    type (DisjointUnion (DeltaSet a) (DeltaSet b)) = DeltaSet (Either1 a b)
 
     disjointUnion a b = DeltaSet face' simps' supers' dimension' faceGraph' nodeMap'
-        (\n -> simpsIndexing a n `disjointUnionIndexing` simpsIndexing b n)
+        (disjointUnionIndexing (simpsIndexing a) (simpsIndexing b) Left1 Right1)
                             
      where
 
@@ -38,31 +34,31 @@ instance DisjointUnionable (DeltaSet a) (DeltaSet b) where
                         (da, db) -> InhomogenousDim (max (dimMax da) (dimMax db))
 
 
-        face' :: FaceFunction (EitherSequence a b)
-        face' n i = 
-                    face a n i +++ face b n i
+        face' :: FaceFunction (Either1 a b)
+        face' i = 
+                    face a i `bimap1` face b i
 
-        simps' :: SimpsFunction (EitherSequence a b)
-        simps' n = 
-                    (Left <$> simps a n) ++ (Right <$> simps b n)
+        simps' :: SimpsFunction (Either1 a b)
+        simps' = 
+                    (Left1 <$> simps a) ++ (Right1 <$> simps b)
 
         
-        supers' :: SuperFunction (EitherSequence a b)
-        supers' n = 
-                    (fmap Left  . supers a n) ||| 
-                    (fmap Right . supers b n)
+        supers' :: SuperFunction (Either1 a b)
+        supers' = 
+                    (fmap Left1  . supers a) `either1` 
+                    (fmap Right1 . supers b)
 
-        faceGraph' :: FaceGraph (EitherSequence a b)
+        faceGraph' :: FaceGraph (Either1 a b)
         faceGraph' = disjointUnionGraphs 
-                        (\(AnySimplex n x) -> AnySimplex n (Left x))
+                        (\(AnySimplex x) -> AnySimplex (Left1 x))
                         id 
-                        (\(AnySimplex n x) -> AnySimplex n (Right x))
+                        (\(AnySimplex x) -> AnySimplex (Right1 x))
                         id 
                         (faceGraph a) 
                         (faceGraph b)
 
 
-        nodeMap' (AnySimplex n x) =
+        nodeMap' (AnySimplex x) =
             case x of
-                 Left x' -> nodeMap a (AnySimplex n x') 
-                 Right x' -> nodeMap b (AnySimplex n x') 
+                 Left1 x' -> nodeMap a (AnySimplex x') 
+                 Right1 x' -> nodeMap b (AnySimplex x') 

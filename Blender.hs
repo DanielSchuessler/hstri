@@ -135,7 +135,7 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams}
                 objCommon grp faceLabel faceMat
             
             where
-                BSI0 { faceInfo0 = FaceInfo{..}, vertexThickness } = ba_simplbl blenderable n0 v 
+                BSI0 { faceInfo0 = FaceInfo{..}, vertexThickness } = ba_simplbl blenderable v 
 
         handleE grp e = do
                 cylinder (coords' v0) (coords' v1) edgeThickness
@@ -144,7 +144,7 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams}
 
             where
                 (v1,v0) = faces10 deltaSet e
-                BSI1 { faceInfo1 = FaceInfo{..}, edgeThickness } = ba_simplbl blenderable n1 e
+                BSI1 { faceInfo1 = FaceInfo{..}, edgeThickness } = ba_simplbl blenderable e
 
 
         handleT grp grpTriLabels t = do
@@ -183,7 +183,7 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams}
 
                 BSI2 { faceInfo2 = FaceInfo{..} 
                      , triangleLabel
-                     } = ba_simplbl blenderable n2 t
+                     } = ba_simplbl blenderable t
 
         
 

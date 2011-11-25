@@ -22,21 +22,22 @@ import Test.QuickCheck
 import TupleTH
 import Util
 import qualified Data.Vector as V
+import Data.Proxy
 
 -- data RightShift f
--- type instance RightShift f :$ n = f :$ (S n)
+-- type instance RightShift f  n = f  (S n)
 -- 
--- data Sequence f = Sequence (f :$ N0) (Sequence (RightShift f)) 
+-- data Sequence f = Sequence (f  N0) (Sequence (RightShift f)) 
 -- 
--- sequenceElem :: Nat n => n -> Sequence f -> f :$ n
+-- sequenceElem :: Nat n => n -> Sequence f -> f  n
 -- sequenceElem n = caseNat n
 --     (\(Sequence x _) -> x)
 --     (\n' (Sequence _ xs) -> sequenceElem n' xs)
 -- 
--- toSequence :: forall f. (forall n. Nat n => n -> f :$ n) -> Sequence f
+-- toSequence :: forall f. (forall n. Nat n => n -> f  n) -> Sequence f
 -- toSequence f = Sequence (f n0) (toSequence f')
 --     where
---         f' :: forall n. Nat n => n -> RightShift f :$ n
+--         f' :: forall n. Nat n => n -> RightShift f  n
 --         f' _ = f (undefined :: S n)
 
 
@@ -45,9 +46,9 @@ import qualified Data.Vector as V
 
 
 
-type FaceFunction a  = forall n. Nat n => n -> FaceIx -> (a :$ (S n)) -> (a :$ n)
-type SimpsFunction a = forall n. Nat n => n -> [a :$ n]
-type SuperFunction a = forall n. Nat n => n -> (a :$ n) -> [a :$ (S n)]
+type FaceFunction a  = forall n. Nat n => FaceIx -> a (S n) -> a  n
+type SimpsFunction a = forall n. Nat n => [a  n]
+type SuperFunction a = forall n. Nat n => a n -> [a (S n)]
 type FaceGraph a = Gr (AnySimplex a) FaceIx
 type SimplexNodeMap a = AnySimplex a -> Node
 
@@ -70,7 +71,7 @@ data DeltaSet a = DeltaSet {
     -- | Convention: Edges are directed from subfaces to superfaces
     faceGraph :: FaceGraph a,
     nodeMap :: SimplexNodeMap a,
-    simpsIndexing :: forall n. Nat n => n -> Indexing (a:$n) 
+    simpsIndexing :: forall n. Nat n => Indexing (a n) 
 }
 
 data SimplexNotMemberOfDeltaSet = SimplexNotMemberOfDeltaSet
@@ -78,8 +79,8 @@ data SimplexNotMemberOfDeltaSet = SimplexNotMemberOfDeltaSet
 
 instance Exception SimplexNotMemberOfDeltaSet
 
-nodeMapGet :: Nat n => DeltaSet a -> n -> (a :$ n) -> Node
-nodeMapGet a n x = nodeMap a (AnySimplex n x)
+nodeMapGet :: Nat n => DeltaSet a -> (a n) -> Node
+nodeMapGet a x = nodeMap a (AnySimplex x)
 
 
 -- | Requires 'simps', 'face' and 'dimension' to be defined
@@ -97,15 +98,16 @@ mkFaceGraph a = (faceGraph',nodeMapFun)
             mkGraph 
             ((\(x,y) -> (y,x)) <$> Map.assocs nodeMap')
             (do
-                (AnySimplex n x, xnode) <- Map.assocs nodeMap'
-                caseNat n
-                    []
-                    (\n' -> do
-                        i <- [0..maxFaceIx n]
-                        let 
-                            y = face a n' i x
-                            ynode = nodeMap' ! AnySimplex n' y
-                        return (ynode, xnode, i))
+                (asi, xnode) <- Map.assocs nodeMap'
+                elimAnySimplexWithNat asi (\n x ->
+                    caseNat n
+                        []
+                        (\(_ :: predn) -> do
+                            i <- [0..maxFaceIx n]
+                            let 
+                                y = face a i x :: a predn
+                                ynode = nodeMap' ! AnySimplex y
+                            return (ynode, xnode, i)))
             )
 
 
@@ -115,22 +117,24 @@ data InvalidFaceGraph = InvalidFaceGraph String
 instance Exception InvalidFaceGraph
 
 -- | Requires 'nodeMap' and 'faceGraph' to be defined
-mkSupers :: OrdN a => DeltaSet a -> SuperFunction a
-mkSupers a n x = do
-    (node,_)  <- lsuc (faceGraph a) (nodeMapGet a n x) 
-    let n'' = successor n
+mkSupers :: forall a. OrdN a => DeltaSet a -> SuperFunction a
+mkSupers a (x :: a n) = do
+    (node,_)  <- lsuc (faceGraph a) (nodeMapGet a x) 
+    let 
+        n = undefined :: n
+        n'' = successor n
         
         
-    case fromJust (lab (faceGraph a) node) of
-         AnySimplex n' x' -> 
-            caseEqNat n' n''
-                (return x')
-                (throw (InvalidFaceGraph (
-                                        "In mkSupers: Expected dimension: "++show n''
-                                        ++"; Actual dimension: "++show n')))
+    elimAnySimplexWithNat (fromJust (lab (faceGraph a) node)) 
+        (\n' x' ->
+                caseEqNat n' n''
+                    (return x')
+                    (throw (InvalidFaceGraph (
+                                            "In mkSupers: Expected dimension: "++show n''
+                                            ++"; Actual dimension: "++show n'))))
 
 
-type AnyIndexing a = AnySimplex (ApplyConstr Indexing :. a)
+data AnyIndexing a = forall n. Nat n => AnyIndexing (Indexing (a n))
                             
 mkDeltaSet :: forall a. OrdN a => FaceFunction a -> SimpsFunction a -> Dim -> DeltaSet a                            
 mkDeltaSet face_ simps_ dimension_ = r
@@ -139,30 +143,34 @@ mkDeltaSet face_ simps_ dimension_ = r
         r = DeltaSet face_ simps_ (mkSupers r) dimension_ fg nm indexing
         (fg,nm) = mkFaceGraph r 
 
-        indexing :: forall n0. Nat n0 => n0 -> Indexing (a:$n0)
-        indexing =
-            let
-                v = V.fromList (mapDimensions (\n -> 
-                        AnySimplex n (getOrd (undefined :: a) n 
-                                        (Indexing.fromDistinctList (simps_ n)))
+
+        indexingsVector = V.fromList (mapDimensions (\(_ :: n) -> 
+                        AnyIndexing (getOrd (undefined :: Proxy (a n)) 
+                                        (Indexing.fromDistinctList (simps_ :: [a n])))
                             :: AnyIndexing a
                         
                             ) 
                                               r)
+
+        indexing :: forall n. Nat n => Indexing (a n)
+        indexing =
+            let
+                n = (undefined :: n)
             in
-                \(n::n) -> case v V.! natToInt n of
-                           AnySimplex n' is ->
-                               caseEqNat n n' 
-                                (is :: Indexing (a:$n)) 
-                                (error "mkDeltaSet/indexing: Internal error" :: Indexing (a:$n))
+                case indexingsVector V.! natToInt n of
+                           AnyIndexing (is :: Indexing (a n')) ->
+                               caseEqNat n (undefined :: n') 
+                                (is :: Indexing (a n)) 
+                                (error "mkDeltaSet/indexing: Internal error" :: Indexing (a n))
 
 mkHomogenousDeltaSet :: forall a n. (Nat n, OrdN a) => 
-    n -> FaceFunction a -> [a :$ n] -> DeltaSet a                            
-mkHomogenousDeltaSet n face_ topsimps = mkDeltaSet face_ simps_ (HomogenousDim nint)
+    FaceFunction a -> [a n] -> DeltaSet a                            
+mkHomogenousDeltaSet face_ topsimps = mkDeltaSet face_ simps_ (HomogenousDim nint)
     where
+        n = undefined :: n
         nint = natToInt n
 
---         subsimps_ :: forall k. Nat k => k -> [a:$(S k)] -> [a:$k]
+--         subsimps_ :: forall k. Nat k => k -> [a(S k)] -> [ak]
 --         subsimps_ k xs = getOrd (undefined :: a) k (
 --                             nub' [ face_ k i x | x <- xs, i <- [0..maxFaceIx k] ]) 
 
@@ -171,18 +179,19 @@ mkHomogenousDeltaSet n face_ topsimps = mkDeltaSet face_ simps_ (HomogenousDim n
         imp = error "mkHomogenousDeltaSet: internal error (should be impossible)"
 
         subsimps_ :: [AnySimplex a] -> [AnySimplex a]
-        subsimps_ xs = nub' $ do
-                AnySimplex k x <- xs
-                caseNat k imp 
-                    (\k' -> do
-                        i <- [0..maxFaceIx k] 
-                        return (AnySimplex k' (face_ k' i x)))
+        subsimps_ asis = nub' $ do
+                asi <- asis
+                elimAnySimplexWithNat asi (\k x ->
+                    caseNat k imp 
+                        (\_ -> do
+                            i <- [0..maxFaceIx k] 
+                            return (AnySimplex (face_ i x))))
                 
 
         simpsMemo :: [[AnySimplex a]]
         simpsMemo = go 0
             where
-                go k | k == nint = fmap (AnySimplex n) topsimps : repeat []
+                go k | k == nint = fmap AnySimplex topsimps : repeat []
                      | otherwise = 
                         let
                             rec = go (k+1)
@@ -192,16 +201,22 @@ mkHomogenousDeltaSet n face_ topsimps = mkDeltaSet face_ simps_ (HomogenousDim n
 
 
         simps_ :: SimpsFunction a
-        simps_ k = do
-            AnySimplex k' x <- simpsMemo !! natToInt k
-            caseEqNat k k' (return x) imp
+        simps_ = mkSimpsFunction (\(k :: k) -> do
+            asi <- simpsMemo !! natToInt k
+            elimAnySimplexWithNat asi (\k' x ->
+                caseEqNat k k' (return x) imp))
 
 
+mkSimpsFunction :: (forall n. Nat n => n -> [a n]) -> SimpsFunction a
+mkSimpsFunction f = f undefined
 
-type Vert a = a :$ N0
-type Arc a =  a :$ N1
-type Tri a =  a :$ N2
-type Tet a =  a :$ N3
+mkFaceFunctionWithNat :: (forall n. Nat n => n -> FaceIx -> a (S n) -> a n) -> FaceFunction a
+mkFaceFunctionWithNat f = f undefined
+
+type Vert a = a  N0
+type Arc a =  a  N1
+type Tri a =  a  N2
+type Tet a =  a  N3
 
 
 -- data DS s = DS {
@@ -213,7 +228,7 @@ type Tet a =  a :$ N3
 --     faceGraph_ :: FaceGraph (DS s)
 -- }
 
--- type instance DS a :$ n = a :$ n
+-- type instance DS a  n = a  n
 
 -- -- | This is more or less the identity 
 -- joinDS :: DS (DS a) -> DS a
@@ -227,31 +242,31 @@ type Tet a =  a :$ N3
 --     faceGraph = faceGraph_
 
 faces10 :: DeltaSet a -> Arc a -> Pair (Vert a)
-faces10 a x = map2 (\i -> face a n0 i x) (0,1)
+faces10 a x = map2 (\i -> face a i x) (0,1)
 
 faces21 :: DeltaSet a -> Tri a -> Triple (Arc a)
-faces21 a x = map3 (\i -> face a n1 i x) (0,1,2)
+faces21 a x = map3 (\i -> face a i x) (0,1,2)
 
 faces32 :: DeltaSet a -> Tet a -> Quadruple (Tri a)
-faces32 a x = map4 (\i -> face a n2 i x) (0,1,2,3)
+faces32 a x = map4 (\i -> face a i x) (0,1,2,3)
 
 s0 :: DeltaSet a -> [Vert a]
-s0 = flip simps n0
+s0 = simps
 s1 :: DeltaSet a -> [Arc a]
-s1 = flip simps n1
+s1 = simps
 s2 :: DeltaSet a -> [Tri a]
-s2 = flip simps n2
+s2 = simps
 s3 :: DeltaSet a -> [Tet a]
-s3 = flip simps n3
+s3 = simps
 
 super01 :: DeltaSet a -> Vert a -> [Arc a]
-super01 = flip supers n0
+super01 = supers
 
 super12 :: DeltaSet a -> Arc a -> [Tri a]
-super12 = flip supers n1
+super12 = supers
 
 super23 :: DeltaSet a -> Tri a -> [Tet a]
-super23 = flip supers n2
+super23 = supers
 
 
 faces20 :: DeltaSet a -> Tri a -> (Vert a, Vert a, Vert a)
@@ -313,10 +328,11 @@ memoSuper d =
             super23_ = (memoFun (super23 d) (s2 d) !)
 
             supers_ :: SuperFunction a
-            supers_ n = caseNat3 n
-                            super01_
-                            super12_
-                            super23_
+            supers_ (x :: a n) = 
+                caseNat3 (undefined :: n)
+                            (super01_ x)
+                            (super12_ x)
+                            (super23_ x)
                             (const $ error ("'supers' called at dimension > 2 for a memoSuper'd complex"))
 
     in
@@ -362,8 +378,6 @@ maxDimension = dimMax . dimension
 
 
             
-simpleMapAnySimplex :: (forall n. n -> a:$n -> b:$n) -> AnySimplex a -> AnySimplex b
-simpleMapAnySimplex f (AnySimplex n a) = AnySimplex n (f n a)
         
 
 -- foldMapDJ
@@ -399,38 +413,40 @@ mapDimensions f a = go (maxDimension a) n0
         go i n | i < 0 = []
                | otherwise = f n : go (i-1) (successor n)
 
-allSimplices :: DeltaSet a -> [AnySimplex a]
-allSimplices a = concat $ mapDimensions (\n -> AnySimplex n <$> simps a n) a 
+allSimplices :: forall a. DeltaSet a -> [AnySimplex a]
+allSimplices a = concat $ mapDimensions (\(_ :: n) -> AnySimplex <$> (simps a :: [a n])) a 
 
 maxFaceIx :: Nat n => n -> FaceIx
 maxFaceIx = FI . natToInt
 
-faces :: (Nat n) => DeltaSet a -> n -> (a :$ S n) -> [a :$ n]
-faces a n x = [ face a n i x | i <- [0..maxFaceIx n] ] 
+faces :: forall n a. (Nat n) => DeltaSet a -> a (S n) -> [a n]
+faces a x = [ face a i x | i <- [0..maxFaceIx (undefined :: n)] ] 
 
 
 
 checkFaceOrderConsistency :: forall a m. (OrdN a, ShowN a, m ~ Either String) => 
     DeltaSet a -> m ()
 checkFaceOrderConsistency ds = (sequence_ :: [m()] -> m()) $ do -- list monad
-    AnySimplex n x <- allSimplices ds
+  asi <- allSimplices ds
+  elimAnySimplexWithNat asi (\(n :: n) x ->
     caseNat2 n [return ()] [return ()]
-        (\n'' -> do
+        (\(n'' :: n'') -> do
             let n' = successor n''
             i <- [0..maxFaceIx n']
             j <- [i+1..maxFaceIx n] 
-            let d_ij_x = face ds n'' i (face ds n' j x) 
-            let d_ji_x = face ds n'' (j-1) (face ds n' i x) 
+            let d_ij_x = face ds i (face ds j x) :: a n'' 
+            let d_ji_x = face ds (j-1) (face ds i x) :: a n''
+            let pro = undefined :: Proxy (a n'')
             [
-              unless (getOrd (undefined :: a) n'' (d_ij_x == d_ji_x))
-                (throwError $ getShow (undefined :: a) n'' $ getShow (undefined :: a) n $
+              unless (getOrd pro  (d_ij_x == d_ji_x))
+                (throwError $ getShow pro $ getShow (undefined :: Proxy (a n)) $
                     concat ["i = ",show i,"; j = ",show j,"; x = ",show x,
                     "; d_i (d_j x) = ",show d_ij_x,
                     "; d_{j-1} (d_i x) = ",show d_ji_x])
 
              ]
 
-        )
+        ))
 
 
 
@@ -439,19 +455,19 @@ checkFaceOrderConsistency ds = (sequence_ :: [m()] -> m()) $ do -- list monad
 oneSkeleton :: DeltaSet a -> Gr (Vert a) (Arc a)
 oneSkeleton ds = mkGraph 
     (do
-        v <- simps ds n0
-        return (nodeMapGet ds n0 v,v))
+        v <- s0 ds
+        return (nodeMapGet ds v,v))
     (do
-        e <- simps ds n1
-        let (nod,nod') = nodeMapGet ds n0 `map2` faces10 ds e
+        e <- s1 ds
+        let (nod,nod') = nodeMapGet ds `map2` faces10 ds e
         return (nod,nod',e)) 
 
 
 anySimplex_face :: DeltaSet a -> FaceIx -> AnySimplex a -> AnySimplex a
-anySimplex_face ds i (AnySimplex n x) =
+anySimplex_face ds i asi = elimAnySimplexWithNat asi (\n x ->
     caseNat n 
         (error "anySimplex_face: Tried to take a face of a 0-simplex")
-        (\n' -> AnySimplex n' (face ds n' i x))
+        (\_ -> AnySimplex (face ds i x)))
 
 ds_fmap :: forall a. DeltaSet a -> StrictlyIncreasingMap -> AnySimplex a -> AnySimplex a 
 ds_fmap ds sim = loop (decomposeToCofaceMaps sim)

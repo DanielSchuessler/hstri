@@ -22,7 +22,6 @@ data EPath a b n where
     EP0 :: LNode a -> EPath a b N0
     EPCons :: EPath a b n -> b -> LNode a -> EPath a b (S n) 
 
-type EPath' a b = ApplyConstr (EPath a b)
 
 epN :: EPath a b n -> Int
 epN (EP0 _) = 0
@@ -61,25 +60,25 @@ mapEPath fa fb p = case p of
 deriving instance (Eq a, Eq b) => Eq (EPath a b n)
 deriving instance (Ord a, Ord b) => Ord (EPath a b n)
 
-instance (Ord a, Ord b) => OrdN (EPath' a b) where getOrd _ _ r = r
-instance (Show a, Show b) => ShowN (EPath' a b) where getShow _ _ r = r
+instance (Ord a, Ord b) => OrdN (EPath a b) where getOrd _ r = r
+instance (Show a, Show b) => ShowN (EPath a b) where getShow _ r = r
 
 
 addLabel :: Graph gr => gr t b -> Node -> (Node, t)
 addLabel g node = (node, fromJust (lab g node))
 
-gPathsOfLength :: (Nat n, Graph gr) => 
-    (forall k. Nat k => k -> EPath a c k -> [(c,Node)]) -> 
-    gr a b -> Node -> n -> [EPath a c n] 
-gPathsOfLength chooserFun g start n = caseNat n
+gPathsOfLength :: forall n gr a b c. (Nat n, Graph gr) => 
+    (forall k. Nat k => EPath a c k -> [(c,Node)]) -> 
+    gr a b -> Node -> [EPath a c n] 
+gPathsOfLength chooserFun g start = caseNat (undefined :: n)
     [EP0 (addLabel g start)]
-    (\n' -> do
-        p <- gPathsOfLength chooserFun g start n'
-        (elbl,node) <- chooserFun n' p
+    (\_ -> do
+        p <- gPathsOfLength chooserFun g start
+        (elbl,node) <- chooserFun p
         return (EPCons p elbl (addLabel g node))) 
 
-pathsOfLength :: forall gr a b n. (Graph gr, Nat n) => gr a b -> Node -> n -> [EPath a b n]
-pathsOfLength g x n = gPathsOfLength (\_ -> (fmap f . out g . unlabel . epLast)) g x n
+pathsOfLength :: forall gr a b n. (Graph gr, Nat n) => gr a b -> Node -> [EPath a b n]
+pathsOfLength g x = gPathsOfLength (fmap f . out g . unlabel . epLast) g x
                                      where
         f :: LEdge b -> (b,Node)
         f (_,node,elbl) = (elbl,node)
@@ -109,9 +108,9 @@ catSkipped s no (Sk0 b) = SkCons s no b
 catSkipped s no (SkCons s' no' b) = SkCons (catSkipped s no s') no' b
 
 skippingPathsOfLength :: forall gr a b c n. 
-    (Graph gr, Nat n, Semigroup c) => ((a,b,a) -> c) -> gr a b -> Node -> n -> [EPath a c n]
+    (Graph gr, Nat n, Semigroup c) => ((a,b,a) -> c) -> gr a b -> Node -> [EPath a c n]
 
-skippingPathsOfLength emb g = gPathsOfLength (\_ -> (chooserFun . unlabel . epLast)) g
+skippingPathsOfLength emb g = gPathsOfLength (chooserFun . unlabel . epLast) g
     where
         chooserFun :: Node -> [(c, Node)]
         chooserFun node = do
@@ -175,16 +174,15 @@ graphComplexFace i (EPCons p sk right_) =
 
 -- | SkipPath (edge-labelled by the edges and nodes that were skipped)
 type SPath a b = EPath a (Skipped b)
-type SPath' a b = ApplyConstr (SPath a b)
 
 nmapSPath :: (a -> a') -> SPath a b n -> SPath a' b n
 nmapSPath fa = mapEPath fa id
 
-graphComplex :: (Ord a, Ord c, Semigroup c) => Gr a b -> Dim -> ((a,b,a) -> c) -> DeltaSet (EPath' a c)
+graphComplex :: (Ord a, Ord c, Semigroup c) => Gr a b -> Dim -> ((a,b,a) -> c) -> DeltaSet (EPath a c)
 graphComplex g dim emb = 
     mkDeltaSet  
-        (\_ -> graphComplexFace)
-        (\n -> concatMap (\nod -> skippingPathsOfLength emb g nod n) (nodes g))
+        graphComplexFace
+        (concatMap (\nod -> skippingPathsOfLength emb g nod) (nodes g))
         dim
 
 class Subdivisible a where
@@ -195,12 +193,11 @@ class Subdivisible a where
 
 
 type BCSFace a = EPath (AnySimplex a) StrictlyIncreasingMap 
-type BCSFace' a = ApplyConstr (BCSFace a)
 
 
 
 instance OrdN a => Subdivisible (DeltaSet a) where
-    type BarycentricSubdivision (DeltaSet a) = DeltaSet (BCSFace' a)
+    type BarycentricSubdivision (DeltaSet a) = DeltaSet (BCSFace a)
     bary a = graphComplex 
                     (faceGraph a) (dimension a) 
                     (\(_,faceIx,s) -> cofaceMap (anySimplex_dim s) faceIx)  

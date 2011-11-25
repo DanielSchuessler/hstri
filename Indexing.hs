@@ -45,12 +45,14 @@ fromInt t i = indexing_v t V.! i
 length ::  Indexing a -> Int
 length = V.length . indexing_v
 
-disjointUnionIndexing :: Indexing b -> Indexing c -> Indexing (Either b c)
-disjointUnionIndexing (Indexing m1 v1) (Indexing m2 v2)
-    = Indexing (M.fromDistinctAscList (l1++l2)) (V.map Left v1 V.++ V.map Right v2) 
+disjointUnionIndexing
+  :: Indexing a1
+     -> Indexing a2 -> (a1 -> a) -> (a2 -> a) -> Indexing a
+disjointUnionIndexing (Indexing m1 v1) (Indexing m2 v2) inl inr
+    = Indexing (M.fromDistinctAscList (l1++l2)) (V.map inl v1 V.++ V.map inr v2) 
   where
-    l1 = first Left <$> M.toAscList m1
-    l2 = (Right *** (+n)) <$> M.toAscList m2
+    l1 = first inl <$> M.toAscList m1
+    l2 = (inr *** (+n)) <$> M.toAscList m2
     n = V.length v1
     
 

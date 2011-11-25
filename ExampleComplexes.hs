@@ -16,9 +16,9 @@ import Data.Typeable
 import Simplicial.DeltaSet
 import Element
 import Simplicial.GraphComplex
+import Simplicial.AnySimplex
 import HomogenousTuples
 import Simplicial.SimplicialComplex
-import TypeLevel.TF
 import FaceIx
 import Test.QuickCheck
 
@@ -31,14 +31,13 @@ data Moebius n where
     Moebius2 :: Moebius N2
 
 
-type Moebius' = ApplyConstr Moebius
 
 
 deriving instance Show (Moebius n)
 deriving instance Eq (Moebius n)
 deriving instance Ord (Moebius n)
-instance ShowN Moebius' where getShow _ _ r = r
-instance OrdN Moebius' where getOrd _ _ r = r
+instance ShowN Moebius where getShow _ r = r
+instance OrdN Moebius where getOrd _ r = r
 
 ix1 :: FaceIx -> a -> a -> a
 ix1 i a b = case i of
@@ -53,24 +52,24 @@ ix2 i a b c = case i of
                    2 -> c
                    _ -> throw (FaceIndexOutOfBounds i)
 
-moebius :: DeltaSet Moebius'
+moebius :: DeltaSet Moebius
 moebius = mkDeltaSet face_ simps_ dimension_
   where
     dimension_ = HomogenousDim 2
 
-    face_ :: FaceFunction Moebius'
-    face_ n i _ = caseNat2 n
+    face_ :: FaceFunction Moebius
+    face_ = mkFaceFunctionWithNat (\n i _ -> caseNat2 n
                     Moebius0
                     (ix2 i MoebiusInner MoebiusInner MoebiusBoundary)
-                    (\_ -> error "impossible")
+                    (\_ -> error "impossible"))
 
 
-    simps_ :: SimpsFunction Moebius'
-    simps_ n = caseNat3 n
+    simps_ :: SimpsFunction Moebius
+    simps_ = mkSimpsFunction (\n -> caseNat3 n
                      [Moebius0]
                      [MoebiusInner, MoebiusBoundary]
                      [Moebius2]
-                     (const [])
+                     (const []))
 
 
 
@@ -86,36 +85,35 @@ data Torus n where
     TorusLowerFace :: Torus N2
     TorusUpperFace :: Torus N2
 
-type Torus' = ApplyConstr Torus
 
 deriving instance Show (Torus n)
 deriving instance Eq (Torus n)
 deriving instance Ord (Torus n)
-instance ShowN Torus' where getShow _ _ r = r
-instance OrdN Torus' where getOrd _ _ r = r
+instance ShowN Torus where getShow _ r = r
+instance OrdN Torus where getOrd _ r = r
 
 
-torus :: DeltaSet Torus'
+torus :: DeltaSet Torus
 torus = mkDeltaSet face_ simps_ dimension_
   where
     dimension_ = HomogenousDim 2
 
-    face_ :: FaceFunction Torus'
-    face_ n i x = caseNat2 n
+    face_ :: FaceFunction Torus
+    face_ = mkFaceFunctionWithNat (\n i x -> caseNat2 n
                     Torus0
-                    (case x of
+                    (case x :: Torus N2 of
                           TorusLowerFace -> ix2 i TorusVerticalEdge TorusDiagEdge TorusHorizontalEdge
                           TorusUpperFace -> ix2 i TorusHorizontalEdge TorusVerticalEdge TorusDiagEdge)
                               
-                    (\_ -> error "impossible")
+                    (\_ -> error "impossible"))
 
 
-    simps_ :: SimpsFunction Torus'
-    simps_ n = caseNat3 n
+    simps_ :: SimpsFunction Torus
+    simps_ = mkSimpsFunction (\n -> caseNat3 n
                      [Torus0]
                      [TorusDiagEdge,TorusVerticalEdge,TorusHorizontalEdge]
                      [TorusUpperFace,TorusLowerFace]
-                     (const [])
+                     (const []))
 
 data ConeDisk n where
     ConeDiskBaseVertex :: ConeDisk N0 
@@ -126,28 +124,27 @@ data ConeDisk n where
 
     ConeDiskTri :: ConeDisk N2
 
-type ConeDisk' = ApplyConstr ConeDisk
 
 deriving instance Show (ConeDisk n)
 deriving instance Eq (ConeDisk n)
 deriving instance Ord (ConeDisk n)
-instance ShowN ConeDisk' where getShow _ _ r = r
-instance OrdN ConeDisk' where getOrd _ _ r = r
+instance ShowN ConeDisk where getShow _ r = r
+instance OrdN ConeDisk where getOrd _ r = r
 
 
-coneDisk :: DeltaSet ConeDisk'
-coneDisk = mkHomogenousDeltaSet n2 face_ [ConeDiskTri]
+coneDisk :: DeltaSet ConeDisk
+coneDisk = mkHomogenousDeltaSet face_ [ConeDiskTri]
   where
 
-    face_ :: FaceFunction ConeDisk'
-    face_ n i x = caseNat2 n
-                    (case x of
+    face_ :: FaceFunction ConeDisk
+    face_ = mkFaceFunctionWithNat (\n i x -> caseNat2 n
+                    (case x :: ConeDisk N1 of
                         ConeDiskBaseCircle -> ConeDiskBaseVertex                        
                         ConeDiskUpArc -> ix1 i ConeDiskApex ConeDiskBaseVertex)
 
                     (ix2 i ConeDiskUpArc ConeDiskUpArc ConeDiskBaseCircle)
                               
-                    (\_ -> error "impossible")
+                    (\_ -> error "impossible"))
 
 
 

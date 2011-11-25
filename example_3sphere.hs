@@ -7,8 +7,8 @@ import Blenderable
 import Data.Function
 import Data.Vect.Double
 import MathUtil
-import SimplexLabels
-import SimplicialComplex
+import Simplicial.Labels
+import Simplicial.SimplicialComplex
 import System.Exit
 import Data.Monoid
 

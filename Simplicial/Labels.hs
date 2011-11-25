@@ -15,18 +15,19 @@ import HomogenousTuples
 import S3
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet
-import TypeLevel.TF
+import TypeLevel.TF.Fun
+import TypeLevel.TF.Bool
 
-newtype SimplexLabels a l = SimplexLabels { runSimplexLabels :: forall n. Nat n => n -> a:$n -> l:$n }
+newtype SimplexLabels a l = SimplexLabels { runSimplexLabels :: forall n. Nat n => a n -> l n }
 
 
 
 
 instance DisjointUnionable (SimplexLabels a l) (SimplexLabels b l) where
-    type DisjointUnion (SimplexLabels a l) (SimplexLabels b l) = SimplexLabels (EitherSequence a b) l
+    type DisjointUnion (SimplexLabels a l) (SimplexLabels b l) = SimplexLabels (Either1 a b) l
 
     disjointUnion a b =
-        SimplexLabels (\n -> runSimplexLabels a n ||| runSimplexLabels b n)
+        SimplexLabels (runSimplexLabels a `either1` runSimplexLabels b)
 
 
 
@@ -42,67 +43,71 @@ instance (ShowN a) => Show (LabeledDeltaSet a l) where
 
 instance DisjointUnionable (LabeledDeltaSet a l) (LabeledDeltaSet b l) where
     type DisjointUnion  (LabeledDeltaSet a l) (LabeledDeltaSet b l) =
-        LabeledDeltaSet (EitherSequence a b) l
+        LabeledDeltaSet (Either1 a b) l
 
     disjointUnion (LabeledDeltaSet a l) (LabeledDeltaSet a' l') =
         LabeledDeltaSet (disjointUnion a a') (disjointUnion l l')
 
-simplbl :: Nat n => LabeledDeltaSet a l -> n -> (a :$ n) -> l :$ n
+simplbl :: Nat n => LabeledDeltaSet a l -> (a n) -> l   n
 simplbl = runSimplexLabels . lds_sl
 
-data OneElSequence x n
-type instance OneElSequence x n :$ n' = IfEq n n' x () 
+-- data OneElSequence x n
+-- type instance OneElSequence x n   n' = IfEq n n' x () 
+-- 
+-- addSimplexLabels :: Nat n => 
+--     n -> (a   n -> l) 
+--     -> DeltaSet a 
+--     -> LabeledDeltaSet a (OneElSequence l n)
+-- mapOneElementSeqLabels :: (Nat n) => n -> (l -> l') -> LabeledDeltaSet a (OneElSequence l n) -> LabeledDeltaSet a (OneElSequence l' n)
+-- mapOneElementSeqLabels n f = mapSimplexLabels (\n' x -> caseEqNat n n' (f x) ())
 
-addSimplexLabels :: Nat n => 
-    n -> (a :$ n -> l) 
-    -> DeltaSet a 
-    -> LabeledDeltaSet a (OneElSequence l n)
-
-addSimplexLabels n f a =
-    LabeledDeltaSet a
-        (SimplexLabels (\n' x -> caseEqNat n n' (f x) ()))
+-- addSimplexLabels n f a =
+--     LabeledDeltaSet a
+--         (SimplexLabels (\x -> caseEqNat n n' (f x) ()))
 
 
 mapSimplexLabels :: 
-    (forall n. Nat n => n -> l:$n -> l':$n) 
+    (forall n. Nat n => l n -> l' n) 
     -> LabeledDeltaSet a l 
     -> LabeledDeltaSet a l'
-mapSimplexLabels g = mapSimplexLabelsWithSimplices (\n -> const (g n))
+mapSimplexLabels g = mapSimplexLabelsWithSimplices (\_ -> g)
 
 
 --(LabeledDeltaSet a (SimplexLabels f)) =
 --    LabeledDeltaSet a (SimplexLabels (\n -> g n . f n))
 
 mapSimplexLabelsWithSimplices :: 
-    (forall n. Nat n => n -> a :$ n -> l:$n -> l':$n) 
+       (forall n. Nat n => a n -> l n -> l' n) 
     -> LabeledDeltaSet a l 
     -> LabeledDeltaSet a l'
 mapSimplexLabelsWithSimplices g (LabeledDeltaSet a (SimplexLabels f)) =
-    LabeledDeltaSet a (SimplexLabels (\n x -> g n x (f n x)))
+    LabeledDeltaSet a (SimplexLabels (\x -> g x (f x)))
 
-mapSimplexLabelsAt :: Nat n =>
-    n -> (l :$ n -> l :$ n) 
+mapSimplexLabelsAt :: forall a l n. Nat n =>
+    n
+    -> (l   n -> l   n) 
     -> LabeledDeltaSet a l
     -> LabeledDeltaSet a l
-mapSimplexLabelsAt n f a = mapSimplexLabels (\n' l -> caseEqNat n n' (f l) l) a 
+mapSimplexLabelsAt _ f a = mapSimplexLabels (\(l :: l n') -> caseEqNat (undefined :: n) (undefined :: n') (f l) l) a 
 
-mapSimplexLabelsWithSimplicesAt :: Nat n =>
-    n -> (a :$ n -> l :$ n -> l :$ n) 
+mapSimplexLabelsWithSimplicesAt :: forall a l n. Nat n =>
+    n 
+    -> (a   n -> l   n -> l   n) 
     -> LabeledDeltaSet a l
     -> LabeledDeltaSet a l
-mapSimplexLabelsWithSimplicesAt n f a = 
-    mapSimplexLabelsWithSimplices (\n' x l -> caseEqNat n n' (f x l) l) a 
+mapSimplexLabelsWithSimplicesAt _ f a = 
+    mapSimplexLabelsWithSimplices (\(x :: a n') l -> caseEqNat (undefined :: n) (undefined :: n') (f x l) l) a 
 
 instance OrdN a => Subdivisible (LabeledDeltaSet a l) where
     type BarycentricSubdivision (LabeledDeltaSet a l) =
-        LabeledDeltaSet (BCSFace' a) (BCSFace' l)
+        LabeledDeltaSet (BCSFace a) (BCSFace l)
 
     bary (LabeledDeltaSet a l) =
         LabeledDeltaSet 
             (bary a)
-            (SimplexLabels (\_ p ->
+            (SimplexLabels (\p ->
                 mapEPath 
-                    (\(AnySimplex n' x) -> AnySimplex n' (runSimplexLabels l n' x)) 
+                    (\(AnySimplex x) -> AnySimplex (runSimplexLabels l x)) 
                     id 
                     p))
 
@@ -117,12 +122,11 @@ instance OrdN a => Subdivisible (LabeledDeltaSet a l) where
 -- 
 --
 
-data CoordLabelsF
-
-type instance CoordLabelsF :$ N0 = Vec3
-type instance CoordLabelsF :$ N1 = ()
-type instance CoordLabelsF :$ N2 = Maybe TriangleLabel
-type instance CoordLabelsF :$ (S (S (S n))) = ()
+data CoordLabelsF n where
+    CoordLabelsF0 :: Vec3 -> CoordLabelsF N0
+    CoordLabelsF1 :: CoordLabelsF N1
+    CoordLabelsF2 :: Maybe TriangleLabel -> CoordLabelsF N2
+    CoordLabelsF3 :: CoordLabelsF (S (S (S n)))
 
 data TriangleLabel = TriangleLabel {
         tl_text :: String,
@@ -143,38 +147,43 @@ data TriangleLabel = TriangleLabel {
 
 type WithCoords a = LabeledDeltaSet a CoordLabelsF
 
-addCoordFunc :: (Vert a -> Vec3) -> (Tri a -> Maybe TriangleLabel) -> DeltaSet a -> WithCoords a
-addCoordFunc f0 f2 a = LabeledDeltaSet a (SimplexLabels (\n x ->
-    caseNat3 n 
-        (f0 x)
-        ()
-        (f2 x)
-        (const ())))
+addCoordFunc :: forall a. (Vert a -> Vec3) -> (Tri a -> Maybe TriangleLabel) -> DeltaSet a -> WithCoords a
+addCoordFunc f0 f2 a = LabeledDeltaSet a (SimplexLabels (\(x :: a n) ->
+    caseNat3 (undefined :: n) 
+        (CoordLabelsF0 $ f0 x)
+        CoordLabelsF1
+        (CoordLabelsF2 $ f2 x)
+        (const CoordLabelsF3)))
         
 
-vertlbl :: LabeledDeltaSet a l -> (a :$ Z) -> l :$ Z
-vertlbl a = simplbl a n0
+vertlbl :: LabeledDeltaSet a l -> (a Z) -> l Z
+vertlbl = simplbl
 
 class Coords t where
     transformCoords :: (Vec3 -> Vec3) -> t -> t
 
 instance Coords (WithCoords a) where
-    transformCoords = mapSimplexLabelsAt n0
+    transformCoords f = mapSimplexLabelsAt n0 (\(CoordLabelsF0 v) -> CoordLabelsF0 (f v))
 
-mapOneElementSeqLabels :: (Nat n) => n -> (l -> l') -> LabeledDeltaSet a (OneElSequence l n) -> LabeledDeltaSet a (OneElSequence l' n)
-mapOneElementSeqLabels n f = mapSimplexLabels (\n' x -> caseEqNat n n' (f x) ())
 
 
 setTriangleLabel
-  :: (Eq (a :$ N2), (l :$ N2) ~ Maybe TriangleLabel) =>
-     (a :$ N2)
-     -> TriangleLabel -> LabeledDeltaSet a l -> LabeledDeltaSet a l
+  :: Eq (a N2) => a N2
+     -> TriangleLabel -> WithCoords a -> WithCoords a
 setTriangleLabel tri (newlbl :: TriangleLabel) a = 
     mapSimplexLabelsWithSimplicesAt n2 (\x l ->
-        case () of
-             _ | x == tri -> Just newlbl 
-               | otherwise -> l)
+        if x == tri 
+           then CoordLabelsF2 (Just newlbl)
+           else l)
                              a
 
 
 
+getCoords :: WithCoords a -> a Z -> Vec3
+getCoords a x = case vertlbl a x of
+                     CoordLabelsF0 v -> v
+
+getTriangleLabel
+  :: WithCoords a -> a N2 -> Maybe TriangleLabel
+getTriangleLabel a x = case simplbl a x of
+                            CoordLabelsF2 tl -> tl

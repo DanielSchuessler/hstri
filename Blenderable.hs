@@ -12,10 +12,10 @@ import Prelude hiding(catch,mapM_,sequence_)
 import Simplicial.DeltaSet
 import Simplicial.Labels
 import ToPython
-import TypeLevel.TF
+import Simplicial.AnySimplex
 
 data Blenderable a = Blenderable { 
-    ba_main :: LabeledDeltaSet a (ApplyConstr BlenderSimplexInfo),
+    ba_main :: LabeledDeltaSet a BlenderSimplexInfo,
     ba_materials :: [Material]
 }
     deriving Show
@@ -42,7 +42,7 @@ instance Coords (BlenderSimplexInfo n) where
     transformCoords _ x = x
 
 instance Coords (Blenderable a) where
-    transformCoords f b = b { ba_main = mapSimplexLabels (\_ -> transformCoords f) (ba_main b) } 
+    transformCoords f b = b { ba_main = mapSimplexLabels (transformCoords f) (ba_main b) } 
 
 data FaceInfo = FaceInfo {
         faceLabel :: String,
@@ -139,33 +139,38 @@ nsurfVertThickness = 0.03
 
 
 pseudomanifold
-  :: (ShowN a, (l :$ Z) ~ Vec3, (l:$N2) ~ Maybe TriangleLabel) =>
-     LabeledDeltaSet a l -> Blenderable a
+  :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
+     WithCoords a -> Blenderable a
 pseudomanifold = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
 
 mkBlenderable
-  :: forall a l. (ShowN a, (l :$ Z) ~ Vec3, (l:$N2) ~ Maybe TriangleLabel) =>
+  :: forall a. (Show (Vert a), Show (Arc a), Show (Tri a)) =>
      Material
      -> Material
      -> Material
      -> Double
-     -> LabeledDeltaSet a l
+     -> WithCoords a
      -> Blenderable a
 mkBlenderable mat0 mat1 mat2 vertThick a = Blenderable { 
     ba_main = mapSimplexLabelsWithSimplices 
-        (\n s x -> caseNat3 n
-                    (BSI0 x (FaceInfo (sh n0 s) mat0) vertThick)
-                    (BSI1 (FaceInfo (sh n1 s) mat1) (edgeThicknessFactor*vertThick))
-                    (BSI2 (FaceInfo (sh n2 s) mat2) x)
-                    (const BSIOther))
+        (\s l -> 
+            case l of
+                CoordLabelsF0 x ->
+                    (BSI0 x (FaceInfo (show s) mat0) vertThick)
+                CoordLabelsF1 ->
+                    (BSI1 (FaceInfo (show s) mat1) (edgeThicknessFactor*vertThick))
+                CoordLabelsF2 x ->
+                    (BSI2 (FaceInfo (show s) mat2) x)
+                CoordLabelsF3 ->
+                     BSIOther)
     
         a
         ,
     ba_materials = [mat0,mat1,mat2]
 }
-    where
-        sh :: forall n. Nat n => n -> a :$ n -> String
-        sh = showN (undefined :: a)
+--     where
+--         sh :: forall n. Nat n => n -> a n -> String
+--         sh _ = showN 
 
 
 
@@ -177,8 +182,8 @@ nsurfMat2 ::  Material
 nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++transparency 0.55 0.7 1)
 
 normalSurface
-  :: (ShowN a, (l :$ Z) ~ Vec3, (l :$ N2) ~ Maybe TriangleLabel) =>
-     LabeledDeltaSet a l -> Blenderable a
+  :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
+     WithCoords a -> Blenderable a
 normalSurface = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
 
 
@@ -200,7 +205,7 @@ defaultWorldProps = ["use_sky_blend" & False,
 
 
 instance DisjointUnionable (Blenderable a) (Blenderable b) where
-    type DisjointUnion (Blenderable a) (Blenderable b) = Blenderable (EitherSequence a b)
+    type DisjointUnion (Blenderable a) (Blenderable b) = Blenderable (Either1 a b)
 
     disjointUnion (Blenderable a ma) (Blenderable a' ma') =
         Blenderable 
@@ -211,14 +216,12 @@ instance DisjointUnionable (Blenderable a) (Blenderable b) where
 ba_ds :: Blenderable a -> DeltaSet a
 ba_ds = lds_ds . ba_main
 
-ba_simplbl :: Nat n => Blenderable a -> n -> (a :$ n) -> BlenderSimplexInfo n
-ba_simplbl a n = simplbl (ba_main a) n
+ba_simplbl :: Nat n => Blenderable a -> (a n) -> BlenderSimplexInfo n
+ba_simplbl a = simplbl (ba_main a)
 
-ba_coords :: Blenderable a -> (a :$ N0) -> Vec3
-ba_coords a = bsiCoords . ba_simplbl a n0
+ba_coords :: Blenderable a -> (a   N0) -> Vec3
+ba_coords a = bsiCoords . ba_simplbl a
 
-normalSurface'
-  :: (ShowN a, (a :$ N0) ~ Vec3) => DeltaSet a -> Blenderable a
-normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
+--normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
 
 
