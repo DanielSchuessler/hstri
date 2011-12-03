@@ -6,7 +6,7 @@ import System.Directory
 import System.Random
 import qualified System.FilePath as File
 import System.Process
-import Util
+import PrettyUtil
 import Text.PrettyPrint.ANSI.Leijen as PP
 
 import Control.Monad.Writer

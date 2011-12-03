@@ -14,5 +14,13 @@ main = do
         print res
         return res
 
-    res <- mapM go [ qc_AbstractTetrahedron, qc_NormalCoordinates, qc_NormalDisc, qc_Triangulation, qc_TriangulationCxtObject ]
+    res <- mapM go [ 
+        qc_AbstractTetrahedron, 
+        qc_NormalCoordinates, 
+        qc_NormalArc, 
+        qc_NormalDisc, 
+        qc_Triangulation, 
+        qc_TriangulationCxtObject,
+        qc_Equivalence 
+        ]
     print (and res)

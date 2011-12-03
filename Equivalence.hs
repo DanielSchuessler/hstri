@@ -7,7 +7,7 @@ module Equivalence(
     IsEquivalenceClass(..),HasEquivalence(..), eqvRep, eqvEquivalents,
     -- * Equivalence classes
     EquivalenceClass, ec_elements, ec_map, ec_mapMonotonic, 
-    ec_singleton, ec_union, ec_join,
+    ec_singleton, ec_union, ec_join, ec_elementList,
     -- * Equivalence relations
     Equivalence, eqv_classmap, eqv_classes, eqv_eq, mkEquivalence, eqv_classcount,
     eqv_class_elements, eqv_reps, eqv_generators, eqv_equivalents,
@@ -23,8 +23,8 @@ import Data.Monoid
 import HomogenousTuples
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Text.PrettyPrint.ANSI.Leijen
 import Text.Printf.TH
+import PrettyUtil
 import Util
 
 
@@ -53,6 +53,9 @@ data EquivalenceClass a = EquivalenceClass {
     -- | An arbitraily chosen Representative of the equivalence class 
     ec_rep :: !a
 }
+
+ec_elementList :: EquivalenceClass a -> [a]
+ec_elementList = setToList . ec_elements 
 
 instance KEYCLASS(a) => IsEquivalenceClass (EquivalenceClass a) a where
     equivalents = setToList . ec_elements

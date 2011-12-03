@@ -2,9 +2,9 @@
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module Triangulation(
-    module IndexedSimplices,
+    module AbstractTetrahedron,
     module Equivalence,
-    Gluing,
+    module FacetGluing,
     Triangulation,
     
     -- * Properties 
@@ -17,8 +17,22 @@ module Triangulation(
     tOIEdgeEquivalents,
     tOIEdgeDegree,
     tGluingsIrredundant,
+    tINormalCorners,
+    tINormalTris,
+    tINormalArcs,
+    tINormalQuads,
+    tOIEdges,
+    getOIEdgeGluingSense,
     -- * Construction 
     mkTriangulation,mkTriangulationG,triang,randomTriangulation,randT,
+    -- * Canonical representatives for things that are glued
+    canonicalizeIVertex,
+    canonicalizeIEdge,
+    canonicalizeOIEdge,
+    canonicalizeITriangle,
+    canonicalizeINormalArc,
+    canonicalizeINormalCorner,
+
 
 
     -- * Testing
@@ -37,7 +51,6 @@ import Data.Function
 import qualified Data.List as List
 import Equivalence
 import HomogenousTuples
-import IndexedSimplices
 import Prelude hiding(catch,lookup)
 import System.Random
 import Test.QuickCheck
@@ -46,6 +59,11 @@ import Test.QuickCheck.Gen
 import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import TupleTH
 import FacetGluing
+import INormalDisc
+import NormalDisc
+import Element
+import Edge
+import Data.Maybe
 
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
@@ -159,7 +177,7 @@ mkTriangulation tTetrahedra_ tGluings_
 
     let allIEdges :: [IEdge]
         allIEdges = concatMap edgeList tTetrahedra_
-        allOIEdges = concatMap (\e0 ->  [packOrderedFace NoFlip e0, packOrderedFace Flip e0]) allIEdges
+        _allOIEdges = concatMap (asList . allOIEdges) tTetrahedra_
 
         allIVertices :: [IVertex]
         allIVertices = concatMap vertexList allIEdges
@@ -205,7 +223,7 @@ mkTriangulation tTetrahedra_ tGluings_
             allIEdges
 
 
-        oEdgeEqv = mkEquivalence pairs allOIEdges
+        oEdgeEqv = mkEquivalence pairs _allOIEdges
             where
                 pairs =
                     [ pair | 
@@ -404,3 +422,82 @@ tOIEdgeEquivalents tr oiedge = eqv_equivalents (oEdgeEqv tr) oiedge
 tOIEdgeDegree :: Triangulation -> OIEdge -> Int
 tOIEdgeDegree tr = length . tOIEdgeEquivalents tr
 
+
+tINormalCorners :: Triangulation -> [INormalCorner]
+tINormalCorners = concatMap normalCornerList . tTetrahedra_ 
+tINormalArcs :: Triangulation -> [INormalArc]
+tINormalArcs = concatMap normalArcList . tTetrahedra_ 
+tINormalTris :: Triangulation -> [INormalTri]
+tINormalTris = concatMap normalTriList . tTetrahedra_ 
+tINormalQuads :: Triangulation -> [INormalQuad]
+tINormalQuads = concatMap normalQuadList . tTetrahedra_ 
+
+tOIEdges :: Triangulation -> [OIEdge]
+tOIEdges = concatMap (asList . allOIEdges) . tTetrahedra_
+
+-- | Returns whether the two given oriented edges are glued to each other in order, reversely, or not at all
+getOIEdgeGluingSense
+  :: Triangulation -> OIEdge -> OIEdge -> Maybe S2
+getOIEdgeGluingSense t oedge1 oedge2 = 
+    let
+        eq = eqv_eq (oEdgeEqv t)
+    in
+        if eq oedge1 oedge2
+        then Just NoFlip
+        else if eq (Flip .* oedge1) oedge2 
+        then Just Flip
+        else Nothing
+
+
+prop_getOIEdgeGluingSense_same :: Triangulation -> Property
+prop_getOIEdgeGluingSense_same tr = forAllElements (tOIEdges tr)
+    (\e -> getOIEdgeGluingSense tr e e == Just NoFlip )
+    
+prop_getOIEdgeGluingSense_sym :: Triangulation -> Property
+prop_getOIEdgeGluingSense_sym tr = 
+    join forAllElements2 (tOIEdges tr) (\(e1, e2) -> f e1 e2 == f e2 e1)
+  where
+        f = getOIEdgeGluingSense tr
+
+canonicalizeIVertex
+  :: Triangulation -> IVertex -> IVertex
+canonicalizeIVertex t x = eqvRep (vertexEqv t) x
+
+canonicalizeIEdge
+  :: Triangulation -> IEdge -> IEdge
+canonicalizeIEdge t x = (eqvRep (edgeEqv t) x)
+
+canonicalizeOIEdge
+  :: Triangulation -> OIEdge -> OIEdge
+canonicalizeOIEdge t x = (eqvRep (oEdgeEqv t) x)
+
+canonicalizeITriangle :: Triangulation -> ITriangle -> ITriangle
+canonicalizeITriangle t rep = 
+    case lookup rep (tGlueMap_ t) of
+                            Just (forgetVertexOrder -> rep') | rep' < rep -> rep'
+                            _ -> rep
+
+canonicalizeINormalArc :: Triangulation -> INormalArc -> INormalArc
+canonicalizeINormalArc t ina =
+    let
+        tri = iNormalArcGetTriangle ina
+    in
+          case lookup tri (tGlueMap_ t) of
+                            Just otri | _tri' <- forgetVertexOrder otri, 
+                                        _tri' < tri -> 
+                                
+                                    
+                                 (iNormalArc (_tri',
+                                    (fromJust . gluingMapVertex (tri,otri) $ iNormalArcGetVertex ina)))
+                                    
+
+                            _ -> ina
+
+canonicalizeINormalCorner :: Triangulation -> INormalCorner -> INormalCorner
+canonicalizeINormalCorner t (viewI -> I i (edge -> e)) = 
+      iNormalCorner $ canonicalizeIEdge t (i ./ e)
+
+prop_forgetVertexOrder_natural_for_canonicalization :: Triangulation -> Property
+prop_forgetVertexOrder_natural_for_canonicalization t =
+    forAllElements (tOIEdges t)
+        (\e -> canonicalizeIEdge t (forgetVertexOrder e) == forgetVertexOrder (canonicalizeOIEdge t e)) 

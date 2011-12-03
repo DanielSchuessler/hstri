@@ -21,7 +21,7 @@ import List
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet
 import Simplicial.GraphComplex
-import Simplicial.Labels
+--import Simplicial.Labels
 import TupleTH
 
 

@@ -8,6 +8,9 @@ import Data.List
 type Pair a = (a,a)
 type Triple a = (a,a,a)
 type Quadruple a = (a,a,a,a)
+type Sextuple a = (a,a,a,a,a,a)
+type Septuple a = (a,a,a,a,a,a,a)
+type Dodecatuple a = (a,a,a,a,a,a,a,a,a,a,a,a)
 
 toList2 ::  (t, t) -> [t]
 toList2 (x1,x2) = [x1,x2]

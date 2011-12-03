@@ -19,15 +19,11 @@ import Data.Word
 import Language.Haskell.TH
 import Test.QuickCheck hiding((.&.))
 import Test.QuickCheck.All
-import Text.PrettyPrint.ANSI.Leijen
-import Data.Ratio
 import Data.BitSet.Word8(BitSet(..))
 import Language.Haskell.TH.Syntax
 import Data.Permute as Permute
 import Data.Char
-import Numeric
 import qualified Data.Set as S
-import qualified Data.Map as M
 import Control.Exception
 
 
@@ -87,25 +83,6 @@ forAll2 gen1 gen2 p = forAll gen1 (\x1 -> forAll gen2 (p x1))
 forAll3 :: (Testable prop, Show a1, Show a2, Show a) =>Gen a -> Gen a1 -> Gen a2 -> (a -> a1 -> a2 -> prop) -> Property
 forAll3 gen1 gen2 gen3 p = forAll gen1 (\x1 -> forAll gen2 (\x2 -> forAll gen3 (p x1 x2)))
 
-spacedEncloseSep ::  Doc -> Doc -> Doc -> [Doc] -> Doc
-spacedEncloseSep l r separator = encloseSep (l <> space) (space <> r) (separator <> space)
-
-
-prettyListAsSet ::  Pretty a => [a] -> Doc
-prettyListAsSet = spacedEncloseSep lbrace rbrace comma . fmap pretty
-
-
-
-prettyAssocs ::  (Pretty a1, Pretty a) => [(a, a1)] -> Doc
-prettyAssocs xs =  spacedEncloseSep lbrace rbrace comma 
-                    [ pretty k </> nest 2 (string "->" </> pretty v)
-                        | (k,v) <- xs ]
-
-prettyString ::  Pretty a => a -> String
-prettyString = ($"") . displayS . renderPretty 0.5 116 . pretty
-
-pr ::  Pretty a => a -> IO ()
-pr = putStrLn . prettyString
 
 
 
@@ -272,7 +249,6 @@ instance (NFData (Colour Double)) where
 
 
 
-instance Pretty Word where pretty = pretty . toInteger
 
 
 
@@ -307,8 +283,6 @@ prop_flipNibbles x = word8ToNibbles (flipNibbles x) == (y0,y1)
         
 
         
-instance (Integral a, Show a) => Pretty (Ratio a) where
-    pretty = text . show
 
 deriveCollectionKeyClass ''BitSet
 
@@ -354,35 +328,6 @@ liftByShow ::  Show a => a -> ExpQ
 liftByShow = conE . mkName . show
 
 
-prettyStringMatrix :: [[String]] -> String
-prettyStringMatrix xss = unlines . fmap (intercalate "  " . fmap fmtCell) $ xss 
-    where
-        maxWidth = maximum . fmap length . concat $ xss
-        fmtCell x = replicate (maxWidth - length x) ' ' ++ x
-
-class PrettyScalar a where
-    prettyScalar :: a -> String
-
-instance PrettyScalar Rational where
-    prettyScalar 0 = ""
-    prettyScalar x = show (numerator x) ++ "/" ++ show (denominator x)
-
-instance PrettyScalar Double where
-    prettyScalar 0 = ""
-    prettyScalar x = showFFloat (Just 4) x "" 
-
-prettyMatrix :: PrettyScalar a => [[a]] -> String
-prettyMatrix = prettyStringMatrix . (fmap . fmap) prettyScalar
-
-prMatrix :: PrettyScalar a => [[a]] -> IO ()
-prMatrix = putStrLn . prettyMatrix 
-
-
-instance (Ord a, Pretty a) => Pretty (Set a) where
-    pretty = prettyListAsSet . setToList 
-
-instance (Ord a, Pretty a, Pretty b) => Pretty (Map a b) where
-    pretty = prettyAssocs . M.assocs 
 
 wrapException :: String -> a -> a
 wrapException msg = mapException (\(SomeException e) -> 

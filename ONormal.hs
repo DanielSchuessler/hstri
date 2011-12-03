@@ -15,7 +15,7 @@ newtype ONormalArc = ONormalArc (Pair NormalCorner)
 class MakeONormalArc a where
     oNormalArc :: a -> ONormalArc 
 
-class AsList oNormalArcTuple => HasONormalArcs a oNormalArcTuple | a -> oNormalArcTuple where
+class AsList oNormalArcTuple => ONormalArcs a oNormalArcTuple | a -> oNormalArcTuple where
     oNormalArcs :: a -> oNormalArcTuple
 
 instance MakeONormalArc (Pair NormalCorner) where
@@ -24,13 +24,13 @@ instance MakeONormalArc (Pair NormalCorner) where
 instance MakeONormalArc (Pair Edge) where
     oNormalArc = oNormalArc . map2 normalCorner 
 
-instance HasNormalCorners ONormalArc (Pair NormalCorner) where
+instance NormalCorners ONormalArc (Pair NormalCorner) where
     normalCorners (ONormalArc x) = x
 
-instance HasONormalArcs Triangle (Triple NormalArc) where
+instance ONormalArcs Triangle (Triple NormalArc) where
     oNormalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
 
-instance HasONormalArcs OTriangle (Triple NormalArc) where
+instance ONormalArcs OTriangle (Triple NormalArc) where
     oNormalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
 
 

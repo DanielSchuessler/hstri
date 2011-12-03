@@ -1,5 +1,5 @@
-{-# LANGUAGE NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances #-}
-{-# OPTIONS -Wall #-}
+{-# LANGUAGE FlexibleContexts, BangPatterns, TypeFamilies, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances, MultiParamTypeClasses #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 module Edge where
 
 import Control.Exception
@@ -9,9 +9,17 @@ import Data.Maybe
 import Element
 import HomogenousTuples
 import Test.QuickCheck
-import Text.PrettyPrint.ANSI.Leijen
+import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import Util
 import Vertex
+import TIndex
+import FaceClasses
+import OrderableFace
+import Data.Word
+import S2
+import Control.Monad
+import Control.Applicative
+import TupleTH
 
 -- | Edge of an abstract tetrahedron (unoriented)
 newtype Edge = Edge (BitSet Vertex) 
@@ -106,4 +114,135 @@ instance Finite Edge
 
 instance Quote Edge where
     quotePrec _ e = "e" ++ show e
+
+-- | An 'Edge' with a tetrahedron index attached to it
+data IEdge = IEdge {-# UNPACK #-} !TIndex {-# UNPACK #-} !Edge
+    deriving (Eq,Ord)
+
+instance Enum IEdge where
+    toEnum (toEnum -> I i x) = (./) i x
+    fromEnum = fromEnum . viewI
+
+instance HasTIndex IEdge Edge where
+    viewI (IEdge i x) = I i x
+    (./) = IEdge
+
+instance Show IEdge where show = show . viewI
+instance Quote IEdge where quotePrec prec = quotePrec prec . viewI
+instance Pretty IEdge where pretty = pretty . viewI
+                            
+                            
+-- | Oriented edge of an abstract tetrahedron
+newtype OEdge = OEdge Word8 {- The lower nibble encodes the first vertex, the upper nibble encodes the second vertex. Invariant: The vertices are distinct. -}
+    deriving(Eq,Ord)
+
+instance Enum OEdge where 
+    fromEnum (unpackOrderedFace -> (g,e)) = fromEnum (EnumPair g e)
+    toEnum n = packOrderedFace g (e::Edge) where EnumPair g e = toEnum n
+
+
+prop_EnumOEdge :: Property
+prop_EnumOEdge = forAll (elements [0..11]) (\n -> fromEnum (toEnum n :: OEdge) .=. n)
+
+
+-- | Make an oriented edge of an abstract tetrahedron from two of its vertices (which must be distinct)
+verticesToOEdge ::  (Vertex, Vertex) -> OEdge
+verticesToOEdge (Vertex v0, Vertex v1) = OEdge (nibblesToWord8 (v0,v1))
+
+instance Bounded OEdge where
+    minBound = verticesToOEdge (vA,vB)
+    maxBound = verticesToOEdge (vD,vC)
+
+class MakeOEdge a where
+    oedge :: a -> OEdge
+
+
+instance MakeOEdge (Pair Vertex) where
+    oedge = verticesToOEdge
+
+
+instance (OrderableFace IEdge OIEdge) where
+    type VertexSymGroup IEdge = S2
+    type VertexTuple IEdge = Pair IVertex
+    unpackOrderedFace (viewI -> I i (unpackOrderedFace -> (g,e))) = (g, (./) i e)
+    packOrderedFace g = mapI (packOrderedFace g)
+
+instance LeftAction S2 OIEdge where (.*) = defaultLeftActionForOrderedFace
+
+-- | Vertices contained in a given edge
+instance Vertices Edge (Pair Vertex) where
+    vertices = edgeVertices
+
+
+instance OrderableFace Edge OEdge where 
+    type VertexSymGroup Edge = S2
+    type VertexTuple Edge = Pair Vertex
+
+    unpackOrderedFace (vertices -> (v0,v1)) =
+      let
+        e = edge (v0,v1)
+      in
+        case compare v0 v1 of
+             LT -> (NoFlip, e)
+             GT -> (Flip  , e)
+             EQ -> error ("Invalid OEdge with vertices "++show (v0,v1))
+
+    packOrderedFace g e = verticesToOEdge (g .* vertices e) 
+
+instance LeftAction S2 OEdge where
+    (.*) = defaultLeftActionForOrderedFace
+
+instance Show OEdge where
+    show (vertices -> (v0,v1)) = show v0 ++ show v1
+
+instance Vertices OEdge (Pair Vertex) where
+    vertices (OEdge (word8ToNibbles -> (x1,x0))) = (Vertex x1, Vertex x0)
+
+instance Arbitrary OEdge where arbitrary = liftM2 packOrderedFace arbitrary arbitrary 
+instance Pretty OEdge where pretty = abstractTetrahedronColor . text . show
+
+
+-- | An 'OEdge' with a tetrahedron index attached to it
+type OIEdge = I OEdge 
+
+instance Finite OEdge
+
+instance Vertices IEdge (Pair IVertex) where 
+    {-# INLINABLE vertices #-}
+    vertices z = map2 ((./) (getTIndex z)) (vertices (forgetTIndex z)) 
+
+instance Vertices OIEdge (Pair IVertex) where 
+    vertices z = map2 ((./) (getTIndex z)) (vertices (forgetTIndex z)) 
+
+instance Edges TIndex (IEdge,IEdge,IEdge,IEdge,IEdge,IEdge) where
+    edges z = map6 (z ./) allEdges'
+
+-- | Edges containing a given vertex
+instance Edges Vertex (Triple Edge) where
+    edges !v = fromList3 (filter6 (isVertexOfEdge v) allEdges')
+
+
+trivialHasTIndexInstance [t|OEdge|]
+
+instance Edges IVertex (Triple IEdge) where
+    edges (viewI -> I i v) = map3 (i ./) (edges v) 
+
+instance Arbitrary IEdge where
+    arbitrary = (./) <$> arbitrary <*> arbitrary
+
+
+allOIEdges :: TIndex -> (Dodecatuple OIEdge)
+allOIEdges ti = $(catTuples 6 6) (map6 (packOrderedFace NoFlip) es) (map6 (packOrderedFace Flip) es)
+    where
+        es = edges ti
+
+
+otherVertex :: (Eq a1, Vertices a (a1, a1)) => a -> a1 -> a1
+otherVertex (vertices -> (v0,v1)) v =
+    if v0==v
+    then v1
+    else if v1==v
+    then v0
+    else error ("otherVertex: Second arg not a vertex of first arg")
+
 

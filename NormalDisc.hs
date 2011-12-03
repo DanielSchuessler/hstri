@@ -4,35 +4,28 @@
 module NormalDisc(
         module AbstractTetrahedron,
         module AbstractTetrahedron2,
+        module NormalArc,
 
         -- * Normal discs
         NormalDisc(..),
-        MakeNormalDisc(..),   allNormalDiscs,
+        MakeNormalDisc(..),   allNormalDiscs, 
+        NormalDiscs(..),normalDiscList,
           
 
         -- * Normal triangles
         NormalTri(..),
-        allNormalTris, normalTriGetVertex, 
+        allNormalTris, allNormalTris', normalTriGetVertex, 
         MakeNormalTri(..),
+        NormalTris(..),normalTriList,normalTriByNormalArc,
 
 
         -- * Normal quadrilaterals
         NormalQuad(..), allNormalQuads, allNormalQuads', normalQuadByDisjointEdge, normalQuadGetDisjointEdges,
         normalQuadByVertexAndTriangle, normalQuadGetIntersectedEdges,
+        normalQuadByNormalArc,
+        NormalQuads(..),normalQuadList,
 
 
-        -- * Normal arcs
-        NormalArc, normalArcGetTriangle, normalArcGetVertex, allNormalArcs,
-            normalArcGetOppositeEdge,
-        MakeNormalArc(..),
-        HasNormalArcs(..),
-        normalArcList,
-
-        -- * Normal corners
-        NormalCorner, allNormalCorners, normalCornerGetContainingEdge, 
-        MakeNormalCorner(..),
-        HasNormalCorners(..),
-        normalCornerList,
 
 
         -- * Testing
@@ -44,8 +37,6 @@ module NormalDisc(
 
 import AbstractTetrahedron
 import AbstractTetrahedron2
-import Collections
-import Control.Exception(assert)
 import Data.Functor
 import Data.List(sort)
 import Element
@@ -55,6 +46,7 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import TupleTH
+import NormalArc
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)
@@ -72,16 +64,21 @@ instance Show NormalTri where
 --    show nt = "{Normal triangle enclosing "++show (normalTriGetVertex nt)++"}"
 
 
-allNormalTris ::  [NormalTri]
-allNormalTris = NormalTri <$> allVertices
+allNormalTris :: [NormalTri]
+allNormalTris = asList allNormalTris'
+
+allNormalTris' :: (NormalTri, NormalTri, NormalTri, NormalTri)
+allNormalTris' = map4 NormalTri allVertices'
 
 data NormalQuad = 
-    -- | The quad disjoint from the edges 'AB' and 'CD'.
-    Q | 
-    -- | The quad disjoint from the edges 'AC' and 'BD'.
-    Q' | 
-    -- | The quad disjoint from the edges 'AD' and 'BC'.                  
-    Q'' deriving(Enum,Bounded,Eq,Ord)
+    -- | The quad disjoint from the edges 'eAB' and 'eCD'.
+    Q_ab | 
+    -- | The quad disjoint from the edges 'eAC' and 'eBD'.
+    Q_ac | 
+    -- | The quad disjoint from the edges 'eAD' and 'eBC'.                  
+    Q_ad 
+    
+    deriving(Enum,Bounded,Eq,Ord)
 
 instance Show NormalQuad where
     show q = "q"++(show . fst . normalQuadGetDisjointEdges) q 
@@ -98,7 +95,7 @@ allNormalQuads ::  [NormalQuad]
 allNormalQuads = asList allNormalQuads'
 
 allNormalQuads' :: Triple NormalQuad
-allNormalQuads' = (Q,Q',Q'')
+allNormalQuads' = (Q_ab,Q_ac,Q_ad)
 
 allNormalDiscs ::  [NormalDisc]
 allNormalDiscs = (normalDisc <$> allNormalTris) ++ (normalDisc <$> allNormalQuads)
@@ -132,85 +129,27 @@ instance MakeNormalDisc Vertex where
 
 
 
-data NormalArc = NormalArc Triangle Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
-    deriving (Eq,Ord)
-
-instance Show NormalArc where
-    show (NormalArc t v) = "{Normal arc in "++show t++" dual to "++show v++"}" 
-
-instance HasNormalCorners NormalArc (Pair NormalCorner) where
-    normalCorners (NormalArc t v) =  
-        (   fromList2
-          . fmap NormalCorner
-          . filter3 (v `isSubface`)) (edges t)
-
-instance HasNormalCorners Triangle (Triple NormalCorner) where
-    normalCorners = map3 normalCorner . edges
-
-instance HasNormalCorners OTriangle (Triple NormalCorner) where
-    normalCorners = map3 normalCorner . edges
-
-instance MakeNormalCorner OEdge where
-    normalCorner = normalCorner . forgetVertexOrder
-
-
-prop_NormalCornersOfNormalArc_distinct :: NormalArc -> Bool
-prop_NormalCornersOfNormalArc_distinct nat = let (c1,c2) = normalCorners nat in c1 /= c2
-
-
-class MakeNormalArc a where
-    normalArc :: a -> NormalArc
-
--- | Construct a normal arc by the triangle that contains it and the vertex (of that triangle) 
--- dual to the normal arc (i.e., the vertex which the normal arc separates from the other two vertices of the triangle)
-instance MakeNormalArc (Triangle,Vertex) where
-    normalArc (f,v) = assert (isSubface v f) 
-                        (NormalArc f v)
-
-
--- | Construct a normal arc by the two edges it intersects
-instance MakeNormalArc (Edge,Edge) where
-    normalArc es = normalArc (triangle es, vertex es) 
-
--- | Construct a normal arc by its normal corners
-instance MakeNormalArc (NormalCorner,NormalCorner) where
-    normalArc = normalArc . map2 normalCornerGetContainingEdge 
 
 normalQuadGetDisjointEdges ::  NormalQuad -> (Edge, Edge)
 normalQuadGetDisjointEdges q = case q of
-                                    Q -> (edge (vA,vB),edge (vC,vD))
-                                    Q' -> (edge (vA,vC),edge (vB,vD))
-                                    Q'' -> (edge (vA,vD),edge (vB,vC))
+                                    Q_ab -> (edge (vA,vB),edge (vC,vD))
+                                    Q_ac -> (edge (vA,vC),edge (vB,vD))
+                                    Q_ad -> (edge (vA,vD),edge (vB,vC))
 
-normalQuadGetIntersectedEdges ::  NormalQuad -> [Edge]
+normalQuadGetIntersectedEdges ::  NormalQuad -> Quadruple Edge
 normalQuadGetIntersectedEdges (normalQuadGetDisjointEdges -> (e1,e2)) =
+    fromList4 $
     $(filterTuple 6) (\e -> e /= e1 && e /= e2) allEdges'
 
 prop_normalQuadGetIntersectedEdges ::  NormalQuad -> Bool
 prop_normalQuadGetIntersectedEdges nqt = 
-    sort allEdges == sort (normalQuadGetIntersectedEdges nqt ++ asList (normalQuadGetDisjointEdges nqt))
+    sort allEdges == sort (toList4 (normalQuadGetIntersectedEdges nqt) 
+        ++ asList (normalQuadGetDisjointEdges nqt))
 
 
 
-class AsList normalArcTuple => HasNormalArcs a normalArcTuple | a -> normalArcTuple where
-    normalArcs :: a -> normalArcTuple
 
-class AsList normalCornerTuple => HasNormalCorners a normalCornerTuple | a -> normalCornerTuple where
-    normalCorners :: a -> normalCornerTuple
 
-normalArcList ::  HasNormalArcs a normalArcTuple => a -> [Element normalArcTuple]
-normalArcList = asList . normalArcs
-
-normalCornerList ::  HasNormalCorners a normalCornerTuple => a -> [Element normalCornerTuple]
-normalCornerList = asList . normalCorners
-
-instance HasNormalArcs NormalQuad (Quadruple NormalArc) where
-    normalArcs q = case q of
-                   Q   -> go (vC,vD,vA,vB)
-                   Q'  -> go (vB,vA,vD,vC)
-                   Q'' -> go (vA,vB,vC,vD)
-        where
-            go = $(zipTupleWith 4) (curry normalArc) (tABC,tABD,tACD,tBCD)
 
 
 prop_NormalDisc_NormalArcs_correct :: NormalDisc -> Bool
@@ -221,8 +160,6 @@ prop_NormalDisc_NormalArcs_complete nat ndt =
     isSubface nat ndt ==> 
         any (==nat) (normalArcs ndt) 
 
-instance Arbitrary NormalArc where
-    arbitrary = elements [ minBound .. maxBound ]
 
 -- | Constructs a normal quad specified by one of the two edges disjoint from it
 normalQuadByDisjointEdge ::  Edge -> NormalQuad
@@ -245,94 +182,22 @@ normalQuadByVertexAndTriangle :: Vertex -> Triangle -> NormalQuad
 normalQuadByVertexAndTriangle v f = normalQuadByDisjointEdge (edgeByOppositeVertexAndTriangle v f) 
 
 
+-- | Returns the unique normal quad type containing a normal arc of the given type
+normalQuadByNormalArc :: NormalArc -> NormalQuad
+normalQuadByNormalArc na = normalQuadByVertexAndTriangle (normalArcGetVertex na) (normalArcGetTriangle na)
 
--- | Gets the triangle containing the given normal arc
-normalArcGetTriangle ::  NormalArc -> Triangle
-normalArcGetTriangle (NormalArc f _) = f
-
--- | Gets the vertex separated by the normal arc from the other two vertices in the 'normalArcGetTriangle'
-normalArcGetVertex ::  NormalArc -> Vertex
-normalArcGetVertex (NormalArc _ v) = v
-
--- | Gets the edge which is contained in the 'normalArcGetTriangle' of the 
--- given normal arc, but disjoint from the normal arc
-normalArcGetOppositeEdge ::  NormalArc -> Edge
-normalArcGetOppositeEdge nat = edgeByOppositeVertexAndTriangle (normalArcGetVertex nat) (normalArcGetTriangle nat)
+prop_normalQuadByNormalArc :: NormalArc -> Bool
+prop_normalQuadByNormalArc na = isSubface na (normalQuadByNormalArc na) 
 
 
-instance Enum NormalArc where
-    fromEnum (NormalArc f v) = 3 * fromEnum f + indexInTriple v (vertices f) 
-    toEnum n = assert (n >= 0) $
-               assert (n < 12) $
-                   let 
-                        (d,m) = divMod n 3
-                        f :: Triangle
-                        f = toEnum d
-                   in normalArc (f, vertexList f !! m)
-
-instance Bounded NormalArc where
-    minBound = normalArc (f, minimum . vertexList $ f)
-        where
-            f :: Triangle
-            f = minBound
-
-    maxBound = normalArc (f , maximum . vertexList $ f)
-        where
-            f :: Triangle
-            f = maxBound
-
-
-
-allNormalArcs :: [NormalArc]
-allNormalArcs = [minBound .. maxBound]
-
-instance Pretty NormalArc where pretty = green . text . show
-
-newtype NormalCorner = NormalCorner Edge 
-    deriving (Eq,Ord,Enum,Bounded,Arbitrary)
-
-class MakeNormalCorner a where
-    normalCorner :: a -> NormalCorner
-
-instance Show NormalCorner where
-    show (NormalCorner e) = "{Normal corner on "++show e++"}"
-
-instance Pretty NormalCorner where pretty = green . text . show
-
-allNormalCorners :: [NormalCorner]
-allNormalCorners = [minBound .. maxBound]
-
-normalCornerGetContainingEdge ::  NormalCorner -> Edge
-normalCornerGetContainingEdge (NormalCorner e) = e
-
-instance MakeEdge NormalCorner where
-    edge = normalCornerGetContainingEdge
-
-
-instance MakeNormalCorner Edge where
-    normalCorner = NormalCorner
-
-instance IsSubface NormalCorner Edge where
-    isSubface nct e = normalCornerGetContainingEdge nct == e 
-
-instance IsSubface NormalCorner Triangle where
-    isSubface nct t = normalCornerGetContainingEdge nct `isSubface` t
-
-instance HasNormalArcs NormalTri (Triple NormalArc) where
+instance NormalArcs NormalTri (Triple NormalArc) where
     normalArcs (normalTriGetVertex -> v) = map3 (\f -> normalArc (f, v)) (triangles v)
 
-instance HasNormalArcs NormalDisc [NormalArc] where
+instance NormalArcs NormalDisc [NormalArc] where
     normalArcs = either normalArcList normalArcList . unNormalDisc
 
 
-instance HasNormalArcs Triangle (Triple NormalArc) where
-    normalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
 
-instance HasNormalArcs OTriangle (Triple NormalArc) where
-    normalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
-
-instance IsSubface NormalArc Triangle where
-    isSubface nat t = normalArcGetTriangle nat == t
 
 instance IsSubface NormalArc NormalTri where
     isSubface nat ntt = normalTriGetVertex ntt == normalArcGetVertex nat
@@ -344,22 +209,62 @@ instance IsSubface NormalArc NormalDisc where
     isSubface nat = either (isSubface nat) (isSubface nat) . unNormalDisc
 
 
-prop_Triangle_NormalArcs_correct :: Triangle -> Bool
-prop_Triangle_NormalArcs_correct t = all3 (`isSubface` t) (normalArcs t) 
-
-prop_Triangle_NormalArcs_complete :: NormalArc -> Triangle -> Property
-prop_Triangle_NormalArcs_complete nat t = 
-    isSubface nat t ==> 
-        any3 (==nat) (normalArcs t) 
 
 
 
 qc_NormalDisc ::  IO Bool
 qc_NormalDisc = $(quickCheckAll)
 
-deriveCollectionKeyClass ''NormalArc
-deriveCollectionKeyClass ''NormalCorner
-deriveCollectionKeyClass ''NormalDisc
+-- deriveCollectionKeyClass ''NormalArc
+-- deriveCollectionKeyClass ''NormalCorner
+-- deriveCollectionKeyClass ''NormalDisc
+
+
+instance NormalArcs NormalQuad (Quadruple NormalArc) where
+    normalArcs q = case q of
+                   Q_ab   -> go (vC,vD,vA,vB)
+                   Q_ac  -> go (vB,vA,vD,vC)
+                   Q_ad -> go (vA,vB,vC,vD)
+        where
+            go = $(zipTupleWith 4) (curry normalArc) (tABC,tABD,tACD,tBCD)
 
 
 
+class AsList tuple => NormalTris a tuple | a -> tuple where
+    normalTris :: a -> tuple
+
+normalTriList :: NormalTris a b => a -> [Element b]
+normalTriList = asList . normalTris
+
+class AsList tuple => NormalQuads a tuple | a -> tuple where
+    normalQuads :: a -> tuple
+
+
+normalQuadList :: NormalQuads a b => a -> [Element b]
+normalQuadList = asList . normalQuads
+
+class AsList tuple => NormalDiscs a tuple | a -> tuple where
+    normalDiscs :: a -> tuple
+
+
+normalDiscList ::  NormalDiscs a b => a -> [Element b]
+normalDiscList = asList . normalDiscs
+
+-- | Normal triangles meeting a given edge
+instance NormalTris Edge (Pair NormalTri) where
+    normalTris = map2 normalTri . vertices 
+
+instance NormalCorners NormalTri (Triple NormalCorner) where
+    normalCorners nt =
+        map3 normalCorner (edges . normalTriGetVertex $ nt)
+
+instance NormalCorners NormalQuad (Quadruple NormalCorner) where
+    normalCorners =
+        map4 normalCorner . normalQuadGetIntersectedEdges
+
+-- | Returns the unique normal tri type containing a normal arc of the given type
+normalTriByNormalArc :: NormalArc -> NormalTri
+normalTriByNormalArc = normalTri . normalArcGetVertex
+
+prop_normalTriByNormalArc :: NormalArc -> Bool
+prop_normalTriByNormalArc na = isSubface na (normalTriByNormalArc na) 

@@ -1,102 +1,108 @@
-{-# LANGUAGE ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts #-}
+{-# LANGUAGE TupleSections, ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall #-}
 module NormalCoordinates where
 
 import AbstractTetrahedron as Abstract
 import Collections
+import Control.Arrow
 import Control.Exception
 import Control.Monad.Reader
 import Data.AdditiveGroup
 import Data.Functor
 import Data.Monoid
 import Data.VectorSpace
+import HomogenousTuples
+import INormalDisc
 import IndexedSimplices
 import PolymakeInterface
+import Prelude hiding(lookup)
+import PrettyUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import Triangulation
 import TriangulationCxtObject
 import qualified Data.Foldable as Fold
-import Prelude hiding(lookup)
+import qualified Data.Map as M
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
-newtype NormalCoordinate r = NC (Map INormalDisc r) 
+newtype StandardCoordinates r = SC (Map INormalDisc r) 
 
-deriving instance Functor NormalCoordinate
+deriving instance Functor StandardCoordinates
 
-instance (Num r) => AdditiveGroup (NormalCoordinate r) where
-    zeroV = NC mempty
-    NC xs ^+^ NC ys = NC (unionMaybeWith f xs ys)
+instance (Num r) => AdditiveGroup (StandardCoordinates r) where
+    zeroV = SC mempty
+    SC xs ^+^ SC ys = SC (unionMaybeWith f xs ys)
         where
             f x y = case x + y of
                          0 -> Nothing
                          s -> Just s
     negateV = fmap negate
 
-instance (Num r) => VectorSpace (NormalCoordinate r) where
-    type Scalar (NormalCoordinate r) = r
+instance (Num r) => VectorSpace (StandardCoordinates r) where
+    type Scalar (StandardCoordinates r) = r
     0 *^ _ = zeroV
     r *^ x = fmap (r*) x 
 
-instance (Num r) => InnerSpace (NormalCoordinate r) where
-    NC x <.> NC y = Fold.foldl' (+) 0 (intersectionWith (*) x y)
+instance (Num r) => InnerSpace (StandardCoordinates r) where
+    SC x <.> SC y = Fold.foldl' (+) 0 (intersectionWith (*) x y)
 
-deriving instance (Pretty r) => Pretty (NormalCoordinate r)
+deriving instance (Pretty r) => Pretty (StandardCoordinates r)
 
-instance (Pretty r) => Show (NormalCoordinate r) where
+instance (Pretty r) => Show (StandardCoordinates r) where
     show = prettyString
 
-toNormalCoordinate :: (Num r) => INormalDisc -> NormalCoordinate r
-toNormalCoordinate x = NC (singletonMap x 1)
+class NormalSurface a where
+    standardCoordinates :: Num r => a -> StandardCoordinates r
 
-mkNormalTri :: (Num r) => IVertex -> NormalCoordinate r
-mkNormalTri (viewI -> I i v) = 
-    toNormalCoordinate (i ./ (normalDisc (normalTri v))) 
+instance NormalSurface INormalDisc where
+    standardCoordinates x = SC (singletonMap x 1)
+
+instance NormalSurface INormalTri where
+    standardCoordinates = standardCoordinates . iNormalDisc
+
+instance NormalSurface INormalQuad where
+    standardCoordinates = standardCoordinates . iNormalDisc
+
+mkNormalTri :: (Num r) => IVertex -> StandardCoordinates r
+mkNormalTri = standardCoordinates . iNormalTri
 
 
-mkNormalQuadByQuad :: (Num r) => TIndex -> NormalQuad -> NormalCoordinate r
-mkNormalQuadByQuad ti q = toNormalCoordinate (ti ./ (normalDisc q))
+mkNormalQuadByDisjointEdge :: (Num r) => TIndex -> Abstract.Edge -> StandardCoordinates r
+mkNormalQuadByDisjointEdge ti e = standardCoordinates (ti ./ normalQuadByDisjointEdge e)
 
-mkNormalQuadByDisjointEdge :: (Num r) => TIndex -> Abstract.Edge -> NormalCoordinate r
-mkNormalQuadByDisjointEdge ti e = toNormalCoordinate (ti ./ (normalDisc $ normalQuadByDisjointEdge e))
-
-mkNormalQuadByVertexAndTTriangle :: (Num r) => Vertex -> ITriangle -> NormalCoordinate r
+mkNormalQuadByVertexAndTTriangle :: (Num r) => Vertex -> ITriangle -> StandardCoordinates r
 mkNormalQuadByVertexAndTTriangle v (viewI -> I i f) = 
     mkNormalQuadByDisjointEdge i (edgeByOppositeVertexAndTriangle v f)
 
 
-mkTetrahedralSolution :: (Num r) => TIndex -> NormalCoordinate r
+mkTetrahedralSolution :: (Num r) => TIndex -> StandardCoordinates r
 mkTetrahedralSolution ti = 
-    sumV (((mkNormalTri . (ti ./)) <$> Abstract.allVertices)
+    sumV (fmap standardCoordinates (normalTriList ti)
           ++
-          ((negateV . mkNormalQuadByQuad) ti <$> [Q,Q',Q'']))
+          fmap (negateV . standardCoordinates) (normalQuadList ti))
 
-mkEdgeSolution :: (Num r) => TEdge -> NormalCoordinate r
+mkEdgeSolution :: (Num r) => TEdge -> StandardCoordinates r
 mkEdgeSolution e =
         sumV (f <$> equivalentIEdges e)
     where
         f preimage = (t1 ^+^ t2) ^-^ q
             where
-                ti = getTIndex preimage
-                ae = forgetTIndex preimage
-                avs = vertices ae
-                t1 = mkNormalTri (ti ./ fst avs)
-                t2 = mkNormalTri (ti ./ snd avs)
-                q = mkNormalQuadByDisjointEdge ti ae
+                (t1,t2) = map2 standardCoordinates (normalTris preimage)
+                q = standardCoordinates (iNormalQuadByDisjointEdge preimage)
 
 -- | Construct the Kang-Rubinstein basis for the solution space of the matching equations of tindex triangulation
-krBasis :: Num r => Triangulation -> [NormalCoordinate r]
-krBasis t = (mkTetrahedralSolution <$> tTetrahedra_ t) ++ (mkEdgeSolution <$> (tEdges t))
+krBasis :: Num r => Triangulation -> [StandardCoordinates r]
+krBasis t = (mkTetrahedralSolution <$> tTetrahedra_ t) ++ (mkEdgeSolution <$> (edges t))
 
 
-ncCoefficient :: (Num r) => NormalCoordinate r -> INormalDisc -> r
-ncCoefficient (NC nc) nd = case lookup nd nc of
+ncCoefficient :: (Num r) => StandardCoordinates r -> INormalDisc -> r
+ncCoefficient (SC nc) nd = case lookup nd nc of
                                     Just r -> r
                                     Nothing -> 0
 
-toVec :: (Num r) => Triangulation -> NormalCoordinate r -> [r] 
+
+toVec :: (Num r) => Triangulation -> StandardCoordinates r -> [r] 
 toVec t nc = fmap (ncCoefficient nc) (allINormalDiscs t)
 
 allINormalDiscs :: Triangulation -> [INormalDisc]
@@ -105,12 +111,12 @@ allINormalDiscs t = [ ti ./ ndt | ti <- (tTetrahedra_ t) , ndt <- allNormalDiscs
 
 
 
--- type NormalCoordinateFunctional tindex r = NormalCoordinate tindex r -> r
+-- type StandardCoordinateFunctional tindex r = StandardCoordinates tindex r -> r
 
 -- | Identified through the standard inner product
-type NormalCoordinateFunctional r = NormalCoordinate r 
+type StandardCoordinateFunctional r = StandardCoordinates r 
 
-matchingEquations ::  Num r => Triangulation -> [NormalCoordinate r]
+matchingEquations ::  Num r => Triangulation -> [StandardCoordinates r]
 matchingEquations = liftM (fmap fst) matchingEquationsWithReasons
 
 data MatchingEquationReason = MatchingEquationReason ITriangle OITriangle Vertex Vertex
@@ -124,30 +130,35 @@ instance Show MatchingEquationReason where
                     show (iNormalArc (x', v'))
                   ]
                             
-
-matchingEquationsWithReasons :: Num r => Triangulation -> [(NormalCoordinate r, MatchingEquationReason)]
-matchingEquationsWithReasons t =
-    
+matchingEquationReasons
+  :: Triangulation -> [MatchingEquationReason]
+matchingEquationReasons t =
       [
-            (y,y_reason)
+         MatchingEquationReason x x' (forgetTIndex v) (forgetTIndex v')
                
         |
             (x,x') <- tGluings_ t,
-            (v,v') <- zip (vertexList x) (vertexList x'),
-
-            let y =  (((mkNormalTri v                                                                    
-                          ^+^ mkNormalQuadByVertexAndTTriangle (forgetTIndex v) x)                       
-                          ^-^ mkNormalTri v')                                                            
-                          ^-^ mkNormalQuadByVertexAndTTriangle (forgetTIndex v') (forgetVertexOrder  x')),
-
-            let y_reason = MatchingEquationReason x x' (forgetTIndex v) (forgetTIndex v')
+            (v,v') <- zip (vertexList x) (vertexList x')
 
             ]
+
+matchingEquationReasonToVector
+  :: Num r => MatchingEquationReason -> StandardCoordinates r
+matchingEquationReasonToVector (MatchingEquationReason x x' v v') =
+                              (mkNormalTri (getTIndex x ./ v)
+                          ^+^ mkNormalQuadByVertexAndTTriangle v x)
+                          ^-^ mkNormalTri (getTIndex x' ./ v')
+                          ^-^ mkNormalQuadByVertexAndTTriangle v' (forgetVertexOrder x')
+
+matchingEquationsWithReasons :: Num r => Triangulation -> [(StandardCoordinates r, MatchingEquationReason)]
+matchingEquationsWithReasons =
+    fmap (matchingEquationReasonToVector &&& id) . matchingEquationReasons
+    
 
 
 explainMatchingEquations ::  Triangulation -> IO ()
 explainMatchingEquations t = putStrLn $
-    unlines (concatMap (\(x,y) -> [show (x :: NormalCoordinateFunctional Double), 
+    unlines (concatMap (\(x,y) -> [show (x :: StandardCoordinateFunctional Double), 
                                    "\t"++show y]) 
                        (matchingEquationsWithReasons t)) 
 
@@ -157,7 +168,7 @@ explainMatchingEquations t = putStrLn $
 prop_krBasisMatchingEquations ::  Triangulation -> Gen Prop
 prop_krBasisMatchingEquations t =
         (let
-            krB = krBasis t :: [NormalCoordinate Int]
+            krB = krBasis t :: [StandardCoordinates Int]
             mE = matchingEquations t
          in
             conjoin [ (x <.> y) == 0 
@@ -181,7 +192,7 @@ getVertexSolutions t = do
     let
         nonNegativityConditions :: [[s]]
         nonNegativityConditions = 
-            [ 0 : toVec t (toNormalCoordinate x) | x <- allINormalDiscs t ]
+            [ 0 : toVec t (standardCoordinates x) | x <- allINormalDiscs t ]
 
         sumOne :: [s]
         sumOne =
@@ -192,15 +203,32 @@ getVertexSolutions t = do
 
 
 
-getVertexSolutions' :: PmScalar s => Triangulation -> IO [NormalCoordinate s]
+getVertexSolutions' :: PmScalar s => Triangulation -> IO [StandardCoordinates s]
 getVertexSolutions' t = do
     s0 <- getVertexSolutions t
 
     let fromVec (r:rs) = assert (r==1) . sumV $ zipWith f rs (allINormalDiscs t)
         fromVec _ = assert False undefined
-        f r nd = r *^ toNormalCoordinate nd 
+        f r nd = r *^ standardCoordinates nd 
 
     return (fromVec <$> s0)
 
 
 --edgesOfNormalDisc :: NormalDics -> [
+
+normalArcCounts
+  :: Num a => StandardCoordinates a -> M.Map (I NormalArc) a
+normalArcCounts (SC m) = 
+    M.fromListWith (+)
+    . concatMap (\(d,r) -> fmap (,r) (normalArcList d)) 
+    . M.toList
+    $ m
+
+instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
+    arbitrary = 
+        (SC . M.fromListWith (+)) <$> arbitrary 
+
+
+--prop_normalArcCounts_welldefined ::
+
+

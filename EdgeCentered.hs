@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction, ViewPatterns, TypeOperators, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, ViewPatterns, TypeOperators, FlexibleContexts, TypeFamilies #-}
 {-# OPTIONS -Wall #-}
 module EdgeCentered where
 import Equivalence
@@ -7,12 +7,12 @@ import Data.Map as M
 import Data.List as L
 import HomogenousTuples
 import Test.QuickCheck
-import SimplexLabels
-import SimplicialComplex
+import Simplicial.Labels
+import Simplicial.SimplicialComplex
 import Data.Vect.Double hiding((.*))
-import TypeLevel.TF
 import Data.Maybe
 import Control.Monad
+import Control.Arrow(first)
 
 data EdgeNeighborhoodVertex =
     Bottom |
@@ -123,6 +123,8 @@ makeEdgeNeighborhood tr oiEdge =
 
         h = 0.5
 
+        coords0 (OT x) = coords x
+
         coords Bottom = (-h) *& vec3Z
         coords Top = h *& vec3Z
         coords (RingVertex i) = Vec3 (sin phi) (-(cos phi)) 0  
@@ -131,7 +133,7 @@ makeEdgeNeighborhood tr oiEdge =
                 i' = fromIntegral i
                 n' = fromIntegral n
 
-        triangleLabel = flip M.lookup (M.fromList triangleLabelList)
+        triangleLabel = flip M.lookup (M.fromList (fmap (first OT) triangleLabelList))
 
         triangleLabelList :: [(Triple EdgeNeighborhoodVertex, TriangleLabel)]
         triangleLabelList = do
@@ -160,7 +162,7 @@ makeEdgeNeighborhood tr oiEdge =
 
             
     in
-        (m,addCoordFunc coords triangleLabel ds)
+        (m,addCoordFunc coords0 triangleLabel ds)
 
 
 mapEdge :: (Ord a, Vertices a1 (Pair a)) => Map a b -> a1 -> Pair b
@@ -205,10 +207,9 @@ prop_edgeIsGlued tr m oiedge =
         
 
 prop_enoughGluings
-  :: (Eq b, Eq a1, (a :$ N2) ~ (b, b, b), (l :$ N2) ~ Maybe a1) =>
-     Triangulation
-     -> t -> (Map IVertex b, LabeledDeltaSet a l) -> Property
-prop_enoughGluings tr _ (m,x) =
+  :: Eq v =>
+     Triangulation -> (Map IVertex v, WithCoords (OTuple v)) -> Property
+prop_enoughGluings tr (m,x) =
         forAll (elements (tGluings_ tr))
             (\(tri,otri) ->
 
@@ -216,8 +217,8 @@ prop_enoughGluings tr _ (m,x) =
                     im1 = mapTri m tri 
                     im2 = mapTri m otri
                     
-                    lbl1 = simplbl x n2 im1
-                    lbl2 = simplbl x n2 im2
+                    lbl1 = getTriangleLabel x (OT im1)
+                    lbl2 = getTriangleLabel x (OT im2)
                 in
 
                     label "equal images" (im1 == im2)
@@ -230,4 +231,4 @@ prop_enoughGluings tr _ (m,x) =
             )
 
         
-
+--qc_EdgeCentered = $(quickCheckAll)

@@ -1,5 +1,5 @@
-{-# LANGUAGE NoMonomorphismRestriction, TemplateHaskell #-}
-{-# OPTIONS -Wall #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, MultiParamTypeClasses #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 module Vertex where
 
 import Collections
@@ -9,8 +9,12 @@ import Data.Word
 import Element
 import Language.Haskell.TH.Syntax as Syntax
 import Test.QuickCheck
-import Text.PrettyPrint.ANSI.Leijen
+import PrettyUtil
 import Util
+import TIndex
+import FaceClasses
+import HomogenousTuples
+import Control.Applicative
 
 
 -- | Vertex of an abstract tetrahedron
@@ -73,3 +77,28 @@ deriveCollectionKeyClass ''Vertex
 vertexTripleToString :: (Vertex,Vertex,Vertex) -> String
 vertexTripleToString (u,v,w) = concatMap show [u,v,w]
 
+
+-- | A 'Vertex' with a tetrahedron index attached to it
+data IVertex = IVertex {-# UNPACK #-} !TIndex {-# UNPACK #-} !Vertex
+    deriving(Eq,Ord)
+
+instance HasTIndex IVertex Vertex where
+    viewI (IVertex i x) = I i x
+    (./) = IVertex
+
+instance Enum IVertex where
+    toEnum (toEnum -> I i x) = (./) i x
+    fromEnum = fromEnum . viewI
+
+instance Show IVertex where show = show . viewI
+instance Quote IVertex where quotePrec prec = quotePrec prec . viewI
+instance Pretty IVertex where pretty = pretty . viewI
+
+abstractTetrahedronColor ::  Doc -> Doc
+abstractTetrahedronColor = cyan
+
+instance Vertices TIndex (Quadruple IVertex) where
+    vertices z = map4 (z ./) allVertices'
+
+instance Arbitrary IVertex where
+    arbitrary = (./) <$> arbitrary <*> arbitrary
