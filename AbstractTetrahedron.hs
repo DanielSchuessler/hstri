@@ -6,6 +6,7 @@ module AbstractTetrahedron(
     module S3,
     module Util,
     module TIndex,
+    module Data.Monoid,
 
     -- * Vertices
     Vertex,
@@ -28,7 +29,7 @@ module AbstractTetrahedron(
     -- * Ordered faces
     OrderableFace(..), defaultLeftActionForOrderedFace,
     forgetVertexOrder,
-    IsSubface(..),
+    IsSubface(..),liftIsSubface,
     -- ** Ordered edges
     OEdge,
     verticesToOEdge,
@@ -57,6 +58,7 @@ import Triangle
 import TIndex
 import FaceClasses
 import OrderableFace
+import Data.Monoid
 
 class IsSubface x y where
     isSubface :: x -> y -> Bool
@@ -174,8 +176,6 @@ instance (IsSubface a b) => IsSubface (I a) (I b) where
 
 
 
-instance IsSubface IVertex IEdge where
-    isSubface x y = isSubface (viewI x) (viewI y)
 
 
 
@@ -199,4 +199,11 @@ F(ITriangle)
 
     
 
+liftIsSubface
+  :: (HasTIndex ia a, HasTIndex ia1 a1, IsSubface a a1) =>
+     ia -> ia1 -> Bool
+liftIsSubface x y = isSubface (viewI x) (viewI y)
 
+instance IsSubface IVertex IEdge where isSubface = liftIsSubface
+instance IsSubface IVertex ITriangle where isSubface = liftIsSubface
+instance IsSubface IEdge ITriangle where isSubface = liftIsSubface

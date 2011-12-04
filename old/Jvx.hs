@@ -1,3 +1,6 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+module Jvx where
+
 toJVX :: forall a. (Ord (Vertex a), Show (Vertex a), DeltaSet a) => a -> (Vertex a -> Vec3) -> ByteString
 toJVX a coords = 
     xrender $

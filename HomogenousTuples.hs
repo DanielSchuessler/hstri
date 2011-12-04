@@ -93,3 +93,8 @@ sort2 = $(tupleFromList 2) . sort . $(tupleToList 2)
 sort3 :: Ord t => (t, t, t) -> (t, t, t)
 sort3 = $(tupleFromList 3) . sort . $(tupleToList 3)
 
+
+
+rotate4_1 :: (t1, t2, t3, t) -> (t, t1, t2, t3)
+rotate4_1 = $(rotateTuple 4 1)
+

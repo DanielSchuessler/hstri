@@ -1,5 +1,6 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE NoMonomorphismRestriction #-} 
+{-# OPTIONS -Wall #-}
 module Utils where
 
 import Control.Monad
@@ -20,7 +21,7 @@ import Control.Applicative
 -- Reactive helper functions
 
 integral :: (Real p, Fractional t) => t -> Signal t -> SignalGen p (Signal t)
-integral v0 s = transfer v0 (\dt v v0 -> v0+v*realToFrac dt) s
+integral v0 s = transfer v0 (\dt v v1 -> v1+v*realToFrac dt) s
 
 driveNetwork :: (MonadIO m) => (p -> IO (m a)) -> IO (Maybe p) -> m ()
 driveNetwork network driver = loop
@@ -28,8 +29,8 @@ driveNetwork network driver = loop
         loop = do
             dt <- liftIO driver
             case dt of
-                Just dt -> do
-                    join . liftIO $ network dt
+                Just dt' -> do
+                    _ <- join . liftIO $ network dt'
                     loop
                 Nothing -> return ()
 
@@ -37,8 +38,8 @@ driveNetwork network driver = loop
 
 initCommon :: String -> IO (Signal (Int, Int))
 initCommon title = do
-    initialize
-    openWindow defaultDisplayOptions
+    _ <- initialize
+    _ <- openWindow defaultDisplayOptions
         { displayOptions_numRedBits     = 8
         , displayOptions_numGreenBits   = 8
         , displayOptions_numBlueBits    = 8
@@ -156,6 +157,7 @@ aff :: Vector g => g -> g -> Double -> g
 aff a b p = (1-p) *& a &+ p *& b
 
 
+fi :: (Integral a, Num b) => a -> b
 fi = fromIntegral
 
 vec3ToVertex ::  Vec3 -> Vertex3 Double
@@ -170,6 +172,6 @@ withChangeDetect :: Eq a => Signal a -> SignalGen p (Signal (Bool, a))
 withChangeDetect s = do
     sprev <- delay undefined s
     isFirst <- delay True (return False)
-    let f xprev x isFirst = (isFirst || x /= xprev, x)
+    let f xprev x isFirst' = (isFirst' || x /= xprev, x)
     return (f <$> sprev <*> s <*> isFirst)
 

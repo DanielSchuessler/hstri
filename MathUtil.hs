@@ -10,9 +10,6 @@ import Control.Monad
 import TupleTH
 import Data.Vect.Double.Instances
 import Data.Vect.Double.Util.Dim4
-import Control.Monad.LPMonad
-import Data.Algebra
-import Data.LinearProgram
 import Control.Applicative
 import Control.Exception
 import System.Directory

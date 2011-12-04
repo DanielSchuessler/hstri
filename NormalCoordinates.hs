@@ -9,7 +9,6 @@ import Control.Exception
 import Control.Monad.Reader
 import Data.AdditiveGroup
 import Data.Functor
-import Data.Monoid
 import Data.VectorSpace
 import HomogenousTuples
 import INormalDisc
@@ -23,6 +22,7 @@ import Triangulation
 import TriangulationCxtObject
 import qualified Data.Foldable as Fold
 import qualified Data.Map as M
+import TupleTH
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
@@ -231,4 +231,28 @@ instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
 
 --prop_normalArcCounts_welldefined ::
 
+-- The number of normal triangles in the first arg containing a normal arc of the given type.
+-- Note that this is only well-defined in the disjoint union of tetrahedra, not in the quotient space!
+numberOfTrisContainingArcType
+  :: Num r => StandardCoordinates r -> INormalArc -> r
+numberOfTrisContainingArcType nc arc = ncCoefficient nc (iNormalDisc $ iNormalTriByNormalArc arc) 
 
+numberOfQuadsContainingArcType
+  :: Num r => StandardCoordinates r -> INormalArc -> r
+numberOfQuadsContainingArcType nc arc = ncCoefficient nc (iNormalDisc $ iNormalQuadByNormalArc arc) 
+
+numberOfArcsOfType
+  :: Num r => StandardCoordinates r -> INormalArc -> r
+numberOfArcsOfType nc = liftM2 (+) (numberOfTrisContainingArcType nc) (numberOfQuadsContainingArcType nc) 
+
+numberOfCornersOfType
+  :: Num t => StandardCoordinates t -> INormalCorner -> t
+numberOfCornersOfType nc (viewI -> I i corn) =
+    $(foldr1Tuple 4) (+) (map4 (ncCoefficient nc . (i ./)) (normalDiscsContainingNormalCorner corn))
+
+--     let
+--         e = normalCornerGetContainingEdge e
+--         (t,_) = triangles e
+--         arcTypes = map2 (normalArcByTriangleAndVertex t) (vertices e)
+
+                                          

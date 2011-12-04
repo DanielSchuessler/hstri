@@ -11,6 +11,7 @@ module TriangulationCxtObject(
 
     vertexPreimage,
     edgePreimage,
+    trianglePreimage,
     MakeTVertex(..),
     MakeTEdge(..),
     MakeTTriangle(..),
@@ -70,8 +71,12 @@ vertexPreimage (T t x) = eqvClassOf (vertexEqv t) x
 edgePreimage :: TEdge -> EquivalenceClass IEdge
 edgePreimage (T t x) = eqvClassOf (edgeEqv t) x
 
-trianglePreimage :: TTriangle -> Either ITriangle Gluing
-trianglePreimage (T t x) = maybe (Left x) (Right . (x,)) $ lookup x (tGlueMap_ t)
+trianglePreimage :: TTriangle -> [OITriangle]
+trianglePreimage (T t x) = maybe [otri]
+                                 (\otri' -> [otri,otri'])
+                                 (lookup x (tGlueMap_ t))
+                    where
+                        otri = packOrderedFace mempty x
 
 class MakeTVertex a where tvertex :: a -> TVertex
 class MakeTEdge a where tedge :: a -> TEdge
@@ -115,7 +120,6 @@ instance MakeTTriangle (Triangulation, ITriangle) where
                         
 instance MakeTNormalCorner (Triangulation, INormalCorner) where
     tnormalCorner (t,x) = T t (canonicalizeINormalCorner t x) 
-    
 
 instance MakeTNormalCorner TEdge where
     tnormalCorner (T t e)= T t (iNormalCorner e)
@@ -163,25 +167,34 @@ equivalentIEdges = ec_elementList . edgePreimage
 
 
 
-instance Show TVertex where show = prettyString . pretty
-instance Show TEdge where show = prettyString . pretty
-instance Show TTriangle where show = prettyString . pretty
+instance Show TVertex where showsPrec = prettyShowsPrec
+instance Show TEdge where showsPrec = prettyShowsPrec
+instance Show TTriangle where showsPrec = prettyShowsPrec
+instance Show TNormalCorner where showsPrec = prettyShowsPrec
+instance Show TNormalArc where showsPrec = prettyShowsPrec
+
 
 instance  Pretty TVertex where
-    pretty x = encloseSep lbrace rbrace comma (fmap pretty (equivalentIVertices x))
+    pretty = prettyListAsSet . equivalentIVertices
 
 instance  Pretty TEdge where
-    pretty x = encloseSep lbrace rbrace comma (fmap pretty (equivalentIEdges x))
+    pretty = prettyListAsSet . equivalentIEdges
 
 instance  Pretty TTriangle where
-    pretty t@(T _ rep) = encloseSep lbrace rbrace comma elts
-        where
-            elts =  case lookupGluingOfTTriangle t of
-                        Nothing -> [pretty rep]
-                        Just rep' -> [pretty rep,pretty rep']
+    pretty = prettyListAsSet . trianglePreimage
 
+instance  Pretty TNormalCorner where
+    pretty = prettyListAsSet . ec_elementList . normalCornerPreimage
 
-
+instance  Pretty TNormalArc where
+    pretty (T t rep) = 
+      let    
+        tri = iNormalArcGetTriangle rep
+      in
+        prettyListAsSet $
+        case lookup tri (tGlueMap_ t) of
+                        Nothing -> [rep] 
+                        Just otri -> [rep, gluingMap (tri,otri) rep]
 
 
 
@@ -247,8 +260,6 @@ instance  IsSubface TEdge TTriangle where
 instance IsSubface TTriangle TIndex where
     isSubface x i = isSubface_TTet (getTriangulation x) (unT x) i
 
-deriving instance Show TNormalArc
-deriving instance Show TNormalCorner
 
 
 

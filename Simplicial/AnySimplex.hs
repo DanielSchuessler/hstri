@@ -10,6 +10,7 @@ module Simplicial.AnySimplex(
     OrdN(..),compareN
 
  ) where
+
 import TypeLevel.TF.Nat
 import TypeLevel.TF.Fun
 import TypeLevel.TF.Nat.Small
@@ -21,7 +22,8 @@ elimAnySimplexWithNat :: AnySimplex a -> (forall n. Nat n => n -> a n -> r) -> r
 elimAnySimplexWithNat (AnySimplex x) f = f undefined x
 
 anySimplex_dim :: AnySimplex a -> Int
-anySimplex_dim (AnySimplex (_ :: a n)) = natToInt (undefined :: n)
+anySimplex_dim a = elimAnySimplexWithNat a (const . natToInt)
+
 
 simpleMapAnySimplex :: (forall n. n -> a n -> b n) -> AnySimplex a -> AnySimplex b
 simpleMapAnySimplex f (AnySimplex a) = AnySimplex (f undefined a)

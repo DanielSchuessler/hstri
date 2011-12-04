@@ -17,6 +17,7 @@ import Simplicial.AnySimplex
 import Simplicial.DeltaSet
 import TypeLevel.TF.Fun
 import TypeLevel.TF.Bool
+import PreRenderable
 
 newtype SimplexLabels a l = SimplexLabels { runSimplexLabels :: forall n. Nat n => a n -> l n }
 
@@ -128,21 +129,6 @@ data CoordLabelsF n where
     CoordLabelsF2 :: Maybe TriangleLabel -> CoordLabelsF N2
     CoordLabelsF3 :: CoordLabelsF (S (S (S n)))
 
-data TriangleLabel = TriangleLabel {
-        tl_text :: String,
-
-        -- | This specifies how the *vertices* of the triangle should be permuted before
-        -- drawing the label with vertex 0 on the lower left, vertex 1 on the lower right,
-        -- and vertex 2 on top.
-        tl_transform :: S3,
-
-        -- | 
-        -- 0: Text sits on the base edge
-        --
-        -- 1: Text is on the same height as the top vertex
-        tl_up :: Double
-}
-    deriving(Show,Eq)
 
 
 type WithCoords a = LabeledDeltaSet a CoordLabelsF
@@ -159,8 +145,6 @@ addCoordFunc f0 f2 a = LabeledDeltaSet a (SimplexLabels (\(x :: a n) ->
 vertlbl :: LabeledDeltaSet a l -> (a Z) -> l Z
 vertlbl = simplbl
 
-class Coords t where
-    transformCoords :: (Vec3 -> Vec3) -> t -> t
 
 instance Coords (WithCoords a) where
     transformCoords f = mapSimplexLabelsAt n0 (\(CoordLabelsF0 v) -> CoordLabelsF0 (f v))

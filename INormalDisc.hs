@@ -6,6 +6,7 @@ import NormalDisc
 import HomogenousTuples
 import ONormal
 import Control.Exception
+import AbstractTetrahedron()
 
 type INormalCorner = I NormalCorner
 type INormalArc = I NormalArc
@@ -50,6 +51,9 @@ instance MakeINormalArc (ITriangle,IVertex) where
         assert (i0==i) $
         (./) i (normalArc (t, v))
 
+instance MakeINormalArc (OITriangle,IVertex) where
+    iNormalArc (t,v) = iNormalArc (forgetVertexOrder t,v)
+
 instance NormalCorners INormalArc (Pair INormalCorner) where
     normalCorners (viewI -> I i a) = map2 (i ./) (normalCorners a) 
 
@@ -62,8 +66,12 @@ instance MakeINormalDisc INormalTri where
 instance MakeINormalDisc INormalQuad where
     iNormalDisc = mapI normalDisc
 
+
 instance NormalCorners TIndex (Sextuple INormalCorner) where
     normalCorners ti = map6 (ti ./) allNormalCorners'
+
+instance NormalCorners ITriangle (Triple INormalCorner) where
+    normalCorners (viewI -> I ti d) = map3 (ti ./) (normalCorners d) 
 
 instance NormalArcs TIndex [INormalArc] where
     normalArcs ti = map (ti ./) allNormalArcs
@@ -128,3 +136,8 @@ iNormalQuadByNormalArc = mapI normalQuadByNormalArc
 
 iNormalCornerGetContainingEdge :: INormalCorner -> IEdge
 iNormalCornerGetContainingEdge = mapI normalCornerGetContainingEdge
+
+
+instance IsSubface INormalArc ITriangle where isSubface = liftIsSubface
+instance IsSubface INormalCorner ITriangle where isSubface = liftIsSubface
+instance IsSubface INormalCorner IEdge where isSubface = liftIsSubface

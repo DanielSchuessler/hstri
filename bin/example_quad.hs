@@ -6,7 +6,8 @@ import NormalCoordinates
 import Triangulation
 import EdgeCentered
 import Data.Vect.Double
-import Simplicial.Labels
+import PreRenderable
+import PrettyUtil
 
 exampleTri = fromRight $ mkTriangulation [0..3]
     [ (tindex i ./ tABD,tindex (mod (i+1) 4) ./ oABC) 
@@ -14,7 +15,7 @@ exampleTri = fromRight $ mkTriangulation [0..3]
         | i <- [0..3]
     ]
 
-(enMap,en) = makeEdgeNeighborhood exampleTri (0 ./ oedge (vA,vB))
+(spq,en) = makeEdgeNeighborhood exampleTri (0 ./ oedge (vA,vB))
 
 main = testBlender
     (defaultScene 

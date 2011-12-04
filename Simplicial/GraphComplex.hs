@@ -182,7 +182,7 @@ graphComplex :: (Ord a, Ord c, Semigroup c) => Gr a b -> Dim -> ((a,b,a) -> c) -
 graphComplex g dim emb = 
     mkDeltaSet  
         graphComplexFace
-        (concatMap (\nod -> skippingPathsOfLength emb g nod) (nodes g))
+        (mkSimpsFunction (\_ -> concatMap (\nod -> skippingPathsOfLength emb g nod) (nodes g)))
         dim
 
 class Subdivisible a where

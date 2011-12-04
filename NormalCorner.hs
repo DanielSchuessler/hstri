@@ -12,7 +12,7 @@ module NormalCorner(
 
 import AbstractTetrahedron
 import Element
-import Text.PrettyPrint.ANSI.Leijen
+import PrettyUtil
 import Test.QuickCheck
 import HomogenousTuples
 
@@ -30,9 +30,12 @@ class MakeNormalCorner a where
     normalCorner :: a -> NormalCorner
 
 instance Show NormalCorner where
-    show (NormalCorner e) = "{Normal corner on "++show e++"}"
+    showsPrec = prettyShowsPrec
 
-instance Pretty NormalCorner where pretty = green . text . show
+instance Pretty NormalCorner where 
+    pretty (NormalCorner e) = green (lbrace <>
+        text "Corner on"
+        <+> pretty e <> rbrace)
 
 allNormalCorners' :: (Sextuple NormalCorner)
 allNormalCorners' = map6 NormalCorner allEdges'

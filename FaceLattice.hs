@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances, TupleSections, FunctionalDependencies, MultiParamTypeClasses, ImplicitParams, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, TypeSynonymInstances, ScopedTypeVariables, FlexibleContexts, GeneralizedNewtypeDeriving, StandaloneDeriving, ExistentialQuantification #-}
+{-# OPTIONS -Wall #-}
 module FaceLattice where
 
 import Control.DeepSeq
@@ -8,54 +9,53 @@ import Data.Colour as Colour
 import Data.Colour.RGBSpace
 import Data.Colour.RGBSpace.HSV
 import Data.Colour.SRGB as SRGB
-import Data.Functor
 import Data.Graph.Inductive.Graph as G
 import Data.Graph.Inductive.PatriciaTree
 import Data.GraphViz as GraphViz
 import Data.GraphViz.Attributes.Colors as GraphVizColors
 import Data.GraphViz.Attributes.Complete
 import Data.GraphViz.Printing
-import Data.Hashable
 import Data.List(genericLength)
 import Data.Maybe
 import Data.Text.Lazy as Text
-import Equivalence
 import IndexedSimplices
-import NormalDisc
 import System.Process
 import System.SimpleArgs(getArgs)
 import Triangulation
 import TriangulationCxtObject
-import TupleTH
-import Util
 import qualified Data.Text.Lazy.IO as TextIO
+import AbstractTetrahedron
+import Control.Exception
+import System.Exit
 
 class GraphvizFormatable a y | a -> y where fmt :: a -> y
 
+i2fieldLabel :: (Show a, HasTIndex ia a) => ia -> RecordField
 i2fieldLabel (viewI -> I i a) = FieldLabel (Text.pack $ show i ++ "." ++ show a)
 
 instance GraphvizFormatable ITriangle RecordField where fmt = i2fieldLabel
+instance GraphvizFormatable OITriangle RecordField where fmt = i2fieldLabel
 instance GraphvizFormatable IEdge RecordField where fmt = i2fieldLabel
 instance GraphvizFormatable IVertex RecordField where fmt = i2fieldLabel
 
 instance GraphvizFormatable (FL,Node,TIndex) Attributes where
-    fmt (fl,nodeId,i) = 
+    fmt (_,_,i) = 
             [ Label (StrLabel (Text.pack $ show i)) ]
 
 instance GraphvizFormatable (FL,Node,TTriangle) Attributes where
-    fmt (fl,nodeId,x) = 
+    fmt (_,_,x) = 
             [ Shape Record
-            , Label (RecordLabel (fmap fmt (equivalentITriangles x)))
+            , Label (RecordLabel (fmap fmt (trianglePreimage x)))
             ]
 
 instance GraphvizFormatable (FL,Node,TEdge) Attributes where
-    fmt (fl,nodeId,x) = 
+    fmt (_,_,x) = 
             [ Shape Record
             , Label (RecordLabel (fmap fmt (equivalentIEdges x)))
             ]
 
 instance GraphvizFormatable (FL,Node,TVertex) Attributes where
-    fmt (fl,nodeId,x) = 
+    fmt (_,_,x) = 
             [ Shape Record
             , Label (RecordLabel (fmap fmt (equivalentIVertices x)))
             ]
@@ -63,12 +63,14 @@ instance GraphvizFormatable (FL,Node,TVertex) Attributes where
 class FLN_Id a where
     flnId :: a -> Int
 
+tagBits :: Int
 tagBits = 3
 
 instance FLN_Id TIndex where
     flnId i = shiftL (fromEnum i) tagBits .|. 3  
 
-faceLatticeNodeId' tag x = shiftL (fromEnum . canonicalRep $ x) tagBits .|. tag 
+faceLatticeNodeId' :: Enum b => Int -> T b -> Int
+faceLatticeNodeId' tag x = shiftL (fromEnum . unT $ x) tagBits .|. tag 
 
 instance FLN_Id TTriangle where flnId = faceLatticeNodeId' 2 
 instance FLN_Id TEdge where flnId = faceLatticeNodeId' 1 
@@ -85,7 +87,7 @@ instance FLN_Class TIndex where
     calculateFlnColour fl n _ = averageColour fl (pre fl n)
 
 instance FLN_Class TTriangle where
-    calculateFlnColour _ _ x = uncurryRGB sRGB (hsv (fromIntegral ((1223 * fromEnum (canonicalRep x)) `mod` 360) :: Double) 1 1)
+    calculateFlnColour _ _ x = uncurryRGB sRGB (hsv (fromIntegral ((1223 * fromEnum (unT x)) `mod` 360) :: Double) 1 1)
 
 instance FLN_Class TEdge where
     calculateFlnColour fl n _ = averageColour fl (suc fl n)
@@ -97,10 +99,11 @@ instance FLN_Class TVertex where
 
 
 averageColour :: FL -> [Node] -> Colour Double
-averageColour fl (node0:nodes) = affineCombo [ (w, getColour node) | node <- nodes ] (getColour node0)
+averageColour fl (node0:nodes') = affineCombo [ (w, getColour node) | node <- nodes' ] (getColour node0)
     where
-        w = 1 / (1 + genericLength nodes) 
+        w = 1 / (1 + genericLength nodes') 
         getColour = flnColour . fromJust . lab fl
+averageColour _ _ = assert False undefined
 
 
 
@@ -108,6 +111,7 @@ averageColour fl (node0:nodes) = affineCombo [ (w, getColour node) | node <- nod
 -- | Face Lattice Node
 data FLN = forall a. FLN_Class a => FLN a (Colour Double)
 
+flnColour :: FLN -> Colour Double
 flnColour (FLN _ c) = c
 
 -- | Face Lattice Edge
@@ -118,23 +122,24 @@ type FL = Gr FLN FLE
 instance Show FLN where show (FLN a _) = show a
     
 instance GraphvizFormatable (FL, LNode FLN) Attributes where 
-    fmt (fl, (i, FLN a colour)) = Color [color] : FontColor color : fmt (fl,i,a) 
+    fmt (fl, (i, FLN a colour)) = Color [color_] : FontColor color_ : fmt (fl,i,a) 
         where
-            color = colour2color colour    
+            color_ = colour2color colour    
 
 
+colour2color :: (Floating b, RealFrac b) => Colour b -> Color
 colour2color colour = uncurryRGB GraphVizColors.RGB (toSRGB24 colour)
 
 
 faceLattice ::  Triangulation -> Gr FLN FLE
 faceLattice = do
         tets <- tTetrahedra_ 
-        ts <- tTriangles 
-        es <- tEdges
-        vs <- tVertices
+        ts <- triangles 
+        es <- AbstractTetrahedron.edges
+        vs <- vertices
 
         let 
-            nodes = tetNodes ++. (triangleNodes ++. (edgeNodes ++. (vertexNodes ++. [])))
+            nodes_ = tetNodes ++. (triangleNodes ++. (edgeNodes ++. (vertexNodes ++. [])))
 
             (++.) :: [(x,LNode FLN)] -> [LNode FLN] -> [LNode FLN]
             xs ++. ys = fmap snd xs ++ ys 
@@ -155,14 +160,14 @@ faceLattice = do
                                             | ((x,(ix,flnx)),(y,(iy,flny))) <- cart xs ys, 
                                                 isSubface x y ] 
 
-            colourFromSource x y = flnColour x
-            colourFromTarget x y = flnColour y
+            colourFromSource x _ = flnColour x
+            colourFromTarget _ y = flnColour y
 
-            edges =    subfaces colourFromSource triangleNodes tetNodes 
+            edges_ =   subfaces colourFromSource triangleNodes tetNodes 
                     ++ subfaces colourFromTarget edgeNodes triangleNodes
                     ++ subfaces colourFromTarget vertexNodes edgeNodes
 
-            result = insEdges edges (insNodes nodes gempty)
+            result = insEdges edges_ (insNodes nodes_ gempty)
 
         return result
                 
@@ -198,9 +203,11 @@ dotGraph = do
 
 
 
+white :: Color
 white = X11Color White
 
-main = do
+test_FaceLattice :: IO ()
+test_FaceLattice = do
     (nTets,nGluings) <- getArgs
     t <- randomTriangulation nTets nGluings
     viewFL t
@@ -219,8 +226,8 @@ viewFL t = do
 --     res <- runGraphviz dotGraph0 Svg "out.svg"
 --     either error (\x -> rawSystem "gwenview" [x]) res
     --runGraphvizCanvas Dot dotGraph0 Xlib
-    system "dot out.dot -Tsvg > out.svg && gwenview out.svg"
-    return ()
+    ec <- system "dot out.dot -Tsvg > out.svg && gwenview out.svg"
+    exitWith ec
  
 instance NFData FLN where
     rnf (FLN x c) = x `seq` rnf c

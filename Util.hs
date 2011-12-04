@@ -21,7 +21,6 @@ import Test.QuickCheck hiding((.&.))
 import Test.QuickCheck.All
 import Data.BitSet.Word8(BitSet(..))
 import Language.Haskell.TH.Syntax
-import Data.Permute as Permute
 import Data.Char
 import qualified Data.Set as S
 import Control.Exception
@@ -311,16 +310,16 @@ instance (Quote a, Quote b) => Quote (a,b) where
     quotePrec _ (x,y) = quoteParen True (quote x ++ ", "++quote y)
 
 
-charsToPermute ::  Int -> [Char] -> Permute
-charsToPermute n = listPermute n . fmap f
-    where
-        f c = ord c - ord 'a'
-
-
-permuteToChars ::  Permute -> [Char]
-permuteToChars = fmap f . Permute.elems 
-    where
-        f i = chr (i + ord 'a')
+-- charsToPermute ::  Int -> [Char] -> Permute
+-- charsToPermute n = listPermute n . fmap f
+--     where
+--         f c = ord c - ord 'a'
+-- 
+-- 
+-- permuteToChars ::  Permute -> [Char]
+-- permuteToChars = fmap f . Permute.elems 
+--     where
+--         f i = chr (i + ord 'a')
 
 
 -- | Suitable for types with only nullable constructors and derived Show instance

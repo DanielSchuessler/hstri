@@ -12,6 +12,8 @@ module Triangulation(
     embedsEdges,
     lookupGluingOfITriangle,
     lookupGluingOfOITriangle,
+    tIVertices,
+    tIEdges,
     tITriangles,
     tOITriangles,
     tOIEdgeEquivalents,
@@ -56,14 +58,13 @@ import System.Random
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Test.QuickCheck.Gen
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
+import PrettyUtil
 import TupleTH
 import FacetGluing
 import INormalDisc
 import NormalDisc
 import Element
 import Edge
-import Data.Maybe
 
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
@@ -134,13 +135,12 @@ askVertexEqv = vertexEqv `liftM` ask
 
 instance Pretty Triangulation where
     pretty Triangulation{..} =
-        vsep ( text "Triangulation {"
-               : [indent 2 (text x <+> nest 2 (char '=' </> y)) | (x,y) <- fields ]
-               ++ [rbrace] )
+        prettyRecord "Triangulation" fields
+
           where
             fields = [ ("Tetrahedron indices", pretty (fmap (dullcyan . pretty) tTetrahedra_)) 
                      , ("Triangle gluings", pretty tGluings_)
-                     , ("Edges", pretty edgeEqv)
+--                     , ("Edges", pretty edgeEqv)
                      , ("Ordered edges", pretty oEdgeEqv)
                      , ("Vertices", pretty vertexEqv)
                      ]
@@ -283,7 +283,7 @@ triang gluings = fromRight $ mkTriangulation (nub' $ tets) gluings
 -- 
 
 instance Show Triangulation where
-    showsPrec _ = displayS . renderPretty 0.4 116 . pretty
+    showsPrec = prettyShowsPrec 
 
 
 
@@ -409,11 +409,6 @@ lookupGluingOfOITriangle t (unpackOrderedFace -> (g,tri)) =
     (g .*) <$> lookupGluingOfITriangle t tri
 
 
-tITriangles :: Triangulation -> [ITriangle]
-tITriangles tr = [ i ./ tri | i <- tTetrahedra_ tr, tri <- allTriangles ] 
-
-tOITriangles :: Triangulation -> [OITriangle]
-tOITriangles tr = [ packOrderedFace g it | it <- tITriangles tr, g <- allS3 ]
 
 
 tOIEdgeEquivalents :: Triangulation -> OIEdge -> [OIEdge]
@@ -423,6 +418,18 @@ tOIEdgeDegree :: Triangulation -> OIEdge -> Int
 tOIEdgeDegree tr = length . tOIEdgeEquivalents tr
 
 
+tITriangles :: Triangulation -> [ITriangle]
+tITriangles = concatMap triangleList . tTetrahedra_
+
+tOITriangles :: Triangulation -> [OITriangle]
+tOITriangles tr = liftM2 packOrderedFace allS3 (tITriangles tr)
+
+tIVertices :: Triangulation -> [IVertex]
+tIVertices = concatMap vertexList . tTetrahedra_ 
+
+tIEdges :: Triangulation -> [IEdge]
+tIEdges = concatMap edgeList . tTetrahedra_ 
+
 tINormalCorners :: Triangulation -> [INormalCorner]
 tINormalCorners = concatMap normalCornerList . tTetrahedra_ 
 tINormalArcs :: Triangulation -> [INormalArc]
@@ -431,6 +438,7 @@ tINormalTris :: Triangulation -> [INormalTri]
 tINormalTris = concatMap normalTriList . tTetrahedra_ 
 tINormalQuads :: Triangulation -> [INormalQuad]
 tINormalQuads = concatMap normalQuadList . tTetrahedra_ 
+
 
 tOIEdges :: Triangulation -> [OIEdge]
 tOIEdges = concatMap (asList . allOIEdges) . tTetrahedra_
@@ -487,8 +495,7 @@ canonicalizeINormalArc t ina =
                                         _tri' < tri -> 
                                 
                                     
-                                 (iNormalArc (_tri',
-                                    (fromJust . gluingMapVertex (tri,otri) $ iNormalArcGetVertex ina)))
+                                 (gluingMap (tri,otri) ina)
                                     
 
                             _ -> ina
@@ -501,3 +508,4 @@ prop_forgetVertexOrder_natural_for_canonicalization :: Triangulation -> Property
 prop_forgetVertexOrder_natural_for_canonicalization t =
     forAllElements (tOIEdges t)
         (\e -> canonicalizeIEdge t (forgetVertexOrder e) == forgetVertexOrder (canonicalizeOIEdge t e)) 
+

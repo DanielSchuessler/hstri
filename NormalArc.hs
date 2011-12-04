@@ -5,6 +5,7 @@ module NormalArc(
 
         NormalArc, normalArcGetTriangle, normalArcGetVertex, allNormalArcs,
             normalArcGetOppositeEdge, normalArcGetVertexIndex, normalArcByTriangleAndVertexIndex,
+            normalArcByTriangleAndVertex,
         MakeNormalArc(..),
         NormalArcs(..),
         normalArcList,
@@ -19,15 +20,15 @@ import AbstractTetrahedron
 import HomogenousTuples
 import Control.Exception
 import Element
-import Text.PrettyPrint.ANSI.Leijen
 import Test.QuickCheck
 import Test.QuickCheck.All
+import PrettyUtil
 
 data NormalArc = NormalArc Triangle Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
     deriving (Eq,Ord)
 
 instance Show NormalArc where
-    show (NormalArc t v) = "{Normal arc in "++show t++" dual to "++show v++"}" 
+    showsPrec = prettyShowsPrec 
 
 instance NormalCorners NormalArc (Pair NormalCorner) where
     normalCorners (NormalArc t v) =  
@@ -47,7 +48,13 @@ class MakeNormalArc a where
 -- | Construct a normal arc by the triangle that contains it and the vertex (of that triangle) 
 -- dual to the normal arc (i.e., the vertex which the normal arc separates from the other two vertices of the triangle)
 instance MakeNormalArc (Triangle,Vertex) where
-    normalArc (f,v) = assert (isSubface v f) 
+    normalArc (f,v) = normalArcByTriangleAndVertex f v
+    
+    
+-- | Construct a normal arc by the triangle that contains it and the vertex (of that triangle) 
+-- dual to the normal arc (i.e., the vertex which the normal arc separates from the other two vertices of the triangle)
+normalArcByTriangleAndVertex :: Triangle -> Vertex -> NormalArc
+normalArcByTriangleAndVertex f v = assert (isSubface v f) 
                         (NormalArc f v)
 
 
@@ -110,7 +117,11 @@ allNormalArcs :: [NormalArc]
 allNormalArcs = [minBound .. maxBound]
 
 
-instance Pretty NormalArc where pretty = green . text . show
+instance Pretty NormalArc where 
+    pretty na = green (lbrace <> text "Arc dual to" <+> 
+                        pretty (normalArcGetVertex na) <+> text "in" <+> 
+                        pretty (normalArcGetTriangle na) <>
+                            rbrace)
 
 
 class AsList normalArcTuple => NormalArcs a normalArcTuple | a -> normalArcTuple where
@@ -139,3 +150,14 @@ prop_Triangle_NormalArcs_complete nat t =
 
 qc_NormalArc :: IO Bool
 qc_NormalArc = $(quickCheckAll)
+
+instance IsSubface NormalArc OTriangle where
+    isSubface na t = isSubface na (forgetVertexOrder t)
+
+prop_normalArcByNormalCorners :: NormalArc -> Property
+prop_normalArcByNormalCorners na = 
+        na == normalArc (nc1,nc2)
+        .&.
+        na == normalArc (nc2,nc1)
+    where
+        (nc1,nc2) = normalCorners na 

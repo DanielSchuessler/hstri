@@ -298,11 +298,20 @@ instance Triangles Vertex (Triple Triangle) where
 --
 -- Example: @edgeByOppositeVertexAndTriangle 'B' 'ABD' = 'AD'@
 edgeByOppositeVertexAndTriangle :: Vertex -> Triangle -> Edge
-edgeByOppositeVertexAndTriangle v f =
-    case filter3 (\e -> not (isVertexOfEdge v e)) (edges f) of
+edgeByOppositeVertexAndTriangle v t =
+    case filter3 (\e -> not (isVertexOfEdge v e)) (edges t) of
 
          [e0] -> e0
-         _ -> error ("edgeByOppositeVertexAndTriangle is not defined for args "++show v++", "++show f)
+         _ -> error ("edgeByOppositeVertexAndTriangle is not defined for args "++show v++", "++show t)
+
+vertexByOppositeEdge
+  :: (Show a, Vertices a (Triple Vertex)) =>
+     Edge -> a -> Vertex
+vertexByOppositeEdge e t =
+    case filter3 (\v -> not (isVertexOfEdge v e)) (vertices t) of
+
+         [v0] -> v0
+         _ -> error ("vertexByOppositeEdge is not defined for args "++show e++", "++show t)
 
 instance Triangles TIndex (Quadruple ITriangle) where
     triangles z = map4 (z ./) allTriangles'
@@ -348,3 +357,5 @@ oiTriangleByVertices (map3 viewI -> (I i0 v0, I i1 v1, I i2 v2)) =
 
 instance Arbitrary ITriangle where
     arbitrary = (./) <$> arbitrary <*> arbitrary
+
+

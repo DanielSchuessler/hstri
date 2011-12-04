@@ -1,23 +1,20 @@
-{-# LANGUAGE TypeOperators, GADTs, RecordWildCards, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, DeriveFunctor #-}
+{-# LANGUAGE ViewPatterns, TypeOperators, GADTs, RecordWildCards, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, DeriveFunctor #-}
 {-# LANGUAGE Rank2Types, NoMonomorphismRestriction, ScopedTypeVariables, NamedFieldPuns, TypeFamilies, DefaultSignatures, FlexibleContexts, OverlappingInstances, StandaloneDeriving, UndecidableInstances, GeneralizedNewtypeDeriving, CPP #-} 
+{-# OPTIONS -Wall #-}
 -- | All 'Pair's, 'Triple's and 'Quadruple's are assumed to be strictly ascendingly ordered in this module.
 module Simplicial.SimplicialComplex where
 
 
 import AbstractTetrahedron
-import Control.Applicative
 import Control.Exception
 import Control.Monad
-import Data.Graph.Inductive
 import Data.List
-import Data.Map as Map
 import Data.Set as Set
 import Data.Vect.Double 
-import Data.Vect.Double.Instances
-import Debug.Trace
 import FaceIx
 import HomogenousTuples
 import List
+import PreRenderable
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet
 import Simplicial.GraphComplex
@@ -57,17 +54,16 @@ instance Ord v => OrdN (OTuple v) where
 type SimplicialComplex v = DeltaSet (OTuple v)
 
 
--- | The @v@ parameter is a dummy
-simplicialFaces :: forall v. v -> FaceFunction (OTuple v)
-simplicialFaces _ = 
+simplicialFaces :: forall v. FaceFunction (OTuple v)
+simplicialFaces = 
 
-  (\i (OT x :: OTuple v (S n)) -> 
+  (\_i (OT x :: OTuple v (S n)) -> 
     caseNat4 (undefined :: n)
-                         (OT ($(deleteAtTuple 2) i x))
-                         (OT ($(deleteAtTuple 3) i x))
-                         (OT ($(deleteAtTuple 4) i x))
-                         (OT (lToQuadruple (ldelete (runFI i) x)))
-                         (\_ -> OT (ldelete (runFI i) x))
+                         (OT ($(deleteAtTuple 2) _i x))
+                         (OT ($(deleteAtTuple 3) _i x))
+                         (OT ($(deleteAtTuple 4) _i x))
+                         (OT (lToQuadruple (ldelete (runFI _i) x)))
+                         (\_ -> OT (ldelete (runFI _i) x))
                          
                          
                          )
@@ -75,11 +71,15 @@ simplicialFaces _ =
     
     
 
-fromSimps :: forall v. Ord v => SimpsFunction (OTuple v) -> Dim -> SimplicialComplex v
-fromSimps s dim = mkDeltaSet (simplicialFaces (undefined :: v)) s dim
+fromSimplices :: forall v. Ord v => SimpsFunction (OTuple v) -> Dim -> SimplicialComplex v
+fromSimplices s _dim = 
+    mkDeltaSet 
+        ({-# SCC "fromSimplices/eval:simplicialFaces" #-} simplicialFaces) 
+        ({-# SCC "fromSimplices/eval:s" #-} s) 
+        ({-# SCC "fromSimplices/eval:_dim" #-} _dim) 
 
 fromTets :: forall v. Ord v => [Quadruple v] -> SimplicialComplex v
-fromTets xs = assert (all isOrdered4 xs) $ fromSimps s (HomogenousDim 3)
+fromTets xs = assert (all isOrdered4 xs) $ fromSimplices s (HomogenousDim 3)
     where
 
         s :: SimpsFunction (OTuple v)
@@ -92,19 +92,34 @@ fromTets xs = assert (all isOrdered4 xs) $ fromSimps s (HomogenousDim 3)
 
 
 fromTris :: forall v. Ord v => [Triple v] -> SimplicialComplex v
-fromTris xs = assert (all isOrdered3 xs) $ fromSimps s (HomogenousDim 2)
+fromTris xs = assert (all isOrdered3 xs) $ fromSimplices s (HomogenousDim 2)
     where
 
         s :: SimpsFunction (OTuple v)
-        s = mkSimpsFunction (\n -> caseNat3 n
+        s = {-# SCC "fromTris/s" #-}
+             mkSimpsFunction (\n -> caseNat3 n
                         (fmap OT . nub' . concatMap toList3 $ xs)
                         (fmap OT . nub' . concatMap (toList3 . $(subtuples 3 2)) $ xs)
                         (fmap OT xs)
                         (const []))
 
 
+-- | Input tuples need *not* be ordered
+fromTrisAndQuads :: Ord v => 
+    [Triple v] -> [Quadruple v] -> (SimplicialComplex v, Set (OTuple v N1))
+fromTrisAndQuads (fmap sort3 -> tris) quads = 
+        assert (Set.null (Set.intersection quadDiagonals triEdges))
+            (sc, quadDiagonals)
+    where
+        quadHalfs = concatMap (\(a,b,c,d) -> [sort3 (a,b,c),sort3 (a,c,d)]) quads
+        quadDiagonals = Set.fromList (fmap (\(a,_,c,_) -> OT (sort2 (a,c))) quads)
+        sc = fromTris (tris ++ quadHalfs)
+        triEdges = Set.fromList (s1 (fromTris tris))
+
+
+
 fromEdges :: forall v. Ord v => [Pair v] -> SimplicialComplex v
-fromEdges xs = assert (all isOrdered2 xs) $ fromSimps s (HomogenousDim 1)
+fromEdges xs = assert (all isOrdered2 xs) $ fromSimplices s (HomogenousDim 1)
     where
 
         s :: SimpsFunction (OTuple v)
@@ -128,19 +143,20 @@ abstractTet = fromTets [allVertices']
 
 
 
-tet3d :: WithCoords (OTuple Vertex)
-tet3d = addCoordFunc (f . fromEnum . unOT) (const Nothing) abstractTet
+tet3d :: PreRenderable (OTuple Vertex)
+tet3d = mkPreRenderable (f . fromEnum . unOT) abstractTet 
     where
         f 0 = vec3X
         f 1 = vec3Y
         f 2 = vec3Z
         f 3 = Vec3 1 1 1
+        f _ = assert False undefined
 
 oTupleBarycenter :: forall n v. (Nat n, Vector v) => OTuple v n -> v 
 oTupleBarycenter x = oTupleFoldl1' (&+) x &* (recip (fromIntegral (1 + natToInt (undefined :: n))))
 
 oTupleFoldl1' :: forall n r. Nat n =>  (r -> r -> r) -> OTuple r   n -> r
-oTupleFoldl1' c (OT x) = (caseNat4 (undefined :: n)
+oTupleFoldl1' _c (OT x) = (caseNat4 (undefined :: n)
     (const id)
     $(foldl1Tuple 2)
     $(foldl1Tuple 3)
@@ -150,7 +166,8 @@ oTupleFoldl1' c (OT x) = (caseNat4 (undefined :: n)
 
         :: (r -> r -> r) -> OTuple' r n -> r
 
-        ) c x
+        ) _c x
+
 
 anySimplexBarycenter :: Vector v => AnySimplex (OTuple v) -> v
 anySimplexBarycenter (AnySimplex x) = oTupleBarycenter x
@@ -166,35 +183,12 @@ oTupleMap f (OT x) = OT (caseNat4 (undefined :: n)
 
 
 
-coordAllTheThings :: WithCoords (OTuple v) -> LabeledDeltaSet (OTuple v) (OTuple Vec3)
-coordAllTheThings a = 
-        LabeledDeltaSet ds 
-            (SimplexLabels (oTupleMap (getCoords a . OT))) 
+-- coordAllTheThings :: forall v n. Nat n => (OTuple v N0 -> Vec3) -> OTuple v n -> OTuple Vec3 n
+-- coordAllTheThings f = 
+--             oTupleMap (f . OT) 
 
 
-    where
-        ds = lds_ds a
     
-baryFlat :: forall v. Ord v =>
-        WithCoords (OTuple v) -> WithCoords (BCSFace (OTuple v))
+baryFlat :: forall v. Ord v => (OTuple v N0 -> Vec3) -> (BCSFace (OTuple v) N0 -> Vec3) 
 
-baryFlat a = mapSimplexLabels f b
-    where
-        f :: forall n. Nat n => 
-            BCSFace (OTuple Vec3)   n -> CoordLabelsF   n
-
-        f x = caseNat3 (undefined :: n)
-                    (case x of
-                          EP0 (_,x') -> CoordLabelsF0 (anySimplexBarycenter x'))
-                    CoordLabelsF1
-                    (trace "TriangleLabels not yet supported for barycentric subdivision"
-                        (CoordLabelsF2 Nothing))
-                    (const CoordLabelsF3)
-                         
-
-
-        b :: LabeledDeltaSet (BCSFace (OTuple v)) (BCSFace (OTuple Vec3))
-        b = bary (coordAllTheThings a)
-
-
-
+baryFlat f (EP0 (_,AnySimplex x)) = oTupleBarycenter (oTupleMap (f . OT) x)

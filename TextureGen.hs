@@ -22,7 +22,7 @@ mkLetterDiagram c =
 
 dir = "/h/diplomarbeit/hstri/textures"
 
-main =
+textureGen_test =
     forM_ ['A']
         (\b -> fst $ renderDia Cairo (CairoOptions (dir</>b:".png") (PNG (512,512)))
                 (mkLetterDiagram b))

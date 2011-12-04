@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Homology where
 
-import DeltaSet
+import Simplicial.DeltaSet
 import Data.Packed.Matrix
 import Data.Packed.Vector
 

@@ -5,11 +5,14 @@ module PrettyUtil(
     spacedEncloseSep,
     prettyListAsSet,
     prettyAssocs,
+    docAssocs,
     prettyString,
     pr,
     prettyStringMatrix,
     prettyMatrix,
-    prMatrix
+    prMatrix,
+    prettyRecord,
+    prettyShowsPrec
     
     ) 
 
@@ -22,6 +25,7 @@ import Data.List
 import Collections
 import qualified Data.Map as M
 import Numeric
+import Control.Arrow((***))
 
 
 spacedEncloseSep ::  Doc -> Doc -> Doc -> [Doc] -> Doc
@@ -34,8 +38,11 @@ prettyListAsSet = spacedEncloseSep lbrace rbrace comma . fmap pretty
 
 
 prettyAssocs ::  (Pretty a1, Pretty a) => [(a, a1)] -> Doc
-prettyAssocs xs =  spacedEncloseSep lbrace rbrace comma 
-                    [ pretty k </> nest 2 (string "->" </> pretty v)
+prettyAssocs = docAssocs . fmap (pretty *** pretty)
+
+docAssocs :: [(Doc, Doc)] -> Doc
+docAssocs xs =  spacedEncloseSep lbrace rbrace comma 
+                    [ k </> nest 2 (string "->" </> v)
                         | (k,v) <- xs ]
 
 prettyString ::  Pretty a => a -> String
@@ -79,3 +86,13 @@ instance (Ord a, Pretty a) => Pretty (Set a) where
 instance (Ord a, Pretty a, Pretty b) => Pretty (Map a b) where
     pretty = prettyAssocs . M.assocs 
 
+
+prettyRecord :: String -> [(String, Doc)] -> Doc
+prettyRecord name fields =
+         vsep ( (text name <+> lbrace)
+               : [indent 2 (text x <+> nest 2 (char '=' </> y)) | (x,y) <- fields ]
+               ++ [rbrace] )
+
+
+prettyShowsPrec :: Pretty a => Int -> a -> ShowS
+prettyShowsPrec _ = displayS . renderPretty 0.4 116 . pretty

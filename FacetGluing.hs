@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
 module FacetGluing where
 
 import AbstractTetrahedron
@@ -6,6 +6,9 @@ import IndexedSimplices
 import Control.Applicative
 import HomogenousTuples
 import Data.Maybe
+import INormalDisc
+import Control.Exception
+import Control.Monad
 
 type Gluing = (ITriangle,OITriangle)
 
@@ -25,16 +28,52 @@ instance GluingSpec (t,Triangle,t,OTriangle) where
 flipGluing :: Gluing -> Gluing
 flipGluing (x1, unpackOrderedFace -> (g,x2)) = (x2, packOrderedFace (inv g) x1)
 
-gluingMapVertex :: Gluing -> IVertex -> Maybe IVertex
-gluingMapVertex (t,ot) v = triangleGetVertexAt ot <$> triangleGetIndexOf t v 
+class GluingMappable a where
+    gluingMap :: Gluing -> a -> a
 
-gluingUnmapVertex :: Gluing -> IVertex -> Maybe IVertex
-gluingUnmapVertex (t,ot) v = triangleGetVertexAt t <$> triangleGetIndexOf ot v 
+gluingUnmap g a = gluingMap (flipGluing g) a
+
+instance GluingMappable IVertex where
+
+    gluingMap (t,ot) v = 
+        maybe (error ("gluingMap: vertex not in left triangle")) 
+            (triangleGetVertexAt ot)  
+            (triangleGetIndexOf t v)
+
+instance GluingMappable Vertex where
+
+    gluingMap (t,ot) v = 
+        maybe (error ("gluingMap: vertex not in left triangle")) 
+            (triangleGetVertexAt (forgetTIndex ot))  
+            (triangleGetIndexOf (forgetTIndex t) v)
+
+
+instance GluingMappable OIEdge where
+    gluingMap gl@(t,ot) (viewI -> I i (vertices -> (v0,v1))) = 
+
+        assert (i==getTIndex t) $
+        
+        getTIndex ot ./ oedge (gluingMap gl v0, gluingMap gl v1) 
+
+instance GluingMappable IEdge where
+    gluingMap gl = forgetVertexOrder . gluingMap gl . packOrderedFace NoFlip
+
+instance GluingMappable INormalCorner where
+    gluingMap gl = iNormalCorner . gluingMap gl . iNormalCornerGetContainingEdge
+
+instance GluingMappable INormalArc where
+    gluingMap gl@(tri,otri) arc =
+
+        assert (isSubface arc tri) $
+            iNormalArc . (otri,) . gluingMap gl . iNormalArcGetVertex $ arc
 
 prop_gluingMapVertex :: Gluing -> Bool
 prop_gluingMapVertex gluing@(t,ot) =
     ot == oiTriangleByVertices us
   where
-    us = map3 (fromJust . gluingMapVertex gluing) (vertices t)
+    us = map3 (gluingMap gluing) (vertices t)
+
+
+
 
 

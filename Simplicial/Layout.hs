@@ -2,7 +2,6 @@
 module Simplicial.Layout where
 
 import Simplicial.DeltaSet
-import Simplicial.Labels
 import GraphUtil
 import Data.GraphViz
 import Data.GraphViz.Attributes.Colors
@@ -10,7 +9,6 @@ import Data.GraphViz.Printing(printIt)
 import Data.GraphViz.Attributes.Complete
 import Data.GraphViz.Commands.IO
 import Data.IntMap
-import TypeLevel.TF
 import Data.Graph.Inductive
 import Data.List
 import Data.Vect.Double
@@ -27,18 +25,12 @@ data LayoutMode n where
 
 data NodeType = VertNode | TriNode
 
-layout
-  :: (Show (a :$ N0), Show (a :$ N2), ShowN a) =>
-     DeltaSet a -> IO (WithCoords a)
 layout = layoutG LayoutNoDebug
 
-layoutDebug
-  :: (Show (a :$ N0), Show (a :$ N2), ShowN a) =>
-     DeltaSet a -> IO (WithCoords a)
 layoutDebug = layoutG LayoutDebug
 
 layoutG :: forall a nl. (ShowN a, Show (Vert a), Show (Tri a)) => 
-            LayoutMode nl -> DeltaSet a -> IO (WithCoords a)
+            LayoutMode nl -> DeltaSet a -> IO (Vert a -> Vec3)
 layoutG mode ds = do
     let 
         oneSkeleton_ :: Gr nl ()
@@ -78,12 +70,12 @@ layoutG mode ds = do
              tri <- simps ds n2
              let vs = faces20 ds tri
              return ([],
-                     nodeMapGet ds n2 tri,
+                     nodeMapGet ds tri,
                      case mode of
                          LayoutNoDebug -> ()
                          LayoutDebug -> (TriNode,show tri),
                           
-                     toList3 $ map3 (((),) . nodeMapGet ds n0) vs)
+                     toList3 $ map3 (((),) . nodeMapGet ds) vs)
                      
 
 
@@ -104,7 +96,7 @@ layoutG mode ds = do
     --augmentedOneSkeleton <- graphToGraphWithCmd Neato params oneSkeleton_
     
     let isVertexNode node = case lab (faceGraph ds) node of
-                                Just (AnySimplex n _) -> caseNat n True (const False)
+                                Just a -> elimAnySimplexWithNat a (\n _ -> caseNat n True (const False))
 
     let rawCoords :: [(Node,Vec3)] 
         rawCoords = do
@@ -130,5 +122,5 @@ layoutG mode ds = do
 
 
 
-    return $ addCoordFunc (\v -> coordMap ! (nodeMapGet ds n0 v)) (const Nothing) ds
+    return $ (\v -> coordMap ! (nodeMapGet ds v))
         

@@ -15,9 +15,9 @@ import Data.Function
 import Data.Vect.Double
 import HomogenousTuples
 import MathUtil
+import PreRenderable
 import Prelude hiding(catch,mapM_,sequence_) 
 import Simplicial.DeltaSet
-import Simplicial.Labels
 import System.Environment
 import System.Process
 import Text.Printf.TH
@@ -60,9 +60,12 @@ triLabelMat = Material "triLbl" [ let r = 0.015 in diffuseColor (r,r,r) ]
 --        Scene a
 --     -> Python ()
 toBlender :: Scene a -> Python ()
-toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams} = result
+toBlender scene@Scene{
+        scene_worldProps,
+        scene_blenderable=Blenderable{..},
+        scene_cams} = result
     where
-        deltaSet = ba_ds blenderable        
+        deltaSet = ba_ds
 
         result = do
             ln "from bpy import *"
@@ -114,13 +117,13 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams}
         
 
 
-        materialDefs = mapM_ materialToBlender (triLabelMat : ba_materials blenderable) 
+        materialDefs = mapM_ materialToBlender (triLabelMat : ba_materials ) 
 
 
 
 
 
-        coords' = ba_coords blenderable
+        coords' = ba_coords 
 
 
         objCommon grp faceLabel faceMat = do
@@ -131,20 +134,20 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams}
 
 
         handleV grp v = do
-                sphere (coords' v) vertexThickness
+                sphere (coords' v) (ba_vertexThickness v)
                 objCommon grp faceLabel faceMat
             
             where
-                BSI0 { faceInfo0 = FaceInfo{..}, vertexThickness } = ba_simplbl blenderable v 
+                FaceInfo{..} = ba_faceInfo0 v
 
-        handleE grp e = do
-                cylinder (coords' v0) (coords' v1) edgeThickness
+        handleE grp e = when (ba_visible1 e) $ do
+                cylinder (coords' v0) (coords' v1) (ba_edgeThickness e)
                 objCommon grp faceLabel faceMat
             
 
             where
                 (v1,v0) = faces10 deltaSet e
-                BSI1 { faceInfo1 = FaceInfo{..}, edgeThickness } = ba_simplbl blenderable e
+                FaceInfo{..} = ba_faceInfo1 e
 
 
         handleT grp grpTriLabels t = do
@@ -152,7 +155,7 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams}
                     objVar <.> "show_transparent" .= True
                     objCommon grp faceLabel faceMat
 
-                    case triangleLabel of
+                    case ba_triangleLabel t of
                         Just (TriangleLabel lblstr g upDisplacementFactor) -> 
                             let (cu0,cu1,cu2) = g Util..* cvs 
                                 right_ = normalize (cu1 &- cu0)
@@ -181,9 +184,7 @@ toBlender scene@Scene{scene_worldProps,scene_blenderable=blenderable,scene_cams}
                 vs = faces20Ascending deltaSet t
                 cvs@(cv0,cv1,cv2) = map3 coords' vs
 
-                BSI2 { faceInfo2 = FaceInfo{..} 
-                     , triangleLabel
-                     } = ba_simplbl blenderable t
+                FaceInfo{..} = ba_faceInfo2 t
 
         
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns #-}
+{-# LANGUAGE FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns #-}
 {-# OPTIONS -Wall #-}
 module Blenderable where
 
@@ -10,39 +10,28 @@ import DisjointUnion
 import HomogenousTuples
 import Prelude hiding(catch,mapM_,sequence_) 
 import Simplicial.DeltaSet
-import Simplicial.Labels
 import ToPython
-import Simplicial.AnySimplex
+import PreRenderable
+import GHC.Generics
 
 data Blenderable a = Blenderable { 
-    ba_main :: LabeledDeltaSet a BlenderSimplexInfo,
+    ba_ds :: DeltaSet a,
+    ba_coords :: Vert a -> Vec3,
+    ba_faceInfo0 :: Vert a -> FaceInfo,
+    ba_vertexThickness :: Vert a -> Double,
+    ba_faceInfo1 :: Arc a -> FaceInfo,
+    ba_visible1 :: Arc a -> Bool,
+    ba_edgeThickness :: Arc a -> Double,
+    ba_faceInfo2 :: Tri a -> FaceInfo,
+    ba_triangleLabel :: Tri a -> Maybe TriangleLabel, 
     ba_materials :: [Material]
 }
-    deriving Show
-
-data BlenderSimplexInfo n where
-    BSI0 :: { 
-        bsiCoords :: Vec3,
-        faceInfo0 :: FaceInfo,
-        vertexThickness :: Double
-     } -> BlenderSimplexInfo N0
-    BSI1 :: { 
-        faceInfo1 :: FaceInfo,
-        edgeThickness :: Double
-     } -> BlenderSimplexInfo N1
-    BSI2 :: { 
-        faceInfo2 :: FaceInfo,
-        triangleLabel :: Maybe TriangleLabel
-     } -> BlenderSimplexInfo N2
-    BSIOther :: BlenderSimplexInfo (S (S (S n)))
+    deriving (Generic)
 
 
-instance Coords (BlenderSimplexInfo n) where
-    transformCoords f b@BSI0{bsiCoords} = b { bsiCoords = f bsiCoords } 
-    transformCoords _ x = x
 
 instance Coords (Blenderable a) where
-    transformCoords f b = b { ba_main = mapSimplexLabels (transformCoords f) (ba_main b) } 
+    transformCoords f b = b { ba_coords = f . ba_coords b }
 
 data FaceInfo = FaceInfo {
         faceLabel :: String,
@@ -65,7 +54,6 @@ data Scene a = Scene {
     scene_worldProps :: Props,
     scene_cams :: [Cam]
 }
-    deriving Show
 
 
 data Cam = Cam {
@@ -140,7 +128,7 @@ nsurfVertThickness = 0.03
 
 pseudomanifold
   :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
-     WithCoords a -> Blenderable a
+     PreRenderable a -> Blenderable a
 pseudomanifold = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
 
 mkBlenderable
@@ -149,23 +137,21 @@ mkBlenderable
      -> Material
      -> Material
      -> Double
-     -> WithCoords a
+     -> PreRenderable a
      -> Blenderable a
-mkBlenderable mat0 mat1 mat2 vertThick a = Blenderable { 
-    ba_main = mapSimplexLabelsWithSimplices 
-        (\s l -> 
-            case l of
-                CoordLabelsF0 x ->
-                    (BSI0 x (FaceInfo (show s) mat0) vertThick)
-                CoordLabelsF1 ->
-                    (BSI1 (FaceInfo (show s) mat1) (edgeThicknessFactor*vertThick))
-                CoordLabelsF2 x ->
-                    (BSI2 (FaceInfo (show s) mat2) x)
-                CoordLabelsF3 ->
-                     BSIOther)
-    
-        a
-        ,
+mkBlenderable mat0 mat1 mat2 vertThick pr = Blenderable { 
+    ba_ds = pr_ds pr,
+    ba_coords = pr_coords pr,
+    ba_triangleLabel = pr_triangleLabel pr,
+    ba_visible1 = pr_visible1 pr,
+
+    ba_faceInfo0 = \s -> FaceInfo (show s) mat0,
+    ba_faceInfo1 = \s -> FaceInfo (show s) mat1, 
+    ba_faceInfo2 = \s -> FaceInfo (show s) mat2, 
+
+    ba_vertexThickness = const vertThick,
+    ba_edgeThickness = const (edgeThicknessFactor*vertThick),
+
     ba_materials = [mat0,mat1,mat2]
 }
 --     where
@@ -183,7 +169,7 @@ nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++trans
 
 normalSurface
   :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
-     WithCoords a -> Blenderable a
+     PreRenderable a -> Blenderable a
 normalSurface = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
 
 
@@ -204,23 +190,20 @@ defaultWorldProps = ["use_sky_blend" & False,
                      ]
 
 
-instance DisjointUnionable (Blenderable a) (Blenderable b) where
-    type DisjointUnion (Blenderable a) (Blenderable b) = Blenderable (Either1 a b)
 
-    disjointUnion (Blenderable a ma) (Blenderable a' ma') =
-        Blenderable 
-            (disjointUnion a a') 
+instance DisjointUnionable [Material] [Material] [Material] where
+    disjointUnion ma ma' =
             (nubBy ((==) `on` ma_name) (ma++ma'))
 
+instance DisjointUnionable (Blenderable a) (Blenderable b) (Blenderable (Either1 a b)) where
 
-ba_ds :: Blenderable a -> DeltaSet a
-ba_ds = lds_ds . ba_main
+    disjointUnion = defaultDisjointUnion
 
-ba_simplbl :: Nat n => Blenderable a -> (a n) -> BlenderSimplexInfo n
-ba_simplbl a = simplbl (ba_main a)
 
-ba_coords :: Blenderable a -> (a   N0) -> Vec3
-ba_coords a = bsiCoords . ba_simplbl a
+
+
+
+
 
 --normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
 

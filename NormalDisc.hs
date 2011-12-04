@@ -10,6 +10,7 @@ module NormalDisc(
         NormalDisc(..),
         MakeNormalDisc(..),   allNormalDiscs, 
         NormalDiscs(..),normalDiscList,
+        normalDiscsContainingNormalCorner,
           
 
         -- * Normal triangles
@@ -20,9 +21,14 @@ module NormalDisc(
 
 
         -- * Normal quadrilaterals
-        NormalQuad(..), allNormalQuads, allNormalQuads', normalQuadByDisjointEdge, normalQuadGetDisjointEdges,
-        normalQuadByVertexAndTriangle, normalQuadGetIntersectedEdges,
+        NormalQuad(..), allNormalQuads, allNormalQuads', 
+        normalQuadByDisjointEdge, 
+        normalQuadByVertexAndTriangle, 
         normalQuadByNormalArc,
+        normalQuadsByIntersectedEdge,
+        normalQuadGetIntersectedEdges,
+        normalQuadGetDisjointEdges,
+        otherNormalQuads,
         NormalQuads(..),normalQuadList,
 
 
@@ -47,6 +53,7 @@ import Test.QuickCheck.All
 import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import TupleTH
 import NormalArc
+import Control.Monad
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)
@@ -136,10 +143,17 @@ normalQuadGetDisjointEdges q = case q of
                                     Q_ac -> (edge (vA,vC),edge (vB,vD))
                                     Q_ad -> (edge (vA,vD),edge (vB,vC))
 
+-- | Edges (circularly) adjacent in the returned tuple have nonempty intersections.
 normalQuadGetIntersectedEdges ::  NormalQuad -> Quadruple Edge
-normalQuadGetIntersectedEdges (normalQuadGetDisjointEdges -> (e1,e2)) =
-    fromList4 $
-    $(filterTuple 6) (\e -> e /= e1 && e /= e2) allEdges'
+normalQuadGetIntersectedEdges q =
+    case q of
+         Q_ab -> go (vA,vC,vB,vD)
+         Q_ac -> go (vA,vB,vC,vD)
+         Q_ad -> go (vA,vB,vD,vC)
+        
+        where
+            go vs = $(zipTupleWith 4) (curry edge) (rotate4_1 vs) vs
+
 
 prop_normalQuadGetIntersectedEdges ::  NormalQuad -> Bool
 prop_normalQuadGetIntersectedEdges nqt = 
@@ -162,11 +176,30 @@ prop_NormalDisc_NormalArcs_complete nat ndt =
 
 
 -- | Constructs a normal quad specified by one of the two edges disjoint from it
-normalQuadByDisjointEdge ::  Edge -> NormalQuad
-normalQuadByDisjointEdge e = 
-    case $(filterTuple 3) (\q -> $(elemTuple 2) e (normalQuadGetDisjointEdges q)) allNormalQuads' of
-         [q] -> q
-         xs -> error (unwords ["normalQuadByDisjointEdge",show e ++":", "impossible:", "q =",show xs])
+normalQuadByDisjointEdge :: Edge -> NormalQuad
+normalQuadByDisjointEdge e = r
+    where
+        r | e == eAB = Q_ab
+          | e == eAC = Q_ac
+          | e == eAD = Q_ad
+          | e == eCD = Q_ab
+          | e == eBD = Q_ac
+          | e == eBC = Q_ad
+          | otherwise = error ("normalQuadByDisjointEdge: Unexpected edge")
+
+
+otherNormalQuads :: NormalQuad -> (Pair NormalQuad)
+otherNormalQuads Q_ab = (Q_ac,Q_ad)
+otherNormalQuads Q_ac = (Q_ab,Q_ad)
+otherNormalQuads Q_ad = (Q_ab,Q_ac)
+
+normalQuadsByIntersectedEdge :: Edge -> Pair NormalQuad
+normalQuadsByIntersectedEdge = otherNormalQuads . normalQuadByDisjointEdge
+
+
+--     case $(filterTuple 3) (\q -> $(elemTuple 2) e (normalQuadGetDisjointEdges q)) allNormalQuads' of
+--          [q] -> q
+--          xs -> error (unwords ["normalQuadByDisjointEdge",show e ++":", "impossible:", "q =",show xs])
 
 instance Show NormalDisc where show = either show show . unNormalDisc
 
@@ -211,7 +244,6 @@ instance IsSubface NormalArc NormalDisc where
 
 
 
-
 qc_NormalDisc ::  IO Bool
 qc_NormalDisc = $(quickCheckAll)
 
@@ -221,12 +253,10 @@ qc_NormalDisc = $(quickCheckAll)
 
 
 instance NormalArcs NormalQuad (Quadruple NormalArc) where
-    normalArcs q = case q of
-                   Q_ab   -> go (vC,vD,vA,vB)
-                   Q_ac  -> go (vB,vA,vD,vC)
-                   Q_ad -> go (vA,vB,vC,vD)
-        where
-            go = $(zipTupleWith 4) (curry normalArc) (tABC,tABD,tACD,tBCD)
+    normalArcs q = case normalCorners q of
+                        cs -> map4 
+                                normalArc 
+                                ($(zipTuple 4) (rotate4_1 cs) cs)
 
 
 
@@ -268,3 +298,14 @@ normalTriByNormalArc = normalTri . normalArcGetVertex
 
 prop_normalTriByNormalArc :: NormalArc -> Bool
 prop_normalTriByNormalArc na = isSubface na (normalTriByNormalArc na) 
+
+normalTrisContainingNormalCorner :: NormalCorner -> Pair NormalTri
+normalTrisContainingNormalCorner = map2 normalTri . vertices . normalCornerGetContainingEdge
+
+normalQuadsContainingNormalCorner :: NormalCorner -> Pair NormalQuad
+normalQuadsContainingNormalCorner = normalQuadsByIntersectedEdge . normalCornerGetContainingEdge 
+
+normalDiscsContainingNormalCorner :: NormalCorner -> Quadruple NormalDisc
+normalDiscsContainingNormalCorner = liftM2 ($(catTuples 2 2)) 
+    (map2 normalDisc . normalTrisContainingNormalCorner) 
+    (map2 normalDisc . normalQuadsContainingNormalCorner)
