@@ -33,16 +33,21 @@ type instance (OTuple' v) (Plus4 n) = List v (S (Plus4 n))
 
 newtype OTuple v n = OT { unOT :: OTuple' v n } 
 
-instance (Show v, Nat n) => Show (OTuple v n) where
-#define r (showsPrec prec x)
-    showsPrec prec (OT x) = caseNat4 (undefined :: n) r r r r (const r)
-#undef r
 
+
+#define OT_DERIVE(F,OARGS,ARGS)\
+    F OARGS = caseNat4 (undefined :: n) (F ARGS) (F ARGS) (F ARGS) (F ARGS) (const (F ARGS))
+
+instance (Show v, Nat n) => Show (OTuple v n) where
+    OT_DERIVE( showsPrec prec, (OT x), x )
 
 instance (Eq v, Nat n) => Eq (OTuple v n) where
+    OT_DERIVE( (==), (OT x) (OT y), x y )
 
 instance (Ord v, Nat n) => Ord (OTuple v n) where
+    OT_DERIVE( compare, (OT x) (OT y), x y )
 
+#undef OT_DERIVE
 
 instance Show v => ShowN (OTuple v) where
     getShow _ r = r 
@@ -114,7 +119,7 @@ fromTrisAndQuads (fmap sort3 -> tris) quads =
         quadHalfs = concatMap (\(a,b,c,d) -> [sort3 (a,b,c),sort3 (a,c,d)]) quads
         quadDiagonals = Set.fromList (fmap (\(a,_,c,_) -> OT (sort2 (a,c))) quads)
         sc = fromTris (tris ++ quadHalfs)
-        triEdges = Set.fromList (s1 (fromTris tris))
+        triEdges = Set.fromList (edges (fromTris tris))
 
 
 

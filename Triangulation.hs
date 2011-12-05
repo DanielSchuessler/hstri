@@ -117,20 +117,6 @@ data Triangulation = Triangulation {
 
         
 
-askTetrahedra ::  MonadReader Triangulation m => m [TIndex]
-askTetrahedra = tTetrahedra_ `liftM` ask
-
-askGlueMap :: MonadReader Triangulation m => m (Map ITriangle OITriangle)
-askGlueMap = tGlueMap_ `liftM` ask
-
-askEdgeEqv ::  MonadReader Triangulation m => m (Equivalence IEdge)
-askEdgeEqv = edgeEqv `liftM` ask
-
-askOEdgeEqv ::  MonadReader Triangulation m => m (Equivalence OIEdge)
-askOEdgeEqv = oEdgeEqv `liftM` ask  
-
-askVertexEqv :: MonadReader Triangulation m => m (Equivalence IVertex)
-askVertexEqv = vertexEqv `liftM` ask  
 
 
 instance Pretty Triangulation where
@@ -267,20 +253,6 @@ triang gluings = fromRight $ mkTriangulation (nub' $ tets) gluings
 -- ti t i a = T t (I i a)
 
 
--- instance TIndex => HasEquivClass ITriangle where
---     equivClass two = two : case lookup two askGlueMap of
---                                 Just two' -> [forgetVertexOrder two']
---                                 Nothing -> mempty
--- 
--- instance TIndex => HasEquivClass OITriangle where
---     equivClass otwo = otwo : case lookup two askGlueMap of
---                                 Just two' -> [g .* two']
---         where
---             (g,two) = unpackOrderedFace otwo
-
--- tetDeref r = lookup r ?tri 
--- 
--- 
 
 instance Show Triangulation where
     showsPrec = prettyShowsPrec 
@@ -355,8 +327,8 @@ randomTriangulation nTets nGluings = do
     g <- newStdGen 
     return $ unGen (randT nTets nGluings) g 0 
 
-triangTetCount ::  MonadReader Triangulation m => m Int
-triangTetCount = length `liftM` askTetrahedra
+triangTetCount :: Triangulation -> Int
+triangTetCount = length `liftM` tTetrahedra_
 
 
 qc_Triangulation ::  IO Bool

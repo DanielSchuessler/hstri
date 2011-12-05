@@ -1,6 +1,34 @@
 {-# LANGUAGE FlexibleContexts, BangPatterns, TypeFamilies, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
-module Edge where
+module Edge (
+    module Vertex,
+
+    -- * Plain
+    Edge, eAB,eAC,eAD,eBC,eBD,eCD,
+    allEdges,allEdges',
+    MakeEdge(..),
+    oppositeEdge,
+    edgeToBitSet,
+    bitSetToEdge,
+    isVertexOfEdge,
+    intersectEdges,
+
+    -- * Oriented
+    OEdge,
+    MakeOEdge(..),
+    verticesToOEdge,
+
+
+    -- * Indexed
+    IEdge,
+
+    -- * Oriented and indexed
+    OIEdge,
+
+    -- * Testing
+    qc_Edge
+    )
+    where
 
 import Control.Exception
 import Data.BitSet.Word8 as BitSet
@@ -12,14 +40,13 @@ import Test.QuickCheck
 import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import Util
 import Vertex
-import TIndex
-import FaceClasses
 import OrderableFace
 import Data.Word
 import S2
 import Control.Monad
 import Control.Applicative
 import TupleTH
+import Test.QuickCheck.All
 
 -- | Edge of an abstract tetrahedron (unoriented)
 newtype Edge = Edge (BitSet Vertex) 
@@ -147,7 +174,7 @@ prop_EnumOEdge = forAll (elements [0..11]) (\n -> fromEnum (toEnum n :: OEdge) .
 
 -- | Make an oriented edge of an abstract tetrahedron from two of its vertices (which must be distinct)
 verticesToOEdge ::  (Vertex, Vertex) -> OEdge
-verticesToOEdge (Vertex v0, Vertex v1) = OEdge (nibblesToWord8 (v0,v1))
+verticesToOEdge (map2 vertexToWord8 -> (v0, v1)) = OEdge (nibblesToWord8 (v0,v1))
 
 instance Bounded OEdge where
     minBound = verticesToOEdge (vA,vB)
@@ -196,7 +223,7 @@ instance Show OEdge where
     show (vertices -> (v0,v1)) = show v0 ++ show v1
 
 instance Vertices OEdge (Pair Vertex) where
-    vertices (OEdge (word8ToNibbles -> (x1,x0))) = (Vertex x1, Vertex x0)
+    vertices (OEdge (word8ToNibbles -> nibbles)) = map2 vertexFromWord8 nibbles
 
 instance Arbitrary OEdge where arbitrary = liftM2 packOrderedFace arbitrary arbitrary 
 instance Pretty OEdge where pretty = abstractTetrahedronColor . text . show
@@ -214,8 +241,6 @@ instance Vertices IEdge (Pair IVertex) where
 instance Vertices OIEdge (Pair IVertex) where 
     vertices z = map2 ((./) (getTIndex z)) (vertices (forgetTIndex z)) 
 
-instance Edges TIndex (IEdge,IEdge,IEdge,IEdge,IEdge,IEdge) where
-    edges z = map6 (z ./) allEdges'
 
 -- | Edges containing a given vertex
 instance Edges Vertex (Triple Edge) where
@@ -245,4 +270,27 @@ otherVertex (vertices -> (v0,v1)) v =
     then v0
     else error ("otherVertex: Second arg not a vertex of first arg")
 
+instance Link Vertex Edge Vertex where
+    link = flip otherVertex
+
+instance Link Vertex OEdge Vertex where
+    link = flip otherVertex
+
+instance Link IVertex IEdge IVertex where
+    link = flip otherVertex
+
+instance Link IVertex OIEdge IVertex where
+    link = flip otherVertex
+
+qc_Edge :: IO Bool
+qc_Edge = $(quickCheckAll)
+
+edgeToBitSet :: Edge -> BitSet Vertex
+edgeToBitSet (Edge bs) = bs
+
+bitSetToEdge :: BitSet Vertex -> Edge
+bitSetToEdge = Edge
+
+instance Edges TIndex (Sextuple IEdge) where
+    edges z = map6 (z ./) allEdges'
 

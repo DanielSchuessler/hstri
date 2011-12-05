@@ -32,9 +32,11 @@ instance Show NormalArc where
 
 instance NormalCorners NormalArc (Pair NormalCorner) where
     normalCorners (NormalArc t v) =  
-        (   fromList2
+            fromList2
           . fmap normalCorner
-          . filter3 (v `isSubface`)) (edges t)
+          . filter3 (v `isSubface`)
+          . edges
+          $ t
 
 
 
@@ -136,8 +138,6 @@ instance NormalArcs Triangle (Triple NormalArc) where
 instance NormalArcs OTriangle (Triple NormalArc) where
     normalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
 
-instance IsSubface NormalArc Triangle where
-    isSubface nat t = normalArcGetTriangle nat == t
 
 prop_Triangle_NormalArcs_correct :: Triangle -> Bool
 prop_Triangle_NormalArcs_correct t = all3 (`isSubface` t) (normalArcs t) 
@@ -151,8 +151,6 @@ prop_Triangle_NormalArcs_complete nat t =
 qc_NormalArc :: IO Bool
 qc_NormalArc = $(quickCheckAll)
 
-instance IsSubface NormalArc OTriangle where
-    isSubface na t = isSubface na (forgetVertexOrder t)
 
 prop_normalArcByNormalCorners :: NormalArc -> Property
 prop_normalArcByNormalCorners na = 
@@ -161,3 +159,13 @@ prop_normalArcByNormalCorners na =
         na == normalArc (nc2,nc1)
     where
         (nc1,nc2) = normalCorners na 
+
+
+instance IsSubface NormalCorner NormalArc where
+    isSubface c (normalCorners -> (c0,c1)) = c==c0 || c==c1
+
+instance IsSubface NormalArc OTriangle where
+    isSubface na t = isSubface na (forgetVertexOrder t)
+
+instance IsSubface NormalArc Triangle where
+    isSubface nat t = normalArcGetTriangle nat == t

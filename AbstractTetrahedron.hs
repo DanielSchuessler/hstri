@@ -7,35 +7,14 @@ module AbstractTetrahedron(
     module Util,
     module TIndex,
     module Data.Monoid,
+    module Vertex,
+    module Edge,
+    module Triangle,
 
-    -- * Vertices
-    Vertex,
-    vA,vB,vC,vD,
-    allVertices,allVertices',
-    MakeVertex(..),
-    Vertices(..),
-    vertexList,
-    IVertex,
-    -- * Edges
-    Edge, eAB,eAC,eAD,eBC,eBD,eCD,
-    allEdges,allEdges',
-    MakeEdge(..),
-    Edges(..),
-    edgeList,
-    oppositeEdge,
-    IEdge,
-    -- * Triangles
-    module Triangle,Triangles(..),triangleList,
     -- * Ordered faces
     OrderableFace(..), defaultLeftActionForOrderedFace,
     forgetVertexOrder,
     IsSubface(..),liftIsSubface,
-    -- ** Ordered edges
-    OEdge,
-    verticesToOEdge,
-    OEdges(..),
-    MakeOEdge(..),
-    OIEdge,
 
 
     -- * Testing
@@ -56,19 +35,21 @@ import Vertex
 import Edge
 import Triangle
 import TIndex
-import FaceClasses
 import OrderableFace
 import Data.Monoid
 
 class IsSubface x y where
     isSubface :: x -> y -> Bool
 
+-- | Equivalent to 'isVertexOfEdge'
 instance IsSubface Vertex Edge where
     isSubface = isVertexOfEdge
 
+-- | Equivalent to 'isVertexOfTriangle'
 instance IsSubface Vertex Triangle where
     isSubface = isVertexOfTriangle
 
+-- | Equivalent to 'isEdgeOfTriangle'
 instance IsSubface Edge Triangle where
     isSubface = isEdgeOfTriangle
 
@@ -103,6 +84,7 @@ qc_AbstractTetrahedron = $(quickCheckAll)
 class Intersection a b c | a b -> c where
     intersect :: a -> b -> c
 
+-- | Equivalent to 'intersectEdges'
 instance Intersection Edge Edge (Maybe (Either Edge Vertex)) where
     intersect = intersectEdges 
 
@@ -207,3 +189,4 @@ liftIsSubface x y = isSubface (viewI x) (viewI y)
 instance IsSubface IVertex IEdge where isSubface = liftIsSubface
 instance IsSubface IVertex ITriangle where isSubface = liftIsSubface
 instance IsSubface IEdge ITriangle where isSubface = liftIsSubface
+

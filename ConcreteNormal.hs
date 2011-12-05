@@ -172,10 +172,8 @@ embedNormalSurfaceIntoSPQ spq coords nc =
 
         ns = mkConcrete (spq_tr spq) nc
 
-        twoSimplices = 
-            fmap NSTSTri (cns_tris ns)
-            ++
-            concatMap (sequence [NSTSQuadA,NSTSQuadB]) (cns_quads ns)
+        tris = do
+
         
 --         ds = mkHomogenousDeltaSet
 --                 (mkTuply2dFaceFunc 

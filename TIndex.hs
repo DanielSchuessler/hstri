@@ -9,6 +9,10 @@ import Test.QuickCheck
 import Control.Applicative
 import PrettyUtil() -- Pretty Word orphan instance
 
+
+
+
+
 -- | Tetrahedron index
 newtype TIndex = TIndex Word
     deriving(Eq,Ord,Pretty,Enum)
@@ -38,8 +42,12 @@ class HasTIndex ia a | ia -> a, a -> ia where
 
 infix 9 ./
 
-instance HasTIndex TIndex () where
-    viewI = flip I () 
+
+data AbsTet = AbsTet
+    deriving(Eq,Ord,Show)
+
+instance HasTIndex TIndex AbsTet where
+    viewI = flip I AbsTet 
     (./) = const
 
 getTIndex ::  HasTIndex a a' => a -> TIndex
@@ -95,3 +103,6 @@ instance Arbitrary TIndex where
 
 unI :: HasTIndex ia a => ia -> a
 unI (viewI -> I _ x) = x
+
+
+

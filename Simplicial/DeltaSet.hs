@@ -23,6 +23,7 @@ import Test.QuickCheck
 import TupleTH
 import Util
 import qualified Data.Vector as V
+import FaceClasses as F
 
 -- data RightShift f
 -- type instance RightShift f  n = f  (S n)
@@ -275,12 +276,15 @@ faces32 a x = map4 (\i -> face a i x) (0,1,2,3)
 simps' :: Nat n => DeltaSet a -> [a n]
 simps' ds = simps ds undefined 
 
-s0 :: DeltaSet a -> [Vert a]
-s0 = simps'
-s1 :: DeltaSet a -> [Arc a]
-s1 = simps'
-s2 :: DeltaSet a -> [Tri a]
-s2 = simps'
+instance Vertices (DeltaSet a) [Vert a] where
+    vertices = simps'
+
+instance Edges (DeltaSet a) [Arc a] where
+    edges = simps'
+
+instance Triangles (DeltaSet a) [Tri a] where
+    triangles = simps'
+
 s3 :: DeltaSet a -> [Tet a]
 s3 = simps'
 
@@ -348,9 +352,9 @@ memoSuper
   :: forall a. (Ord (Vert a), Ord (Arc a), Ord (Tri a)) => DeltaSet a -> DeltaSet a
 memoSuper d = 
     let
-            super01_ = (memoFun (super01 d) (s0 d) !)
-            super12_ = (memoFun (super12 d) (s1 d) !)
-            super23_ = (memoFun (super23 d) (s2 d) !)
+            super01_ = (memoFun (super01 d) (vertices d) !)
+            super12_ = (memoFun (super12 d) (F.edges d) !)
+            super23_ = (memoFun (super23 d) (triangles d) !)
 
             supers_ :: SuperFunction a
             supers_ (x :: a n) = 
@@ -370,8 +374,8 @@ instance (ShowN s) => Show (DeltaSet s) where
 
 --                     concat [ 
 --                         f (s3 a) (asList . faces32 a), 
---                         f (s2 a) (asList . faces21 a), 
---                         f (s1 a) (asList . faces10 a),
+--                         f (triangles a) (asList . faces21 a), 
+--                         f (edges a) (asList . faces10 a),
 --                         showVerts
 --                         ]
 --         where
@@ -484,10 +488,10 @@ checkFaceOrderConsistency ds = (sequence_ :: [m()] -> m()) $ do -- list monad
 oneSkeleton :: DeltaSet a -> Gr (Vert a) (Arc a)
 oneSkeleton ds = mkGraph 
     (do
-        v <- s0 ds
+        v <- vertices ds
         return (nodeMapGet ds v,v))
     (do
-        e <- s1 ds
+        e <- F.edges ds
         let (nod,nod') = nodeMapGet ds `map2` faces10 ds e
         return (nod,nod',e)) 
 

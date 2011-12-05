@@ -98,3 +98,14 @@ sort3 = $(tupleFromList 3) . sort . $(tupleToList 3)
 rotate4_1 :: (t1, t2, t3, t) -> (t, t1, t2, t3)
 rotate4_1 = $(rotateTuple 4 1)
 
+
+deleteTuple3 :: Eq a => (a, a, a) -> a -> Maybe (a, a)
+deleteTuple3 (a,b,c) x 
+    | a==x = Just (b,c)  
+    | b==x = Just (a,c)
+    | c==x = Just (a,b)
+    | otherwise = Nothing
+
+
+
+

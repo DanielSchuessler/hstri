@@ -24,6 +24,7 @@ import Text.Printf.TH
 import ToPython
 import TypeLevel.TF
 import qualified Util
+import FaceClasses
 
 
 
@@ -110,9 +111,9 @@ toBlender scene@Scene{
                 methodCallExpr1 bpy_props "StringProperty" (str "Simplex label")
 
 
-            mapM_ (handleV grp0) (s0 deltaSet)
-            mapM_ (handleE grp1) (s1 deltaSet)
-            mapM_ (handleT grp2 grpTriLabels) (s2 deltaSet)
+            mapM_ (handleV grp0) (vertices deltaSet)
+            mapM_ (handleE grp1) (edges deltaSet)
+            mapM_ (handleT grp2 grpTriLabels) (triangles deltaSet)
 
         
 

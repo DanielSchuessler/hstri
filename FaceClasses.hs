@@ -26,3 +26,10 @@ triangleList = asList . triangles
 class AsList oedgeTuple => OEdges a oedgeTuple | a -> oedgeTuple where
     oedges :: a -> oedgeTuple
 
+class Link a b c | a b -> c where
+    link :: a -> b -> c
+
+class Star a b c | a b -> c where
+    star :: a -> b -> c
+
+

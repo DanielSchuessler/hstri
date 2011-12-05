@@ -1,8 +1,9 @@
-{-# LANGUAGE FlexibleContexts, ViewPatterns, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
 module OrderableFace where
 
 import Util
 import FaceClasses
+import Data.Monoid
 
 
 -- | Parameters: 
@@ -46,4 +47,6 @@ defaultLeftActionForOrderedFace g2 (unpackOrderedFace -> (g1,x)) = packOrderedFa
 forgetVertexOrder ::  OrderableFace t ot => ot -> t
 forgetVertexOrder = snd . unpackOrderedFace
 
-
+-- | Equivalent to 'packOrderedFace mempty'
+toOrderedFace :: OrderableFace t ot => t -> ot
+toOrderedFace = packOrderedFace mempty

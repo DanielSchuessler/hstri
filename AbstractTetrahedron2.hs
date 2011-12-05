@@ -1,10 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 module AbstractTetrahedron2 where
 
-import AbstractTetrahedron
+import S3
+import Triangle
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Data.List((\\))
+import Util
 
 $( let
         vs = [vA,vB,vC,vD]

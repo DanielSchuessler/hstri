@@ -18,6 +18,7 @@ module NormalDisc(
         allNormalTris, allNormalTris', normalTriGetVertex, 
         MakeNormalTri(..),
         NormalTris(..),normalTriList,normalTriByNormalArc,
+        ntA,ntB,ntC,ntD,
 
 
         -- * Normal quadrilaterals
@@ -50,10 +51,11 @@ import HomogenousTuples
 import Prelude hiding(catch,lookup)
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import TupleTH
 import NormalArc
 import Control.Monad
+import Data.Maybe
+import PrettyUtil
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)
@@ -66,9 +68,12 @@ class MakeNormalDisc a where
 
 newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary)
 
+ntA,ntB,ntC,ntD :: NormalTri
+(ntA,ntB,ntC,ntD) = map4 normalTri allVertices' 
+
 instance Show NormalTri where
-    show nt = "t"++show (normalTriGetVertex nt)
---    show nt = "{Normal triangle enclosing "++show (normalTriGetVertex nt)++"}"
+    showsPrec = prettyShowsPrec 
+
 
 
 allNormalTris :: [NormalTri]
@@ -207,7 +212,7 @@ instance Pretty NormalDisc where pretty = either pretty pretty . unNormalDisc
 
 instance Pretty NormalQuad where pretty = green . text . show 
 
-instance Pretty NormalTri where pretty = green . text . show
+instance Pretty NormalTri where pretty x = green (text "nt" <> (text . show . normalTriGetVertex) x)
 
 
 -- | Constructs a normal quad by indirectly specifying one of the two edges disjoint from it using 'edgeByOppositeVertexAndTriangle' 
@@ -309,3 +314,10 @@ normalDiscsContainingNormalCorner :: NormalCorner -> Quadruple NormalDisc
 normalDiscsContainingNormalCorner = liftM2 ($(catTuples 2 2)) 
     (map2 normalDisc . normalTrisContainingNormalCorner) 
     (map2 normalDisc . normalQuadsContainingNormalCorner)
+
+
+instance Link NormalCorner NormalTri (Pair NormalCorner) where
+    link nc nt = 
+             fromMaybe (error (unwords ["link",show nc,show nt]))
+                (normalCorners nt `deleteTuple3` nc)
+

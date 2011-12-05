@@ -38,15 +38,17 @@ instance ShowN a => Show (AnySimplex a) where
 instance OrdN a => Eq (AnySimplex a) where
     a == b = compare a b == EQ
 
-
-instance OrdN a => Ord (AnySimplex a) where
-    compare (AnySimplex (x1 :: a n1)) (AnySimplex (x2 :: a n2)) =
+compareAnySimplex :: OrdN t => AnySimplex t -> AnySimplex t -> Ordering
+compareAnySimplex (AnySimplex (x1 :: a n1)) (AnySimplex (x2 :: a n2)) =
         caseEqNat n1_ n2_ 
              (compareN x1 x2)
              (compare (natToInt n1_) (natToInt n2_))
       where
         n1_ = undefined :: n1
-        n2_ = undefined :: n2
+        n2_ = undefined :: n2    
+
+instance OrdN a => Ord (AnySimplex a) where
+    compare = compareAnySimplex 
 
 -- | Means that @a n@ is 'Show' for all @'Nat' n@
 class ShowN a where

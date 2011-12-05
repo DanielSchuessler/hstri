@@ -1,6 +1,37 @@
 {-# LANGUAGE FlexibleContexts, TypeFamilies,BangPatterns,MultiParamTypeClasses, StandaloneDeriving, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
-module Triangle where
+module Triangle(
+    module Edge,
+
+    -- * Plain
+    Triangle,
+    allTriangles,allTriangles',
+    MakeTriangle(..),
+    edgeByOppositeVertexAndTriangle,
+    vertexByOppositeEdge,
+    isVertexOfTriangle,
+    isEdgeOfTriangle,
+
+    -- ** Vertex indices
+    VertexIndexInTriangle(..),
+    triangleGetVertexAt,
+    triangleGetIndexOf,
+
+    -- * Ordered
+    OTriangle,
+    MakeOTriangle(..),
+    verticesToOTriangle,
+
+    -- * Indexed
+    ITriangle,
+
+    -- * Ordered and indexed
+    OITriangle,
+    oiTriangleByVertices
+
+
+
+    ) where
 
 import Collections
 import Control.Exception
@@ -15,8 +46,6 @@ import Data.List as List
 import HomogenousTuples
 import Edge
 import Data.Monoid
-import TIndex
-import FaceClasses
 import OrderableFace
 import S3
 import Control.Monad
@@ -94,7 +123,7 @@ instance MakeTriangle (BitSet Vertex) where
 
 -- | Construct a triangle containing the two edges
 instance MakeTriangle (Pair Edge) where
-    triangle es@(Edge e1,Edge e2) = 
+    triangle es@(edgeToBitSet -> e1,edgeToBitSet -> e2) = 
         case mappend e1 e2 of
             e' | BitSet.size e' == 3 -> Triangle e'
                | otherwise -> error ("triangle "++show es)
@@ -114,7 +143,7 @@ isVertexOfTriangle v (Triangle x) = BitSet.member v x
 
 
 isEdgeOfTriangle :: Edge -> Triangle -> Bool
-isEdgeOfTriangle (Edge x) (Triangle x') = BitSet.isSubsetOf x x'
+isEdgeOfTriangle (edgeToBitSet -> x) (Triangle x') = BitSet.isSubsetOf x x'
 
 instance Arbitrary Triangle where arbitrary = elements allTriangles
 instance Lift Triangle where
@@ -187,7 +216,7 @@ instance LeftAction S3 OTriangle where
 
 
 -- | Ordered edges contained in a given facet, in order
-instance Edges OTriangle (OEdge,OEdge,OEdge) where
+instance Edges OTriangle (Triple OEdge) where
     edges x = case vertices x of
                    (v0,v1,v2) -> ( verticesToOEdge (v0,v1)
                                  , verticesToOEdge (v1,v2)
@@ -231,8 +260,8 @@ verticesToOTriangle (v0, v1, v2)
                      _ -> S3bac .* caseOrdered w1 w0 w2
 
 
-        caseOrdered (Vertex w0) (Vertex w1) (Vertex w2) = packOrderedFace S3abc $
-                case (w0,w1,w2) of
+        caseOrdered w0 w1 w2 = packOrderedFace S3abc $
+                case map3 vertexToWord8 (w0,w1,w2) of
                      (0,1,2) -> tABC
                      (0,1,3) -> tABD
                      (0,2,3) -> tACD
@@ -245,7 +274,7 @@ instance Triangles Edge (Pair Triangle) where
 
 -- | Edges contained in a given triangle
 instance Edges Triangle (Triple Edge) where
-    edges t@(Triangle x) = map3 (\v -> Edge (BitSet.delete v x)) (v2,v0,v1)
+    edges t@(Triangle x) = map3 (\v -> bitSetToEdge (BitSet.delete v x)) (v2,v0,v1)
         where
             (v0,v1,v2) = vertices t
 
@@ -312,6 +341,8 @@ vertexByOppositeEdge e t =
 
          [v0] -> v0
          _ -> error ("vertexByOppositeEdge is not defined for args "++show e++", "++show t)
+
+
 
 instance Triangles TIndex (Quadruple ITriangle) where
     triangles z = map4 (z ./) allTriangles'

@@ -1,6 +1,28 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
-module Vertex where
+module Vertex 
+    (
+    module FaceClasses,
+    module TIndex,
+    -- * Vertices
+    Vertex,
+    vA,vB,vC,vD,
+    allVertices,allVertices',
+    MakeVertex(..),
+    Vertices(..),
+    IVertex,
+    vertexTripleToString,
+    abstractTetrahedronColor,
+    vertexToWord8,
+    vertexFromWord8,
+
+    Link(..),
+    Star(..)
+
+
+    )
+
+    where
 
 import Collections
 import Control.Exception
@@ -15,7 +37,6 @@ import TIndex
 import FaceClasses
 import HomogenousTuples
 import Control.Applicative
-
 
 -- | Vertex of an abstract tetrahedron
 newtype Vertex = Vertex Word8 deriving(Eq,Ord)
@@ -52,6 +73,7 @@ allVertices = asList allVertices'
 
 allVertices' ::  (Vertex, Vertex, Vertex, Vertex)
 allVertices' = (vA,vB,vC,vD)
+
 
 vertexPrettyColor :: Doc -> Doc
 vertexPrettyColor = cyan
@@ -102,3 +124,12 @@ instance Vertices TIndex (Quadruple IVertex) where
 
 instance Arbitrary IVertex where
     arbitrary = (./) <$> arbitrary <*> arbitrary
+
+instance Vertices AbsTet (Quadruple Vertex) where
+    vertices = const allVertices'
+
+vertexToWord8 :: Vertex -> Word8
+vertexToWord8 (Vertex w) = w
+
+vertexFromWord8 :: Word8 -> Vertex
+vertexFromWord8 = Vertex
