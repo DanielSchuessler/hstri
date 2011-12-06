@@ -10,11 +10,12 @@ module AbstractTetrahedron(
     module Vertex,
     module Edge,
     module Triangle,
+    module AbstractTetrahedron2,
+    module OrderableFace,
 
     -- * Ordered faces
-    OrderableFace(..), defaultLeftActionForOrderedFace,
-    forgetVertexOrder,
     IsSubface(..),liftIsSubface,
+    Intersection(..),
 
 
     -- * Testing
@@ -22,6 +23,7 @@ module AbstractTetrahedron(
     
     where
 
+import AbstractTetrahedron2
 import Control.Exception
 import Control.Monad.RWS
 import HomogenousTuples
@@ -36,7 +38,8 @@ import Edge
 import Triangle
 import TIndex
 import OrderableFace
-import Data.Monoid
+import Data.Monoid(Monoid(..),mconcat)
+import QuickCheckUtil
 
 class IsSubface x y where
     isSubface :: x -> y -> Bool

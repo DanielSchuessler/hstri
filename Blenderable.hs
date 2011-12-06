@@ -34,7 +34,7 @@ instance Coords (Blenderable a) where
     transformCoords f b = b { ba_coords = f . ba_coords b }
 
 data FaceInfo = FaceInfo {
-        faceLabel :: String,
+        faceName :: String,
         faceMat :: Material
 }
 
@@ -127,12 +127,11 @@ nsurfVertThickness = 0.03
 
 
 pseudomanifold
-  :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
-     PreRenderable a -> Blenderable a
+  :: PreRenderable a -> Blenderable a
 pseudomanifold = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
 
 mkBlenderable
-  :: forall a. (Show (Vert a), Show (Arc a), Show (Tri a)) =>
+  :: forall a. 
      Material
      -> Material
      -> Material
@@ -145,9 +144,9 @@ mkBlenderable mat0 mat1 mat2 vertThick pr = Blenderable {
     ba_triangleLabel = pr_triangleLabel pr,
     ba_visible1 = pr_visible1 pr,
 
-    ba_faceInfo0 = \s -> FaceInfo (show s) mat0,
-    ba_faceInfo1 = \s -> FaceInfo (show s) mat1, 
-    ba_faceInfo2 = \s -> FaceInfo (show s) mat2, 
+    ba_faceInfo0 = \s -> FaceInfo (pr_name0 pr s) mat0,
+    ba_faceInfo1 = \s -> FaceInfo (pr_name1 pr s) mat1, 
+    ba_faceInfo2 = \s -> FaceInfo (pr_name2 pr s) mat2, 
 
     ba_vertexThickness = const vertThick,
     ba_edgeThickness = const (edgeThicknessFactor*vertThick),
@@ -167,10 +166,10 @@ nsurfMat1 = Material "nsurfMat1" (diffuseColor (0, 0.2, 1):specular 100 0.8)
 nsurfMat2 ::  Material
 nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++transparency 0.55 0.7 1)
 
-normalSurface
+normalSurfaceStyle
   :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
      PreRenderable a -> Blenderable a
-normalSurface = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
+normalSurfaceStyle = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
 
 
 -- | Points cam at positive y dir

@@ -93,6 +93,8 @@ sort2 = $(tupleFromList 2) . sort . $(tupleToList 2)
 sort3 :: Ord t => (t, t, t) -> (t, t, t)
 sort3 = $(tupleFromList 3) . sort . $(tupleToList 3)
 
+sort4 :: Ord t => (t, t, t, t) -> (t, t, t, t)
+sort4 = $(tupleFromList 4) . sort . $(tupleToList 4)
 
 
 rotate4_1 :: (t1, t2, t3, t) -> (t, t1, t2, t3)
@@ -107,5 +109,13 @@ deleteTuple3 (a,b,c) x
     | otherwise = Nothing
 
 
+
+{-# SPECIALIZE indexInTriple :: (Show t, Eq t) => t -> (t,t,t)-> Int #-}
+-- | Returns the first index if more than one element of the triple is equal to the element. Errors if none is.
+indexInTriple ::  (Show t, Num a, Eq t) => t -> (t, t, t) -> a
+indexInTriple x (x1,x2,x3) | x == x1 = 0
+                           | x == x2 = 1
+                           | x == x3 = 2
+                           | otherwise = error ( unwords [ "indexInTriple" , show x, show (x1,x2,x3) ] )
 
 

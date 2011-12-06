@@ -38,7 +38,10 @@ data PreRenderable a = PreRenderable {
     pr_ds :: DeltaSet a,
     pr_coords :: Vert a -> Vec3,
     pr_visible1 :: Arc a -> Bool, 
-    pr_triangleLabel :: Tri a -> Maybe TriangleLabel
+    pr_triangleLabel :: Tri a -> Maybe TriangleLabel,
+    pr_name0 :: Vert a -> String,
+    pr_name1 :: Arc a -> String,
+    pr_name2 :: Tri a -> String
 }
     deriving(Generic)
 
@@ -52,5 +55,8 @@ instance DisjointUnionable (PreRenderable a) (PreRenderable b) (PreRenderable (E
 
 
 mkPreRenderable
-  :: (Vert a -> Vec3) -> DeltaSet a -> PreRenderable a
-mkPreRenderable pr_coords pr_ds = PreRenderable pr_ds pr_coords (const True) (const Nothing) 
+  :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
+     (Vert a -> Vec3) -> DeltaSet a -> PreRenderable a
+mkPreRenderable pr_coords pr_ds = PreRenderable pr_ds pr_coords (const True) (const Nothing) show show show 
+
+

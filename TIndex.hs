@@ -8,6 +8,7 @@ import Util
 import Test.QuickCheck
 import Control.Applicative
 import PrettyUtil() -- Pretty Word orphan instance
+import Quote
 
 
 

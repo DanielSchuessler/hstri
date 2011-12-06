@@ -11,6 +11,7 @@ module Triangle(
     vertexByOppositeEdge,
     isVertexOfTriangle,
     isEdgeOfTriangle,
+    tBCD,tACD,tABD,tABC,
 
     -- ** Vertex indices
     VertexIndexInTriangle(..),
@@ -50,6 +51,7 @@ import OrderableFace
 import S3
 import Control.Monad
 import Control.Applicative
+import Quote
 
 
 
@@ -146,8 +148,10 @@ isEdgeOfTriangle :: Edge -> Triangle -> Bool
 isEdgeOfTriangle (edgeToBitSet -> x) (Triangle x') = BitSet.isSubsetOf x x'
 
 instance Arbitrary Triangle where arbitrary = elements allTriangles
+
 instance Lift Triangle where
     lift (Triangle t) = [| Triangle $(Syntax.lift t) |]
+
 instance Finite Triangle
 
 instance Quote Triangle where
@@ -389,4 +393,6 @@ oiTriangleByVertices (map3 viewI -> (I i0 v0, I i1 v1, I i2 v2)) =
 instance Arbitrary ITriangle where
     arbitrary = (./) <$> arbitrary <*> arbitrary
 
+instance Quote OTriangle where
+    quotePrec _ ot = "o"++show ot
 

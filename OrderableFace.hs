@@ -1,7 +1,17 @@
 {-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
-module OrderableFace where
+{-# OPTIONS -Wall #-}
+module OrderableFace(
+    module Group,
+    module FaceClasses,    
+    OrderableFace(..),
+    defaultLeftActionForOrderedFace,
+    defaultVerticesForOrderedFace,
+    forgetVertexOrder,
+    toOrderedFace
+    
+    ) where
 
-import Util
+import Group
 import FaceClasses
 import Data.Monoid
 

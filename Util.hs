@@ -13,85 +13,27 @@ import Data.Graph.Inductive.Graph(labNodes)
 import Data.Graph.Inductive.PatriciaTree(Gr)
 import Data.Int
 import Data.List as List
-import Data.Monoid
-import Data.Tagged
 import Data.Word
-import Language.Haskell.TH
 import Test.QuickCheck hiding((.&.))
 import Test.QuickCheck.All
 import Data.BitSet.Word8(BitSet(..))
-import Language.Haskell.TH.Syntax
-import Data.Char
 import qualified Data.Set as S
 import Control.Exception
-
-
-cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
-cart = liftM2 (,)
-
-(.*.) ::  Monoid a => a -> a -> a
-(.*.) = mappend
-infixr 7 .*.
-
-polyprop_idl ::  (Monoid a, Eq a) => a -> Bool
-polyprop_idl g = mempty .*. g == g
-
-polyprop_idr ::  (Monoid a, Eq a) => a -> Bool
-polyprop_idr g = g .*. mempty == g
-
-polyprop_assoc ::  (Monoid a, Eq a) => a -> a -> a -> Bool
-polyprop_assoc g3 g2 g1 = (g3 .*. g2) .*. g1 == g3 .*. (g2 .*. g1)
-
-
-class Monoid g => Group g where
-    inv :: g -> g
-
-
-polyprop_invl ::  (Group a, Eq a) => a -> Bool
-polyprop_invl g = inv g .*. g == mempty
-
-polyprop_invr ::  (Group a, Eq a) => a -> Bool
-polyprop_invr g = g .*. inv g == mempty
-
-class LeftAction g x where
-    (.*) ::  g -> x -> x
-
-infixr 7 .*
-
--- We need a type-level tag here because the monoid isn't inferrable from the acted-upon type
-polyprop_act_id :: forall a x. (Monoid a, LeftAction a x, Eq x) => Tagged a (x -> Bool)
-polyprop_act_id = Tagged (\x -> (mempty :: a) .* x == x)
-
-
-polyprop_act_mult :: (LeftAction g x, Monoid g, Eq x) => g -> g -> x -> Bool
-polyprop_act_mult g2 g1 x = (g2 .*. g1) .* x == g2 .* g1 .* x
+import QuickCheckUtil
 
 
 
-forAllElements :: (Testable prop, Show a) => [a] -> (a -> prop) -> Property
-forAllElements [] _ = label "Vacuously true (empty domain)" True
-forAllElements xs p = forAll (elements xs) p
-
-forAllElements2 :: (Testable prop, Show a1, Show a2) =>[a1] -> [a2] -> ((a1, a2) -> prop) -> Property
-forAllElements2 xs ys p = forAllElements (xs `cart` ys) p
 
 
 
-forAll2 :: (Testable prop, Show a1, Show a) =>Gen a -> Gen a1 -> (a -> a1 -> prop) -> Property
-forAll2 gen1 gen2 p = forAll gen1 (\x1 -> forAll gen2 (p x1))
-forAll3 :: (Testable prop, Show a1, Show a2, Show a) =>Gen a -> Gen a1 -> Gen a2 -> (a -> a1 -> a2 -> prop) -> Property
-forAll3 gen1 gen2 gen3 p = forAll gen1 (\x1 -> forAll gen2 (\x2 -> forAll gen3 (p x1 x2)))
-
-
-
+fi :: (Integral a, Num b) => a -> b
+fi = fromIntegral
 
 
 nub' ::  Ord a => [a] -> [a]
 nub' = S.toList . S.fromList
 
 
-changeSize ::  (Int -> Int) -> Gen a -> Gen a
-changeSize f gen = sized (\n -> resize (f n) gen) 
 
 
 isRight ::  Either t t1 -> Bool
@@ -107,20 +49,12 @@ fromRight = either (error . f) id
 
 
 
-{-# SPECIALIZE indexInTriple :: (Show t, Eq t) => t -> (t,t,t)-> Int #-}
--- | Returns the first index if more than one element of the triple is equal to the element. Errors if none is.
-indexInTriple ::  (Show t, Num a, Eq t) => t -> (t, t, t) -> a
-indexInTriple x (x1,x2,x3) | x == x1 = 0
-                           | x == x2 = 1
-                           | x == x3 = 2
-                           | otherwise = error ( unwords [ "indexInTriple" , show x, show (x1,x2,x3) ] )
-
 
 
 
 class (Enum a, Bounded a) => Finite a where
 
--- | Like 'Either', but I use a newtype to avoid orphan instances
+-- | Like 'Either', but I use a new type to avoid orphan instances
 data EnumEither a b = EnumLeft a | EnumRight a
     deriving(Eq,Show)
 
@@ -210,22 +144,6 @@ qc_Util ::  IO Bool
 qc_Util = $(quickCheckAll)        
 
 
--- | Exhaustively checks a property for all elements of a list (in contrast to 'forAll', which samples randomly)
-conjoinMap ::  Testable prop => [t] -> (t -> prop) -> Property
-conjoinMap [] _ = label "Vacuously true (empty domain)" True
-conjoinMap xs p = conjoin (fmap p xs)
-
-conjoinMap2 :: Testable prop => [a1] -> [a2] -> ((a1, a2) -> prop) -> Property
-conjoinMap2 xs ys p = conjoinMap (xs `cart` ys) p
-
-
-
-
-(.=.) ::  (Show a, Eq a) => a -> a -> Property
-x .=. y = 
-    printTestCase (unlines ["Equality failed:","=== FIRST ELEMENT ===",show x,"=== SECOND ELEMENT ===",show y])
-    (x==y)
-
 
 showBits :: forall a. Bits a => a -> String
 showBits = (\x -> fmap (\i -> if testBit x i then '1' else '0') [n-1,n-2..0]) 
@@ -285,29 +203,6 @@ prop_flipNibbles x = word8ToNibbles (flipNibbles x) == (y0,y1)
 
 deriveCollectionKeyClass ''BitSet
 
-instance Lift Word8 where
-    lift w = sigE (litE (IntegerL (toInteger w))) [t| Word8 |]
-
-instance Lift (BitSet a) where
-    lift (BitSet w) = [| BitSet $(lift w) |]
-
-
--- | Things that can be outputed as valid haskell source code
-class Quote a where
-    quotePrec :: Int -> a -> String
-
-quote ::  Quote a => a -> String
-quote = quotePrec 0
-
-quoteParen ::  Bool -> [Char] -> [Char]
-quoteParen True x = "(" ++ x ++ ")"
-quoteParen False x = x
-
-instance Quote a => Quote [a] where
-    quotePrec _ xs = "[" ++ intercalate ", " (fmap quote xs) ++ "]"
-
-instance (Quote a, Quote b) => Quote (a,b) where
-    quotePrec _ (x,y) = quoteParen True (quote x ++ ", "++quote y)
 
 
 -- charsToPermute ::  Int -> [Char] -> Permute
@@ -322,9 +217,6 @@ instance (Quote a, Quote b) => Quote (a,b) where
 --         f i = chr (i + ord 'a')
 
 
--- | Suitable for types with only nullable constructors and derived Show instance
-liftByShow ::  Show a => a -> ExpQ
-liftByShow = conE . mkName . show
 
 
 

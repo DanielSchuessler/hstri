@@ -1,24 +1,31 @@
 {-# LANGUAGE StandaloneDeriving, TemplateHaskell, RecordWildCards, ViewPatterns #-}
 {-# LANGUAGE NoMonomorphismRestriction #-} 
-{-# LANGUAGE FlexibleInstances, BangPatterns #-} 
+{-# LANGUAGE TypeFamilies, FlexibleInstances, BangPatterns #-} 
 module MathUtil where
 
-import Data.Vect.Double as Vect
-import Data.Complex
-import Test.QuickCheck
-import Control.Monad
-import TupleTH
-import Data.Vect.Double.Instances
-import Data.Vect.Double.Util.Dim4
+
+import Collections
 import Control.Applicative
 import Control.Exception
-import System.Directory
-import System.FilePath
-import Test.QuickCheck.Gen
-import System.Random
-import System.Process
-import System.Exit
+import Control.Monad
+import Data.AdditiveGroup
+import Data.Complex
+import Data.Monoid
+import Data.Ratio
+import Data.Vect.Double as Vect
+import Data.Vect.Double.Instances
+import Data.Vect.Double.Util.Dim4
+import Data.VectorSpace
 import Data.Word
+import System.Directory
+import System.Exit
+import System.FilePath
+import System.Process
+import System.Random
+import Test.QuickCheck
+import Test.QuickCheck.Gen
+import TupleTH
+import qualified Data.Foldable as Fold
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -98,3 +105,31 @@ pointZTo z' = Mat3 x' y' z'
 
 matrixApproxEq :: MatrixNorms m => m -> m -> Bool
 matrixApproxEq m1 m2 = matrixDistance m1 m2 < 1E-10
+
+
+-- | Absent keys are taken to have coefficient zero
+instance (Ord k, Num r) => AdditiveGroup (Map k r) where
+    zeroV = mempty
+    xs ^+^ ys = unionMaybeWith f xs ys
+        where
+            f x y = case x + y of
+                         0 -> Nothing
+                         s -> Just s
+    negateV = fmap negate
+
+-- | Absent keys are taken to have coefficient zero
+instance (Ord k, Num r) => VectorSpace (Map k r) where
+    type Scalar (Map k r) = r
+    0 *^ _ = zeroV
+    r *^ x = fmap (r*) x 
+
+-- | Absent keys are taken to have coefficient zero
+instance (Ord k, Num r) => InnerSpace (Map k r) where
+    x <.> y = Fold.foldl' (+) 0 (intersectionWith (*) x y)
+
+
+ratioToIntegral :: Integral a => Ratio a -> Maybe a
+ratioToIntegral r = guard (denominator r == 1) >> Just (numerator r)
+                  
+lcms :: Integral b => [b] -> b
+lcms = foldr lcm 1

@@ -12,6 +12,7 @@ module Edge (
     bitSetToEdge,
     isVertexOfEdge,
     intersectEdges,
+    otherVertex,
 
     -- * Oriented
     OEdge,
@@ -24,29 +25,34 @@ module Edge (
 
     -- * Oriented and indexed
     OIEdge,
+    allOIEdges,
 
     -- * Testing
     qc_Edge
     )
     where
 
+import Control.Applicative
 import Control.Exception
+import Control.Monad
 import Data.BitSet.Word8 as BitSet
 import Data.List as List
 import Data.Maybe
+import Data.Word
 import Element
 import HomogenousTuples
+import OrderableFace
+import QuickCheckUtil
+import Quote
+import S2
+import THUtil() -- Lift BitSet
 import Test.QuickCheck
+import Test.QuickCheck.All
 import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
+import TupleTH
 import Util
 import Vertex
-import OrderableFace
-import Data.Word
-import S2
-import Control.Monad
-import Control.Applicative
-import TupleTH
-import Test.QuickCheck.All
+import Language.Haskell.TH.Syntax
 
 -- | Edge of an abstract tetrahedron (unoriented)
 newtype Edge = Edge (BitSet Vertex) 
@@ -294,3 +300,5 @@ bitSetToEdge = Edge
 instance Edges TIndex (Sextuple IEdge) where
     edges z = map6 (z ./) allEdges'
 
+instance Lift Edge where
+    lift (Edge e) = [| Edge e |]

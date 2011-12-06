@@ -43,6 +43,7 @@ import Triangulation
 import TupleTH
 import UPair
 import PrettyUtil
+import QuickCheckUtil
 
 data T a = T {
     getTriangulation :: Triangulation,

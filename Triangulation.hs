@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
+{-# LANGUAGE PatternGuards, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module Triangulation(
@@ -23,6 +23,7 @@ module Triangulation(
     tINormalTris,
     tINormalArcs,
     tINormalQuads,
+    tINormalDiscs,
     tOIEdges,
     getOIEdgeGluingSense,
     -- * Construction 
@@ -64,7 +65,8 @@ import FacetGluing
 import INormalDisc
 import NormalDisc
 import Element
-import Edge
+import Quote
+import QuickCheckUtil
 
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
@@ -410,6 +412,10 @@ tINormalTris :: Triangulation -> [INormalTri]
 tINormalTris = concatMap normalTriList . tTetrahedra_ 
 tINormalQuads :: Triangulation -> [INormalQuad]
 tINormalQuads = concatMap normalQuadList . tTetrahedra_ 
+
+
+tINormalDiscs :: Triangulation -> [INormalDisc]
+tINormalDiscs = concatMap normalDiscList . tTetrahedra_ 
 
 
 tOIEdges :: Triangulation -> [OIEdge]

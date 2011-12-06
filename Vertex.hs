@@ -15,6 +15,7 @@ module Vertex
     abstractTetrahedronColor,
     vertexToWord8,
     vertexFromWord8,
+    vertexDefaultCoords,
 
     Link(..),
     Star(..)
@@ -37,6 +38,9 @@ import TIndex
 import FaceClasses
 import HomogenousTuples
 import Control.Applicative
+import Quote
+import THUtil() -- Lift Word8
+import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
 
 -- | Vertex of an abstract tetrahedron
 newtype Vertex = Vertex Word8 deriving(Eq,Ord)
@@ -133,3 +137,14 @@ vertexToWord8 (Vertex w) = w
 
 vertexFromWord8 :: Word8 -> Vertex
 vertexFromWord8 = Vertex
+
+-- | Embeds the abstract tetrahedron into R^3 symmetrically
+vertexDefaultCoords :: Vertex -> Vec3
+vertexDefaultCoords = f . vertexToWord8 
+    where
+        f 0 = vec3X
+        f 1 = vec3Y
+        f 2 = vec3Z
+        f 3 = Vec3 1 1 1
+        f _ = assert False undefined
+

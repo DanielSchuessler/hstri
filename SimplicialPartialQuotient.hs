@@ -15,6 +15,7 @@ import Data.Vect.Double(Vec3)
 import INormalDisc
 import NormalDisc
 import PrettyUtil
+import Control.Exception
 
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
 
@@ -23,6 +24,7 @@ data SimplicialPartialQuotient v = SimplicialPartialQuotient {
     spq_tets :: [Quadruple v]
 
 }
+
 
 spq_verts = nub' . concatMap toList4 . spq_tets
 
@@ -145,7 +147,7 @@ prop_enoughGluings spq =
 
 toSimplicialComplex = fromTets . spq_tets   
 
-toPreRenderable spq coords = 
+toPreRenderable (SPQWithCoords spq coords) = 
     let pr0 =
             mkPreRenderable 
                 (coords . unOT)
@@ -176,3 +178,27 @@ spq_INormalCornerEquivalence
 spq_INormalCornerEquivalence = spq_Equivalence_helper normalCornerList tINormalCorners
 
 
+
+
+identitySPQ :: Triangulation -> SimplicialPartialQuotient IVertex
+identitySPQ tr =
+
+            SimplicialPartialQuotient
+                tr
+                id
+                (fmap vertices (tTetrahedra_ tr))
+
+
+data SPQWithCoords v = SPQWithCoords {
+    spqwc_spq :: SimplicialPartialQuotient v,
+    spqwc_coords :: v -> Vec3
+}
+
+
+geometrifySingleTetTriang :: Triangulation -> SPQWithCoords Vertex
+geometrifySingleTetTriang tr = 
+    assert (L.null (tail (tTetrahedra_ tr)))
+    $
+        SPQWithCoords 
+            (SimplicialPartialQuotient tr forgetTIndex [allVertices'])
+            vertexDefaultCoords

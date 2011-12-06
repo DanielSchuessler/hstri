@@ -27,6 +27,7 @@ import qualified Data.Text.Lazy.IO as TextIO
 import AbstractTetrahedron
 import Control.Exception
 import System.Exit
+import QuickCheckUtil
 
 class GraphvizFormatable a y | a -> y where fmt :: a -> y
 

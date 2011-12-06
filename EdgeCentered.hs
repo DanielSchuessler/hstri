@@ -16,11 +16,9 @@ import Data.Map as M
 import Data.List as L
 import HomogenousTuples
 import Test.QuickCheck
-import Simplicial.SimplicialComplex
 import Data.Vect.Double hiding((.*))
 import Data.Maybe
 import Control.Monad
-import PreRenderable
 import SimplicialPartialQuotient
 
 data EdgeNeighborhoodVertex =
@@ -118,8 +116,7 @@ makeEdgeNeighborhoodMap tr oiEdge =
 
 
 makeEdgeNeighborhood :: Triangulation -> OIEdge -> 
-    (SimplicialPartialQuotient EdgeNeighborhoodVertex, 
-     PreRenderable (OTuple EdgeNeighborhoodVertex))
+    (SPQWithCoords EdgeNeighborhoodVertex) 
 
 makeEdgeNeighborhood tr oiEdge =
     let
@@ -146,9 +143,10 @@ makeEdgeNeighborhood tr oiEdge =
 --         labels = fmap return letters ++ join (liftM2 (\x y -> [x,y])) letters ++ error "out of labels :("
 --         letters = "FGJPQR?" 
 
+        spqwc = SPQWithCoords m coords
             
     in
-        (m, toPreRenderable m coords) 
+        spqwc
 
 
 

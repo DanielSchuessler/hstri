@@ -3,7 +3,6 @@
 {-# OPTIONS -Wall #-}
 module NormalDisc(
         module AbstractTetrahedron,
-        module AbstractTetrahedron2,
         module NormalArc,
 
         -- * Normal discs
@@ -18,7 +17,6 @@ module NormalDisc(
         allNormalTris, allNormalTris', normalTriGetVertex, 
         MakeNormalTri(..),
         NormalTris(..),normalTriList,normalTriByNormalArc,
-        ntA,ntB,ntC,ntD,
 
 
         -- * Normal quadrilaterals
@@ -43,7 +41,6 @@ module NormalDisc(
     ) where
 
 import AbstractTetrahedron
-import AbstractTetrahedron2
 import Data.Functor
 import Data.List(sort)
 import Element
@@ -56,6 +53,9 @@ import NormalArc
 import Control.Monad
 import Data.Maybe
 import PrettyUtil
+import Language.Haskell.TH.Syntax
+import THUtil
+import Quote
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)
@@ -68,8 +68,6 @@ class MakeNormalDisc a where
 
 newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary)
 
-ntA,ntB,ntC,ntD :: NormalTri
-(ntA,ntB,ntC,ntD) = map4 normalTri allVertices' 
 
 instance Show NormalTri where
     showsPrec = prettyShowsPrec 
@@ -90,10 +88,8 @@ data NormalQuad =
     -- | The quad disjoint from the edges 'eAD' and 'eBC'.                  
     Q_ad 
     
-    deriving(Enum,Bounded,Eq,Ord)
+    deriving(Enum,Bounded,Eq,Ord,Show)
 
-instance Show NormalQuad where
-    show q = "q"++(show . fst . normalQuadGetDisjointEdges) q 
 
 --     show q = "{Normal quad separating "++show v0++","++show v1++" from "++show v2++","++show v3++"}"
 --         where
@@ -210,9 +206,12 @@ instance Show NormalDisc where show = either show show . unNormalDisc
 
 instance Pretty NormalDisc where pretty = either pretty pretty . unNormalDisc
 
-instance Pretty NormalQuad where pretty = green . text . show 
+instance Pretty NormalQuad where pretty = green . text . quote 
 
-instance Pretty NormalTri where pretty x = green (text "nt" <> (text . show . normalTriGetVertex) x)
+instance Pretty NormalTri where pretty = green . text . quote
+
+instance Quote NormalTri where quote nt = "nt" ++ show (normalTriGetVertex nt)
+instance Quote NormalQuad where quote = show
 
 
 -- | Constructs a normal quad by indirectly specifying one of the two edges disjoint from it using 'edgeByOppositeVertexAndTriangle' 
@@ -246,7 +245,14 @@ instance IsSubface NormalArc NormalQuad where
 instance IsSubface NormalArc NormalDisc where
     isSubface nat = either (isSubface nat) (isSubface nat) . unNormalDisc
 
+instance IsSubface NormalCorner NormalTri where
+    isSubface nc nt = isVertexOfEdge (vertex nt) (edge nc)
 
+instance IsSubface NormalCorner NormalQuad where
+    isSubface nc nq = elem4 nc (normalCorners nq)
+
+instance IsSubface NormalCorner NormalDisc where
+    isSubface nat = either (isSubface nat) (isSubface nat) . unNormalDisc
 
 
 qc_NormalDisc ::  IO Bool
@@ -293,9 +299,17 @@ instance NormalCorners NormalTri (Triple NormalCorner) where
     normalCorners nt =
         map3 normalCorner (edges . normalTriGetVertex $ nt)
 
+
+-- | Elements (circularly) adjacent in the returned tuple are adjacent corners
+normalQuadGetNormalCornersInOrder
+  :: NormalQuad
+     -> (Quadruple NormalCorner)
+normalQuadGetNormalCornersInOrder = map4 normalCorner . normalQuadGetIntersectedEdges
+
+-- | Equivalent to 'normalQuadGetNormalCornersInOrder'
 instance NormalCorners NormalQuad (Quadruple NormalCorner) where
-    normalCorners =
-        map4 normalCorner . normalQuadGetIntersectedEdges
+    normalCorners = normalQuadGetNormalCornersInOrder
+
 
 -- | Returns the unique normal tri type containing a normal arc of the given type
 normalTriByNormalArc :: NormalArc -> NormalTri
@@ -316,8 +330,62 @@ normalDiscsContainingNormalCorner = liftM2 ($(catTuples 2 2))
     (map2 normalDisc . normalQuadsContainingNormalCorner)
 
 
+
+
 instance Link NormalCorner NormalTri (Pair NormalCorner) where
     link nc nt = 
-             fromMaybe (error (unwords ["link",show nc,show nt]))
+             fromMaybe err
                 (normalCorners nt `deleteTuple3` nc)
 
+
+                where
+                    err = (error (unwords ["link",show nc,show nt]
+                                    ++": Normal corner not contained in normal tri"))
+
+
+instance Link NormalCorner NormalQuad (Pair NormalCorner) where
+    link nc nq = 
+        case normalQuadGetNormalCornersInOrder nq of
+             (a,b,c,d)
+                | nc == a -> (d,b)
+                | nc == b -> (a,c)
+                | nc == c -> (b,d)
+                | nc == d -> (c,a)
+                | otherwise ->
+
+                        error (unwords ["link",show nc,show nq]
+                                    ++": Normal corner not contained in normal quad")
+
+instance Link NormalCorner NormalDisc (Pair NormalCorner) where
+    link nc = either (link nc) (link nc) . unNormalDisc
+
+prop_link_nc_nq :: NormalCorner -> NormalQuad -> Property
+prop_link_nc_nq nc nq =
+    isSubface nc nq ==>
+        let
+            (nc0,nc1) = link nc nq 
+        in
+            conjoin [
+                isSubface nc0 nq,
+                isSubface nc1 nq,
+                nc0 /= nc,
+                nc1 /= nc,
+                nc0 /= nc1
+            ]
+
+
+
+
+instance Lift NormalTri where
+    lift (NormalTri v) = [| NormalTri v |] 
+
+instance Lift NormalQuad where
+    lift = liftByShow
+
+instance Lift NormalDisc where
+    lift (NormalDisc x) = [| NormalDisc x |] 
+
+instance Quote NormalDisc where
+    quotePrec prec x = 
+        quoteParen (prec > 10) $
+            "normalDisc " ++ (either (quotePrec 11) (quotePrec 11) $ unNormalDisc x)

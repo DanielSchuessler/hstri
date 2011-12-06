@@ -10,7 +10,8 @@ module Equivalence(
     ec_singleton, ec_union, ec_join, ec_elementList,
     -- * Equivalence relations
     Equivalence, eqv_classmap, eqv_classes, eqv_eq, mkEquivalence, eqv_classcount,
-    eqv_class_elements, eqv_reps, eqv_generators, eqv_equivalents,
+    eqv_class_elements, eqv_reps, eqv_generators, eqv_equivalents, eqv_rep,
+    eqv_classOf,
     -- * Testing
     qc_Equivalence, mkWellDefinednessProp, mkWellDefinednessProp2)   where
 
@@ -25,7 +26,7 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Text.Printf.TH
 import PrettyUtil
-import Util
+import QuickCheckUtil
 
 
 #define KEYCLASS(A) Ord(A)
@@ -103,7 +104,10 @@ deriving instance (Show a, KEYCLASS(a)) => Show (Equivalence a)
 
 instance KEYCLASS(a) => HasEquivalence (Equivalence a) (EquivalenceClass a) a where
     eqvClasses = eqv_classes
-    eqvClassOf !e !x = eqv_classmap e ! x
+    eqvClassOf = eqv_classOf
+    
+eqv_classOf :: Ord k => Equivalence k -> k -> EquivalenceClass k
+eqv_classOf e x = eqv_classmap e ! x
 
 
 -- | Checks whether the given elements are equivalent. Throws an error if the first argument is not in the domain of the equivalence.
@@ -116,7 +120,7 @@ eqv_classcount = length . eqv_classes
 
 -- | Gets the representative of the equivalence class of the given element. Throws an error if the element is not in the domain of the equivalence.
 eqv_rep :: (KEYCLASS(a)) => Equivalence a -> a -> a
-eqv_rep !e !x = ec_rep (eqvClassOf e x)
+eqv_rep !e !x = ec_rep (eqv_classOf e x)
 
 
 -- insertUnlessExists = Map.insertWith (curry snd)

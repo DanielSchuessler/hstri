@@ -12,7 +12,7 @@ import Control.Exception
 import Control.Monad(when)
 import Data.Foldable
 import Data.Function
-import Data.Vect.Double
+import Data.Vect.Double hiding((.*),(.*.))
 import HomogenousTuples
 import MathUtil
 import PreRenderable
@@ -127,23 +127,23 @@ toBlender scene@Scene{
         coords' = ba_coords 
 
 
-        objCommon grp faceLabel faceMat = do
-                objSetName faceLabel
+        objCommon grp faceName faceMat = do
+                objSetName faceName
                 objSetMaterial (ma_var faceMat)
                 grpLink grp objVar
-                objVar <.> "simplexlabel" .= str faceLabel
+                objVar <.> "simplexlabel" .= str faceName
 
 
         handleV grp v = do
                 sphere (coords' v) (ba_vertexThickness v)
-                objCommon grp faceLabel faceMat
+                objCommon grp faceName faceMat
             
             where
                 FaceInfo{..} = ba_faceInfo0 v
 
         handleE grp e = when (ba_visible1 e) $ do
                 cylinder (coords' v0) (coords' v1) (ba_edgeThickness e)
-                objCommon grp faceLabel faceMat
+                objCommon grp faceName faceMat
             
 
             where
@@ -154,11 +154,11 @@ toBlender scene@Scene{
         handleT grp grpTriLabels t = do
                     blenderTriangle cv0 cv1 cv2 
                     objVar <.> "show_transparent" .= True
-                    objCommon grp faceLabel faceMat
+                    objCommon grp faceName faceMat
 
                     case ba_triangleLabel t of
                         Just (TriangleLabel lblstr g upDisplacementFactor) -> 
-                            let (cu0,cu1,cu2) = g Util..* cvs 
+                            let (cu0,cu1,cu2) = g .* cvs 
                                 right_ = normalize (cu1 &- cu0)
                                 basepoint = interpolate 0.5 cu0 cu1
                                 up1 = let up0 = (cu2 &- basepoint) 
@@ -177,7 +177,7 @@ toBlender scene@Scene{
                             in do
                              newTextObj lblstr
                              objVar <.> matrix_basis .= m
-                             objCommon grpTriLabels (lblstr ++ " on "++show g ++" "++faceLabel) triLabelMat 
+                             objCommon grpTriLabels (lblstr ++ " on "++show g ++" "++faceName) triLabelMat 
 
                         Nothing -> return ()
 

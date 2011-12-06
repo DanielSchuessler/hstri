@@ -9,6 +9,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Test.QuickCheck
 import Text.PrettyPrint.ANSI.Leijen
+import Group
 import Util
 
 

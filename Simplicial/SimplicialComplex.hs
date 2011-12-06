@@ -13,7 +13,7 @@ import Data.Set as Set
 import Data.Vect.Double 
 import FaceIx
 import HomogenousTuples
-import List
+import TypeLevel.TF.List
 import PreRenderable
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet
@@ -83,8 +83,13 @@ fromSimplices s _dim =
         ({-# SCC "fromSimplices/eval:s" #-} s) 
         ({-# SCC "fromSimplices/eval:_dim" #-} _dim) 
 
-fromTets :: forall v. Ord v => [Quadruple v] -> SimplicialComplex v
-fromTets xs = assert (all isOrdered4 xs) $ fromSimplices s (HomogenousDim 3)
+
+
+fromTets :: Ord v => [Quadruple v] -> SimplicialComplex v
+fromTets = fromOrderedTets . fmap sort4
+
+fromOrderedTets :: forall v. Ord v => [Quadruple v] -> SimplicialComplex v
+fromOrderedTets xs = assert (all isOrdered4 xs) $ fromSimplices s (HomogenousDim 3)
     where
 
         s :: SimpsFunction (OTuple v)
@@ -96,8 +101,11 @@ fromTets xs = assert (all isOrdered4 xs) $ fromSimplices s (HomogenousDim 3)
                         (const []))
 
 
-fromTris :: forall v. Ord v => [Triple v] -> SimplicialComplex v
-fromTris xs = assert (all isOrdered3 xs) $ fromSimplices s (HomogenousDim 2)
+fromTris :: Ord v => [Triple v] -> SimplicialComplex v
+fromTris = fromOrderedTris . fmap sort3 
+
+fromOrderedTris :: forall v. Ord v => [Triple v] -> SimplicialComplex v
+fromOrderedTris xs = assert (all isOrdered3 xs) $ fromSimplices s (HomogenousDim 2)
     where
 
         s :: SimpsFunction (OTuple v)
@@ -118,8 +126,8 @@ fromTrisAndQuads (fmap sort3 -> tris) quads =
     where
         quadHalfs = concatMap (\(a,b,c,d) -> [sort3 (a,b,c),sort3 (a,c,d)]) quads
         quadDiagonals = Set.fromList (fmap (\(a,_,c,_) -> OT (sort2 (a,c))) quads)
-        sc = fromTris (tris ++ quadHalfs)
-        triEdges = Set.fromList (edges (fromTris tris))
+        sc = fromOrderedTris (tris ++ quadHalfs)
+        triEdges = Set.fromList (edges (fromOrderedTris tris))
 
 
 
@@ -149,13 +157,7 @@ abstractTet = fromTets [allVertices']
 
 
 tet3d :: PreRenderable (OTuple Vertex)
-tet3d = mkPreRenderable (f . fromEnum . unOT) abstractTet 
-    where
-        f 0 = vec3X
-        f 1 = vec3Y
-        f 2 = vec3Z
-        f 3 = Vec3 1 1 1
-        f _ = assert False undefined
+tet3d = mkPreRenderable (vertexDefaultCoords . unOT) abstractTet 
 
 oTupleBarycenter :: forall n v. (Nat n, Vector v) => OTuple v n -> v 
 oTupleBarycenter x = oTupleFoldl1' (&+) x &* (recip (fromIntegral (1 + natToInt (undefined :: n))))

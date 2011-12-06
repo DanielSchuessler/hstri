@@ -4,8 +4,8 @@ module NormalArc(
         module NormalCorner,
 
         NormalArc, normalArcGetTriangle, normalArcGetVertex, allNormalArcs,
-            normalArcGetOppositeEdge, normalArcGetVertexIndex, normalArcByTriangleAndVertexIndex,
-            normalArcByTriangleAndVertex,
+            normalArcGetParallelEdge, normalArcGetVertexIndex, normalArcByTriangleAndVertexIndex,
+            normalArcByTriangleAndVertex,normalArcGetAngle,
         MakeNormalArc(..),
         NormalArcs(..),
         normalArcList,
@@ -23,8 +23,11 @@ import Element
 import Test.QuickCheck
 import Test.QuickCheck.All
 import PrettyUtil
+import Quote
+import QuickCheckUtil
+import Language.Haskell.TH.Syntax
 
-data NormalArc = NormalArc Triangle Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
+data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
     deriving (Eq,Ord)
 
 instance Show NormalArc where
@@ -89,8 +92,8 @@ normalArcByTriangleAndVertexIndex t i = NormalArc t (triangleGetVertexAt t i)
 
 -- | Gets the edge which is contained in the 'normalArcGetTriangle' of the 
 -- given normal arc, but disjoint from the normal arc
-normalArcGetOppositeEdge ::  NormalArc -> Edge
-normalArcGetOppositeEdge nat = edgeByOppositeVertexAndTriangle (normalArcGetVertex nat) (normalArcGetTriangle nat)
+normalArcGetParallelEdge ::  NormalArc -> Edge
+normalArcGetParallelEdge nat = edgeByOppositeVertexAndTriangle (normalArcGetVertex nat) (normalArcGetTriangle nat)
 
 
 instance Enum NormalArc where
@@ -120,17 +123,18 @@ allNormalArcs = [minBound .. maxBound]
 
 
 instance Pretty NormalArc where 
-    pretty na = green (lbrace <> text "Arc dual to" <+> 
-                        pretty (normalArcGetVertex na) <+> text "in" <+> 
-                        pretty (normalArcGetTriangle na) <>
-                            rbrace)
+    pretty = green . text . quote
+--     pretty na = green (lbrace <> text "Arc dual to" <+> 
+--                         pretty (normalArcGetVertex na) <+> text "in" <+> 
+--                         pretty (normalArcGetTriangle na) <>
+--                             rbrace)
 
 
 class AsList normalArcTuple => NormalArcs a normalArcTuple | a -> normalArcTuple where
     normalArcs :: a -> normalArcTuple
 
 instance Arbitrary NormalArc where
-    arbitrary = elements [ minBound .. maxBound ]
+    arbitrary = elements allNormalArcs
 
 instance NormalArcs Triangle (Triple NormalArc) where
     normalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
@@ -169,3 +173,41 @@ instance IsSubface NormalArc OTriangle where
 
 instance IsSubface NormalArc Triangle where
     isSubface nat t = normalArcGetTriangle nat == t
+
+-- | The middle returned vertex is the 'normalArcGetVertex' of the 'NormalArc'; the other two complete the 'normalArcGetTriangle'
+normalArcGetAngle :: NormalArc -> (Vertex, Vertex, Vertex)
+normalArcGetAngle na = (v0,v,v1)
+    where
+        v = normalArcGetVertex na
+        (v0,v1) = vertices (edgeByOppositeVertexAndTriangle v (normalArcGetTriangle na))
+
+
+prop_normalArcGetAngle :: NormalArc -> Property
+prop_normalArcGetAngle na =
+        v .=. normalArcGetVertex na
+        .&.
+        triangle vs .=. normalArcGetTriangle na
+
+    where
+        vs@(_,v,_) = normalArcGetAngle na
+
+prop_normalArcGetAngle_corners :: NormalArc -> Property
+prop_normalArcGetAngle_corners na =
+        na .=. normalArc (nc0,nc1)
+
+    where
+        (v0,v,v1) = normalArcGetAngle na
+        nc0 = normalCorner (v0,v) 
+        nc1 = normalCorner (v1,v) 
+        
+
+instance Quote NormalArc where
+    quote (normalArcGetAngle -> (v0,v,v1)) =
+        "na" ++ concatMap show [v0,v,v,v1]
+
+
+instance Lift NormalArc where
+    lift (NormalArc x y) = [| NormalArc x y |]
+
+instance MakeVertex NormalArc where
+    vertex = normalArcGetVertex

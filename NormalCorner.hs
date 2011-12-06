@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns, TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall #-}
 module NormalCorner(
          -- * Normal corners
@@ -15,6 +15,8 @@ import Element
 import PrettyUtil
 import Test.QuickCheck
 import HomogenousTuples
+import Language.Haskell.TH.Syntax
+import Quote
 
 class AsList normalCornerTuple => NormalCorners a normalCornerTuple | a -> normalCornerTuple where
     normalCorners :: a -> normalCornerTuple
@@ -33,9 +35,7 @@ instance Show NormalCorner where
     showsPrec = prettyShowsPrec
 
 instance Pretty NormalCorner where 
-    pretty (NormalCorner e) = green (lbrace <>
-        text "Corner on"
-        <+> pretty e <> rbrace)
+    pretty = green . text . quote
 
 allNormalCorners' :: (Sextuple NormalCorner)
 allNormalCorners' = map6 NormalCorner allEdges'
@@ -50,8 +50,13 @@ instance MakeEdge NormalCorner where
     edge = normalCornerGetContainingEdge
 
 
+-- | Normal corner on the given edge
 instance MakeNormalCorner Edge where
     normalCorner = NormalCorner
+
+-- | Normal corner on the edge joining the two vertices
+instance MakeNormalCorner (Vertex,Vertex) where
+    normalCorner = normalCorner . edge
 
 instance IsSubface NormalCorner Edge where
     isSubface nct e = normalCornerGetContainingEdge nct == e 
@@ -67,4 +72,10 @@ instance NormalCorners OTriangle (Triple NormalCorner) where
 
 instance MakeNormalCorner OEdge where
     normalCorner = normalCorner . forgetVertexOrder
+
+instance Lift NormalCorner where
+    lift (NormalCorner e) = [| NormalCorner e |]
+
+instance Quote NormalCorner where
+    quote (NormalCorner (vertices -> (v0,v1))) = "nc"++show v0++show v1
 

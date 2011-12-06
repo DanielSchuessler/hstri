@@ -1,18 +1,54 @@
 {-# LANGUAGE TupleSections, ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
-{-# OPTIONS -Wall #-}
-module NormalCoordinates where
+{-# OPTIONS -Wall -fno-warn-orphans #-}
+module NormalCoordinates(
+    module Data.VectorSpace,
+    StandardCoordinates,
+    stc_toDenseList,
+    stc_fromDenseList,
+    stc_toAssocs,
+    stc_fromAssocs,
+    NormalSurface(..),
+    -- * Properties
+    ncCoefficient,
+    normalArcCounts,
+    numberOfTrisContainingArcType,
+    numberOfQuadsContainingArcType,
+    numberOfArcsOfType,
+    numberOfCornersOfType,
+    admissible,
+    satisfiesMatchingEquations,
+    satisfiesQuadrilateralConstraints,
+
+
+    -- * Vertex solutions
+    getVertexSolutions,
+    getVertexSolutions',
+    toFundamentalEdgeSurface,
+    getFundamentalEdgeSurfaces,
+
+    -- * Kang-Rubinstein basis
+    mkTetrahedralSolution,
+    mkEdgeSolution,
+    krBasis,
+
+    -- * Testing
+    qc_NormalCoordinates
+
+
+    ) where
 
 import AbstractTetrahedron as Abstract
 import Collections
 import Control.Arrow
 import Control.Exception
 import Control.Monad.Reader
-import Data.AdditiveGroup
+import Data.AdditiveGroup hiding(Sum)
 import Data.Functor
-import Data.VectorSpace
+import Data.VectorSpace hiding(Sum)
 import HomogenousTuples
 import INormalDisc
 import IndexedSimplices
+import MathUtil
 import PolymakeInterface
 import Prelude hiding(lookup)
 import PrettyUtil
@@ -20,32 +56,36 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Triangulation
 import TriangulationCxtObject
-import qualified Data.Foldable as Fold
 import qualified Data.Map as M
 import TupleTH
+import MathUtil()
+import Data.Ratio
+import Data.Maybe
+import Quote
+import qualified Data.Foldable as Fold
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
 newtype StandardCoordinates r = SC (Map INormalDisc r) 
+    deriving(AdditiveGroup,InnerSpace)
 
-deriving instance Functor StandardCoordinates
-
-instance (Num r) => AdditiveGroup (StandardCoordinates r) where
-    zeroV = SC mempty
-    SC xs ^+^ SC ys = SC (unionMaybeWith f xs ys)
-        where
-            f x y = case x + y of
-                         0 -> Nothing
-                         s -> Just s
-    negateV = fmap negate
-
-instance (Num r) => VectorSpace (StandardCoordinates r) where
+instance Num r => VectorSpace (StandardCoordinates r) where 
     type Scalar (StandardCoordinates r) = r
-    0 *^ _ = zeroV
-    r *^ x = fmap (r*) x 
+    r *^ SC x = SC (r *^ x)
 
-instance (Num r) => InnerSpace (StandardCoordinates r) where
-    SC x <.> SC y = Fold.foldl' (+) 0 (intersectionWith (*) x y)
+
+stc_map
+  :: Num r' =>
+     (r -> r') -> StandardCoordinates r -> StandardCoordinates r'
+stc_map f (SC m) = 
+    SC $
+        M.mapMaybe (\r -> let fr = f r
+                        in
+                            if fr == 0 then Nothing else Just fr) 
+                   m
+
+
+
 
 deriving instance (Pretty r) => Pretty (StandardCoordinates r)
 
@@ -102,11 +142,9 @@ ncCoefficient (SC nc) nd = case lookup nd nc of
                                     Nothing -> 0
 
 
-toVec :: (Num r) => Triangulation -> StandardCoordinates r -> [r] 
-toVec t nc = fmap (ncCoefficient nc) (allINormalDiscs t)
+stc_toDenseList :: (Num r) => Triangulation -> StandardCoordinates r -> [r] 
+stc_toDenseList t nc = fmap (ncCoefficient nc) (tINormalDiscs t)
 
-allINormalDiscs :: Triangulation -> [INormalDisc]
-allINormalDiscs t = [ ti ./ ndt | ti <- (tTetrahedra_ t) , ndt <- allNormalDiscs ]
 
 
 
@@ -116,8 +154,8 @@ allINormalDiscs t = [ ti ./ ndt | ti <- (tTetrahedra_ t) , ndt <- allNormalDiscs
 -- | Identified through the standard inner product
 type StandardCoordinateFunctional r = StandardCoordinates r 
 
-matchingEquations ::  Num r => Triangulation -> [StandardCoordinates r]
-matchingEquations = liftM (fmap fst) matchingEquationsWithReasons
+matchingEquations ::  Num r => Triangulation -> [StandardCoordinateFunctional r]
+matchingEquations = liftM (fmap matchingEquationReasonToVector) matchingEquationReasons
 
 data MatchingEquationReason = MatchingEquationReason ITriangle OITriangle Vertex Vertex
 
@@ -185,14 +223,14 @@ qc_NormalCoordinates = $(quickCheckAll)
 getVertexSolutions :: forall s. PmScalar s => Triangulation -> IO [[s]]
 getVertexSolutions t = do 
     let k = triangTetCount t
-        matchingEquations_ = fmap ( (0 :) . toVec t ) (matchingEquations t)
+        matchingEquations_ = fmap ( (0 :) . stc_toDenseList t ) (matchingEquations t)
 
     liftIO (putStrLn ("matching equations = "++show matchingEquations_))
     
     let
         nonNegativityConditions :: [[s]]
         nonNegativityConditions = 
-            [ 0 : toVec t (standardCoordinates x) | x <- allINormalDiscs t ]
+            [ 0 : stc_toDenseList t (standardCoordinates x) | x <- tINormalDiscs t ]
 
         sumOne :: [s]
         sumOne =
@@ -201,17 +239,45 @@ getVertexSolutions t = do
     polymakeGetVertices' nonNegativityConditions (sumOne : matchingEquations_)
 
 
+stc_fromDenseList
+  :: Num r => Triangulation -> [r] -> StandardCoordinates r
+stc_fromDenseList t = sumV . zipWith f (tINormalDiscs t)
+    where
+        f nd r = r *^ standardCoordinates nd 
 
 
 getVertexSolutions' :: PmScalar s => Triangulation -> IO [StandardCoordinates s]
 getVertexSolutions' t = do
     s0 <- getVertexSolutions t
 
-    let fromVec (r:rs) = assert (r==1) . sumV $ zipWith f rs (allINormalDiscs t)
+    let fromVec (r:rs) = assert (r==1) (stc_fromDenseList t rs) 
         fromVec _ = assert False undefined
-        f r nd = r *^ standardCoordinates nd 
 
     return (fromVec <$> s0)
+
+
+getFundamentalEdgeSurfaces
+  :: Triangulation -> IO [StandardCoordinates Integer]
+getFundamentalEdgeSurfaces tr =
+    fmap 
+        (filter (isRight . satisfiesQuadrilateralConstraints (tTetrahedra_ tr)) 
+            . fmap toFundamentalEdgeSurface)
+        (getVertexSolutions' tr :: IO [ StandardCoordinates Rational ])
+
+
+stc_toAssocs :: StandardCoordinates r -> [(INormalDisc, r)]
+stc_toAssocs (SC m) = M.assocs m 
+
+stc_fromAssocs :: Num r => [(INormalDisc, r)] -> StandardCoordinates r
+stc_fromAssocs = SC . M.fromList . filter ((/=0) . snd) 
+
+
+toFundamentalEdgeSurface :: Integral i => StandardCoordinates (Ratio i) -> StandardCoordinates i
+toFundamentalEdgeSurface stc =
+    let
+        l = lcms (fmap (denominator . snd) (stc_toAssocs stc))
+    in
+        stc_map (fromJust . ratioToIntegral . (*(l%1))) stc
 
 
 --edgesOfNormalDisc :: NormalDics -> [
@@ -224,9 +290,11 @@ normalArcCounts (SC m) =
     . M.toList
     $ m
 
+
+
 instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
     arbitrary = 
-        (SC . M.fromListWith (+)) <$> arbitrary 
+        (SC . M.filter (/= 0) . M.fromListWith (+)) <$> arbitrary 
 
 
 --prop_normalArcCounts_welldefined ::
@@ -256,3 +324,42 @@ numberOfCornersOfType nc (viewI -> I i corn) =
 --         arcTypes = map2 (normalArcByTriangleAndVertex t) (vertices e)
 
                                           
+
+admissible
+  :: (Num r, Ord r) => Triangulation -> StandardCoordinates r -> Either String ()
+admissible tr stc@(SC m) = do
+    Fold.mapM_ (\r -> unless (r >= 0) (Left ("Negative coefficient"))) m
+    satisfiesMatchingEquations tr stc
+    satisfiesQuadrilateralConstraints (tTetrahedra_ tr) stc 
+
+satisfiesMatchingEquations
+  :: Num r =>
+     Triangulation -> StandardCoordinates r -> Either [Char] ()
+satisfiesMatchingEquations tr stc =
+        mapM_ p (matchingEquationReasons tr)
+    where
+        p me = unless (r==0)
+                      (Left ("Matching equation "++show me++" not satisfied ("++show r++")"))
+            where
+                r = matchingEquationReasonToVector me <.> stc
+
+satisfiesQuadrilateralConstraints
+  :: (Num r, Ord r) =>
+     [TIndex] -> StandardCoordinates r -> Either String ()
+satisfiesQuadrilateralConstraints tets stc = 
+        mapM_ p tets
+    where
+        p tet = 
+            unless ($(sumTuple 3) (map3 f (normalQuads tet)) <= (1::Int))
+                   (Left ("Quadrilateral constraints violated at tet "++show tet))
+
+        f quad = if ncCoefficient stc (iNormalDisc quad) == 0 
+                    then 0
+                    else 1
+
+
+
+instance Quote r => Quote (StandardCoordinates r) where
+    quotePrec prec x =
+        quoteParen (prec > 10)
+            (quoteApp "stc_fromAssocs" (stc_toAssocs x))

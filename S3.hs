@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeFamilies #-}
 {-# OPTIONS -Wall #-}
-module S3(S3(..),allS3,qc_S3) where
+module S3(module Group, S3(..),allS3,qc_S3) where
 
 import Collections
 import Data.Hashable
@@ -11,6 +11,9 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Text.PrettyPrint.ANSI.Leijen
 import Util
+import Group
+import THUtil
+import Quote
 
 -- | Symmetric group / permutation group on 3 elements
 data S3 = S3abc | S3bca | S3cab | S3acb | S3bac | S3cba deriving(Read,Show,Eq,Enum,Bounded,Ord)
