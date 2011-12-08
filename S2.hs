@@ -8,7 +8,7 @@ import Data.Monoid
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Test.QuickCheck
-import Text.PrettyPrint.ANSI.Leijen
+import PrettyUtil
 import Group
 import Util
 

@@ -14,6 +14,10 @@ newtype Python a = Python { unPython :: Writer String a }
 instance Show (Python ()) where
     show = execWriter . unPython
 
+indent :: Python a -> Python a
+indent = censor (unlines . fmap (replicate 4 ' ' ++) . lines)
+    
+
 
 renderPython = execWriter . unPython
 
@@ -93,6 +97,17 @@ instance IsTuple (SingleArg a)
 instance ToPython a => ToPython (SingleArg a) where
     toPython (SingleArg a) = py "(" >> toPython a >> py ")"
 
+
+funCallExpr1 :: (ToPython arg) => String -> arg -> Python ()
+funCallExpr1 meth arg = funCallExpr meth (SingleArg arg)
+
+funCallExpr :: (ToPython argTuple, IsTuple argTuple) => 
+    String -> argTuple -> Python ()
+funCallExpr meth argTuple = do
+    py meth
+    toPython argTuple
+
+
 methodCallExpr1 :: (ToPython obj, ToPython arg) => obj -> String -> arg -> Python ()
 methodCallExpr1 obj meth arg = methodCallExpr obj meth (SingleArg arg)
 
@@ -147,3 +162,16 @@ lns = mapM_ ln
 
 
 
+data PythonFunDef = PythonFunDef { 
+    pfd_name :: String, 
+    pfd_argList :: [String], 
+    pfd_defBody :: Python () 
+}
+
+
+pfd_call1 pfd = funCallExpr1 (pfd_name pfd) 
+pfd_call pfd = funCallExpr (pfd_name pfd) 
+
+pfd_def pfd = do 
+            ln ("def "++pfd_name pfd++"("++intercalate "," (pfd_argList pfd) ++"):")
+            indent $ pfd_defBody pfd

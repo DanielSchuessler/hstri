@@ -86,7 +86,7 @@ abnormalCurve = normalSurface' $ fromEdges (sort2 <$> [(u,v),(v,w)])
 main = testBlender . 
        defaultScene .
        transformCoords rot $
-       (pseudomanifold (baryFlat tet3d)
+       (pseudomanifoldStyle (baryFlat tet3d)
         --`disjointUnion` abnormalCurve
         )
   where
@@ -96,4 +96,4 @@ main = testBlender .
 --testLayout :: (Show (Vert a), ShowN a) => DeltaSet a -> IO ExitCode
 -- testLayout ds = do
 --     wc <- layoutDebug ds
---     testBlender . defaultScene . pseudomanifold $ wc
+--     testBlender . defaultScene . pseudomanifoldStyle $ wc

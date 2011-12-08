@@ -48,11 +48,12 @@ import S2
 import THUtil() -- Lift BitSet
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
+import PrettyUtil
 import TupleTH
 import Util
 import Vertex
 import Language.Haskell.TH.Syntax
+import Data.Function
 
 -- | Edge of an abstract tetrahedron (unoriented)
 newtype Edge = Edge (BitSet Vertex) 
@@ -114,7 +115,7 @@ instance MakeVertex (Pair Edge) where
 
 
 intersectEdges :: Edge -> Edge -> Maybe (Either Edge Vertex)
-intersectEdges e1 e2 = case filter2 (\v -> elem2 v (edgeVertices e2)) (edgeVertices e1) of
+intersectEdges e1 e2 = case (intersect2_2 `on` edgeVertices) e1 e2 of
                             [] -> Nothing
                             y -> Just (case y of
                                             [v] -> assert (e1/=e2) (Right v)

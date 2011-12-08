@@ -34,7 +34,7 @@ layoutG :: forall a nl. (ShowN a, Show (Vert a), Show (Tri a)) =>
 layoutG mode ds = do
     let 
         oneSkeleton_ :: Gr nl ()
-        oneSkeleton_ = nmap labelNode . emap (const ()) $ oneSkeleton ds
+        oneSkeleton_ = nmap labelNode . emap (const ()) $ oneSkeletonGraph ds
         
         labelNode :: Vert a -> nl
         labelNode v = case mode of

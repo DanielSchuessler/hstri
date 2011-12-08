@@ -39,10 +39,6 @@ deriveCollectionKeyClass :: Name -> DecsQ
 deriveCollectionKeyClass _ = return [] 
 
 
-setEq :: (Show a, Ord a) => [a] -> [a] -> Property
-setEq x y = 
-    printTestCase (unlines ["Sets aren't equal:","=== FIRST SET ===",show x,"=== SECOND SET ===",show y])
-    (S.fromList x == S.fromList y)
 
 class Sized xs where
     size :: xs -> Int

@@ -12,6 +12,7 @@ module AbstractTetrahedron(
     module Triangle,
     module AbstractTetrahedron2,
     module OrderableFace,
+    module Data.Word,
 
     -- * Ordered faces
     IsSubface(..),liftIsSubface,
@@ -40,6 +41,9 @@ import TIndex
 import OrderableFace
 import Data.Monoid(Monoid(..),mconcat)
 import QuickCheckUtil
+import Data.Word
+import qualified Data.List as L
+import Control.Arrow((+++))
 
 class IsSubface x y where
     isSubface :: x -> y -> Bool
@@ -87,16 +91,26 @@ qc_AbstractTetrahedron = $(quickCheckAll)
 class Intersection a b c | a b -> c where
     intersect :: a -> b -> c
 
+instance Eq a => Intersection [a] [a] [a] where
+    intersect = L.intersect
+
+
 -- | Equivalent to 'intersectEdges'
 instance Intersection Edge Edge (Maybe (Either Edge Vertex)) where
     intersect = intersectEdges 
+
+instance Intersection IEdge IEdge (Maybe (Either IEdge IVertex))  where
+    intersect (viewI -> I i x) (viewI -> I i' x') = 
+        if (i==i')
+           then fmap ((i ./) +++ (i ./)) (intersect x x')
+           else Nothing
+         
 
 instance Intersection Triangle Triangle (Either Triangle Edge) where
     intersect t1 t2 = case filter3 (\v -> elem3 v (edges t2)) (edges t1) of
                            [e] -> assert (t1/=t2) (Right e)
                            [_,_,_] -> assert (t1==t2) (Left t1)
                            _ -> assert False (error "impossible")
-
 
 
 

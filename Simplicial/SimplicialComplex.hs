@@ -20,6 +20,7 @@ import Simplicial.DeltaSet
 import Simplicial.GraphComplex
 --import Simplicial.Labels
 import TupleTH
+import PrettyUtil
 
 
 type Plus4 n = S (S (S (S n)))
@@ -30,7 +31,7 @@ type instance (OTuple' v) N1 = Pair v
 type instance (OTuple' v) N2 = Triple v
 type instance (OTuple' v) N3 = Quadruple v
 type instance (OTuple' v) (Plus4 n) = List v (S (Plus4 n)) 
-
+                                        
 newtype OTuple v n = OT { unOT :: OTuple' v n } 
 
 
@@ -41,11 +42,15 @@ newtype OTuple v n = OT { unOT :: OTuple' v n }
 instance (Show v, Nat n) => Show (OTuple v n) where
     OT_DERIVE( showsPrec prec, (OT x), x )
 
+instance (Pretty v, Nat n) => Pretty (OTuple v n) where
+    OT_DERIVE( prettyPrec prec, (OT x), x )
+
 instance (Eq v, Nat n) => Eq (OTuple v n) where
     OT_DERIVE( (==), (OT x) (OT y), x y )
 
 instance (Ord v, Nat n) => Ord (OTuple v n) where
     OT_DERIVE( compare, (OT x) (OT y), x y )
+
 
 #undef OT_DERIVE
 

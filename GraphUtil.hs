@@ -19,14 +19,21 @@ mapCxt fn fa fb (adj, n, a, adj') =
  where
     g = fb *** fn
 
-disjointUnionGraphs :: (a -> a'') -> (b -> b'') -> (a' -> a'') -> (b' -> b'') -> Gr a b -> Gr a' b' -> Gr a'' b''
+-- | Also returns the embedding of the 'Node' set of the second graph into that of the 'Node' set of the result graph (the embedding of the /first/ graph into the result graph is the identity)
+disjointUnionGraphs :: (a -> a'') -> (b -> b'') -> (a' -> a'') -> (b' -> b'') -> 
+    Gr a b -> Gr a' b' -> (Gr a'' b'', Node -> Node)
 disjointUnionGraphs fa fb fa' fb' g g' =
     let
         (_,n) = nodeRange g
 
-        c cxt r = mapCxt (+n) fa' fb' cxt & r
+        nodeEmbedding = (+(n+1))
+
+        c cxt r = mapCxt nodeEmbedding  fa' fb' cxt & r
+
+        result = ufold c (gmap (mapCxt id fa fb) g) g'
     in
-        ufold c (gmap (mapCxt id fa fb) g) g'
+        (result,nodeEmbedding)
+        
 
 unlabel :: LNode b -> Node
 unlabel = fst
@@ -68,3 +75,4 @@ graphToGraphWithCmd command params gr = dotAttributesWithCmd command gr' dot
     dot = graphToDot params' gr'
     params' = params { fmtEdge = setEdgeIDAttribute $ fmtEdge params }
     gr' = addEdgeIDs gr
+

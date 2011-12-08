@@ -30,6 +30,9 @@ defaultDisjointUnion a b = to (gDisjointUnion (from a) (from b))
 instance DisjointUnionable (a n -> r) (a' n -> r) (Either1 a a' n -> r) where
     disjointUnion = either1
 
+instance DisjointUnionable (AnySimplex a -> r) (AnySimplex a' -> r) (AnySimplex (Either1 a a') -> r) where
+    disjointUnion f f' (AnySimplex x) = either1 (f . AnySimplex) (f' . AnySimplex) x
+
 instance DisjointUnionable (DeltaSet a) (DeltaSet b) (DeltaSet (Either1 a b)) where
 
     disjointUnion a b = DeltaSet face' simps'_ supers' dimension' faceGraph' nodeMap'
@@ -58,7 +61,8 @@ instance DisjointUnionable (DeltaSet a) (DeltaSet b) (DeltaSet (Either1 a b)) wh
                     (fmap Right1 . supers b)
 
         faceGraph' :: FaceGraph (Either1 a b)
-        faceGraph' = disjointUnionGraphs 
+        (faceGraph',nodeEmbedding) = 
+            disjointUnionGraphs 
                         (\(AnySimplex x) -> AnySimplex (Left1 x))
                         id 
                         (\(AnySimplex x) -> AnySimplex (Right1 x))
@@ -70,7 +74,7 @@ instance DisjointUnionable (DeltaSet a) (DeltaSet b) (DeltaSet (Either1 a b)) wh
         nodeMap' (AnySimplex x) =
             case x of
                  Left1 x' -> nodeMap a (AnySimplex x') 
-                 Right1 x' -> nodeMap b (AnySimplex x') 
+                 Right1 x' -> nodeEmbedding (nodeMap b (AnySimplex x'))
 
 
 

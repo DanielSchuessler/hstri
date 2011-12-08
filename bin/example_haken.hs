@@ -33,7 +33,7 @@ main = do
         setCams cams .
        defaultScene $
     --   transformCoords rot $
-       (pseudomanifold  x)
+       (pseudomanifoldStyle  x)
 
 cams = [Cam (Vec3 (-0.22153916954994202) (-0.8245114088058472) (3.923537492752075))
             (eulerAnglesXYZ (0.20578281581401825) (-6.364510909406818e-07) (-0.11199047416448593))

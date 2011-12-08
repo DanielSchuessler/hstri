@@ -6,7 +6,7 @@ import Collections
 import Element
 import NormalDisc
 import HomogenousTuples
-import Text.PrettyPrint.ANSI.Leijen
+import PrettyUtil
 
 -- | Ordered 'NormalArc'
 newtype ONormalArc = ONormalArc (Pair NormalCorner) 

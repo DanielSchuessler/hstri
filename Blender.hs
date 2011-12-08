@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
--- {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
+{-# OPTIONS -Wall #-}
 module Blender(
     module Blenderable,
     module MathUtil,
@@ -20,15 +20,17 @@ import Prelude hiding(catch,mapM_,sequence_)
 import Simplicial.DeltaSet
 import System.Environment
 import System.Process
-import Text.Printf.TH
 import ToPython
-import TypeLevel.TF
-import qualified Util
 import FaceClasses
+import System.Exit
+import Simplicial.AnySimplex
+import THUtil
+import PrettyUtil(Pretty)
+
+#define CONSTRAINTS(a) Pretty (Vert a), ShowN a, Pretty (Arc a)
 
 
-
-
+sceneVar,worldVar,camVar,objVar,lightVar :: Python ()
 
 sceneVar = py "scene"
 worldVar = py "world"
@@ -38,19 +40,35 @@ lightVar = py "light"
 
 
 
+objSetName ::  String -> Python ()
 objSetName x = objVar <.> "name" .= str x
 
+objSetMaterial ::  ToPython r => r -> Python ()
 objSetMaterial x = objVar <.> "active_material" .= x 
 
+ops ::  String -> Python ()
 ops x = py "ops" <.> x
+dat ::  String -> Python ()
 dat x = py "data" <.> x
-context x = py "context" <.> x
+
+bpy_props ::  Python ()
 bpy_props = py "props"
+types ::  String -> Python ()
 types x = py "types" <.> x
 
+ma_var ::  Material -> Python ()
 ma_var = py . ma_name
 
+triLabelMat ::  Material
 triLabelMat = Material "triLbl" [ let r = 0.015 in diffuseColor (r,r,r) ]
+
+
+objCommon ::  Python () -> String -> Material -> Python ()
+objCommon grp faceName faceMat = do
+                objSetName faceName
+                objSetMaterial (ma_var faceMat)
+                grpLink grp objVar
+                objVar <.> "simplexlabel" .= str faceName
 
 -- toBlender :: forall a. (BlenderLabel a, 
 --                         VertexInfoClass (Vertex a),
@@ -60,10 +78,36 @@ triLabelMat = Material "triLbl" [ let r = 0.015 in diffuseColor (r,r,r) ]
 --                         DeltaSet a) => 
 --        Scene a
 --     -> Python ()
-toBlender :: Scene a -> Python ()
-toBlender scene@Scene{
+
+returnContextStmt :: Python ()
+returnContextStmt = py "return context.object"
+
+makeSphereFunDef :: PythonFunDef
+makeSphereFunDef = PythonFunDef {
+    pfd_name = "makeSphere",
+    pfd_argList = ["loc"],
+    pfd_defBody =
+        do
+                methodCall1 (ops "surface") "primitive_nurbs_surface_sphere_add" 
+                    (namedArg "location" (py "loc"))
+                returnContextStmt
+}
+
+
+makeCylinderFunDef :: PythonFunDef
+makeCylinderFunDef = PythonFunDef {
+    pfd_name = "makeCylinder",
+    pfd_argList = [],
+    pfd_defBody = do
+            methodCall (ops "surface") "primitive_nurbs_surface_cylinder_add" ()
+            returnContextStmt
+
+}
+
+toBlender :: (CONSTRAINTS(a)) => Scene a -> Python ()
+toBlender Scene{
         scene_worldProps,
-        scene_blenderable=Blenderable{..},
+        scene_blenderable = ba@Blenderable{..},
         scene_cams} = result
     where
         deltaSet = ba_ds
@@ -72,10 +116,17 @@ toBlender scene@Scene{
             ln "from bpy import *"
             ln "from pprint import pprint"
 
+            mapM_ pfd_def [makeSphereFunDef,makeCylinderFunDef]
+
+
             -- Make a new scene
             sceneVar .= methodCallExpr1 (dat "scenes") "new" (str "TheScene")
             -- Remove all other scenes
-            ln $ $(printf "for s in data.scenes:\n  if (s != %s):\n    data.scenes.remove(s)") (renderPython sceneVar)
+            ln  "for s in data.scenes:"
+            indent $ do
+                ln ("if (s != "++(renderPython sceneVar)++"):" )
+                indent $ do
+                    ln  "data.scenes.remove(s)" 
 
             -- Make a new world, assign it to the scene, set world properties
             worldVar .= methodCallExpr1 (dat "worlds") "new" (str "TheWorld")
@@ -83,7 +134,7 @@ toBlender scene@Scene{
             setProp sceneVar "world" worldVar
 
             -- cameras
-            forM_ (zip [0..] scene_cams) (\(i, (Cam pos eulers fov)) -> do
+            forM_ (zip [0::Integer ..] scene_cams) (\(i, (Cam pos eulers fov)) -> do
                 let nam = "cam"++show i
                 camVar .= methodCallExpr1 (dat "cameras") "new" (str nam)
                 camVar <.> "angle" .= fov
@@ -111,9 +162,9 @@ toBlender scene@Scene{
                 methodCallExpr1 bpy_props "StringProperty" (str "Simplex label")
 
 
-            mapM_ (handleV grp0) (vertices deltaSet)
-            mapM_ (handleE grp1) (edges deltaSet)
-            mapM_ (handleT grp2 grpTriLabels) (triangles deltaSet)
+            mapM_ (handleV ba grp0) (vertices deltaSet)
+            mapM_ (handleE ba grp1) (edges deltaSet)
+            mapM_ (handleT ba grp2 grpTriLabels) (triangles deltaSet)
 
         
 
@@ -124,87 +175,107 @@ toBlender scene@Scene{
 
 
 
-        coords' = ba_coords 
+handleSimplex
+  :: Nat n =>
+     Python () -> Blenderable a -> BlenderGroup -> a n -> Python ()
+handleSimplex f ba grp si = when (ba_visible ba asi) $ do
+        f
+        objCommon grp faceName faceMat
+    
 
-
-        objCommon grp faceName faceMat = do
-                objSetName faceName
-                objSetMaterial (ma_var faceMat)
-                grpLink grp objVar
-                objVar <.> "simplexlabel" .= str faceName
-
-
-        handleV grp v = do
-                sphere (coords' v) (ba_vertexThickness v)
-                objCommon grp faceName faceMat
-            
-            where
-                FaceInfo{..} = ba_faceInfo0 v
-
-        handleE grp e = when (ba_visible1 e) $ do
-                cylinder (coords' v0) (coords' v1) (ba_edgeThickness e)
-                objCommon grp faceName faceMat
-            
-
-            where
-                (v1,v0) = faces10 deltaSet e
-                FaceInfo{..} = ba_faceInfo1 e
-
-
-        handleT grp grpTriLabels t = do
-                    blenderTriangle cv0 cv1 cv2 
-                    objVar <.> "show_transparent" .= True
-                    objCommon grp faceName faceMat
-
-                    case ba_triangleLabel t of
-                        Just (TriangleLabel lblstr g upDisplacementFactor) -> 
-                            let (cu0,cu1,cu2) = g .* cvs 
-                                right_ = normalize (cu1 &- cu0)
-                                basepoint = interpolate 0.5 cu0 cu1
-                                up1 = let up0 = (cu2 &- basepoint) 
-                                      in up0 &- (dotprod right_ up0) *& right_
-                                height = norm up1
-                                up_ = up1 &* recip height 
-                                m = 
-                                    scalingUniformProj4 (0.4 * height)
-                                    .*.
-                                    safeOrthogonal (Mat3 right_ up_ (crossprod right_ up_)) 
-                                    .*.
-                                    translation (basepoint &+ upDisplacementFactor *& up1)
+    where
+        asi = AnySimplex si
+        FaceInfo{..} = ba_faceInfo ba asi
 
 
 
-                            in do
-                             newTextObj lblstr
-                             objVar <.> matrix_basis .= m
-                             objCommon grpTriLabels (lblstr ++ " on "++show g ++" "++faceName) triLabelMat 
+type BlenderGroup = Python ()
 
-                        Nothing -> return ()
+handleV ::  Blenderable a -> BlenderGroup -> Vert a -> Python ()
+handleV ba grp v = handleSimplex    
+                    (sphere (ba_coords ba v) (ba_vertexThickness ba v)) 
+                    ba grp v
 
-            where
-                vs = faces20Ascending deltaSet t
-                cvs@(cv0,cv1,cv2) = map3 coords' vs
+handleE :: (CONSTRAINTS(a)) => Blenderable a -> BlenderGroup -> Arc a -> Python ()
+handleE ba grp e = handleSimplex 
+                    (either handleErr id
+                        (cylinder (ba_coords ba v0) (ba_coords ba v1) (ba_edgeThickness ba e)))
+                    ba grp e
+    
 
-                FaceInfo{..} = ba_faceInfo2 t
+    where
+        (v1,v0) = faces10 (ba_ds ba) e
+        handleErr err = error (err++"\n"++"In handleE\n"++ $(prVars' ['ba,'e]))
+
+
+handleT :: Blenderable a -> BlenderGroup -> BlenderGroup -> Tri a -> Python ()
+handleT ba grp grpTriLabels t = when (ba_visible ba (AnySimplex t)) $ do
+            blenderTriangle cv0 cv1 cv2 
+            objVar <.> "show_transparent" .= True
+            objCommon grp faceName faceMat
+
+            handleTriLabel ba grpTriLabels t
+
+    where
+        vs = faces20Ascending (ba_ds ba) t
+        (cv0,cv1,cv2) = map3 (ba_coords ba) vs
+
+        FaceInfo{..} = ba_faceInfo ba (AnySimplex t)
 
         
+handleTriLabel :: Blenderable a -> BlenderGroup -> Tri a -> Python ()
+handleTriLabel ba grpTriLabels t =
+            case ba_triangleLabel ba t of
+                Nothing -> return ()
+
+                Just (TriangleLabel lblstr g upDisplacementFactor) -> 
+                    let (cu0,cu1,cu2) = g .* cvs 
+                        right_ = normalize (cu1 &- cu0)
+                        basepoint = interpolate 0.5 cu0 cu1
+                        up1 = let up0 = (cu2 &- basepoint) 
+                                in up0 &- (dotprod right_ up0) *& right_
+                        height = norm up1
+                        up_ = up1 &* recip height 
+                        m = 
+                            scalingUniformProj4 (0.4 * height)
+                            .*.
+                            safeOrthogonal (Mat3 right_ up_ (crossprod right_ up_)) 
+                            .*.
+                            translation (basepoint &+ upDisplacementFactor *& up1)
+
+
+
+                    in do
+                        newTextObj lblstr
+                        objVar <.> matrix_basis .= m
+                        objCommon grpTriLabels (lblstr ++ " on "++show g ++" "++faceName) triLabelMat 
+
+
+    where
+        vs = faces20Ascending (ba_ds ba) t
+        cvs = map3 (ba_coords ba) vs
+
+        FaceInfo{..} = ba_faceInfo ba (AnySimplex t)
 
 
         
-        sphere loc radius = do
-            methodCall1 (ops "surface") "primitive_nurbs_surface_sphere_add" 
-                (namedArg "location" loc)
-
-            assignObjFromContext
-
+sphere :: Vec3 -> Double -> Python ()
+sphere loc radius = do
+            objVar .= pfd_call1 makeSphereFunDef loc
             objVar <.> "scale" .= (Vec3 radius radius radius)
 
 
-        cylinder :: Vec3 -> Vec3 -> Double -> Python ()
-        cylinder from to radius = do
-            methodCall (ops "surface") "primitive_nurbs_surface_cylinder_add" ()
 
-            assignObjFromContext
+
+cylinder :: Vec3 -> Vec3 -> Double -> Either String (Python ())
+cylinder from to radius = 
+    if normsqr (from &- to) <= 1E-14
+       then Left ("cylinder: from = to") 
+       else Right $
+
+    
+        do
+            objVar .= pfd_call makeCylinderFunDef ()
 
             objVar <.> matrix_basis .= m
 
@@ -223,10 +294,10 @@ toBlender scene@Scene{
 
 
         
-        assignObjFromContext = objVar .= (context "object")
-
+matrix_basis ::  [Char]
 matrix_basis = "matrix_basis"
 
+blenderTriangle ::  Vec3 -> Vec3 -> Vec3 -> Python ()
 blenderTriangle p0 p1 p2 =
     mesh [p0,p1,p2] [(0,1,2)]
 
@@ -245,6 +316,7 @@ newGroup varName groupName = do
     return var
 
 
+testBlender :: (CONSTRAINTS(a)) => Scene a -> IO ExitCode
 testBlender s = do
     let fn = "/tmp/foo.py"
     writeFile fn (renderPython $ toBlender s)
@@ -253,8 +325,10 @@ testBlender s = do
     rawSystem "blender" ("-P":fn:args)
 
 
+meshVar ::  Python ()
 meshVar = py "me"
 
+emptyList ::  [()]
 emptyList = [] :: [()]
 
 mesh :: [Vec3] -> [(Int,Int,Int)] -> Python ()
@@ -272,11 +346,13 @@ mesh verts faceList =
             methodCall meshVar "update" ()
             newObj "SomeMesh" meshVar 
 
+txtVar ::  Python ()
 txtVar = py "txt"
 
 textThickness :: Double
 textThickness = 1E-5
 
+newTextObj ::  String -> Python ()
 newTextObj txt = do
     txtVar .= methodCallExpr (dat "curves") "new" (str "T", str "FONT")
     txtVar <.> "body" .= str txt
@@ -286,6 +362,7 @@ newTextObj txt = do
 
 
 -- | Returns the object in the 'objVar' \"register\" :-)
+newObj ::  ToPython t => String -> t -> Python ()
 newObj name objData = do
             objVar .= (methodCallExpr (dat "objects") "new" (str name,objData))
             methodCall1 (sceneVar <.> "objects") "link" objVar

@@ -1,23 +1,31 @@
 {-# LANGUAGE TemplateHaskell, FlexibleContexts, CPP, RecordWildCards, NoMonomorphismRestriction, FlexibleInstances, StandaloneDeriving, GADTs, ViewPatterns, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
-module ConcreteNormal where
+module ConcreteNormal(
+    module NormalCoordinates,
+    module SimplicialPartialQuotient,
+    module PreRenderable,
+    module Simplicial.SimplicialComplex,
+    Concrete,c_unique,c_type,
+    Corn,
+    standardCoordinatesToPreRenderable,
+
+    )
+    where
 
 import AbstractTetrahedron
 import Control.Exception
 import Data.Maybe
-import HomogenousTuples
-import NormalCoordinates
-import SimplicialPartialQuotient
-import TriangulationCxtObject
-import Simplicial.SimplicialComplex
-import PreRenderable
 import Data.Set as Set
 import Data.Vect.Double(interpolate)
-import THUtil
+import HomogenousTuples
+import NormalCoordinates
+import PreRenderable
 import PrettyUtil
-
-trace :: String -> a -> a
-trace = const id
+import Simplicial.AnySimplex
+import Simplicial.SimplicialComplex
+import SimplicialPartialQuotient
+import THUtil
+import TriangulationCxtObject
 
 -- | Quads are numbered away from their 'firstDisjointEdge'
 firstDisjointEdge :: NormalQuad -> Edge
@@ -25,6 +33,9 @@ firstDisjointEdge q = uncurry min (normalQuadGetDisjointEdges q)
 
 data Concrete a = C !Int !a
     deriving(Eq,Ord,Show)
+
+instance Pretty a => Pretty (Concrete a) where
+    prettyPrec prec (C u a) = prettyPrecApp prec "C" [anyPretty u, anyPretty a] 
 
 c_unique :: Concrete t -> Int
 c_unique (C u _) = u
@@ -64,12 +75,12 @@ discPosToCornerPos_helper cns_x_arcPos tr nc x corner linkCornerSelector =
         arcPos = cns_x_arcPos nc x arc
         result = arcPosToCornerPos tr nc (C arcPos (i ./ arc)) corner
     in
-        trace (unwords ["discPosToCornerPos_helper _ _ _",
-                            showsPrec 11 x "",
-                            show corner,
-                            "_",
-                            ":",
-                            $(showVars ['arc,'arcPos,'result])])
+--         trace (unwords ["discPosToCornerPos_helper _ _ _",
+--                             showsPrec 11 x "",
+--                             show corner,
+--                             "_",
+--                             ":",
+--                             $(showVars ['arc,'arcPos,'result])])
 
               result
          
@@ -134,11 +145,8 @@ arcPosToCornerPos tr nc (C arcPos arc) corner =
                                         Flip -> cornPos_max - arcPos
                 in
 
-                    trace (unwords ["arcPosToCornerPos _ _",
-                                        showsPrec 11 (C arcPos arc) "",
-                                        show corner,
-                                    ":",
-                                        $(showVars ['cornPos_max,'sense,'result])])
+                    trace (unwords ["arcPosToCornerPos",
+                                        $(showVars ['arcPos,'arc,'corner,'cornPos_max,'sense,'result])])
 
                           result
 
@@ -218,7 +226,7 @@ mkConcrete (tr :: Triangulation) nc =
 
 canonicalOIEdgeForCorner :: Triangulation -> INormalCorner -> OIEdge
 canonicalOIEdgeForCorner tr c = 
-            canonicalizeOIEdge tr (edgeToOEdge (iNormalCornerGetContainingEdge c))
+            canonicalize tr (edgeToOEdge (iNormalCornerGetContainingEdge c))
 
     where
         edgeToOEdge :: IEdge -> OIEdge
@@ -243,12 +251,17 @@ getArcNumberingVsCornerNumberingSense tr (viewI -> I i narc) ncorner =
 
 
 
+data Corn = Corn CornerPosition Int (EquivalenceClass INormalCorner) 
+    deriving(Eq,Ord,Show)
+
+instance Pretty Corn where
+    prettyPrec prec (Corn u n eq) = prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty eq] 
 
 standardCoordinatesToPreRenderable
   :: (Integral i, Eq v, Pretty i) =>
      SPQWithCoords v
      -> StandardCoordinates i
-     -> PreRenderable (OTuple (Concrete INormalCorner))
+     -> PreRenderable (OTuple Corn)
 standardCoordinatesToPreRenderable (SPQWithCoords spq coords) nc =  
     let
         tr = spq_tr spq
@@ -257,54 +270,76 @@ standardCoordinatesToPreRenderable (SPQWithCoords spq coords) nc =
 
         cns = mkConcrete (spq_tr spq) nc
 
-        tris :: [Triple (Concrete INormalCorner)]
+        tris :: [Triple Corn]
         tris = do
             cx@(C _ (viewI -> I i x)) <- cns_tris cns 
             let f corner = 
-                    C 
+                    mkCorn 
                         (triPosToCornerPos tr nc cx corner)
-                        (eqv_rep cornEqv (i ./ corner))
+                        (i ./ corner)
 
             [ map3 f (normalCorners x) ]
 
-        quads :: [Quadruple (Concrete INormalCorner)]
+        quads :: [Quadruple Corn]
         quads = do
             cx@(C _ (viewI -> I i x)) <- cns_quads cns 
             let f corner = 
-                    C 
+                    mkCorn 
                         (quadPosToCornerPos tr nc cx corner)
-                        (eqv_rep cornEqv (i ./ corner))
+                        (i ./ corner)
 
             [ map4 f (normalCorners x) ]
 
 
         (sc,quadDiagonals) = fromTrisAndQuads tris quads
 
-        cornerCoords (C pos icorn) = 
+        mkCorn pos nonCanonicalINormalCorner =
             let
-                n = numberOfCornersOfType nc icorn
-                the_oedge = toOrderedFace (iNormalCornerGetContainingEdge icorn)
-                Just sense = 
-                    getOIEdgeGluingSense tr
-                        (canonicalOIEdgeForCorner tr icorn)
-                        the_oedge
+                n = numberOfCornersOfType nc nonCanonicalINormalCorner
+            in
+                Corn (fi pos) (fi n) (eqv_classOf cornEqv nonCanonicalINormalCorner)
 
-                (v0,v1) = map2 (coords . spq_map spq) (vertices (sense .* the_oedge))
+        cornerCoords (Corn pos n ec) = 
+            let
+                 (v0,v1) = map2 
+                            (coords . spq_map spq) 
+                            
+                            (vertices . 
+                             iNormalCornerGetContainingEdge . 
+                             canonicalRep 
+                                {- doesn't matter which rep we take here, since they all
+                                   (by definition of cornEqv) get mapped to the same thing
+                                   by spq_map -} $ 
+                             ec)
+
+--                 the_oedge = toOrderedFace (iNormalCornerGetContainingEdge icorn)
+--                 Just sense = 
+--                     getOIEdgeGluingSense tr
+--                         (canonicalOIEdgeForCorner tr icorn)
+--                         the_oedge
+-- 
+--                 (v0,v1) = map2 (coords . spq_map spq) (vertices (sense .* the_oedge))
             in
                 interpolate (fi (1+pos) / fi (1+n)) v0 v1
 
         
     in
 
-        case admissible tr nc of
-             Left err -> error ("standardCoordinatesToPreRenderable: Input surface "++show nc++" not admissible: "++err)
-             Right () ->
+--         case admissible tr nc of
+--              Left err -> error ("standardCoordinatesToPreRenderable: Input surface "++show nc
+--                                     ++" not admissible: "++err)
+--              Right () ->
 
                 (mkPreRenderable
                     (cornerCoords . unOT)
                     sc)
 
-                    { pr_visible1 = \e -> not (Set.member e quadDiagonals) }
+                    { pr_visible = \asi -> elimAnySimplexWithNat asi (\n ->
+                            caseNat2 n
+                                (const True)
+                                (\e -> not (Set.member e quadDiagonals))
+                                (const (const True))) 
+                    }
 
 
 --         ds = mkHomogenousDeltaSet

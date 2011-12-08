@@ -2,12 +2,11 @@
 {-# OPTIONS -Wall #-}
 module TIndex where
 import Data.Word
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
 import Language.Haskell.TH
 import Util
 import Test.QuickCheck
 import Control.Applicative
-import PrettyUtil() -- Pretty Word orphan instance
+import PrettyUtil -- Pretty Word orphan instance
 import Quote
 
 
@@ -78,20 +77,23 @@ mapI
 mapI f (viewI -> I i x) = i ./ f x 
 
 instance (Show a) => Show (I a) where 
-    showsPrec prec (I i x) = showParen (prec >= 1) (showsPrec 10 i . showString " ./ " . showsPrec 10 x)
+--    showsPrec prec (I i x) = showParen (prec >= 1) (showsPrec 10 i . showString " ./ " . showsPrec 10 x)
+    showsPrec _ (I i x) = shows i . showChar '.' . shows x
 
 instance Quote TIndex where
     quotePrec _ (TIndex i) = show i -- relies on Num TIndex instance
 
 instance (Quote a) => Quote (I a) where 
-    quotePrec prec (I i x) = quoteParen (prec >= 1) (quotePrec 10 i ++ " ./ " ++ quotePrec 10 x)
+    quotePrec prec (I i x) = quoteParen (prec > 9) (quotePrec 10 i ++ " ./ " ++ quotePrec 10 x)
 
 instance Finite a => Enum (I a) where
     toEnum n = case toEnum n of EnumPair a b -> I a b
     fromEnum (I a b) = fromEnum (EnumPair a b)
 
 instance (Pretty a) => Pretty (I a) where
-    pretty (I x y) = dullcyan (pretty x) <> dot <> pretty y
+    pretty (I x y) = 
+        
+        dullcyan (pretty x) <> dot <> pretty y
 
 instance (Arbitrary a) => Arbitrary (I a) where
     arbitrary = I <$> arbitrary <*> arbitrary

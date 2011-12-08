@@ -34,25 +34,24 @@ module Triangle(
 
     ) where
 
-import Collections
-import Control.Exception
-import Data.BitSet.Word8 as BitSet
-import Element
-import Language.Haskell.TH.Syntax as Syntax
-import Test.QuickCheck
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>))
-import Util
-import Vertex
-import Data.List as List
-import HomogenousTuples
-import Edge
-import Data.Monoid
-import OrderableFace
-import S3
-import Control.Monad
-import Control.Applicative
-import Quote
 
+import Control.Applicative
+import Control.Exception
+import Control.Monad
+import Data.BitSet.Word8 as BitSet
+import Data.List as List
+import Data.Monoid
+import Edge
+import Element
+import HomogenousTuples
+import Language.Haskell.TH.Syntax as Syntax
+import OrderableFace
+import QuickCheckUtil
+import PrettyUtil
+import Quote
+import S3
+import Test.QuickCheck
+import Util
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 

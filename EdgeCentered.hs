@@ -20,18 +20,22 @@ import Data.Vect.Double hiding((.*))
 import Data.Maybe
 import Control.Monad
 import SimplicialPartialQuotient
+import PrettyUtil
 
 data EdgeNeighborhoodVertex =
     Bottom |
     Top |
-    RingVertex Int
+    EquatorVertex Int
 
     deriving(Eq,Ord)
 
 instance Show EdgeNeighborhoodVertex where
     show Bottom = "B"
     show Top = "T"
-    show (RingVertex i) = show i
+    show (EquatorVertex i) = show i
+
+instance Pretty EdgeNeighborhoodVertex where
+    pretty = black . text . show
 
 
 makeEdgeNeighborhoodMap :: Triangulation -> OIEdge -> SimplicialPartialQuotient EdgeNeighborhoodVertex
@@ -48,12 +52,13 @@ makeEdgeNeighborhoodMap tr oiEdge =
         -- Arbitrary choice of orientation; these could be flipped
         [initialv2,initialv3] = allVertices L.\\ [initialv0,initialv1] 
 
-        makeMapFragmentForTet tet i bottomPreimage topPreimage ringVertexPreimage ringVertexPreimage'
+        makeMapFragmentForTet tet i bottomPreimage topPreimage 
+                                equatorVertexPreimage equatorVertexPreimage'
             = M.fromList
                         [ ( tet ./ bottomPreimage, Bottom)
                         , ( tet ./ topPreimage, Top)
-                        , ( tet ./ ringVertexPreimage, RingVertex i)
-                        , ( tet ./ ringVertexPreimage', RingVertex (mod (i+1) n))
+                        , ( tet ./ equatorVertexPreimage, EquatorVertex i)
+                        , ( tet ./ equatorVertexPreimage', EquatorVertex (mod (i+1) n))
                         ] 
 
         initialMap = makeMapFragmentForTet initialTet 0 initialv0 initialv1 initialv2 initialv3
@@ -102,11 +107,11 @@ makeEdgeNeighborhoodMap tr oiEdge =
                     loop (i+1) m' currentTet v0 v1 v3
 
 
-        tets = ([ (Bottom,Top,RingVertex i,RingVertex (i+1))
+        tets = ([ (Bottom,Top,EquatorVertex i,EquatorVertex (i+1))
                                     
                         | i <- [0..n-2] ]
 
-                        ++ [(Bottom,Top,RingVertex 0,RingVertex (n-1))])
+                        ++ [(Bottom,Top,EquatorVertex 0,EquatorVertex (n-1))])
 
 
         res = loop 1 initialMap initialTet initialv0 initialv1 initialv3  
@@ -127,12 +132,19 @@ makeEdgeNeighborhood tr oiEdge =
 
 
 
-        h = 0.5
+        h = max 0.2 (sqrt (equatorEdgeLengthSqr - 1))
+
+        equatorEdgeLengthSqr = normsqr (coords (EquatorVertex 1) &- coords (EquatorVertex 0))
+
+        -- equatorEdgeLength = sqrt (1 + h^2)
+        -- sqrt (equatorEdgeLengthSqr - 1) = h
+
+
 
 
         coords Bottom = (-h) *& vec3Z
         coords Top = h *& vec3Z
-        coords (RingVertex i) = Vec3 (sin phi) (-(cos phi)) 0  
+        coords (EquatorVertex i) = Vec3 (sin phi) (-(cos phi)) 0  
             where 
                 phi = 2*pi*(2*i'-1)/(2*n')
                 i' = fromIntegral i

@@ -14,16 +14,17 @@ import Data.Map as Map
 import Data.Maybe
 import Data.Proxy
 import Data.Typeable
+import FaceClasses as F
 import FaceIx
 import HomogenousTuples
 import Indexing
+import PrettyUtil
 import Simplicial.AnySimplex
 import Simplicial.StrictlyIncreasingMap
 import Test.QuickCheck
 import TupleTH
 import Util
 import qualified Data.Vector as V
-import FaceClasses as F
 
 -- data RightShift f
 -- type instance RightShift f  n = f  (S n)
@@ -53,10 +54,11 @@ type SuperFunction a = forall n. Nat n => a n -> [a (S n)]
 type FaceGraph a = Gr (AnySimplex a) FaceIx
 type SimplexNodeMap a = AnySimplex a -> Node
 
+-- | Invariant: Dimensions are nonnegative, 'InhomogenousDim 0' is an invalid value (since, if 0 is the maximal dimension of simplices, then the DeltaSet is homogenous)
 data Dim = 
     -- | Each simplex is contained in a maximal simplex of the given dimension
     HomogenousDim Int |
-    -- | The int specifies the maximum dimension
+    -- | The int specifies the maximum dimension.
     InhomogenousDim Int
     deriving(Show)
 
@@ -370,7 +372,17 @@ memoSuper d =
     
 
 instance (ShowN s) => Show (DeltaSet s) where
-    showsPrec prec a = showsPrec prec (faceGraph a) 
+    showsPrec = prettyShowsPrec
+
+instance (ShowN s) => Pretty (DeltaSet s) where
+    pretty ds = 
+        prettyRecord "DeltaSet"
+           [
+            ("nodeMap", prettyFunction (nodeMap ds) (allSimplices ds)),
+            ("faceGraph", string (show (faceGraph ds)))
+            
+           ]
+        
 
 --                     concat [ 
 --                         f (s3 a) (asList . faces32 a), 
@@ -485,8 +497,8 @@ checkFaceOrderConsistency ds = (sequence_ :: [m()] -> m()) $ do -- list monad
 
 
 
-oneSkeleton :: DeltaSet a -> Gr (Vert a) (Arc a)
-oneSkeleton ds = mkGraph 
+oneSkeletonGraph :: DeltaSet a -> Gr (Vert a) (Arc a)
+oneSkeletonGraph ds = mkGraph 
     (do
         v <- vertices ds
         return (nodeMapGet ds v,v))
@@ -494,6 +506,26 @@ oneSkeleton ds = mkGraph
         e <- F.edges ds
         let (nod,nod') = nodeMapGet ds `map2` faces10 ds e
         return (nod,nod',e)) 
+
+
+class OneSkeletonable a where
+    oneSkeleton :: a -> a
+
+
+instance OrdN a => OneSkeletonable (DeltaSet a) where
+    oneSkeleton ds =
+        mkDeltaSet 
+            (face ds) 
+            (\n -> caseNat2 n
+                    (vertices ds)
+                    (F.edges ds)
+                    (const []))
+
+            (case dimension ds of
+                HomogenousDim 0 -> HomogenousDim 0
+                HomogenousDim _ -> HomogenousDim 1
+                InhomogenousDim _ -> InhomogenousDim 1)
+
 
 
 anySimplex_face :: DeltaSet a -> FaceIx -> AnySimplex a -> AnySimplex a
@@ -517,3 +549,4 @@ prop_ds_fmap_consistent_with_face ds =
         in
             forAll (genFaceIx n) (\i ->
                 ds_fmap ds (cofaceMap n i) anys == anySimplex_face ds i anys))
+

@@ -18,7 +18,7 @@ main :: IO ExitCode
 main = testBlender . 
        defaultScene .
        transformCoords rot $
-       (pseudomanifold 
+       (pseudomanifoldStyle 
             (setGluing "F" (vA,vB,vC) (vA,vB,vD) mempty
                  (setGluing "G" (vA,vC,vD) (vB,vC,vD) mempty
        

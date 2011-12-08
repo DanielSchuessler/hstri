@@ -1,7 +1,15 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Either1 where
+import PrettyUtil
 
 data Either1 s1 s2 n = Left1 (s1 n) | Right1 (s2 n)
-    deriving(Eq,Ord)
+    deriving(Eq,Ord,Show)
+
+
+instance (Pretty (s1 n), Pretty (s2 n)) => Pretty (Either1 s1 s2 n) where
+    prettyPrec prec (Left1 a) = prettyPrecApp prec "Left1" [a]
+    prettyPrec prec (Right1 b) = prettyPrecApp prec "Right1" [b]
+
 
 
 either1 :: (t1 t3 -> t) -> (t2 t3 -> t) -> Either1 t1 t2 t3 -> t

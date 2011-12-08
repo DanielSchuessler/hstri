@@ -8,6 +8,7 @@ module NormalCoordinates(
     stc_toAssocs,
     stc_fromAssocs,
     NormalSurface(..),
+    vertexLinkingSurface,
     -- * Properties
     ncCoefficient,
     normalArcCounts,
@@ -175,7 +176,7 @@ matchingEquationReasons t =
          MatchingEquationReason x x' (forgetTIndex v) (forgetTIndex v')
                
         |
-            (x,x') <- tGluings_ t,
+            (x,x') <- tOriginalGluings t,
             (v,v') <- zip (vertexList x) (vertexList x')
 
             ]
@@ -339,7 +340,7 @@ satisfiesMatchingEquations tr stc =
         mapM_ p (matchingEquationReasons tr)
     where
         p me = unless (r==0)
-                      (Left ("Matching equation "++show me++" not satisfied ("++show r++")"))
+                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
             where
                 r = matchingEquationReasonToVector me <.> stc
 
@@ -363,3 +364,12 @@ instance Quote r => Quote (StandardCoordinates r) where
     quotePrec prec x =
         quoteParen (prec > 10)
             (quoteApp "stc_fromAssocs" (stc_toAssocs x))
+
+
+-- | Sum of the coordinates of the elements
+instance NormalSurface a => NormalSurface [a] where
+    standardCoordinates xs = sumV (map standardCoordinates xs)
+
+
+vertexLinkingSurface :: TVertex -> StandardCoordinates Integer
+vertexLinkingSurface = standardCoordinates . vertexLinkingSurfaceTris

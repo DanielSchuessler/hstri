@@ -13,6 +13,8 @@ import Data.Vect.Double.Base
 import S3
 import GHC.Generics
 import DisjointUnion
+import Simplicial.AnySimplex
+import Control.Exception
 
 
 data TriangleLabel = TriangleLabel {
@@ -37,11 +39,9 @@ class Coords t where
 data PreRenderable a = PreRenderable {
     pr_ds :: DeltaSet a,
     pr_coords :: Vert a -> Vec3,
-    pr_visible1 :: Arc a -> Bool, 
+    pr_visible :: AnySimplex a -> Bool, 
     pr_triangleLabel :: Tri a -> Maybe TriangleLabel,
-    pr_name0 :: Vert a -> String,
-    pr_name1 :: Arc a -> String,
-    pr_name2 :: Tri a -> String
+    pr_name :: AnySimplex a -> String
 }
     deriving(Generic)
 
@@ -57,6 +57,14 @@ instance DisjointUnionable (PreRenderable a) (PreRenderable b) (PreRenderable (E
 mkPreRenderable
   :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
      (Vert a -> Vec3) -> DeltaSet a -> PreRenderable a
-mkPreRenderable pr_coords pr_ds = PreRenderable pr_ds pr_coords (const True) (const Nothing) show show show 
+mkPreRenderable pr_coords pr_ds = 
+    PreRenderable pr_ds pr_coords (const True) (const Nothing) 
+        (\asi -> elimAnySimplexWithNat asi (\n -> 
+            caseNat3 n
+                show
+                show
+                show
+                (const (assert False undefined))))
 
-
+instance OrdN a => OneSkeletonable (PreRenderable a) where
+    oneSkeleton pr = pr { pr_ds = oneSkeleton (pr_ds pr) }

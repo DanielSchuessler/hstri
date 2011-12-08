@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns #-}
+{-# LANGUAGE StandaloneDeriving, FlexibleContexts, FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns, RecordWildCards #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module Blenderable where
 
@@ -13,16 +14,21 @@ import Simplicial.DeltaSet
 import ToPython
 import PreRenderable
 import GHC.Generics
+import SimplicialPartialQuotient
+import Simplicial.SimplicialComplex
+import ConcreteNormal
+import NormalEverything
+import Simplicial.AnySimplex
+import Control.Exception
+import PrettyUtil
 
 data Blenderable a = Blenderable { 
     ba_ds :: DeltaSet a,
     ba_coords :: Vert a -> Vec3,
-    ba_faceInfo0 :: Vert a -> FaceInfo,
+    ba_faceInfo :: AnySimplex a -> FaceInfo,
     ba_vertexThickness :: Vert a -> Double,
-    ba_faceInfo1 :: Arc a -> FaceInfo,
-    ba_visible1 :: Arc a -> Bool,
+    ba_visible :: AnySimplex a -> Bool,
     ba_edgeThickness :: Arc a -> Double,
-    ba_faceInfo2 :: Tri a -> FaceInfo,
     ba_triangleLabel :: Tri a -> Maybe TriangleLabel, 
     ba_materials :: [Material]
 }
@@ -54,6 +60,8 @@ data Scene a = Scene {
     scene_worldProps :: Props,
     scene_cams :: [Cam]
 }
+
+deriving instance (Pretty (Vert a), ShowN a) => Show (Scene a)
 
 
 data Cam = Cam {
@@ -126,9 +134,9 @@ nsurfVertThickness = 0.03
 
 
 
-pseudomanifold
+pseudomanifoldStyle
   :: PreRenderable a -> Blenderable a
-pseudomanifold = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
+pseudomanifoldStyle = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
 
 mkBlenderable
   :: forall a. 
@@ -138,15 +146,16 @@ mkBlenderable
      -> Double
      -> PreRenderable a
      -> Blenderable a
-mkBlenderable mat0 mat1 mat2 vertThick pr = Blenderable { 
-    ba_ds = pr_ds pr,
-    ba_coords = pr_coords pr,
-    ba_triangleLabel = pr_triangleLabel pr,
-    ba_visible1 = pr_visible1 pr,
+mkBlenderable mat0 mat1 mat2 vertThick pr_ = Blenderable { 
+    ba_ds = pr_ds pr_,
+    ba_coords = pr_coords pr_,
+    ba_triangleLabel = pr_triangleLabel pr_,
+    ba_visible = pr_visible pr_,
 
-    ba_faceInfo0 = \s -> FaceInfo (pr_name0 pr s) mat0,
-    ba_faceInfo1 = \s -> FaceInfo (pr_name1 pr s) mat1, 
-    ba_faceInfo2 = \s -> FaceInfo (pr_name2 pr s) mat2, 
+    ba_faceInfo = \asi -> elimAnySimplexWithNat asi (\n _ ->
+        FaceInfo 
+            (pr_name pr_ asi) 
+            (caseNat3 n mat0 mat1 mat2 (assert False undefined))),
 
     ba_vertexThickness = const vertThick,
     ba_edgeThickness = const (edgeThicknessFactor*vertThick),
@@ -206,4 +215,26 @@ instance DisjointUnionable (Blenderable a) (Blenderable b) (Blenderable (Either1
 
 --normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
 
+fromSPQWC
+  :: (Ord v, Show v) =>
+     SPQWithCoords v
+     -> Blenderable (OTuple v)
+fromSPQWC = pseudomanifoldStyle . toPreRenderable
 
+fromStandardCoordinates
+  :: (Eq v, Integral i, Pretty i) =>
+     SPQWithCoords v
+     -> StandardCoordinates i
+     -> Blenderable (OTuple Corn)
+fromStandardCoordinates spqwc stc = normalSurfaceStyle (standardCoordinatesToPreRenderable spqwc stc) 
+
+
+instance (Pretty (Vert a), ShowN a) => Pretty (Blenderable a) where
+    pretty Blenderable{..} = prettyRecord "Blenderable"
+        [("ba_ds",pretty ba_ds),
+         ("ba_coords",prettyFunction ba_coords (vertices ba_ds))
+        ]
+
+
+instance (Pretty (Vert a), ShowN a) => Show (Blenderable a) where
+    showsPrec = prettyShowsPrec

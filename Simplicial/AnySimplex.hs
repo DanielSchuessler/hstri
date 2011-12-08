@@ -1,7 +1,9 @@
 {-# LANGUAGE Rank2Types, ExistentialQuantification, TypeOperators, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 module Simplicial.AnySimplex(
-    AnySimplex(..),anySimplex_dim,elimAnySimplexWithNat,simpleMapAnySimplex,
+    AnySimplex(..),anySimplex_dim,
+    elimAnySimplexWithNat, foldAnySimplexWithNat,
+    simpleMapAnySimplex,
     module TypeLevel.TF.Nat,
     module TypeLevel.TF.Fun,
     module TypeLevel.TF.Nat.Small,
@@ -15,11 +17,17 @@ import TypeLevel.TF.Nat
 import TypeLevel.TF.Fun
 import TypeLevel.TF.Nat.Small
 import Data.Proxy
+import PrettyUtil
+import Either1
 
 data AnySimplex a = forall n. Nat n => AnySimplex (a n)
 
 elimAnySimplexWithNat :: AnySimplex a -> (forall n. Nat n => n -> a n -> r) -> r
 elimAnySimplexWithNat (AnySimplex x) f = f undefined x
+
+foldAnySimplexWithNat
+  :: (forall n. Nat n => n -> a n -> c) -> AnySimplex a -> c
+foldAnySimplexWithNat = flip elimAnySimplexWithNat
 
 anySimplex_dim :: AnySimplex a -> Int
 anySimplex_dim a = elimAnySimplexWithNat a (const . natToInt)
@@ -30,10 +38,13 @@ simpleMapAnySimplex f (AnySimplex a) = AnySimplex (f undefined a)
 
 
 
--- Stuff that doesn't really belong in this module
 instance ShowN a => Show (AnySimplex a) where
     showsPrec prec (AnySimplex x) =
         showsPrecN prec x
+
+
+instance ShowN a => Pretty (AnySimplex a) where
+    pretty = string . show
 
 instance OrdN a => Eq (AnySimplex a) where
     a == b = compare a b == EQ
@@ -50,6 +61,7 @@ compareAnySimplex (AnySimplex (x1 :: a n1)) (AnySimplex (x2 :: a n2)) =
 instance OrdN a => Ord (AnySimplex a) where
     compare = compareAnySimplex 
 
+-- Stuff that doesn't really belong in this module
 -- | Means that @a n@ is 'Show' for all @'Nat' n@
 class ShowN a where
     getShow :: Nat n => Proxy (a n) -> (Show (a n) => r) -> r
@@ -71,4 +83,16 @@ compareN x y = getOrd (prox x) (compare x y)
 
 prox :: a -> Proxy a
 prox _ = undefined
+
+instance (ShowN s1, ShowN s2) => ShowN (Either1 s1 s2) where
+    getShow (_ :: Proxy (Either1 s1 s2 n)) r = 
+        getShow (prox (undefined :: s1 n))
+            (getShow (prox (undefined :: s2 n))
+                r)
+
+instance (OrdN s1, OrdN s2) => OrdN (Either1 s1 s2) where
+    getOrd (_ :: Proxy (Either1 s1 s2 n)) r = 
+        getOrd (prox (undefined :: s1 n))
+            (getOrd (prox (undefined :: s2 n))
+                r)
 

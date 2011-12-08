@@ -15,7 +15,7 @@ main :: IO ExitCode
 main = testBlender . 
        defaultScene .
        transformCoords rot $
-       (pseudomanifold 
+       (pseudomanifoldStyle 
             (setGluing "F" (vA,vB,vC) (vA,vB,vD) S3bac
                  (setGluing "G" (vA,vC,vD) (vB,vC,vD) S3cab
        

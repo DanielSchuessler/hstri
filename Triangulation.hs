@@ -8,7 +8,7 @@ module Triangulation(
     Triangulation,
     
     -- * Properties 
-    tTetrahedra_,tGluings_, tGlueMap_, edgeEqv,oEdgeEqv,vertexEqv,triangTetCount,
+    tTetrahedra_,tOriginalGluings, tGlueMap_, edgeEqv,oEdgeEqv,vertexEqv,triangTetCount,
     embedsEdges,
     lookupGluingOfITriangle,
     lookupGluingOfOITriangle,
@@ -28,13 +28,10 @@ module Triangulation(
     getOIEdgeGluingSense,
     -- * Construction 
     mkTriangulation,mkTriangulationG,triang,randomTriangulation,randT,
+    -- * Transformation
+    addGluings,
     -- * Canonical representatives for things that are glued
-    canonicalizeIVertex,
-    canonicalizeIEdge,
-    canonicalizeOIEdge,
-    canonicalizeITriangle,
-    canonicalizeINormalArc,
-    canonicalizeINormalCorner,
+    TriangulationQuotientSpaceCanonicalizable(..),
 
 
 
@@ -80,7 +77,7 @@ genI t = liftM2 I (genTet t) arbitrary
 tGluingsIrredundant :: Triangulation -> [Gluing]
 tGluingsIrredundant tr = 
     let
-        gluings = tGluings_ tr
+        gluings = tOriginalGluings tr
         gluingsFirstTris = setFromList (fst <$> gluings) 
 
         isRedundant (tri,unpackOrderedFace -> (_,tri')) =
@@ -98,7 +95,8 @@ prop_tGluingsIrredundant tr =
 -- but kept in this data structure for memoization purposes
 data Triangulation = Triangulation { 
     tTetrahedra_ :: [TIndex], 
-    tGluings_ :: [Gluing],
+    -- | The original gluings as passed to 'mkTriangulation'
+    tOriginalGluings :: [Gluing],
 
     -- | INVARIANT: 
     --
@@ -127,7 +125,7 @@ instance Pretty Triangulation where
 
           where
             fields = [ ("Tetrahedron indices", pretty (fmap (dullcyan . pretty) tTetrahedra_)) 
-                     , ("Triangle gluings", pretty tGluings_)
+                     , ("Triangle gluings", pretty tOriginalGluings)
 --                     , ("Edges", pretty edgeEqv)
                      , ("Ordered edges", pretty oEdgeEqv)
                      , ("Vertices", pretty vertexEqv)
@@ -159,7 +157,7 @@ runTriangulationBuilder tTetrahedra_ (TriangulationBuilder x)
 
 
 mkTriangulation :: [TIndex] -> [Gluing] -> Either String Triangulation
-mkTriangulation tTetrahedra_ tGluings_
+mkTriangulation tTetrahedra_ tOriginalGluings
         =   
             assert (not . hasDuplicates $ tTetrahedra_) (do
 
@@ -187,13 +185,13 @@ mkTriangulation tTetrahedra_ tGluings_
                                 ("Triangle "++show t++" is glued to both triangle "++show f1++" and "++show f2))
         
     tGlueMap_ <- List.foldl' addGluing (return mempty) 
-                        (tGluings_ ++ fmap flipGluing tGluings_)
+                        (tOriginalGluings ++ fmap flipGluing tOriginalGluings)
 
 
     let vertexEqv :: Equivalence IVertex 
         vertexEqv = mkEquivalence
             [ pair |
-                (two,otwo') <- tGluings_,
+                (two,otwo') <- tOriginalGluings,
                 pair <- zip (vertexList two) (vertexList otwo')
                 ]
 
@@ -203,7 +201,7 @@ mkTriangulation tTetrahedra_ tGluings_
         edgeEqv = mkEquivalence
             [ pair | 
                 
-                  (two,otwo') <- tGluings_
+                  (two,otwo') <- tOriginalGluings
                 , pair <- zip (edgeList two)
                               (forgetVertexOrder <$> edgeList otwo')
             ]
@@ -216,7 +214,7 @@ mkTriangulation tTetrahedra_ tGluings_
                 pairs =
                     [ pair | 
                         
-                        (two,otwo') <- tGluings_
+                        (two,otwo') <- tOriginalGluings
                         , pair0 <- zip (edgeList (packOrderedFace S3abc two))
                                        (edgeList otwo')
 
@@ -232,7 +230,7 @@ mkTriangulation tTetrahedra_ tGluings_
 
 
                             
-    return Triangulation{ tTetrahedra_, tGlueMap_, edgeEqv, oEdgeEqv, vertexEqv, tGluings_ })
+    return Triangulation{ tTetrahedra_, tGlueMap_, edgeEqv, oEdgeEqv, vertexEqv, tOriginalGluings })
 
 glue :: TIndex -> Triangle -> TIndex -> (S3, Triangle) -> TriangulationBuilder ()
 glue i0 f0 i1 (g,f1) = TriangulationBuilder (tell [(i0 ./ f0, i1 ./ (packOrderedFace g f1))])
@@ -272,15 +270,15 @@ instance Arbitrary Triangulation where
 
 
 
-    shrink t = concatMap removeTet (tTetrahedra_ t) ++ fmap removeGluing (tGluings_ t)
+    shrink t = concatMap removeTet (tTetrahedra_ t) ++ fmap removeGluing (tOriginalGluings t)
         where
             -- we can remove a tetrahedron iff it is isolated
             removeTet tet =
                 if $(allTuple 4) (isBoundaryITriangle t) (triangles tet)
-                then [ fromRight $ mkTriangulation (List.delete tet (tTetrahedra_ t)) (tGluings_ t) ]
+                then [ fromRight $ mkTriangulation (List.delete tet (tTetrahedra_ t)) (tOriginalGluings t) ]
                 else []
 
-            removeGluing g = fromRight $ mkTriangulation (tTetrahedra_ t) (List.delete g (tGluings_ t))
+            removeGluing g = fromRight $ mkTriangulation (tTetrahedra_ t) (List.delete g (tOriginalGluings t))
 
 generateUntilRight :: Show a => Gen (Either a b) -> Gen b
 generateUntilRight g = fromRight <$> (g `suchThat` isRight)
@@ -369,7 +367,7 @@ instance Quote Triangulation where
     quotePrec prec t = quoteParen (prec >= 11) ("mkTriangulation "
                                                     ++ quotePrec 11 (tTetrahedra_ t)
                                                     ++ " "
-                                                    ++ quotePrec 11 (tGluings_ t))
+                                                    ++ quotePrec 11 (tOriginalGluings t))
 
 
 
@@ -445,45 +443,48 @@ prop_getOIEdgeGluingSense_sym tr =
   where
         f = getOIEdgeGluingSense tr
 
-canonicalizeIVertex
-  :: Triangulation -> IVertex -> IVertex
-canonicalizeIVertex t x = eqvRep (vertexEqv t) x
+class TriangulationQuotientSpaceCanonicalizable a where
+    canonicalize :: Triangulation -> a -> a
 
-canonicalizeIEdge
-  :: Triangulation -> IEdge -> IEdge
-canonicalizeIEdge t x = (eqvRep (edgeEqv t) x)
+instance TriangulationQuotientSpaceCanonicalizable IVertex where
+    canonicalize t x = eqvRep (vertexEqv t) x
 
-canonicalizeOIEdge
-  :: Triangulation -> OIEdge -> OIEdge
-canonicalizeOIEdge t x = (eqvRep (oEdgeEqv t) x)
+instance TriangulationQuotientSpaceCanonicalizable IEdge where
+    canonicalize t x = (eqvRep (edgeEqv t) x)
 
-canonicalizeITriangle :: Triangulation -> ITriangle -> ITriangle
-canonicalizeITriangle t rep = 
-    case lookup rep (tGlueMap_ t) of
-                            Just (forgetVertexOrder -> rep') | rep' < rep -> rep'
-                            _ -> rep
+instance TriangulationQuotientSpaceCanonicalizable OIEdge where
+    canonicalize t x = (eqvRep (oEdgeEqv t) x)
 
-canonicalizeINormalArc :: Triangulation -> INormalArc -> INormalArc
-canonicalizeINormalArc t ina =
-    let
-        tri = iNormalArcGetTriangle ina
-    in
-          case lookup tri (tGlueMap_ t) of
-                            Just otri | _tri' <- forgetVertexOrder otri, 
-                                        _tri' < tri -> 
-                                
+instance TriangulationQuotientSpaceCanonicalizable ITriangle where
+    canonicalize t rep = 
+        case lookup rep (tGlueMap_ t) of
+                                Just (forgetVertexOrder -> rep') | rep' < rep -> rep'
+                                _ -> rep
+
+instance TriangulationQuotientSpaceCanonicalizable INormalArc where
+    canonicalize t ina =
+        let
+            tri = iNormalArcGetTriangle ina
+        in
+            case lookup tri (tGlueMap_ t) of
+                                Just otri | _tri' <- forgetVertexOrder otri, 
+                                            _tri' < tri -> 
                                     
-                                 (gluingMap (tri,otri) ina)
-                                    
+                                        
+                                    (gluingMap (tri,otri) ina)
+                                        
 
-                            _ -> ina
+                                _ -> ina
 
-canonicalizeINormalCorner :: Triangulation -> INormalCorner -> INormalCorner
-canonicalizeINormalCorner t (viewI -> I i (edge -> e)) = 
-      iNormalCorner $ canonicalizeIEdge t (i ./ e)
+instance TriangulationQuotientSpaceCanonicalizable INormalCorner where
+    canonicalize t (viewI -> I i (edge -> e)) = 
+        iNormalCorner $ canonicalize t (i ./ e)
 
 prop_forgetVertexOrder_natural_for_canonicalization :: Triangulation -> Property
 prop_forgetVertexOrder_natural_for_canonicalization t =
     forAllElements (tOIEdges t)
-        (\e -> canonicalizeIEdge t (forgetVertexOrder e) == forgetVertexOrder (canonicalizeOIEdge t e)) 
+        (\e -> canonicalize t (forgetVertexOrder e) == forgetVertexOrder (canonicalize t e)) 
 
+
+addGluings :: Triangulation -> [Gluing] -> Either String Triangulation
+addGluings tr gluings = mkTriangulation (tTetrahedra_ tr) (tOriginalGluings tr ++ gluings)

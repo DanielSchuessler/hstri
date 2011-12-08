@@ -119,3 +119,6 @@ indexInTriple x (x1,x2,x3) | x == x1 = 0
                            | otherwise = error ( unwords [ "indexInTriple" , show x, show (x1,x2,x3) ] )
 
 
+intersect2_2 :: Eq a => (a, a) -> (a, a) -> [a]
+intersect2_2 xs ys = filter2 (`elem2` ys) xs 
+    

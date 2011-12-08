@@ -27,6 +27,7 @@ import Test.QuickCheck.All
 import Text.Printf.TH
 import PrettyUtil
 import QuickCheckUtil
+import Element
 
 
 #define KEYCLASS(A) Ord(A)
@@ -318,3 +319,9 @@ eqv_equivalents e = equivalents . eqvClassOf e
 -- | Returns a list containing a represenative of each class 
 eqv_reps ::  Equivalence b -> [b]
 eqv_reps e = ec_rep `fmap` eqv_classes e 
+
+
+type instance Element (EquivalenceClass a) = a
+
+instance AsList (EquivalenceClass a) where
+    asList = ec_elementList

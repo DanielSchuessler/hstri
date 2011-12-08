@@ -9,7 +9,7 @@ import Data.Tagged
 import Language.Haskell.TH.Syntax
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Text.PrettyPrint.ANSI.Leijen
+import PrettyUtil
 import Util
 import Group
 import THUtil

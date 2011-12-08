@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, ViewPatterns #-}
+{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
 module SimplicialPartialQuotient where
 
 import Triangulation
@@ -27,15 +27,6 @@ data SimplicialPartialQuotient v = SimplicialPartialQuotient {
 
 
 spq_verts = nub' . concatMap toList4 . spq_tets
-
-instance Show v => Show (SimplicialPartialQuotient v) where
-    showsPrec = prettyShowsPrec
-
-instance Show v => Pretty (SimplicialPartialQuotient v) where
-    pretty spq = docAssocs 
-                    (fmap 
-                        (pretty &&& (text . show . spq_map spq)) 
-                        (tIVertices (spq_tr spq))) 
 
 
 
@@ -124,7 +115,7 @@ prop_enoughGluings spq =
     let
         _triangleLabel = makeTriangleLabelling spq 
     in
-        forAll (elements . tGluings_ . spq_tr $ spq)
+        forAll (elements . tOriginalGluings . spq_tr $ spq)
             (\(tri,otri) ->
 
                 let
@@ -202,3 +193,25 @@ geometrifySingleTetTriang tr =
         SPQWithCoords 
             (SimplicialPartialQuotient tr forgetTIndex [allVertices'])
             vertexDefaultCoords
+
+
+instance Pretty v => Show (SimplicialPartialQuotient v) where
+    showsPrec = prettyShowsPrec
+
+instance Pretty v => Pretty (SimplicialPartialQuotient v) where
+    pretty SimplicialPartialQuotient{..} = 
+        prettyRecord "SimplicialPartialQuotient"
+            [("spq_tr",pretty spq_tr),
+             ("spq_map",prettyFunction spq_map (tIVertices spq_tr)),
+             ("spq_tets",pretty spq_tets) 
+            ]
+
+instance (Ord v, Pretty v) => Show (SPQWithCoords v) where
+    showsPrec = prettyShowsPrec
+
+instance (Ord v, Pretty v) => Pretty (SPQWithCoords v) where
+    pretty SPQWithCoords{..} =
+        prettyRecord "SPQWithCoords"
+            [("spqwc_spq",pretty spqwc_spq),
+             ("spqwc_coords",prettyFunction spqwc_coords (spq_verts spqwc_spq))]
+

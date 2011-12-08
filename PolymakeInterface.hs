@@ -2,18 +2,16 @@
 {-# OPTIONS -Wall #-} 
 module PolymakeInterface where
 
-import System.Directory
-import System.Random
-import qualified System.FilePath as File
-import System.Process
-import PrettyUtil
-import Text.PrettyPrint.ANSI.Leijen as PP
-
 import Control.Monad.Writer
-import Data.List(intersperse)
-import Text.Parsec as P
-import Data.Ratio
 import Data.Functor.Identity
+import Data.List(intersperse)
+import Data.Ratio
+import PrettyUtil as PP
+import System.Directory
+import System.Process
+import System.Random
+import Text.Parsec as P
+import qualified System.FilePath as File
 
 type Parser a = ParsecT String () Identity a
 
