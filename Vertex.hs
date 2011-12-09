@@ -41,6 +41,7 @@ import Control.Applicative
 import Quote
 import THUtil() -- Lift Word8
 import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
+import Data.Vect.Double.Base((&-))
 
 -- | Vertex of an abstract tetrahedron
 newtype Vertex = Vertex Word8 deriving(Eq,Ord)
@@ -140,11 +141,13 @@ vertexFromWord8 = Vertex
 
 -- | Embeds the abstract tetrahedron into R^3 symmetrically
 vertexDefaultCoords :: Vertex -> Vec3
-vertexDefaultCoords = f . vertexToWord8 
+vertexDefaultCoords = (\x -> f x &- center_) . vertexToWord8 
     where
         f 0 = vec3X
         f 1 = vec3Y
         f 2 = vec3Z
         f 3 = Vec3 1 1 1
         f _ = assert False undefined
+
+        center_ = Vec3 0.5 0.5 0.5
 

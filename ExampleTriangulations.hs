@@ -19,11 +19,11 @@ tr_octahedron :: Triangulation
 tr_octahedron = tr_aroundEdge 4 
 
 tr_aroundEdge_topVertex, tr_aroundEdge_bottomVertex :: Word -> TVertex
-tr_aroundEdge_bottomVertex n = pMap (tr_aroundEdge n) (0 ./ vA)
-tr_aroundEdge_topVertex n = pMap (tr_aroundEdge n) (0 ./ vB)
+tr_aroundEdge_bottomVertex n = pMap (tr_aroundEdge n) (0 ./ vB)
+tr_aroundEdge_topVertex n = pMap (tr_aroundEdge n) (0 ./ vA)
 
 tr_aroundEdge_centralEdge_preimage :: OIEdge
-tr_aroundEdge_centralEdge_preimage = 0 ./ oedge (vA,vB)
+tr_aroundEdge_centralEdge_preimage = 0 ./ oedge (vB,vA)
 
 tr_aroundEdge_centralEdge :: Word -> T OIEdge
 tr_aroundEdge_centralEdge n = pMap (tr_aroundEdge n) tr_aroundEdge_centralEdge_preimage
@@ -41,3 +41,9 @@ octahedronCam1 =
         (Vec3 0.217 (-3.091) 2.071)
         (Vec3 1.0077831745147705 0 0.06999944895505905)
         defaultFOV
+
+tr_oneTet :: Triangulation
+tr_oneTet = fromRight $ mkTriangulation [0] []
+
+spqwc_oneTet :: SPQWithCoords Vertex
+spqwc_oneTet = geometrifySingleTetTriang tr_oneTet

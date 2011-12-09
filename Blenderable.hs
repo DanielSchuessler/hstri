@@ -110,7 +110,7 @@ transparency alpha spec_alpha fresnel =
                 "translucency" & (1-alpha),
                 "raytrace_transparency.fresnel_factor" & (1::Int),
                 "raytrace_transparency.fresnel" & (fresnel::Double),
-                "raytrace_transparency.depth" & (5::Int)
+                "raytrace_transparency.depth" & (15::Int)
                 ]
 
 -- newtype Pseudomanifold a = Pseudomanifold { unPseudomanifold :: a }
@@ -188,7 +188,7 @@ defaultScene a = Scene a defaultWorldProps [defaultCam]
 defaultCam :: Cam
 defaultCam = Cam (Vec3 0.66 (-2.3) 0.52) (eulerAnglesXYZ (pi/2) 0 0) defaultFOV
 
-(&) ::  ToPython a => t -> a -> (t, Python ())
+(&) :: ToPython a => t -> a -> (t, Python ())
 x & y = (x, toPython y)
 
 defaultWorldProps :: Props
@@ -212,7 +212,6 @@ instance DisjointUnionable (Blenderable a) (Blenderable b) (Blenderable (Either1
 
 
 
-
 --normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
 
 fromSPQWC
@@ -222,10 +221,10 @@ fromSPQWC
 fromSPQWC = pseudomanifoldStyle . toPreRenderable
 
 fromStandardCoordinates
-  :: (Eq v, Integral i, Pretty i) =>
+  :: (Ord v, Integral i, Pretty i, Show v) =>
      SPQWithCoords v
      -> StandardCoordinates i
-     -> Blenderable (OTuple Corn)
+     -> Blenderable (OTuple (Corn v))
 fromStandardCoordinates spqwc stc = normalSurfaceStyle (standardCoordinatesToPreRenderable spqwc stc) 
 
 
@@ -238,3 +237,5 @@ instance (Pretty (Vert a), ShowN a) => Pretty (Blenderable a) where
 
 instance (Pretty (Vert a), ShowN a) => Show (Blenderable a) where
     showsPrec = prettyShowsPrec
+
+

@@ -14,7 +14,6 @@ module ConcreteNormal(
 
 import AbstractTetrahedron
 import Control.Exception
-import Data.Maybe
 import Data.Set as Set
 import Data.Vect.Double(interpolate)
 import HomogenousTuples
@@ -24,7 +23,6 @@ import PrettyUtil
 import Simplicial.AnySimplex
 import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
-import THUtil
 import TriangulationCxtObject
 
 -- | Quads are numbered away from their 'firstDisjointEdge'
@@ -62,18 +60,17 @@ discPosToCornerPos_helper
       Integral i) =>
 
      (StandardCoordinates i -> Concrete idisc -> NormalArc -> Int)
-     -> Triangulation
      -> StandardCoordinates i
      -> Concrete idisc
      -> NormalCorner
      -> (Pair NormalCorner -> NormalCorner)
      -> CornerPosition
-discPosToCornerPos_helper cns_x_arcPos tr nc x corner linkCornerSelector =
+discPosToCornerPos_helper cns_x_arcPos nc x corner linkCornerSelector =
     let
         I i x' = viewI (c_type x)
         arc = normalArc (corner, linkCornerSelector (link corner x'))
         arcPos = cns_x_arcPos nc x arc
-        result = arcPosToCornerPos tr nc (C arcPos (i ./ arc)) corner
+        result = arcPosToCornerPos nc (C arcPos (i ./ arc)) corner
     in
 --         trace (unwords ["discPosToCornerPos_helper _ _ _",
 --                             showsPrec 11 x "",
@@ -86,8 +83,7 @@ discPosToCornerPos_helper cns_x_arcPos tr nc x corner linkCornerSelector =
          
 triPosToCornerPos_helper
   :: Integral i =>
-     Triangulation
-     -> StandardCoordinates i
+        StandardCoordinates i
      -> Concrete INormalTri
      -> NormalCorner
      -> (Pair NormalCorner -> NormalCorner)
@@ -96,8 +92,7 @@ triPosToCornerPos_helper = discPosToCornerPos_helper triPosToArcPos
 
 quadPosToCornerPos_helper
   :: Integral i =>
-     Triangulation
-     -> StandardCoordinates i
+        StandardCoordinates i
      -> Concrete INormalQuad
      -> NormalCorner
      -> (Pair NormalCorner -> NormalCorner)
@@ -106,25 +101,23 @@ quadPosToCornerPos_helper = discPosToCornerPos_helper quadPosToArcPos
 
 triPosToCornerPos
   :: Integral i =>
-     Triangulation
-     -> StandardCoordinates i
+        StandardCoordinates i
      -> Concrete INormalTri
      -> NormalCorner
      -> CornerPosition
-triPosToCornerPos tr nc x c = assert (r1==r2) $ r1
+triPosToCornerPos nc x c = assert (r1==r2) $ r1
   where
-    (r1,r2) = map2 (triPosToCornerPos_helper tr nc x c) (fst,snd)
+    (r1,r2) = map2 (triPosToCornerPos_helper nc x c) (fst,snd)
 
 quadPosToCornerPos
   :: Integral i =>
-     Triangulation
-     -> StandardCoordinates i
+        StandardCoordinates i
      -> Concrete INormalQuad
      -> NormalCorner
      -> CornerPosition
-quadPosToCornerPos tr nc x c = 
+quadPosToCornerPos nc x c = 
   let
-    (r1,r2) = map2 (quadPosToCornerPos_helper tr nc x c) (fst,snd)
+    (r1,r2) = map2 (quadPosToCornerPos_helper nc x c) (fst,snd)
   in
     if (r1==r2)
        then r1
@@ -132,21 +125,21 @@ quadPosToCornerPos tr nc x c =
         
 
 
-arcPosToCornerPos :: Integral i => Triangulation -> StandardCoordinates i -> 
+arcPosToCornerPos :: Integral i => StandardCoordinates i -> 
                     Concrete INormalArc -> NormalCorner -> CornerPosition 
-arcPosToCornerPos tr nc (C arcPos arc) corner =
+arcPosToCornerPos nc (C arcPos arc) corner =
                 let
                     icorner = getTIndex arc ./ corner
                     cornPos_max = fi (numberOfCornersOfType nc icorner - 1)
-                    sense = getArcNumberingVsCornerNumberingSense tr arc corner
+                    sense = getArcNumberingVsCornerNumberingSense (forgetTIndex arc) corner
                     result = 
                         case sense of 
                                         NoFlip -> arcPos
                                         Flip -> cornPos_max - arcPos
                 in
 
-                    trace (unwords ["arcPosToCornerPos",
-                                        $(showVars ['arcPos,'arc,'corner,'cornPos_max,'sense,'result])])
+--                     trace (unwords ["arcPosToCornerPos",
+--                                         $(prVars' ['arcPos,'arc,'corner,'cornPos_max,'sense,'result])])
 
                           result
 
@@ -215,7 +208,7 @@ mkConcrete (tr :: Triangulation) nc =
         cns_cornersOfArc cna =
                 map2 
                     (\icorner -> 
-                            C (arcPosToCornerPos tr nc cna (forgetTIndex icorner)) icorner)  
+                            C (arcPosToCornerPos nc cna (forgetTIndex icorner)) icorner)  
                     (normalCorners . c_type $ cna)
 
 
@@ -224,68 +217,56 @@ mkConcrete (tr :: Triangulation) nc =
         CNS{..}
 
 
-canonicalOIEdgeForCorner :: Triangulation -> INormalCorner -> OIEdge
-canonicalOIEdgeForCorner tr c = 
-            canonicalize tr (edgeToOEdge (iNormalCornerGetContainingEdge c))
-
-    where
-        edgeToOEdge :: IEdge -> OIEdge
-        edgeToOEdge = toOrderedFace
-            
-
 getArcNumberingVsCornerNumberingSense
-  :: Triangulation -> INormalArc -> NormalCorner -> S2
-getArcNumberingVsCornerNumberingSense tr (viewI -> I i narc) ncorner = 
+  :: NormalArc -> NormalCorner -> S2
+getArcNumberingVsCornerNumberingSense narc ncorner = 
     let
-        incorner = i ./ ncorner
+        (v0,v1) = vertices $ normalCornerGetContainingEdge ncorner
+
         v = normalArcGetVertex narc
-        e = normalCornerGetContainingEdge ncorner
-        numberingDirectionForArcs = i ./ oedge (v, otherVertex e v) 
 
     in
-        fromJust (getOIEdgeGluingSense tr 
-                    numberingDirectionForArcs 
-                    (canonicalOIEdgeForCorner tr incorner)) 
+        if v0==v 
+           then NoFlip
+           else assert (v1==v) Flip
 
         
 
 
-
-data Corn = Corn CornerPosition Int (EquivalenceClass INormalCorner) 
+-- | An interior point of an edge of the 'SimplicialPartialQuotient'
+data Corn v = Corn CornerPosition Int v v
     deriving(Eq,Ord,Show)
 
-instance Pretty Corn where
-    prettyPrec prec (Corn u n eq) = prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty eq] 
+instance Pretty v => Pretty (Corn v) where
+    prettyPrec prec (Corn u n v0 v1) = 
+        prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty v0,anyPretty v1] 
+
 
 standardCoordinatesToPreRenderable
-  :: (Integral i, Eq v, Pretty i) =>
+  :: forall v i. (Integral i, Ord v, Pretty i, Show v) =>
      SPQWithCoords v
      -> StandardCoordinates i
-     -> PreRenderable (OTuple Corn)
+     -> PreRenderable (OTuple (Corn v))
 standardCoordinatesToPreRenderable (SPQWithCoords spq coords) nc =  
     let
-        tr = spq_tr spq
-
-        cornEqv = spq_INormalCornerEquivalence spq
-
         cns = mkConcrete (spq_tr spq) nc
 
-        tris :: [Triple Corn]
+        tris :: [Triple (Corn v)]
         tris = do
             cx@(C _ (viewI -> I i x)) <- cns_tris cns 
             let f corner = 
                     mkCorn 
-                        (triPosToCornerPos tr nc cx corner)
+                        (triPosToCornerPos nc cx corner)
                         (i ./ corner)
 
             [ map3 f (normalCorners x) ]
 
-        quads :: [Quadruple Corn]
+        quads :: [Quadruple (Corn v)]
         quads = do
             cx@(C _ (viewI -> I i x)) <- cns_quads cns 
             let f corner = 
                     mkCorn 
-                        (quadPosToCornerPos tr nc cx corner)
+                        (quadPosToCornerPos nc cx corner)
                         (i ./ corner)
 
             [ map4 f (normalCorners x) ]
@@ -293,34 +274,19 @@ standardCoordinatesToPreRenderable (SPQWithCoords spq coords) nc =
 
         (sc,quadDiagonals) = fromTrisAndQuads tris quads
 
+        mkCorn :: CornerPosition -> INormalCorner -> Corn v
         mkCorn pos nonCanonicalINormalCorner =
             let
                 n = numberOfCornersOfType nc nonCanonicalINormalCorner
+                (u0,u1) = map2 (spq_map spq)
+                               (vertices (iNormalCornerGetContainingEdge nonCanonicalINormalCorner))
             in
-                Corn (fi pos) (fi n) (eqv_classOf cornEqv nonCanonicalINormalCorner)
+                if u0 <= u1
+                   then Corn (fi pos)         (fi n) u0 u1
+                   else Corn (fi n - pos - 1) (fi n) u1 u0
 
-        cornerCoords (Corn pos n ec) = 
-            let
-                 (v0,v1) = map2 
-                            (coords . spq_map spq) 
-                            
-                            (vertices . 
-                             iNormalCornerGetContainingEdge . 
-                             canonicalRep 
-                                {- doesn't matter which rep we take here, since they all
-                                   (by definition of cornEqv) get mapped to the same thing
-                                   by spq_map -} $ 
-                             ec)
-
---                 the_oedge = toOrderedFace (iNormalCornerGetContainingEdge icorn)
---                 Just sense = 
---                     getOIEdgeGluingSense tr
---                         (canonicalOIEdgeForCorner tr icorn)
---                         the_oedge
--- 
---                 (v0,v1) = map2 (coords . spq_map spq) (vertices (sense .* the_oedge))
-            in
-                interpolate (fi (1+pos) / fi (1+n)) v0 v1
+        cornerCoords (Corn pos n v0 v1) = 
+                interpolate (fi (1+pos) / fi (1+n)) (coords v0) (coords v1)
 
         
     in

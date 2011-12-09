@@ -14,7 +14,6 @@ import Data.Vect.Double
 import FaceIx
 import HomogenousTuples
 import TypeLevel.TF.List
-import PreRenderable
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet
 import Simplicial.GraphComplex
@@ -161,8 +160,6 @@ abstractTet = fromTets [allVertices']
 
 
 
-tet3d :: PreRenderable (OTuple Vertex)
-tet3d = mkPreRenderable (vertexDefaultCoords . unOT) abstractTet 
 
 oTupleBarycenter :: forall n v. (Nat n, Vector v) => OTuple v n -> v 
 oTupleBarycenter x = oTupleFoldl1' (&+) x &* (recip (fromIntegral (1 + natToInt (undefined :: n))))
@@ -204,3 +201,5 @@ oTupleMap f (OT x) = OT (caseNat4 (undefined :: n)
 baryFlat :: forall v. Ord v => (OTuple v N0 -> Vec3) -> (BCSFace (OTuple v) N0 -> Vec3) 
 
 baryFlat f (EP0 (_,AnySimplex x)) = oTupleBarycenter (oTupleMap (f . OT) x)
+
+

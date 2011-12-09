@@ -1,4 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
+{-# OPTIONS -Wall #-}
 module SimplicialPartialQuotient where
 
 import Triangulation
@@ -8,7 +9,6 @@ import Data.Map as M
 import PreRenderable
 import Control.Monad
 import HomogenousTuples
-import Control.Arrow
 import Simplicial.SimplicialComplex
 import Data.Maybe
 import Data.Vect.Double(Vec3)
@@ -26,6 +26,7 @@ data SimplicialPartialQuotient v = SimplicialPartialQuotient {
 }
 
 
+spq_verts :: Ord v => SimplicialPartialQuotient v -> [v]
 spq_verts = nub' . concatMap toList4 . spq_tets
 
 
@@ -49,6 +50,9 @@ mapTri (spq_map -> m) tri = map3 m (vertices tri)
 
 
 
+makeTriangleLabelling
+  :: Ord v =>
+     SimplicialPartialQuotient v -> Triple v -> Maybe TriangleLabel
 makeTriangleLabelling spq = flip M.lookup (M.fromList (triangleLabelList spq))
 
 
@@ -73,16 +77,22 @@ triangleLabelList spq = do
 
 
 -- | Gluings of the original triangulation which are *not* implemented by 'spq_map'
+extraGluings
+  :: Eq v => SimplicialPartialQuotient v -> [Gluing]
 extraGluings spq = 
             L.filter 
                 (not . isGluingImplemented spq)
                 (tGluingsIrredundant (spq_tr spq))  
 
+implementedGluings
+  :: Eq v => SimplicialPartialQuotient v -> [Gluing]
 implementedGluings spq = 
             L.filter 
                 (isGluingImplemented spq)
                 (tGluingsIrredundant (spq_tr spq))  
 
+isGluingImplemented
+  :: (Eq v) => SimplicialPartialQuotient v -> Gluing -> Bool
 isGluingImplemented spq (tri,otri) = mapTri spq tri == mapTri spq otri 
 
 
@@ -136,8 +146,12 @@ prop_enoughGluings spq =
             )
 
 
+toSimplicialComplex
+  :: Ord v => SimplicialPartialQuotient v -> SimplicialComplex v
 toSimplicialComplex = fromTets . spq_tets   
 
+toPreRenderable
+  :: (Ord v, Show v) => SPQWithCoords v -> PreRenderableSimplicialComplex v
 toPreRenderable (SPQWithCoords spq coords) = 
     let pr0 =
             mkPreRenderable 
@@ -150,6 +164,12 @@ toPreRenderable (SPQWithCoords spq coords) =
 
 
     
+spq_Equivalence_helper
+  :: (Eq v, Ord a, GluingMappable a) =>
+     (ITriangle -> [a])
+     -> (Triangulation -> [a])
+     -> SimplicialPartialQuotient v
+     -> Equivalence a
 spq_Equivalence_helper thingsOfTri allThings spq = 
     mkEquivalence 
         (do

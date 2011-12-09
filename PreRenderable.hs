@@ -4,7 +4,9 @@ module PreRenderable(
     TriangleLabel(..),
     PreRenderable(..),
     Coords(..),
-    mkPreRenderable
+    mkPreRenderable,
+    PreRenderableSimplicialComplex,
+    tet3d
 
     ) where
 
@@ -15,6 +17,8 @@ import GHC.Generics
 import DisjointUnion
 import Simplicial.AnySimplex
 import Control.Exception
+import Simplicial.SimplicialComplex
+import Vertex
 
 
 data TriangleLabel = TriangleLabel {
@@ -68,3 +72,9 @@ mkPreRenderable pr_coords pr_ds =
 
 instance OrdN a => OneSkeletonable (PreRenderable a) where
     oneSkeleton pr = pr { pr_ds = oneSkeleton (pr_ds pr) }
+
+
+type PreRenderableSimplicialComplex v = PreRenderable (OTuple v)
+
+tet3d :: PreRenderableSimplicialComplex Vertex
+tet3d = mkPreRenderable (vertexDefaultCoords . unOT) abstractTet 

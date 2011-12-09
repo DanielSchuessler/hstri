@@ -1,7 +1,7 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE NoMonomorphismRestriction #-} 
 {-# OPTIONS -Wall #-}
-module Utils where
+module Interactive.Utils where
 
 import Control.Monad
 import Control.Monad.Trans
