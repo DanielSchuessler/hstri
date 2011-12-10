@@ -1,9 +1,9 @@
 
-module Floor where
+module Interactive.Floor where
 
 import Data.Vect.Double
 import Graphics.Rendering.OpenGL
-import Utils
+import Interactive.Utils
 import Control.Monad
 import Data.Vect.Double.OpenGL
 

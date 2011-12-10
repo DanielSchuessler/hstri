@@ -1,7 +1,7 @@
 module Examples where
 import Triangulation
 import TriangulationCxtObject
-import NormalCoordinates
+import StandardCoordinates
 import Data.TrieSet as Set
 import FaceLattice
 import ParseJvx

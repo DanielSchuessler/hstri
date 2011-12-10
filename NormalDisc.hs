@@ -6,7 +6,7 @@ module NormalDisc(
         module NormalArc,
 
         -- * Normal discs
-        NormalDisc(..),
+        NormalDisc,eitherND,
         MakeNormalDisc(..),   allNormalDiscs, 
         NormalDiscs(..),normalDiscList,
         normalDiscsContainingNormalCorner,
@@ -60,6 +60,10 @@ import Quote
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)
 
+eitherND
+  :: (NormalTri -> r) -> (NormalQuad -> r) -> NormalDisc -> r
+eitherND kt kq = either kt kq . unNormalDisc
+
 
 
 class MakeNormalDisc a where
@@ -111,7 +115,7 @@ allNormalDiscs = (normalDisc <$> allNormalTris) ++ (normalDisc <$> allNormalQuad
 instance Enum NormalDisc where
     toEnum x | x < 4 = NormalDisc . Left $ toEnum x   
              | otherwise = NormalDisc . Right $ toEnum (x - 4)
-    fromEnum = either fromEnum ((+4) . fromEnum) . unNormalDisc
+    fromEnum = eitherND fromEnum ((+4) . fromEnum)
 
 instance Bounded NormalDisc where
     minBound = NormalDisc . Left $ minBound
@@ -202,9 +206,9 @@ normalQuadsByIntersectedEdge = otherNormalQuads . normalQuadByDisjointEdge
 --          [q] -> q
 --          xs -> error (unwords ["normalQuadByDisjointEdge",show e ++":", "impossible:", "q =",show xs])
 
-instance Show NormalDisc where show = either show show . unNormalDisc
+instance Show NormalDisc where show = eitherND show show
 
-instance Pretty NormalDisc where pretty = either pretty pretty . unNormalDisc
+instance Pretty NormalDisc where pretty = eitherND pretty pretty
 
 instance Pretty NormalQuad where pretty = green . text . quote 
 
@@ -231,7 +235,7 @@ instance NormalArcs NormalTri (Triple NormalArc) where
     normalArcs (normalTriGetVertex -> v) = map3 (\f -> normalArc (f, v)) (triangles v)
 
 instance NormalArcs NormalDisc [NormalArc] where
-    normalArcs = either normalArcList normalArcList . unNormalDisc
+    normalArcs = eitherND normalArcList normalArcList
 
 
 
@@ -243,7 +247,7 @@ instance IsSubface NormalArc NormalQuad where
     isSubface nat nqt = elem4 nat (normalArcs nqt)
 
 instance IsSubface NormalArc NormalDisc where
-    isSubface nat = either (isSubface nat) (isSubface nat) . unNormalDisc
+    isSubface nat = eitherND (isSubface nat) (isSubface nat)
 
 instance IsSubface NormalCorner NormalTri where
     isSubface nc nt = isVertexOfEdge (vertex nt) (edge nc)
@@ -252,7 +256,7 @@ instance IsSubface NormalCorner NormalQuad where
     isSubface nc nq = elem4 nc (normalCorners nq)
 
 instance IsSubface NormalCorner NormalDisc where
-    isSubface nat = either (isSubface nat) (isSubface nat) . unNormalDisc
+    isSubface nat = eitherND (isSubface nat) (isSubface nat)
 
 
 qc_NormalDisc ::  IO Bool
@@ -357,7 +361,7 @@ instance Link NormalCorner NormalQuad (Pair NormalCorner) where
                                     ++": Normal corner not contained in normal quad")
 
 instance Link NormalCorner NormalDisc (Pair NormalCorner) where
-    link nc = either (link nc) (link nc) . unNormalDisc
+    link nc = eitherND (link nc) (link nc) 
 
 prop_link_nc_nq :: NormalCorner -> NormalQuad -> Property
 prop_link_nc_nq nc nq =
@@ -388,4 +392,4 @@ instance Lift NormalDisc where
 instance Quote NormalDisc where
     quotePrec prec x = 
         quoteParen (prec > 10) $
-            "normalDisc " ++ (either (quotePrec 11) (quotePrec 11) $ unNormalDisc x)
+            "normalDisc " ++ (eitherND (quotePrec 11) (quotePrec 11) x)

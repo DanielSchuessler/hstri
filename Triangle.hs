@@ -395,3 +395,4 @@ instance Arbitrary ITriangle where
 instance Quote OTriangle where
     quotePrec _ ot = "o"++show ot
 
+

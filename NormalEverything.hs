@@ -2,7 +2,7 @@ module NormalEverything(
     module NormalDisc,
     module INormalDisc,
     module NormalConstants,
-    module NormalCoordinates
+    module StandardCoordinates
     ) 
 
     where
@@ -10,4 +10,4 @@ module NormalEverything(
 import NormalDisc
 import INormalDisc
 import NormalConstants
-import NormalCoordinates
+import StandardCoordinates

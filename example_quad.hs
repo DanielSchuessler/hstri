@@ -2,7 +2,7 @@ import Blender
 import TriangulationCxtObject
 import NormalDisc
 import INormalDisc
-import NormalCoordinates
+import StandardCoordinates
 import Triangulation
 import EdgeCentered
 import Data.Vect.Double

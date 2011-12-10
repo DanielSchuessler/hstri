@@ -8,7 +8,7 @@ import Data.Vect.Double
 import PreRenderable
 import ExampleTriangulations
 import Control.Monad
-import NormalCoordinates
+import StandardCoordinates
 import NormalDisc
 import DisjointUnion
 

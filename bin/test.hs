@@ -2,7 +2,7 @@ import Test.QuickCheck.Gen
 import AbstractTetrahedron
 import System.Random
 import Test.QuickCheck
-import NormalCoordinates
+import StandardCoordinates
 import NormalDisc
 import Triangulation
 import TriangulationCxtObject

@@ -124,9 +124,9 @@ iNormalArcByTriangleAndVertexIndex (viewI -> I ti t) vi =
     ti ./ normalArcByTriangleAndVertexIndex t vi
     
 
-eitherINormalDisc
+eitherIND
   :: (INormalTri -> c) -> (INormalQuad -> c) -> INormalDisc -> c
-eitherINormalDisc kt kq (viewI -> I i x) = either (kt . (i ./)) (kq . (i ./)) (unNormalDisc x) 
+eitherIND kt kq (viewI -> I i x) = eitherND (kt . (i ./)) (kq . (i ./)) x
 
 iNormalTriByNormalArc :: INormalArc -> INormalTri
 iNormalTriByNormalArc = mapI normalTriByNormalArc

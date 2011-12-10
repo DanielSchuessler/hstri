@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections, ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
-module NormalCoordinates(
+module StandardCoordinates(
     module Data.VectorSpace,
     StandardCoordinates,
     stc_toDenseList,
@@ -88,7 +88,11 @@ stc_map f (SC m) =
 
 
 
-deriving instance (Pretty r) => Pretty (StandardCoordinates r)
+--deriving instance (Pretty r) => Pretty (StandardCoordinates r)
+
+instance Pretty r => Pretty (StandardCoordinates r) where
+    pretty sc = pretty (stc_toAssocs sc) 
+
 
 instance (Pretty r) => Show (StandardCoordinates r) where
     show = prettyString
@@ -138,9 +142,7 @@ krBasis t = (mkTetrahedralSolution <$> tTetrahedra_ t) ++ (mkEdgeSolution <$> (e
 
 
 ncCoefficient :: (Num r) => StandardCoordinates r -> INormalDisc -> r
-ncCoefficient (SC nc) nd = case lookup nd nc of
-                                    Just r -> r
-                                    Nothing -> 0
+ncCoefficient (SC nc) nd = fromMaybe 0 (lookup nd nc)
 
 
 stc_toDenseList :: (Num r) => Triangulation -> StandardCoordinates r -> [r] 

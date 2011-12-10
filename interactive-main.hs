@@ -1,29 +1,25 @@
 {-# LANGUAGE PackageImports, TemplateHaskell #-}
-import Control.Applicative
-import Control.Monad.Trans
-import FRP.Elerea.Param
-import Graphics.UI.GLFW as GLFW
-
-
---import Paths_lambdacube_examples (getDataFileName)
-
 
 import Command
+import Control.Applicative
 import Control.Arrow
 import Control.Exception(assert)
 import Control.Monad
+import Control.Monad.Trans
 import Data.List((\\),delete)
 import Data.Vect.Double
 import Data.Vect.Double.Base
 import Data.Vect.Double.Instances
 import Data.Vect.Double.OpenGL
 import Data.Vect.Double.Util.Dim4
-import Floor
+import FRP.Elerea.Param
 import Graphics.Rendering.OpenGL  hiding(multMatrix)
+import Graphics.UI.GLFW as GLFW
+import Interactive.Floor
+import Interactive.ReadInput
+import Interactive.Utils
 import MathUtil
-import ReadInput
-import Utils
-import SimplicialComplex
+import Simplicial.SimplicialComplex
 import TupleTH
 
 

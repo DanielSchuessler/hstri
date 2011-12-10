@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, FlexibleContexts, CPP, RecordWildCards, NoMonomorphismRestriction, FlexibleInstances, StandaloneDeriving, GADTs, ViewPatterns, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 module ConcreteNormal(
-    module NormalCoordinates,
+    module StandardCoordinates,
     module SimplicialPartialQuotient,
     module PreRenderable,
     module Simplicial.SimplicialComplex,
@@ -17,7 +17,7 @@ import Control.Exception
 import Data.Set as Set
 import Data.Vect.Double(interpolate)
 import HomogenousTuples
-import NormalCoordinates
+import StandardCoordinates
 import PreRenderable
 import PrettyUtil
 import Simplicial.AnySimplex

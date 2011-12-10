@@ -181,11 +181,9 @@ instance (IsSubface a b) => IsSubface (I a) (I b) where
 
 
 
-#define F(T) instance IsSubface T TIndex where isSubface x i = getTIndex x == i 
-F(IVertex)
-F(IEdge)
-F(ITriangle)
-#undef F
+instance IsSubface IVertex TIndex where isSubface x i = getTIndex x == i 
+instance IsSubface IEdge TIndex where isSubface x i = getTIndex x == i 
+instance IsSubface ITriangle TIndex where isSubface x i = getTIndex x == i 
 
 -- $(concat `liftM` 
 --     mapM  (\t -> 
@@ -206,4 +204,5 @@ liftIsSubface x y = isSubface (viewI x) (viewI y)
 instance IsSubface IVertex IEdge where isSubface = liftIsSubface
 instance IsSubface IVertex ITriangle where isSubface = liftIsSubface
 instance IsSubface IEdge ITriangle where isSubface = liftIsSubface
+
 

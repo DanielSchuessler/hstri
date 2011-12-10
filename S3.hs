@@ -2,7 +2,6 @@
 {-# OPTIONS -Wall #-}
 module S3(module Group, S3(..),allS3,qc_S3) where
 
-import Collections
 import Data.Hashable
 import Data.Monoid
 import Data.Tagged
@@ -63,13 +62,93 @@ toFun g = case g of
 
 
 fromFun ::  (ABC -> ABC) -> S3
-fromFun f = s3the (\g ->  
-                          toFun g A == f A 
-                       && toFun g B == f B)
+fromFun f = case (f A, f B) of
+                 (A,B) -> S3abc
+                 (A,C) -> S3acb
+                 (B,A) -> S3bac
+                 (B,C) -> S3bca
+                 (C,A) -> S3cab
+                 (C,B) -> S3cba
+                 _ -> error "fromFun: not bijective"
+
+
+
+--s3mult :: S3 -> S3 -> S3
+-- s3mult g2 g1 = fromFun (toFun g1 . toFun g2)
+-- 
+
+
+-- s3mult S3abc g = g
+-- s3mult g S3abc = g
+-- s3mult S3bca S3bca = S3cab
+-- s3mult S3bca S3cab = S3abc
+-- s3mult S3bca S3acb = S3cba
+-- s3mult S3bca S3bac = S3acb
+-- s3mult S3bca S3cba = S3bac
+-- s3mult S3cab S3bca = S3abc
+-- s3mult S3cab S3cab = S3bca
+-- s3mult S3cab S3acb = S3bac
+-- s3mult S3cab S3bac = S3cba
+-- s3mult S3cab S3cba = S3acb
+-- s3mult S3acb S3bca = S3bac
+-- s3mult S3acb S3cab = S3cba
+-- s3mult S3acb S3acb = S3abc
+-- s3mult S3acb S3bac = S3bca
+-- s3mult S3acb S3cba = S3cab
+-- s3mult S3bac S3bca = S3cba
+-- s3mult S3bac S3cab = S3acb
+-- s3mult S3bac S3acb = S3cab
+-- s3mult S3bac S3bac = S3abc
+-- s3mult S3bac S3cba = S3bca
+-- s3mult S3cba S3bca = S3acb
+-- s3mult S3cba S3cab = S3bac
+-- s3mult S3cba S3acb = S3bca
+-- s3mult S3cba S3bac = S3cab
+-- s3mult S3cba S3cba = S3abc
+
+-- faster than s3mult (factor ~1.08)
+
+s3mult' :: S3 -> S3 -> S3
+s3mult' S3abc S3abc = S3abc
+s3mult' S3abc S3bca = S3bca
+s3mult' S3abc S3cab = S3cab
+s3mult' S3abc S3acb = S3acb
+s3mult' S3abc S3bac = S3bac
+s3mult' S3abc S3cba = S3cba
+s3mult' S3bca S3abc = S3bca
+s3mult' S3bca S3bca = S3cab
+s3mult' S3bca S3cab = S3abc
+s3mult' S3bca S3acb = S3cba
+s3mult' S3bca S3bac = S3acb
+s3mult' S3bca S3cba = S3bac
+s3mult' S3cab S3abc = S3cab
+s3mult' S3cab S3bca = S3abc
+s3mult' S3cab S3cab = S3bca
+s3mult' S3cab S3acb = S3bac
+s3mult' S3cab S3bac = S3cba
+s3mult' S3cab S3cba = S3acb
+s3mult' S3acb S3abc = S3acb
+s3mult' S3acb S3bca = S3bac
+s3mult' S3acb S3cab = S3cba
+s3mult' S3acb S3acb = S3abc
+s3mult' S3acb S3bac = S3bca
+s3mult' S3acb S3cba = S3cab
+s3mult' S3bac S3abc = S3bac
+s3mult' S3bac S3bca = S3cba
+s3mult' S3bac S3cab = S3acb
+s3mult' S3bac S3acb = S3cab
+s3mult' S3bac S3bac = S3abc
+s3mult' S3bac S3cba = S3bca
+s3mult' S3cba S3abc = S3cba
+s3mult' S3cba S3bca = S3acb
+s3mult' S3cba S3cab = S3bac
+s3mult' S3cba S3acb = S3bca
+s3mult' S3cba S3bac = S3cab
+s3mult' S3cba S3cba = S3abc
 
 
 instance Monoid S3 where
-    mappend g2 g1 = fromFun (toFun g1 . toFun g2)
+    mappend = s3mult'
     mempty = S3abc
 
 prop_idl :: S3 -> Bool
@@ -114,7 +193,6 @@ prop_permute_mult = polyprop_act_mult
 qc_S3 ::  IO Bool
 qc_S3 = $(quickCheckAll)
 
-deriveCollectionKeyClass ''S3
 
 instance Hashable S3 where hash = fromEnum
 instance Finite S3

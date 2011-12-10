@@ -326,11 +326,11 @@ instance NormalArcs (T INormalTri) (Triple TNormalArc) where
 instance NormalArcs (T INormalQuad) (Quadruple TNormalArc) where
     normalArcs (T t x) = map4 (pMap t) (normalArcs x) 
 
-eitherTNormalDisc :: (T INormalTri -> c) -> (T INormalQuad -> c) -> T INormalDisc -> c
-eitherTNormalDisc kt kq (T t x) = eitherINormalDisc (kt . T t) (kq . T t) x
+eitherTND :: (T INormalTri -> c) -> (T INormalQuad -> c) -> T INormalDisc -> c
+eitherTND kt kq (T t x) = eitherIND (kt . T t) (kq . T t) x
 
 instance NormalArcs (T INormalDisc) [TNormalArc] where
-    normalArcs = eitherTNormalDisc normalArcList normalArcList
+    normalArcs = eitherTND normalArcList normalArcList
 
 instance NormalArcs TTriangle (Triple TNormalArc) where
     normalArcs (T t x) = map3 (T t) (normalArcs x)
