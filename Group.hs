@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, NoMonomorphismRestriction, ScopedTypeVariables #-}
 module Group where
 import Data.Monoid
-import Data.Tagged
+import Data.Proxy
 import qualified Data.Vect.Double as V
 
 (.*.) ::  Monoid a => a -> a -> a
@@ -33,13 +33,27 @@ class LeftAction g x where
 
 infixr 7 .*
 
+class RightAction g x where
+    (*.) ::   x -> g -> x
+
+infixl 7 *.
+
 -- We need a type-level tag here because the monoid isn't inferrable from the acted-upon type
-polyprop_act_id :: forall a x. (Monoid a, LeftAction a x, Eq x) => Tagged a (x -> Bool)
-polyprop_act_id = Tagged (\x -> (mempty :: a) .* x == x)
+polyprop_lact_id :: forall a x. (Monoid a, LeftAction a x, Eq x) => Proxy a -> x -> Bool
+polyprop_lact_id p x = (mempty `asProxyTypeOf` p) .* x == x
 
 
-polyprop_act_mult :: (LeftAction g x, Monoid g, Eq x) => g -> g -> x -> Bool
-polyprop_act_mult g2 g1 x = (g2 .*. g1) .* x == g2 .* g1 .* x
+polyprop_lact_mult :: (LeftAction g x, Monoid g, Eq x) => g -> g -> x -> Bool
+polyprop_lact_mult g2 g1 x = (g2 .*. g1) .* x == g2 .* g1 .* x
+
+-- We need a type-level tag here because the monoid isn't inferrable from the acted-upon type
+polyprop_ract_id :: forall a x. (Monoid a, RightAction a x, Eq x) => Proxy a -> x -> Bool
+polyprop_ract_id p x = x *. (mempty `asProxyTypeOf` p) == x
+
+
+polyprop_ract_mult :: (RightAction g x, Monoid g, Eq x) => g -> g -> x -> Bool
+polyprop_ract_mult g1 g2 x = x *. (g1 .*. g2) == x *. g1 *. g2
+
 
 -- | Matrix multiplication
 instance Monoid V.Mat3 where 

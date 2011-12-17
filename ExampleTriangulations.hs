@@ -5,10 +5,11 @@ import TriangulationCxtObject
 import EdgeCentered
 import Blenderable
 import Data.Vect.Double
+import Control.Arrow
 
 tr_aroundEdge :: Word -> Triangulation
 tr_aroundEdge n =
- fromRight $ mkTriangulation [0..tindex (n-1)]
+ fromRight $ mkTriangulation n
     [ (tindex i ./ tABD,
        tindex (mod (i+1) n) ./ oABC) 
         
@@ -43,7 +44,16 @@ octahedronCam1 =
         defaultFOV
 
 tr_oneTet :: Triangulation
-tr_oneTet = fromRight $ mkTriangulation [0] []
+tr_oneTet = fromRight $ mkTriangulation 1 []
 
 spqwc_oneTet :: SPQWithCoords Vertex
 spqwc_oneTet = geometrifySingleTetTriang tr_oneTet
+
+tr_l31 :: Triangulation
+tr_l31 = fromRight $ mkTriangulation 2 
+    ((0./tABC,1./oBCA) 
+     :
+     fmap ((0./) &&& ((1./) . toOrderedFace)) [tABD,tACD,tBCD])
+                        
+spqwc_l31 :: SPQWithCoords TVertex
+spqwc_l31 = geometrifyTwoTetTriang tr_l31 (0./tABC)

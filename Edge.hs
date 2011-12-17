@@ -8,6 +8,7 @@ module Edge (
     allEdges,allEdges',
     MakeEdge(..),
     oppositeEdge,
+    oppositeIEdge,
     edgeToBitSet,
     bitSetToEdge,
     isVertexOfEdge,
@@ -54,6 +55,8 @@ import Util
 import Vertex
 import Language.Haskell.TH.Syntax
 import Data.Function
+import ShortShow
+import Data.Proxy
 
 -- | Edge of an abstract tetrahedron (unoriented)
 newtype Edge = Edge (BitSet Vertex) 
@@ -132,6 +135,8 @@ instance Pretty Edge where pretty = edgePrettyColor . text . show
 oppositeEdge ::  Edge -> Edge
 oppositeEdge (Edge e) = Edge (BitSet.complement e)
 
+oppositeIEdge :: IEdge -> IEdge
+oppositeIEdge = mapI oppositeEdge
 
 prop_OppositeEdge_Order2 ::  Edge -> Property
 prop_OppositeEdge_Order2 e = let e' = oppositeEdge e in (e' /= e) .&. (oppositeEdge e' == e)
@@ -164,6 +169,7 @@ instance HasTIndex IEdge Edge where
 instance Show IEdge where show = show . viewI
 instance Quote IEdge where quotePrec prec = quotePrec prec . viewI
 instance Pretty IEdge where pretty = pretty . viewI
+instance ShortShow IEdge where shortShow = shortShow . viewI
                             
                             
 -- | Oriented edge of an abstract tetrahedron
@@ -171,8 +177,8 @@ newtype OEdge = OEdge Word8 {- The lower nibble encodes the first vertex, the up
     deriving(Eq,Ord)
 
 instance Enum OEdge where 
-    fromEnum (unpackOrderedFace -> (g,e)) = fromEnum (EnumPair g e)
-    toEnum n = packOrderedFace g (e::Edge) where EnumPair g e = toEnum n
+    fromEnum (unpackOrderedFace -> (e,g)) = fromEnum (EnumPair e g)
+    toEnum n = packOrderedFace e g where EnumPair e g = toEnum n
 
 
 prop_EnumOEdge :: Property
@@ -198,10 +204,13 @@ instance MakeOEdge (Pair Vertex) where
 instance (OrderableFace IEdge OIEdge) where
     type VertexSymGroup IEdge = S2
     type VertexTuple IEdge = Pair IVertex
-    unpackOrderedFace (viewI -> I i (unpackOrderedFace -> (g,e))) = (g, (./) i e)
-    packOrderedFace g = mapI (packOrderedFace g)
+    unpackOrderedFace = defaultUnpackOrderedFaceI
+    packOrderedFace = defaultPackOrderedFaceI
 
-instance LeftAction S2 OIEdge where (.*) = defaultLeftActionForOrderedFace
+prop_OrderableFace_IEdge :: Property
+prop_OrderableFace_IEdge = polyprop_OrderableFace (undefined :: Proxy IEdge)
+
+instance RightAction S2 OIEdge where (*.) = defaultRightActionForOrderedFace
 
 -- | Vertices contained in a given edge
 instance Vertices Edge (Pair Vertex) where
@@ -217,14 +226,17 @@ instance OrderableFace Edge OEdge where
         e = edge (v0,v1)
       in
         case compare v0 v1 of
-             LT -> (NoFlip, e)
-             GT -> (Flip  , e)
+             LT -> (e,NoFlip)
+             GT -> (e,Flip)
              EQ -> error ("Invalid OEdge with vertices "++show (v0,v1))
 
-    packOrderedFace g e = verticesToOEdge (g .* vertices e) 
+    packOrderedFace e g = verticesToOEdge (vertices e *. g) 
 
-instance LeftAction S2 OEdge where
-    (.*) = defaultLeftActionForOrderedFace
+prop_OrderableFace_Edge :: Property
+prop_OrderableFace_Edge = polyprop_OrderableFace (undefined :: Proxy Edge)
+
+instance RightAction S2 OEdge where
+    (*.) = defaultRightActionForOrderedFace
 
 instance Show OEdge where
     show (vertices -> (v0,v1)) = show v0 ++ show v1
@@ -243,28 +255,30 @@ instance Finite OEdge
 
 instance Vertices IEdge (Pair IVertex) where 
     {-# INLINABLE vertices #-}
-    vertices z = map2 ((./) (getTIndex z)) (vertices (forgetTIndex z)) 
+    vertices = traverseI map2 vertices
 
 instance Vertices OIEdge (Pair IVertex) where 
-    vertices z = map2 ((./) (getTIndex z)) (vertices (forgetTIndex z)) 
+    vertices = traverseI map2 vertices
 
 
 -- | Edges containing a given vertex
-instance Edges Vertex (Triple Edge) where
-    edges !v = fromList3 (filter6 (isVertexOfEdge v) allEdges')
+instance Star Vertex (OneSkeleton AbsTet) (Triple Edge) where
+    star v _ = fromList3 (filter6 (isVertexOfEdge v) allEdges')
 
 
 trivialHasTIndexInstance [t|OEdge|]
 
-instance Edges IVertex (Triple IEdge) where
-    edges (viewI -> I i v) = map3 (i ./) (edges v) 
+-- | Edges containing a given vertex
+instance Star IVertex (OneSkeleton AbsTet) (Triple IEdge) where
+    star v p = traverseI map3 (flip star p) v
 
 instance Arbitrary IEdge where
     arbitrary = (./) <$> arbitrary <*> arbitrary
 
 
 allOIEdges :: TIndex -> (Dodecatuple OIEdge)
-allOIEdges ti = $(catTuples 6 6) (map6 (packOrderedFace NoFlip) es) (map6 (packOrderedFace Flip) es)
+allOIEdges ti = $(catTuples 6 6) (map6 (flip packOrderedFace NoFlip) es) 
+                                 (map6 (flip packOrderedFace Flip) es)
     where
         es = edges ti
 
@@ -303,3 +317,7 @@ instance Edges TIndex (Sextuple IEdge) where
 
 instance Lift Edge where
     lift (Edge e) = [| Edge e |]
+
+instance ShortShow Edge where shortShow = show
+instance ShortShow OEdge where shortShow = show
+

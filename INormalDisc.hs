@@ -89,6 +89,10 @@ instance NormalDiscs TIndex [INormalDisc] where
 instance NormalTris IEdge (Pair INormalTri) where
     normalTris = map2 iNormalTri . vertices 
 
+-- | Normal triangles meeting a given edge
+instance NormalTris OIEdge (Pair INormalTri) where
+    normalTris = map2 iNormalTri . vertices 
+
 instance NormalArcs INormalDisc [INormalArc] where
     normalArcs (viewI -> I ti d) = fmap (ti ./) (normalArcs d) 
 
@@ -106,6 +110,9 @@ iNormalQuadByDisjointEdge :: IEdge -> INormalQuad
 iNormalQuadByDisjointEdge = mapI normalQuadByDisjointEdge 
 
 instance MakeINormalCorner IEdge where
+    iNormalCorner = mapI normalCorner
+
+instance MakeINormalCorner OIEdge where
     iNormalCorner = mapI normalCorner
 
 iNormalArcGetVertex :: INormalArc -> IVertex
@@ -141,3 +148,7 @@ iNormalCornerGetContainingEdge = mapI normalCornerGetContainingEdge
 instance IsSubface INormalArc ITriangle where isSubface = liftIsSubface
 instance IsSubface INormalCorner ITriangle where isSubface = liftIsSubface
 instance IsSubface INormalCorner IEdge where isSubface = liftIsSubface
+
+instance MakeINormalDisc INormalDisc where
+    iNormalDisc = id
+

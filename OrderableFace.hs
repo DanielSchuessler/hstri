@@ -1,19 +1,28 @@
-{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
 {-# OPTIONS -Wall #-}
 module OrderableFace(
     module Group,
     module FaceClasses,    
     OrderableFace(..),
-    defaultLeftActionForOrderedFace,
+    defaultRightActionForOrderedFace,
     defaultVerticesForOrderedFace,
     forgetVertexOrder,
-    toOrderedFace
+    toOrderedFace,
+    defaultPackOrderedFaceI,
+    defaultUnpackOrderedFaceI,
+
+    polyprop_OrderableFace
     
     ) where
 
 import Group
 import FaceClasses
 import Data.Monoid
+import QuickCheckUtil
+import Test.QuickCheck
+import Data.Proxy
+import TIndex
+import Control.Arrow
 
 
 -- | Parameters: 
@@ -24,14 +33,16 @@ import Data.Monoid
 --
 -- CONTRACT:
 --
--- * for all @x :: ot@, @g .* vertices x == vertices (g .* x)@
+-- * @vertices (packOrderedFace x g) == vertices x *. g@
 --
--- * for all @x :: t@, @vertices x == vertices (packOrderedFace 'mempty' x)@
+-- * @packOrderedFace x (g1 .*. g2) == (packOrderedFace x g1) *. g2@
+--
+-- * @id == uncurry packOrderedFace . unpackOrderedFace@
 --
 -- * 'packOrderedFace' and 'unpackOrderedFace' must be inverses of each other (in other words, @ot@ is isomorphic to @(VertexSymGroup t, t)@, but I leave open the possibility to use a more efficient representation in the future)
 class ( Group (VertexSymGroup t)
-      , LeftAction (VertexSymGroup t) (VertexTuple t)
-      , LeftAction (VertexSymGroup t) ot
+      , RightAction (VertexSymGroup t) (VertexTuple t)
+      , RightAction (VertexSymGroup t) ot
       , Vertices t  (VertexTuple t)
       , Vertices ot (VertexTuple t) 
       )
@@ -44,19 +55,48 @@ class ( Group (VertexSymGroup t)
 
     type VertexSymGroup t
     type VertexTuple t
-    unpackOrderedFace :: ot -> (VertexSymGroup t, t)
-    packOrderedFace :: (VertexSymGroup t) -> t -> ot
+    unpackOrderedFace :: ot -> (t,VertexSymGroup t)
+    packOrderedFace ::  t -> (VertexSymGroup t) -> ot
 
 
 defaultVerticesForOrderedFace :: OrderableFace t ot => ot -> VertexTuple t
-defaultVerticesForOrderedFace (unpackOrderedFace -> (g,x)) = g .* vertices x
+defaultVerticesForOrderedFace (unpackOrderedFace -> (x,g)) = vertices x *. g
 
-defaultLeftActionForOrderedFace :: OrderableFace t ot => VertexSymGroup t -> ot -> ot
-defaultLeftActionForOrderedFace g2 (unpackOrderedFace -> (g1,x)) = packOrderedFace (g2 .*. g1) x
+defaultRightActionForOrderedFace :: OrderableFace t ot => ot -> VertexSymGroup t -> ot
+defaultRightActionForOrderedFace (unpackOrderedFace -> (x,g1)) g2 = packOrderedFace x (g1 .*. g2)
+
+polyprop_OrderableFace :: forall t ot. 
+    (Show t, Show ot, Show (VertexSymGroup t), Show (VertexTuple t),
+     OrderableFace t ot,
+     Arbitrary t, Arbitrary ot, Arbitrary (VertexSymGroup t),
+     Eq (VertexTuple t), Eq ot) =>
+    Proxy t -> Property
+polyprop_OrderableFace _ =
+    p1 .&. p2 .&. p3
+ where
+    p1 (x :: t) g =
+        vertices (packOrderedFace x g) .=. vertices x *. g
+
+    p2 (x :: t) g1 g2 =
+        packOrderedFace x (g1 .*. g2) .=. packOrderedFace x g1 *. g2
+            
+    p3 (ox :: ot) =
+        ox .=. uncurry packOrderedFace (unpackOrderedFace ox)
 
 forgetVertexOrder ::  OrderableFace t ot => ot -> t
-forgetVertexOrder = snd . unpackOrderedFace
+forgetVertexOrder = fst . unpackOrderedFace
 
 -- | Equivalent to 'packOrderedFace mempty'
 toOrderedFace :: OrderableFace t ot => t -> ot
-toOrderedFace = packOrderedFace mempty
+toOrderedFace = flip packOrderedFace mempty
+
+defaultUnpackOrderedFaceI
+  :: (HasTIndex ia a, HasTIndex ib b, OrderableFace b a) =>
+     ia -> (ib, VertexSymGroup b)
+defaultUnpackOrderedFaceI = traverseI first unpackOrderedFace
+
+defaultPackOrderedFaceI
+  :: (HasTIndex ia a, HasTIndex ib b, OrderableFace a b) =>
+     ia -> VertexSymGroup a -> ib
+defaultPackOrderedFaceI = traverseI fmap packOrderedFace
+

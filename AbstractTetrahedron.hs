@@ -80,10 +80,10 @@ prop_edgeByOppositeVertexAndTriangle v t | isSubface v t = (isSubface e t .&. no
 
 
 prop_edgesContainingVertex :: Vertex -> Bool
-prop_edgesContainingVertex v = all3 (isSubface v) (edges v)
+prop_edgesContainingVertex v = all3 (isSubface v) (star v (OneSkeleton AbsTet))
 
 prop_trianglesContainingVertex :: Vertex -> Bool
-prop_trianglesContainingVertex v = all3 (isSubface v) (triangles v)
+prop_trianglesContainingVertex v = all3 (isSubface v) (star v (TwoSkeleton AbsTet))
 
 qc_AbstractTetrahedron ::  IO Bool
 qc_AbstractTetrahedron = $(quickCheckAll)

@@ -1,10 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable, NoMonomorphismRestriction, ViewPatterns, TemplateHaskell, Arrows #-}    
-module ParseRga where
+{-# OPTIONS -Wall #-}
+module ParseRga(readRgaFile,test,RequiredAttributeNotPresentException(..)) where
 
 import Control.Monad
-import Data.Functor
-import Data.List(sort)
-import Data.Map as Map hiding(mapMaybe)
 import Data.Maybe
 import HomogenousTuples
 --import Text.XML.Light hiding(parseXMLDoc,strContent)
@@ -14,14 +12,17 @@ import Text.XML.HXT.Core
 import Control.Exception
 import Data.Typeable
 import Data.List.Split
-import qualified Debug.Trace(trace)
 
+readRgaFile :: String -> IO [Triangulation]
 readRgaFile fn =
     runX (readDocument opts fn >>> parseRga)
   where
     opts = [ withTrace 0 ]
 
 
+parseRga
+  :: ArrowXml cat =>
+     cat XmlTree Triangulation
 parseRga =      getChildren 
             >>> getChildren
             >>> hasName "packet" 
@@ -34,27 +35,30 @@ parseRga =      getChildren
                                     <<< isElem <<< getChildren) -< x
                     returnA -< translateGluings (read n) tets
 
+getRequiredAttrValue :: ArrowXml a => String -> a XmlTree String
 getRequiredAttrValue a =
     getAttrValue0 a 
     `orElse`
     constA (throw (RequiredAttributeNotPresentException a))
 
-translateGluings :: Int -> [[Int]] -> Triangulation
+translateGluings :: Word -> [[Int]] -> Triangulation
 translateGluings ntet gluingRows = 
-    assert (ntet == length gluingRows) $
+    assert (ntet == fi (length gluingRows)) $
         either error id res
     where
         res =
                 mkTriangulation 
-                    (fromIntegral <$> tindices)
+                    ntet
                     (concatMap translateGluingForTet (zip tindices gluingRows))
 
 
-        tetIxInBounds tet = tet >= 0 && tet < ntet
+        tetIxInBounds tet = tet >= 0 && tet < tindex ntet
 
-        tindices = [0..ntet-1]
+        tindices | ntet==0 = []
+                 | otherwise = [0..tindex (ntet-1)]
 
 
+        translateGluingForTet :: (TIndex, [Int]) -> [Gluing] 
         translateGluingForTet (tet, gluingRow) =
             assert (length (gluingRow) == 8) $
             assert (tetIxInBounds tet) $
@@ -62,8 +66,9 @@ translateGluings ntet gluingRows =
 
             where
 
+                translateGluing :: (Int,[Int]) -> Maybe Gluing
                 translateGluing (_, [-1,-1]) = Nothing
-                translateGluing (faceIx, [tet',dcba]) = 
+                translateGluing (faceIx, [fromIntegral -> tet',dcba]) = 
                     assert (faceIx >= 0 && faceIx < 4) $
                     assert (tetIxInBounds tet') $
                     let
@@ -80,14 +85,16 @@ translateGluings ntet gluingRows =
 
                         us = map3 (toEnum . ([a,b,c,d] !!)) vis
 
-                        res :: Gluing
-                        res =
-                                (fromIntegral tet ./ triangle vs, 
-                                 fromIntegral tet' ./ otriangle us)
+                        res_ :: Gluing
+                        res_ =
+                                (tet ./ triangle vs, 
+                                 tet' ./ otriangle us)
 
                     in
                        -- Debug.Trace.trace (show res) 
-                        (Just res)
+                        (Just res_)
+
+                translateGluing _ = assert False undefined
             
 
 data RequiredAttributeNotPresentException = RequiredAttributeNotPresentException String
@@ -103,5 +110,6 @@ instance Exception RequiredAttributeNotPresentException
 
     
 
+test :: IO [Triangulation]
 test = readRgaFile "/h/dev/regina-things/sfsHakenExample2Triang.rga"
 

@@ -12,7 +12,6 @@ module ConcreteNormal(
     )
     where
 
-import AbstractTetrahedron
 import Control.Exception
 import Data.Set as Set
 import Data.Vect.Double(interpolate)
@@ -23,7 +22,8 @@ import PrettyUtil
 import Simplicial.AnySimplex
 import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
-import TriangulationCxtObject
+import TriangulationCxtObject hiding(VertexView(..))
+import ShortShow
 
 -- | Quads are numbered away from their 'firstDisjointEdge'
 firstDisjointEdge :: NormalQuad -> Edge
@@ -173,7 +173,7 @@ concreteTris
      Triangulation -> StandardCoordinates i -> [Concrete INormalTri]
 concreteTris tr nc = do
             tri <- tINormalTris tr
-            u <- [ 0 .. fi (ncCoefficient nc (iNormalDisc tri)-1) ]
+            u <- [ 0 .. fi (stc_coefficient nc (iNormalDisc tri)-1) ]
 
             return (C u tri)
 
@@ -182,7 +182,7 @@ concreteQuads
      Triangulation -> StandardCoordinates i -> [Concrete INormalQuad]
 concreteQuads tr nc = do
             quad <- tINormalQuads tr
-            u <- [0 .. fi (ncCoefficient nc (iNormalDisc quad)-1) ]
+            u <- [0 .. fi (stc_coefficient nc (iNormalDisc quad)-1) ]
 
             return (C u quad) 
                     
@@ -237,13 +237,17 @@ getArcNumberingVsCornerNumberingSense narc ncorner =
 data Corn v = Corn CornerPosition Int v v
     deriving(Eq,Ord,Show)
 
+instance ShortShow v => ShortShow (Corn v) where
+    shortShow (Corn _ _ v0 v1) = shortShow (v0,v1)
+
+
 instance Pretty v => Pretty (Corn v) where
     prettyPrec prec (Corn u n v0 v1) = 
         prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty v0,anyPretty v1] 
 
 
 standardCoordinatesToPreRenderable
-  :: forall v i. (Integral i, Ord v, Pretty i, Show v) =>
+  :: forall v i. (Integral i, Ord v, Pretty i, ShortShow v) =>
      SPQWithCoords v
      -> StandardCoordinates i
      -> PreRenderable (OTuple (Corn v))

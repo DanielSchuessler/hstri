@@ -8,7 +8,7 @@ module Triangulation(
     Triangulation,
     
     -- * Properties 
-    tTetrahedra_,tOriginalGluings, tGlueMap_, edgeEqv,oEdgeEqv,vertexEqv,triangTetCount,
+    tNumberOfTetrahedra,tTetrahedra_,tOriginalGluings, tGlueMap_, edgeEqv,oEdgeEqv,vertexEqv,triangTetCount,
     embedsEdges,
     lookupGluingOfITriangle,
     lookupGluingOfOITriangle,
@@ -26,6 +26,7 @@ module Triangulation(
     tINormalDiscs,
     tOIEdges,
     getOIEdgeGluingSense,
+    gluedNormalArc,
     -- * Construction 
     mkTriangulation,mkTriangulationG,triang,randomTriangulation,randT,
     -- * Transformation
@@ -57,7 +58,6 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Test.QuickCheck.Gen
 import PrettyUtil
-import TupleTH
 import FacetGluing
 import INormalDisc
 import NormalDisc
@@ -88,13 +88,20 @@ tGluingsIrredundant tr =
 
 prop_tGluingsIrredundant :: Triangulation -> Bool
 prop_tGluingsIrredundant tr = 
-    tGlueMap_ tr == tGlueMap_ (fromRight $ mkTriangulation (tTetrahedra_ tr) (tGluingsIrredundant tr)) 
+    tGlueMap_ tr == tGlueMap_ (fromRight $ mkTriangulation 
+                        (tNumberOfTetrahedra tr) 
+                        (tGluingsIrredundant tr)) 
 
+tTetrahedra_ :: Triangulation -> [TIndex]
+tTetrahedra_ tr = if n==0 then [] else [0..tindex (n - 1)]
+    where
+        n = tNumberOfTetrahedra tr
 
 -- Note: All fields except the first two ('triangTets_', 'triangGluings_') are semantically redundant, 
 -- but kept in this data structure for memoization purposes
 data Triangulation = Triangulation { 
-    tTetrahedra_ :: [TIndex], 
+    tNumberOfTetrahedra :: Word,
+
     -- | The original gluings as passed to 'mkTriangulation'
     tOriginalGluings :: [Gluing],
 
@@ -120,11 +127,12 @@ data Triangulation = Triangulation {
 
 
 instance Pretty Triangulation where
-    pretty Triangulation{..} =
+    pretty tr@Triangulation{..} =
         prettyRecord "Triangulation" fields
 
           where
-            fields = [ ("Tetrahedron indices", pretty (fmap (dullcyan . pretty) tTetrahedra_)) 
+            fields = [ ("Quote", text (quote tr))
+                     , ("Number of tetrahedra", pretty tNumberOfTetrahedra)
                      , ("Triangle gluings", pretty tOriginalGluings)
 --                     , ("Edges", pretty edgeEqv)
                      , ("Ordered edges", pretty oEdgeEqv)
@@ -151,19 +159,18 @@ newtype TriangulationBuilder a = TriangulationBuilder (Writer [(ITriangle,OITria
 
 
 
-runTriangulationBuilder :: [TIndex] -> TriangulationBuilder a -> Triangulation
-runTriangulationBuilder tTetrahedra_ (TriangulationBuilder x) 
-    = either error id (mkTriangulation tTetrahedra_ (execWriter x)) 
 
 
-mkTriangulation :: [TIndex] -> [Gluing] -> Either String Triangulation
-mkTriangulation tTetrahedra_ tOriginalGluings
-        =   
-            assert (not . hasDuplicates $ tTetrahedra_) (do
+mkTriangulation :: Word -> [Gluing] -> Either String Triangulation
+mkTriangulation tNumberOfTetrahedra tOriginalGluings
+        =
+            (do
 
-    let allIEdges :: [IEdge]
-        allIEdges = concatMap edgeList tTetrahedra_
-        _allOIEdges = concatMap (asList . allOIEdges) tTetrahedra_
+    let tets = [0..tindex (tNumberOfTetrahedra-1)] 
+    
+        allIEdges :: [IEdge]
+        allIEdges = concatMap edgeList tets
+        _allOIEdges = concatMap (asList . allOIEdges) tets
 
         allIVertices :: [IVertex]
         allIVertices = concatMap vertexList allIEdges
@@ -182,7 +189,8 @@ mkTriangulation tTetrahedra_ tOriginalGluings
                             then 
                                 ("Triangle "++show t++" is glued to itself (in order "++show f1++")")
                             else    
-                                ("Triangle "++show t++" is glued to both triangle "++show f1++" and "++show f2))
+                                ("Triangle "++show t++" is glued to both triangle "
+                                    ++show f1++" and "++show f2))
         
     tGlueMap_ <- List.foldl' addGluing (return mempty) 
                         (tOriginalGluings ++ fmap flipGluing tOriginalGluings)
@@ -223,14 +231,21 @@ mkTriangulation tTetrahedra_ tOriginalGluings
                         , pair <- [ pair0,  map2 (Flip .*) pair0 ]
                     ]
 
---         normalArcEqv = mkEquivalence
---             
---             allINormalArcs
 
 
-
+    checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv
                             
-    return Triangulation{ tTetrahedra_, tGlueMap_, edgeEqv, oEdgeEqv, vertexEqv, tOriginalGluings })
+    return Triangulation{ tNumberOfTetrahedra, tGlueMap_, edgeEqv, oEdgeEqv, vertexEqv, tOriginalGluings })
+
+
+checkForEdgeGluedToSelfInReverse :: [IEdge] -> Equivalence OIEdge -> Either String ()
+checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv = mapM_ go allIEdges
+    where
+        go e = 
+            if eqv_classOf oEdgeEqv (toOrderedFace e) == eqv_classOf oEdgeEqv (packOrderedFace Flip e)
+               then Left ("Edge "++show e++" is glued to itself in reverse")
+               else Right ()
+    
 
 glue :: TIndex -> Triangle -> TIndex -> (S3, Triangle) -> TriangulationBuilder ()
 glue i0 f0 i1 (g,f1) = TriangulationBuilder (tell [(i0 ./ f0, i1 ./ (packOrderedFace g f1))])
@@ -240,9 +255,11 @@ glue i0 f0 i1 (g,f1) = TriangulationBuilder (tell [(i0 ./ f0, i1 ./ (packOrdered
 
 -- | Convenience function for the special case that there are no isolated tetrahedra
 triang ::  [Gluing] -> Triangulation
-triang gluings = fromRight $ mkTriangulation (nub' $ tets) gluings
+triang gluings = fromRight $ mkTriangulation n gluings
     where
-        tets = concatMap (\(t,o) -> [ getTIndex t, getTIndex o ]) gluings
+        n | null gluings = 0
+          | otherwise = maximum (concatMap (\(t,o) -> 
+                                    [ fi $ getTIndex t, fi $ getTIndex o ]) gluings) + 1
 
 -- tt3a = ti tt3 1 A
 -- tt3d = ti tt3 1 D
@@ -270,15 +287,17 @@ instance Arbitrary Triangulation where
 
 
 
-    shrink t = concatMap removeTet (tTetrahedra_ t) ++ fmap removeGluing (tOriginalGluings t)
+    shrink t = 
+--            concatMap removeTet (tTetrahedra_ t) ++ 
+            fmap removeGluing (tOriginalGluings t)
         where
-            -- we can remove a tetrahedron iff it is isolated
-            removeTet tet =
-                if $(allTuple 4) (isBoundaryITriangle t) (triangles tet)
-                then [ fromRight $ mkTriangulation (List.delete tet (tTetrahedra_ t)) (tOriginalGluings t) ]
-                else []
-
-            removeGluing g = fromRight $ mkTriangulation (tTetrahedra_ t) (List.delete g (tOriginalGluings t))
+--             -- we can remove a tetrahedron iff it is isolated
+--             removeTet tet =
+--                 if $(allTuple 4) (isBoundaryITriangle t) (triangles tet)
+--                 then [ fromRight $ mkTriangulation (List.delete tet (tTetrahedra_ t)) (tOriginalGluings t) ]
+--                 else []
+-- 
+            removeGluing g = fromRight $ mkTriangulation (tNumberOfTetrahedra t) (List.delete g (tOriginalGluings t))
 
 generateUntilRight :: Show a => Gen (Either a b) -> Gen b
 generateUntilRight g = fromRight <$> (g `suchThat` isRight)
@@ -287,10 +306,10 @@ randT :: Int -> Int -> Gen Triangulation
 randT nTets nGluings = assert (nGluings <= 2*nTets) generateUntilRight go
     where
         go = do
-            let tets = (tindex . fromIntegral) <$> [1..nTets]
+            let 
+                tets = (tindex . fromIntegral) <$> [0..nTets-1]
 
-
-            let loop :: [Gluing] -> Int -> StateT (Set ITriangle) Gen [Gluing] 
+                loop :: [Gluing] -> Int -> StateT (Set ITriangle) Gen [Gluing] 
                 loop acc 0 = return acc
                 loop acc j = do
                     t1 <- takeTriangle
@@ -305,11 +324,10 @@ randT nTets nGluings = assert (nGluings <= 2*nTets) generateUntilRight go
                     put (deleteAt ix trianglesLeft)
                     return res
 
---            ngluings <- choose (0,2*nTets)
 
             pairs <- evalStateT (loop [] nGluings) (setFromList ((./) <$> tets <*> allTriangles))
             
-            return $ mkTriangulation tets pairs
+            return $ mkTriangulation (fi nTets) pairs
 
         
         
@@ -347,9 +365,11 @@ mkTriangulationG ::
 mkTriangulationG tets gluings =
     let
         tetIxs = [tindex 0..]
-        tetIxMap = fromListWithKey (\k _ _ -> error ("Duplicate tetrahedron: "++show k)) (zip tets tetIxs)
+        tetIxMap = fromListWithKey 
+                    (\k _ _ -> error ("Duplicate tetrahedron: "++show k)) 
+                    (zip tets tetIxs)
     in
-        mkTriangulation (elems tetIxMap) (toGluing (tetIxMap!) <$> gluings) 
+        mkTriangulation (fi $ length tets) (toGluing (tetIxMap!) <$> gluings) 
 
 
 
@@ -365,7 +385,7 @@ embedsEdges = mapM_ checkClass . eqvClasses . oEdgeEqv
 
 instance Quote Triangulation where
     quotePrec prec t = quoteParen (prec >= 11) ("mkTriangulation "
-                                                    ++ quotePrec 11 (tTetrahedra_ t)
+                                                    ++ quotePrec 11 (tNumberOfTetrahedra t)
                                                     ++ " "
                                                     ++ quotePrec 11 (tOriginalGluings t))
 
@@ -461,24 +481,37 @@ instance TriangulationQuotientSpaceCanonicalizable ITriangle where
                                 Just (forgetVertexOrder -> rep') | rep' < rep -> rep'
                                 _ -> rep
 
-instance TriangulationQuotientSpaceCanonicalizable INormalArc where
-    canonicalize t ina =
+
+
+gluedNormalArc :: Triangulation -> INormalArc -> Maybe INormalArc
+gluedNormalArc tr ina = 
         let
             tri = iNormalArcGetTriangle ina
         in
-            case lookup tri (tGlueMap_ t) of
-                                Just otri | _tri' <- forgetVertexOrder otri, 
-                                            _tri' < tri -> 
-                                    
-                                        
-                                    (gluingMap (tri,otri) ina)
-                                        
+            case lookup tri (tGlueMap_ tr) of
+                                Just otri -> Just (gluingMap (tri,otri) ina)
+                                _ -> Nothing
 
-                                _ -> ina
+instance TriangulationQuotientSpaceCanonicalizable INormalArc where
+    canonicalize t ina = case gluedNormalArc t ina of
+                              Nothing -> ina
+                              Just ina' -> min ina ina'
 
 instance TriangulationQuotientSpaceCanonicalizable INormalCorner where
     canonicalize t (viewI -> I i (edge -> e)) = 
         iNormalCorner $ canonicalize t (i ./ e)
+
+-- | Identity
+instance TriangulationQuotientSpaceCanonicalizable INormalTri where
+    canonicalize _ = id
+
+-- | Identity
+instance TriangulationQuotientSpaceCanonicalizable INormalQuad where
+    canonicalize _ = id
+
+-- | Identity
+instance TriangulationQuotientSpaceCanonicalizable INormalDisc where
+    canonicalize _ = id
 
 prop_forgetVertexOrder_natural_for_canonicalization :: Triangulation -> Property
 prop_forgetVertexOrder_natural_for_canonicalization t =
@@ -487,4 +520,9 @@ prop_forgetVertexOrder_natural_for_canonicalization t =
 
 
 addGluings :: Triangulation -> [Gluing] -> Either String Triangulation
-addGluings tr gluings = mkTriangulation (tTetrahedra_ tr) (tOriginalGluings tr ++ gluings)
+addGluings tr gluings = 
+    assert (all (\g -> getTIndex (fst g) < tindex n && getTIndex (snd g) < tindex n) gluings) $
+
+    mkTriangulation n (tOriginalGluings tr ++ gluings)
+  where
+    n = tNumberOfTetrahedra tr

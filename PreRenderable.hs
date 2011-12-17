@@ -10,13 +10,14 @@ module PreRenderable(
 
     ) where
 
-import Simplicial.DeltaSet
-import Data.Vect.Double.Base
-import S3
-import GHC.Generics
-import DisjointUnion
-import Simplicial.AnySimplex
 import Control.Exception
+import Data.Vect.Double.Base
+import DisjointUnion
+import GHC.Generics
+import S3
+import ShortShow
+import Simplicial.AnySimplex
+import Simplicial.DeltaSet
 import Simplicial.SimplicialComplex
 import Vertex
 
@@ -59,15 +60,15 @@ instance DisjointUnionable (PreRenderable a) (PreRenderable b) (PreRenderable (E
 
 
 mkPreRenderable
-  :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
+  :: (ShortShow (Vert a), ShortShow (Arc a), ShortShow (Tri a)) =>
      (Vert a -> Vec3) -> DeltaSet a -> PreRenderable a
 mkPreRenderable pr_coords pr_ds = 
     PreRenderable pr_ds pr_coords (const True) (const Nothing) 
         (\asi -> elimAnySimplexWithNat asi (\n -> 
             caseNat3 n
-                show
-                show
-                show
+                shortShow
+                shortShow
+                shortShow
                 (const (assert False undefined))))
 
 instance OrdN a => OneSkeletonable (PreRenderable a) where

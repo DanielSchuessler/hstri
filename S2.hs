@@ -24,14 +24,16 @@ instance Monoid S2 where
 instance Group S2 where
     inv _ = Flip
 
-instance LeftAction S2 (a,a) where
-    NoFlip .* (x,y) = (x,y)
-    Flip .* (x,y) = (y,x)
+instance RightAction S2 (a,a) where
+    (x,y) *. NoFlip = (x,y)
+    (x,y) *. Flip = (y,x)
 
 instance Pretty S2 where
     pretty = yellow . text . show
 
 instance Arbitrary S2 where arbitrary = elements [NoFlip,Flip]
+instance CoArbitrary S2 where coarbitrary = variant . fromEnum
+
 
 deriveCollectionKeyClass ''S2
 

@@ -24,7 +24,6 @@ import Data.Monoid
 import HomogenousTuples
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Text.Printf.TH
 import PrettyUtil
 import QuickCheckUtil
 import Element
@@ -199,8 +198,8 @@ mkProp p = forAll gen (\(pairs :: [(Int,Int)]) ->
         nclasses = length classes
 
     in
-        label ($(printf "%3d classes") (length classes)) $
-        label ($(printf "%2.1f elements/class") (fromIntegral n / fromIntegral nclasses)) $
+--         label ($(printf "%3d classes") (length classes)) $
+--         label ($(printf "%2.1f elements/class") (fromIntegral n / fromIntegral nclasses)) $
             (p allElems pairs e))
   where
     gen = sized (\n -> vectorOf (1+(n`div`5)) (resize (n `div` 4) arbitrary))

@@ -43,6 +43,8 @@ x .=. y =
     printTestCase (unlines ["Equality failed:","=== FIRST ELEMENT ===",show x,"=== SECOND ELEMENT ===",show y])
     (x==y)
 
+infix 4 .=.
+
 
 setEq :: (Show a, Ord a) => [a] -> [a] -> Property
 setEq x y = 

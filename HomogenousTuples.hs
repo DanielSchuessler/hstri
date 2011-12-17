@@ -88,10 +88,32 @@ fromList4 ::  [t2] -> (t2, t2, t2, t2)
 fromList4 = $(tupleFromList 4)
 
 sort2 :: Ord t1 => (t1, t1) -> (t1, t1)
-sort2 = $(tupleFromList 2) . sort . $(tupleToList 2)
+sort2 xs@(x0,x1) = if x0<=x1 then xs else (x1,x0)
 
 sort3 :: Ord t => (t, t, t) -> (t, t, t)
-sort3 = $(tupleFromList 3) . sort . $(tupleToList 3)
+sort3 xs@(x0,x1,x2) =
+    if x0<=x1
+       then 
+        if x1<=x2
+           then xs
+           else -- x2 < x1 
+            if x0<=x2
+               then (x0,x2,x1)
+               else -- x2 < x0 
+                (x2,x0,x1)
+       else -- x1 < x0
+        if x0<=x2
+           then (x1,x0,x2)
+           else -- x2 < x0
+            if x1<=x2
+               then (x1,x2,x0)
+               else -- x2 < x1
+                (x2,x1,x0)
+
+prop_sort3 :: (Int,Int,Int) -> Bool
+prop_sort3 is = sort3 is == sort3' is
+    where
+        sort3' = $(tupleFromList 3) . sort . $(tupleToList 3)
 
 sort4 :: Ord t => (t, t, t, t) -> (t, t, t, t)
 sort4 = $(tupleFromList 4) . sort . $(tupleToList 4)

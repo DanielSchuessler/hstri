@@ -8,6 +8,7 @@ import Test.QuickCheck
 import Control.Applicative
 import PrettyUtil -- Pretty Word orphan instance
 import Quote
+import ShortShow
 
 
 
@@ -15,18 +16,18 @@ import Quote
 
 -- | Tetrahedron index
 newtype TIndex = TIndex Word
-    deriving(Eq,Ord,Pretty,Enum)
+    deriving(Eq,Ord,Pretty,Enum,Num,Real,Integral)
 
 tindex ::  Word -> TIndex
 tindex = TIndex
 
--- | NOTE: Only fromInteger is supported (arithmetic doesn't make much sense on these)
-instance Num TIndex where
-    fromInteger = tindex . fromIntegral
-    (+) = error ("(+) not supported for TIndex")
-    (*) = error ("(+) not supported for TIndex")
-    abs = error ("abs not supported for TIndex")
-    signum = error ("signum not supported for TIndex")
+-- -- | NOTE: Only fromInteger is supported (arithmetic doesn't make much sense on these)
+-- instance Num TIndex where
+--     fromInteger = tindex . fromIntegral
+--     (+) = error ("(+) not supported for TIndex")
+--     (*) = error ("(+) not supported for TIndex")
+--     abs = error ("abs not supported for TIndex")
+--     signum = error ("signum not supported for TIndex")
 
 -- | Thing with a tetrahedron index attached to it
 data I a = I TIndex a 
@@ -63,6 +64,9 @@ forgetTIndex (viewI -> I _ a) = a
 instance Show TIndex where
     show (TIndex i) = show i
 
+instance ShortShow TIndex where
+    shortShow = show
+
 
 trivialHasTIndexInstance :: Q Type -> Q [Dec]
 trivialHasTIndexInstance = 
@@ -76,9 +80,17 @@ mapI
   :: (HasTIndex ia a, HasTIndex ib b) => (a -> b) -> ia -> ib
 mapI f (viewI -> I i x) = i ./ f x 
 
+traverseI
+  :: (HasTIndex ia a, HasTIndex ib b) =>
+     ((b -> ib) -> fa -> fib) -> (a -> fa) -> ia -> fib
+traverseI map_ f (viewI -> I i x) = map_ (i ./) (f x) 
+
 instance (Show a) => Show (I a) where 
 --    showsPrec prec (I i x) = showParen (prec >= 1) (showsPrec 10 i . showString " ./ " . showsPrec 10 x)
     showsPrec _ (I i x) = shows i . showChar '.' . shows x
+    
+instance (ShortShow a) => ShortShow (I a) where 
+    shortShowsPrec _ (I i x) = shortShows i . showChar '.' . shortShows x
 
 instance Quote TIndex where
     quotePrec _ (TIndex i) = show i -- relies on Num TIndex instance
@@ -108,4 +120,6 @@ unI :: HasTIndex ia a => ia -> a
 unI (viewI -> I _ x) = x
 
 
-
+newtype TwoSkeleton a = TwoSkeleton { unTwoSkeleton :: a }
+newtype OneSkeleton a = OneSkeleton { unOneSkeleton :: a }
+newtype ZeroSkeleton a = ZeroSkeleton { unZeroSkeleton :: a } 

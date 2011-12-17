@@ -1,5 +1,6 @@
 module Quote where
 import Data.List
+import Data.Word
 
 -- | Things that can be outputed as valid haskell source code
 class Quote a where
@@ -18,6 +19,8 @@ instance Quote a => Quote [a] where
 
 instance (Quote a, Quote b) => Quote (a,b) where
     quotePrec _ (x,y) = quoteParen True (quote x ++ ", "++quote y)
+
+instance Quote Word where quote = show
 
 
 quoteApp :: Quote a => [Char] -> a -> [Char]

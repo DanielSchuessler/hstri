@@ -232,7 +232,7 @@ prop_normalQuadByNormalArc na = isSubface na (normalQuadByNormalArc na)
 
 
 instance NormalArcs NormalTri (Triple NormalArc) where
-    normalArcs (normalTriGetVertex -> v) = map3 (\f -> normalArc (f, v)) (triangles v)
+    normalArcs (normalTriGetVertex -> v) = map3 (\t -> normalArc (t, v)) (star v (TwoSkeleton AbsTet))
 
 instance NormalArcs NormalDisc [NormalArc] where
     normalArcs = eitherND normalArcList normalArcList
@@ -299,9 +299,13 @@ normalDiscList = asList . normalDiscs
 instance NormalTris Edge (Pair NormalTri) where
     normalTris = map2 normalTri . vertices 
 
+-- | Normal triangles meeting a given edge
+instance NormalTris OEdge (Pair NormalTri) where
+    normalTris = map2 normalTri . vertices 
+
 instance NormalCorners NormalTri (Triple NormalCorner) where
     normalCorners nt =
-        map3 normalCorner (edges . normalTriGetVertex $ nt)
+        map3 normalCorner (star (normalTriGetVertex  nt) (OneSkeleton AbsTet))
 
 
 -- | Elements (circularly) adjacent in the returned tuple are adjacent corners

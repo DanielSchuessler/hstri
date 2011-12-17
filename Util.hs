@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, BangPatterns, DeriveFoldable, DeriveTraversable, DeriveFunctor, ViewPatterns, TypeFamilies, NoMonomorphismRestriction, MultiParamTypeClasses, ScopedTypeVariables, TemplateHaskell, FunctionalDependencies, FlexibleContexts, FlexibleInstances, CPP #-}
+{-# LANGUAGE TupleSections, TypeSynonymInstances, BangPatterns, DeriveFoldable, DeriveTraversable, DeriveFunctor, ViewPatterns, TypeFamilies, NoMonomorphismRestriction, MultiParamTypeClasses, ScopedTypeVariables, TemplateHaskell, FunctionalDependencies, FlexibleContexts, FlexibleInstances, CPP #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 
 module Util where
@@ -17,9 +17,11 @@ import Data.Word
 import Test.QuickCheck hiding((.&.))
 import Test.QuickCheck.All
 import Data.BitSet.Word8(BitSet(..))
-import qualified Data.Set as S
 import Control.Exception
 import QuickCheckUtil
+import Data.Set as S
+import Control.Monad.State
+import Data.Functor
 
 
 
@@ -225,3 +227,20 @@ wrapException msg = mapException (\(SomeException e) ->
     ErrorCall (unlines[msg,"Inner Exception:",show e]))
 
 
+
+data EdgeLabelledTree n e = Node n [(e,EdgeLabelledTree n e)]
+    deriving Show
+
+dfs :: Ord n => n -> (n -> [(e,n)]) -> EdgeLabelledTree n e
+dfs x0 outEdges = evalState (go x0) S.empty
+    where
+        go x = do
+            modify (S.insert x)
+            edgesToUnseen <- filterM isUnseen (outEdges x)
+            Node x <$> mapM goEdge edgesToUnseen
+
+        isUnseen (_,n) = gets (not . S.member n)
+        
+        goEdge (e,n) = (e,) <$> go n
+        
+        

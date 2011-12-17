@@ -46,7 +46,7 @@ instance GraphvizFormatable (FL,Node,TIndex) Attributes where
 instance GraphvizFormatable (FL,Node,TTriangle) Attributes where
     fmt (_,_,x) = 
             [ Shape Record
-            , Label (RecordLabel (fmap fmt (trianglePreimage x)))
+            , Label (RecordLabel (fmap fmt (asList $ trianglePreimage x)))
             ]
 
 instance GraphvizFormatable (FL,Node,TEdge) Attributes where

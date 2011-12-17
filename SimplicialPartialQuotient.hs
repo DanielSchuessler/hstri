@@ -2,20 +2,22 @@
 {-# OPTIONS -Wall #-}
 module SimplicialPartialQuotient where
 
-import Triangulation
-import Test.QuickCheck
-import qualified Data.List as L
-import Data.Map as M
-import PreRenderable
+import Control.Exception
 import Control.Monad
-import HomogenousTuples
-import Simplicial.SimplicialComplex
+import Data.Map as M
 import Data.Maybe
-import Data.Vect.Double(Vec3)
+import Data.Vect.Double((*&),(&+),(&-),Vec3)
+import HomogenousTuples
 import INormalDisc
 import NormalDisc
+import PreRenderable
 import PrettyUtil
-import Control.Exception
+import ShortShow
+import Simplicial.SimplicialComplex
+import Test.QuickCheck
+import Triangulation
+import TriangulationCxtObject
+import qualified Data.List as L
 
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
 
@@ -151,7 +153,7 @@ toSimplicialComplex
 toSimplicialComplex = fromTets . spq_tets   
 
 toPreRenderable
-  :: (Ord v, Show v) => SPQWithCoords v -> PreRenderableSimplicialComplex v
+  :: (Ord v, ShortShow v) => SPQWithCoords v -> PreRenderableSimplicialComplex v
 toPreRenderable (SPQWithCoords spq coords) = 
     let pr0 =
             mkPreRenderable 
@@ -208,12 +210,54 @@ data SPQWithCoords v = SPQWithCoords {
 
 geometrifySingleTetTriang :: Triangulation -> SPQWithCoords Vertex
 geometrifySingleTetTriang tr = 
-    assert (L.null (tail (tTetrahedra_ tr)))
+    assert (tNumberOfTetrahedra tr == 1)
     $
         SPQWithCoords 
             (SimplicialPartialQuotient tr forgetTIndex [allVertices'])
             vertexDefaultCoords
 
+-- | Creates a partial quotient for the given 2-tetrahedron triangulation which implements the gluing of the given triangle (and no others) 
+geometrifyTwoTetTriang :: Triangulation -> ITriangle -> SPQWithCoords TVertex
+geometrifyTwoTetTriang tr theTri = 
+    assert (tNumberOfTetrahedra tr == 2)
+    $
+        SPQWithCoords 
+            (SimplicialPartialQuotient 
+                tr 
+                p
+                (fmap (map4 p . vertices . tindex) [0,1]))
+            (M.fromList a !)
+
+
+    where
+        cA,cB,cC,cD :: Vec3
+        (cA,cB,cC,cD) = map4 vertexDefaultCoords (vA,vB,vC,vD)
+        cD' = (2/3) *& (cA &+ cB &+ cC) &- cD
+
+        theGluedTri = fromMaybe (error ("geometrifyTwoTetTriang:"++
+                                        "second arg is a boundary triangle"))                    
+                                        
+                                (lookupGluingOfITriangle tr theTri)
+
+
+        -- | Triangulation containing only the chosen gluing
+        tr' = fromRight $ mkTriangulation 2 [(theTri,theGluedTri)]
+
+        p = pMap tr' 
+
+
+        (u0,u1,u2) = vertices theTri 
+        u3 = itriangleDualVertex theTri
+        --(v0,v1,v2) = vertices theGluedTri
+        v3 = oitriangleDualVertex theGluedTri
+
+
+        a = [ (p u0, cA)
+            , (p u1, cB)
+            , (p u2, cC)
+            , (p u3, cD)
+            , (p v3, cD')
+            ]
 
 instance Pretty v => Show (SimplicialPartialQuotient v) where
     showsPrec = prettyShowsPrec

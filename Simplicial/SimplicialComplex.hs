@@ -20,6 +20,7 @@ import Simplicial.GraphComplex
 --import Simplicial.Labels
 import TupleTH
 import PrettyUtil
+import ShortShow
 
 
 type Plus4 n = S (S (S (S n)))
@@ -40,6 +41,9 @@ newtype OTuple v n = OT { unOT :: OTuple' v n }
 
 instance (Show v, Nat n) => Show (OTuple v n) where
     OT_DERIVE( showsPrec prec, (OT x), x )
+
+instance (ShortShow v, Nat n) => ShortShow (OTuple v n) where
+    OT_DERIVE( shortShowsPrec prec, (OT x), x )
 
 instance (Pretty v, Nat n) => Pretty (OTuple v n) where
     OT_DERIVE( prettyPrec prec, (OT x), x )

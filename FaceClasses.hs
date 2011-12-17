@@ -27,9 +27,11 @@ class AsList oedgeTuple => OEdges a oedgeTuple | a -> oedgeTuple where
     oedges :: a -> oedgeTuple
 
 class Link a b c | a b -> c where
+    -- | The faces of the 'star' which are disjoint from the first arg.
     link :: a -> b -> c
 
 class Star a b c | a b -> c where
+    -- | The faces of the second arg containing the first arg.
     star :: a -> b -> c
 
 

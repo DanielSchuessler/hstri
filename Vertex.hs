@@ -4,7 +4,6 @@ module Vertex
     (
     module FaceClasses,
     module TIndex,
-    -- * Vertices
     Vertex,
     vA,vB,vC,vD,
     allVertices,allVertices',
@@ -18,7 +17,14 @@ module Vertex
     vertexDefaultCoords,
 
     Link(..),
-    Star(..)
+    Star(..),
+
+    -- * View
+    VertexView(..),
+    viewVertex,unviewVertex,
+
+    -- * Testing
+    qc_Vertex,
 
 
     )
@@ -42,9 +48,38 @@ import Quote
 import THUtil() -- Lift Word8
 import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
 import Data.Vect.Double.Base((&-))
+import QuickCheckUtil
+import Test.QuickCheck.All
+import ShortShow
 
 -- | Vertex of an abstract tetrahedron
 newtype Vertex = Vertex Word8 deriving(Eq,Ord)
+
+data VertexView = A | B | C | D
+    deriving(Eq,Ord,Show)
+
+vA,vB,vC,vD :: Vertex
+vA = Vertex 0
+vB = Vertex 1
+vC = Vertex 2
+vD = Vertex 3
+
+viewVertex :: Vertex -> VertexView
+viewVertex (Vertex v) = case v of
+                           0 -> A
+                           1 -> B
+                           2 -> C
+                           3 -> D
+                           _ -> error ("viewVertex: Invalid Vertex (tag "++show v++")")
+
+unviewVertex :: VertexView -> Vertex
+unviewVertex A = vA
+unviewVertex B = vB
+unviewVertex C = vC
+unviewVertex D = vD
+
+prop_viewUnviewVertex :: Vertex -> Property
+prop_viewUnviewVertex v = v .=. unviewVertex (viewVertex v) 
 
 instance BitSetable Vertex
 
@@ -53,12 +88,11 @@ instance Bounded Vertex where
     maxBound = vD
 
 instance Show Vertex where
-    show (Vertex v) = case v of
-                           0 -> "A"
-                           1 -> "B"
-                           2 -> "C"
-                           3 -> "D"
-                           _ -> error ("Tried to show bad Vertex with tag "++show v)
+    show v = case viewVertex v of
+                           A -> "A"
+                           B -> "B"
+                           C -> "C"
+                           D -> "D"
 
 instance Enum Vertex where
     fromEnum (Vertex v) = fromEnum v
@@ -67,11 +101,6 @@ instance Enum Vertex where
 class MakeVertex a where
     vertex :: a -> Vertex
 
-vA,vB,vC,vD :: Vertex
-vA = Vertex 0
-vB = Vertex 1
-vC = Vertex 2
-vD = Vertex 3
 
 allVertices ::  [Vertex]
 allVertices = asList allVertices' 
@@ -118,6 +147,7 @@ instance Enum IVertex where
     fromEnum = fromEnum . viewI
 
 instance Show IVertex where show = show . viewI
+instance ShortShow IVertex where shortShow = shortShow . viewI
 instance Quote IVertex where quotePrec prec = quotePrec prec . viewI
 instance Pretty IVertex where pretty = pretty . viewI
 
@@ -141,13 +171,23 @@ vertexFromWord8 = Vertex
 
 -- | Embeds the abstract tetrahedron into R^3 symmetrically
 vertexDefaultCoords :: Vertex -> Vec3
-vertexDefaultCoords = (\x -> f x &- center_) . vertexToWord8 
+vertexDefaultCoords = (\x -> f x &- center_) . viewVertex 
     where
-        f 0 = vec3X
-        f 1 = vec3Y
-        f 2 = vec3Z
-        f 3 = Vec3 1 1 1
-        f _ = assert False undefined
+        f A = vec3X
+        f B = vec3Y
+        f C = vec3Z
+        f D = Vec3 1 1 1
 
         center_ = Vec3 0.5 0.5 0.5
 
+
+qc_Vertex :: IO Bool
+qc_Vertex = $quickCheckAll
+
+instance Link Vertex (ZeroSkeleton AbsTet) (Triple Vertex) where
+    link v _ = fromList3 (filter4 (/= v) allVertices')
+
+instance Link IVertex (ZeroSkeleton AbsTet) (Triple IVertex) where
+    link v p = traverseI map3 (flip link p) v
+
+instance ShortShow Vertex where shortShow = show

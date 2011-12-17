@@ -21,6 +21,7 @@ import NormalEverything
 import Simplicial.AnySimplex
 import Control.Exception
 import PrettyUtil
+import ShortShow
 
 data Blenderable a = Blenderable { 
     ba_ds :: DeltaSet a,
@@ -175,9 +176,7 @@ nsurfMat1 = Material "nsurfMat1" (diffuseColor (0, 0.2, 1):specular 100 0.8)
 nsurfMat2 ::  Material
 nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++transparency 0.55 0.7 1)
 
-normalSurfaceStyle
-  :: (Show (Vert a), Show (Arc a), Show (Tri a)) =>
-     PreRenderable a -> Blenderable a
+normalSurfaceStyle :: PreRenderable a -> Blenderable a
 normalSurfaceStyle = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
 
 
@@ -215,13 +214,13 @@ instance DisjointUnionable (Blenderable a) (Blenderable b) (Blenderable (Either1
 --normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
 
 fromSPQWC
-  :: (Ord v, Show v) =>
+  :: (Ord v, ShortShow v) =>
      SPQWithCoords v
      -> Blenderable (OTuple v)
 fromSPQWC = pseudomanifoldStyle . toPreRenderable
 
 fromStandardCoordinates
-  :: (Ord v, Integral i, Pretty i, Show v) =>
+  :: (Ord v, Integral i, Pretty i, ShortShow v) =>
      SPQWithCoords v
      -> StandardCoordinates i
      -> Blenderable (OTuple (Corn v))

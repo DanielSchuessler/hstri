@@ -9,6 +9,8 @@ module Triangle(
     MakeTriangle(..),
     edgeByOppositeVertexAndTriangle,
     vertexByOppositeEdge,
+    triangleByDualVertex,
+    triangleDualVertex,
     isVertexOfTriangle,
     isEdgeOfTriangle,
     tBCD,tACD,tABD,tABC,
@@ -22,14 +24,19 @@ module Triangle(
     OTriangle,
     MakeOTriangle(..),
     verticesToOTriangle,
+    otriangleDualVertex,
 
     -- * Indexed
     ITriangle,
+    itriangleDualVertex,
 
     -- * Ordered and indexed
     OITriangle,
-    oiTriangleByVertices
+    oiTriangleByVertices,
+    oitriangleDualVertex,
 
+    -- * Testing
+    qc_Triangle,
 
 
     ) where
@@ -38,9 +45,7 @@ module Triangle(
 import Control.Applicative
 import Control.Exception
 import Control.Monad
-import Data.BitSet.Word8 as BitSet
 import Data.List as List
-import Data.Monoid
 import Edge
 import Element
 import HomogenousTuples
@@ -52,10 +57,15 @@ import Quote
 import S3
 import Test.QuickCheck
 import Util
+import Test.QuickCheck.All
+import ShortShow
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
-newtype Triangle = Triangle (BitSet Vertex)
+newtype Triangle = Triangle { triangleDualVertex :: Vertex }
+
+triangleByDualVertex :: Vertex -> Triangle
+triangleByDualVertex = Triangle
 
 instance Show Triangle where
     show (triangleVertices -> (v0,v1,v2)) = show v0 ++ show v1 ++ show v2
@@ -64,8 +74,8 @@ deriving instance Eq Triangle
 deriving instance Ord Triangle 
 
 instance Enum Triangle where
-    toEnum n = triangle (toEnum (3-n) :: Vertex)
-    fromEnum t = 3 - fromEnum (vertex t) 
+    toEnum n = triangleByDualVertex (toEnum (3-n) :: Vertex)
+    fromEnum t = 3 - fromEnum (triangleDualVertex t) 
 
 instance Bounded Triangle where
     minBound = tABC
@@ -76,10 +86,10 @@ triangleVertices t = fromList3 ( filter4 (`isVertexOfTriangle` t) allVertices' )
               
 
 tABC, tABD, tACD, tBCD :: Triangle
-tABC = triangle vD
-tABD = triangle vC
-tACD = triangle vB
-tBCD = triangle vA
+tABC = triangleByDualVertex vD
+tABD = triangleByDualVertex vC
+tACD = triangleByDualVertex vB
+tBCD = triangleByDualVertex vA
 
 allTriangles' ::  (Triangle, Triangle, Triangle, Triangle)
 allTriangles' =  ( tABC , tABD , tACD , tBCD )
@@ -95,28 +105,29 @@ instance Pretty Triangle where pretty = trianglePrettyColor . text . show
 class MakeTriangle a where
     triangle :: a -> Triangle
 
--- | Construct the triangle dual to a given vertex
-instance MakeTriangle Vertex where
-    triangle x = Triangle (BitSet.complement (BitSet.singleton x))
 
--- | Construct the vertex dual to a given triangle
-instance MakeVertex Triangle where
-    vertex (Triangle x) = fromList1 (BitSet.toList $ BitSet.complement x)
+ascVerticesToTriangle vs = triangleByDualVertex . unviewVertex $
+        case map3 viewVertex vs of
+             (B,C,D) -> A
+             (A,C,D) -> B
+             (A,B,D) -> C
+             (A,B,C) -> D
+             _ -> error ("ascVerticesToTriangle "++show vs)
 
 -- | The Vertices must be distinct (but needn't be ordered)
 instance MakeTriangle (Vertex,Vertex,Vertex) where
-    triangle (v0,v1,v2) = triangle (BitSet.insert v0 $ BitSet.insert v1 $ BitSet.singleton v2 )
+    triangle vs = ascVerticesToTriangle . sort3
 
 prop_MakeTriangle_VVV ::  Vertex -> Property
-prop_MakeTriangle_VVV v0 = forAll (elements vs') $ \v1 -> forAll (elements (vs' \\ [v1])) $ \v2 -> 
-                            let v012 = (v0,v1,v2) in asList v012 `setEq` (asList . triangleVertices) (triangle v012)
+prop_MakeTriangle_VVV v0 = 
+    forAll (elements vs') $ 
+        \v1 -> forAll (elements (vs' \\ [v1])) $ 
+            \v2 -> 
+                let v012 = (v0,v1,v2) in asList v012 `setEq` (asList . triangleVertices) (triangle v012)
     where
         vs' = allVertices \\ [v0]
 
 
--- | The BitSet must have exactly three elements
-instance MakeTriangle (BitSet Vertex) where
-    triangle b = assert (BitSet.size b == 3) (Triangle b)
 
 
 
@@ -124,10 +135,10 @@ instance MakeTriangle (BitSet Vertex) where
 
 -- | Construct a triangle containing the two edges
 instance MakeTriangle (Pair Edge) where
-    triangle es@(edgeToBitSet -> e1,edgeToBitSet -> e2) = 
-        case mappend e1 e2 of
-            e' | BitSet.size e' == 3 -> Triangle e'
-               | otherwise -> error ("triangle "++show es)
+    triangle (e1,e2) =
+        case intersectEdges (oppositeEdge e1) (oppositeEdge e2) of
+            Just (Right v) -> triangleByDualVertex v
+            _ -> error ("triangle "++show (e1,e2))
 
 
 prop_MakeTriangle_EE ::  Edge -> Edge -> Property
@@ -140,11 +151,11 @@ prop_MakeTriangle_EE e1 e2 = (e1 /= e2 && e1 /= oppositeEdge e2) ==>
 
 
 isVertexOfTriangle :: Vertex -> Triangle -> Bool
-isVertexOfTriangle v (Triangle x) = BitSet.member v x
+isVertexOfTriangle v t = v /= triangleDualVertex t
 
 
 isEdgeOfTriangle :: Edge -> Triangle -> Bool
-isEdgeOfTriangle (edgeToBitSet -> x) (Triangle x') = BitSet.isSubsetOf x x'
+isEdgeOfTriangle e t = isVertexOfEdge (triangleDualVertex t) (oppositeEdge e)
 
 instance Arbitrary Triangle where arbitrary = elements allTriangles
 
@@ -171,9 +182,10 @@ instance Enum ITriangle where
 instance Show ITriangle where show =  show . viewI
 instance Quote ITriangle where quotePrec prec =  quotePrec prec . viewI
 instance Pretty ITriangle where pretty = pretty . viewI
+instance ShortShow ITriangle where shortShow = shortShow . viewI
 
 -- | Triangle of an abstract tetrahedron, with ordered vertices
-data OTriangle = OTriangle !S3 !Triangle deriving(Eq,Ord)
+data OTriangle = OTriangle !Triangle !S3 deriving(Eq,Ord)
 
 
 class MakeOTriangle a where
@@ -182,7 +194,7 @@ class MakeOTriangle a where
 instance MakeOTriangle Triangle where
     otriangle = curry otriangle S3abc
 
-instance MakeOTriangle (S3,Triangle) where
+instance MakeOTriangle (Triangle,S3) where
     otriangle = uncurry packOrderedFace 
 
 
@@ -198,13 +210,13 @@ trivialHasTIndexInstance [t|OTriangle|]
 instance  (OrderableFace ITriangle OITriangle) where
     type VertexSymGroup ITriangle = S3
     type VertexTuple ITriangle = Triple IVertex
-    unpackOrderedFace (viewI -> I i (unpackOrderedFace -> (g,t))) = (g, (./) i t)
-    packOrderedFace g = mapI (packOrderedFace g)
+    unpackOrderedFace = defaultUnpackOrderedFaceI
+    packOrderedFace = defaultPackOrderedFaceI
 
 
 
 
-instance LeftAction S3 OITriangle where (.*) = defaultLeftActionForOrderedFace
+instance RightAction S3 OITriangle where (*.) = defaultRightActionForOrderedFace
 
 instance OrderableFace Triangle OTriangle where
     type VertexSymGroup Triangle = S3
@@ -213,12 +225,12 @@ instance OrderableFace Triangle OTriangle where
     packOrderedFace = OTriangle
 
 
-instance LeftAction S3 OTriangle where
-    (.*) = defaultLeftActionForOrderedFace
+instance RightAction S3 OTriangle where
+    (*.) = defaultRightActionForOrderedFace
 
 
 
--- | Ordered edges contained in a given facet, in order
+-- | Ordered edges contained in a given triangle, in order
 instance Edges OTriangle (Triple OEdge) where
     edges x = case vertices x of
                    (v0,v1,v2) -> ( verticesToOEdge (v0,v1)
@@ -230,54 +242,20 @@ instance Edges OTriangle (Triple OEdge) where
 
 instance MakeOTriangle (Triple Vertex) where
     otriangle = verticesToOTriangle
+
 -- | Inverse function to @vertices :: O (Triangle) -> Triple Vertex@
 verticesToOTriangle ::  (Vertex, Vertex, Vertex) -> OTriangle
-verticesToOTriangle (v0, v1, v2)
-        = case compare v0 v1 of
-               LT -> case0LT1 v0 v1 v2
-               EQ -> err
-               _ -> 
-                     -- let y = case0LT1 v1 v0 v2 
-                     -- By correctness of case0LT1, we have: 
-                     -- > vertices y = (v1,v0,v2) 
-                     -- so,
-                     -- > vertices (S3bac .* y) = S3bac .* (v1,v0,v2) = (v0,v1,v2)
-                     -- as desired
-                    S3bac .* case0LT1 v1 v0 v2
-
-    where
-        err = error (unwords ["verticesToOTriangle",show v0, show v1, show v2])
-
-        case0LT1 w0 w1 w2 =
-            assert (w0 < w1) $
-                case compare w1 w2 of
-                     LT -> caseOrdered w0 w1 w2
-                     EQ -> err
-                     _ -> S3acb .* case0LT2_1LT2 w0 w2 w1
-
-        case0LT2_1LT2 w0 w1 w2 =
-            assert (w0 < w2 && w1 < w2) $
-                case compare w0 w1 of
-                     LT -> caseOrdered w0 w1 w2
-                     EQ -> err
-                     _ -> S3bac .* caseOrdered w1 w0 w2
-
-
-        caseOrdered w0 w1 w2 = packOrderedFace S3abc $
-                case map3 vertexToWord8 (w0,w1,w2) of
-                     (0,1,2) -> tABC
-                     (0,1,3) -> tABD
-                     (0,2,3) -> tACD
-                     (1,2,3) -> tBCD
-                     _ -> error (unwords ["impossible:","caseOrdered",show w0, show w1, show w2])
+verticesToOTriangle vs =
+    case sort3WithPermutation vs of
+         (vs',g) -> packOrderedFace (ascVerticesToTriangle vs')
 
 -- | Triangles containing a given edge
-instance Triangles Edge (Pair Triangle) where
-    triangles e = fromList2 ( filter4 (e `isEdgeOfTriangle`) allTriangles' ) 
+instance Star Edge (TwoSkeleton AbsTet) (Pair Triangle) where
+    star e _ = fromList2 ( filter4 (e `isEdgeOfTriangle`) allTriangles' ) 
 
 -- | Edges contained in a given triangle
 instance Edges Triangle (Triple Edge) where
-    edges t@(Triangle x) = map3 (\v -> bitSetToEdge (BitSet.delete v x)) (v2,v0,v1)
+    edges t = map3 edge ((v0,v1),(v1,v2),(v2,v0)) 
         where
             (v0,v1,v2) = vertices t
 
@@ -321,8 +299,8 @@ instance Edges ITriangle (Triple IEdge) where
 
 
 -- | Triangles containing a given vertex
-instance Triangles Vertex (Triple Triangle) where
-    triangles !v = fromList3 (filter4 (isVertexOfTriangle v) allTriangles')
+instance Star Vertex (TwoSkeleton AbsTet) (Triple Triangle) where
+    star v _ = fromList3 (filter4 (isVertexOfTriangle v) allTriangles')
 
 -- | Gets the edge which is contained in the given triangle and does /not/ contain the given vertex. 
 --
@@ -336,6 +314,14 @@ edgeByOppositeVertexAndTriangle v t =
          [e0] -> e0
          _ -> error ("edgeByOppositeVertexAndTriangle is not defined for args "++show v++", "++show t)
 
+-- | Equivalent to 'edgeByOppositeVertexAndTriangle'
+instance Link Vertex Triangle Edge where
+    link = edgeByOppositeVertexAndTriangle
+
+instance Link IVertex ITriangle IEdge where
+    link (viewI -> I i v) (viewI -> I i' t) = 
+        assert (i==i') (i ./ link v t)
+
 vertexByOppositeEdge
   :: (Show a, Vertices a (Triple Vertex)) =>
      Edge -> a -> Vertex
@@ -345,16 +331,24 @@ vertexByOppositeEdge e t =
          [v0] -> v0
          _ -> error ("vertexByOppositeEdge is not defined for args "++show e++", "++show t)
 
+-- | Equivalent to 'vertexByOppositeEdge'
+instance Link Edge Triangle Vertex where
+    link = vertexByOppositeEdge
 
+instance Link IEdge ITriangle IVertex where
+    link (viewI -> I i e) (viewI -> I i' t) = 
+        assert (i==i') (i ./ link e t)
 
 instance Triangles TIndex (Quadruple ITriangle) where
     triangles z = map4 (z ./) allTriangles'
 
-instance Triangles IVertex (Triple ITriangle) where
-    triangles (viewI -> I i v) = map3 (i ./) (triangles v) 
+-- | Triangles containing a given vertex
+instance Star IVertex (TwoSkeleton AbsTet) (Triple ITriangle) where
+    star v p = traverseI map3 (flip star p) v
 
-instance Triangles IEdge (Pair ITriangle) where
-    triangles (viewI -> I i v) = map2 (i ./) (triangles v) 
+-- | Triangles containing a given edge
+instance Star IEdge (TwoSkeleton AbsTet) (Pair ITriangle) where
+    star e p = traverseI map2 (flip star p) e
 
 instance OEdges OTriangle (Triple OEdge) where
     oedges (vertices -> (v0,v1,v2)) = (oedge (v0,v1), oedge (v1,v2), oedge(v2,v0)) 
@@ -396,3 +390,44 @@ instance Quote OTriangle where
     quotePrec _ ot = "o"++show ot
 
 
+
+qc_Triangle :: IO Bool
+qc_Triangle = $quickCheckAll
+
+
+otriangleDualVertex :: OTriangle -> Vertex
+otriangleDualVertex = triangleDualVertex . forgetVertexOrder
+itriangleDualVertex :: ITriangle -> IVertex
+itriangleDualVertex = mapI triangleDualVertex
+oitriangleDualVertex :: I OTriangle -> IVertex
+oitriangleDualVertex = mapI otriangleDualVertex
+
+itriangleByDualVertex :: IVertex -> ITriangle
+itriangleByDualVertex = mapI triangleByDualVertex
+
+-- Equivalent to 'triangleDualVertex'
+instance Link Triangle AbsTet Vertex where 
+    link t _ = triangleDualVertex t
+
+-- Equivalent to 'itriangleDualVertex'
+instance Link ITriangle AbsTet IVertex where 
+    link t _ = itriangleDualVertex t
+
+-- Equivalent to 'triangleByDualVertex'
+instance Link Vertex AbsTet Triangle where 
+    link v _ = triangleByDualVertex v
+
+-- Equivalent to 'itriangleByDualVertex'
+instance Link IVertex AbsTet ITriangle where 
+    link v _ = itriangleByDualVertex v
+
+instance Star Vertex (OneSkeleton Triangle) (Pair Edge) where
+    star v (OneSkeleton t) = case link v t of
+                                  (vertices -> (v0,v1)) -> (edge (v,v0), edge (v,v1))
+
+instance Star IVertex (OneSkeleton ITriangle) (Pair IEdge) where
+    star (viewI -> I i v) (OneSkeleton (viewI -> I i' t)) = 
+        assert (i==i')
+         (map2 (i ./) (star v (OneSkeleton t)))
+
+instance ShortShow Triangle where shortShow = show 
