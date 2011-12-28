@@ -23,10 +23,12 @@ module Edge (
 
     -- * Indexed
     IEdge,
+    iEdgeByVertices,
 
     -- * Oriented and indexed
     OIEdge,
     allOIEdges,
+    oiEdgeByVertices,
 
     -- * Testing
     qc_Edge
@@ -321,3 +323,21 @@ instance Lift Edge where
 instance ShortShow Edge where shortShow = show
 instance ShortShow OEdge where shortShow = show
 
+withTIndexEqual
+  :: (HasTIndex ia a, HasTIndex ia1 a1, HasTIndex ia2 a2) =>
+     (a -> a1 -> a2) -> ia -> ia1 -> ia2
+withTIndexEqual f 
+    (viewI -> I i0 v0) 
+    (viewI -> I i1 v1) 
+    =
+        assert (i0==i1)
+
+        i0 ./ f v0 v1
+
+iEdgeByVertices
+  :: IVertex -> IVertex -> IEdge
+iEdgeByVertices = withTIndexEqual (curry edge)
+
+oiEdgeByVertices
+  :: IVertex -> IVertex -> OIEdge
+oiEdgeByVertices = withTIndexEqual (curry oedge)

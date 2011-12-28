@@ -43,7 +43,7 @@ main = (testBlender . setCams [octahedronCam1])
             (
                 (fromSPQWC spqwc)
                 `disjointUnion`
-   --             fromStandardCoordinates spqwc (standardCoordinates [0./Q_ac,1./Q_ac,2./Q_ad,3./Q_ad])
+                fromStandardCoordinates spqwc (standardCoordinates [0./Q_ac,1./Q_ac,2./Q_ad,3./Q_ad])
             )
         )
     

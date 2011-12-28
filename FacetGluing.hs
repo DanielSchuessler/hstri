@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
+{-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
 module FacetGluing where
 
 import AbstractTetrahedron
@@ -9,28 +9,31 @@ import Data.Maybe
 import INormalDisc
 import Control.Exception
 import Control.Monad
+import QuickCheckUtil
+import Test.QuickCheck
 
 type Gluing = (ITriangle,OITriangle)
 
-class GluingSpec a where
-    type TetIndex a
-    toGluing :: (TetIndex a -> TIndex) -> a -> Gluing
+-- class GluingSpec a where
+--     type TetIndex a
+--     toGluing :: (TetIndex a -> TIndex) -> a -> Gluing
+-- 
+-- instance GluingSpec (t,Triangle,t,S3,Triangle) where
+--     type TetIndex (t,Triangle,t,S3,Triangle) = t
+--     toGluing f (tt1,t1,tt2,g,t2) = (f tt1 ./ t1, f tt2 ./ packOrderedFace g t2)
+-- 
+-- instance GluingSpec (t,Triangle,t,OTriangle) where
+--     type TetIndex (t,Triangle,t,OTriangle) = t
+--     toGluing f (tt1,t1,tt2,t2) = (f tt1 ./ t1, f tt2 ./ t2)
 
 
 oiTriangleGluing :: OITriangle -> OITriangle -> Gluing
-oiTriangleGluing (unpackOrderedFace -> (g,tri)) otri = (tri, inv g .* otri)
+oiTriangleGluing (unpackOrderedFace -> (tri,g)) otri = (tri,otri *. inv g)
 
-instance GluingSpec (t,Triangle,t,S3,Triangle) where
-    type TetIndex (t,Triangle,t,S3,Triangle) = t
-    toGluing f (tt1,t1,tt2,g,t2) = (f tt1 ./ t1, f tt2 ./ packOrderedFace g t2)
-
-instance GluingSpec (t,Triangle,t,OTriangle) where
-    type TetIndex (t,Triangle,t,OTriangle) = t
-    toGluing f (tt1,t1,tt2,t2) = (f tt1 ./ t1, f tt2 ./ t2)
 
 -- | Creates a gluing equivalent to the input gluing but with the 'ITriangle's swapped and the permutation inverted
 flipGluing :: Gluing -> Gluing
-flipGluing (x1, unpackOrderedFace -> (g,x2)) = (x2, packOrderedFace (inv g) x1)
+flipGluing (x1, unpackOrderedFace -> (x2,g)) = (x2, packOrderedFace x1 (inv g))
 
 class GluingMappable a where
     gluingMap :: Gluing -> a -> a
@@ -60,7 +63,7 @@ instance GluingMappable OIEdge where
         getTIndex ot ./ oedge (gluingMap gl v0, gluingMap gl v1) 
 
 instance GluingMappable IEdge where
-    gluingMap gl = forgetVertexOrder . gluingMap gl . packOrderedFace NoFlip
+    gluingMap gl = forgetVertexOrder . gluingMap gl . toOrderedFace
 
 instance GluingMappable INormalCorner where
     gluingMap gl = iNormalCorner . gluingMap gl . iNormalCornerGetContainingEdge
@@ -71,13 +74,44 @@ instance GluingMappable INormalArc where
         assert (isSubface arc tri) $
             iNormalArc . (otri,) . gluingMap gl . iNormalArcGetVertex $ arc
 
-prop_gluingMapVertex :: Gluing -> Bool
+instance GluingMappable OITriangle where
+    gluingMap (tri,otri) (unpackOrderedFace -> (tri',g)) =
+        assert (tri == tri')
+            (otri *. g)
+
+prop_gluingMapVertex :: Gluing -> Property
 prop_gluingMapVertex gluing@(t,ot) =
-    ot == oiTriangleByVertices us
+    ot .=. oiTriangleByVertices us
   where
     us = map3 (gluingMap gluing) (vertices t)
 
 
+prop_gluingMapOITriangle :: OITriangle -> OITriangle -> Property
+prop_gluingMapOITriangle ot1 ot2 =
+    gluingMap (oiTriangleGluing ot1 ot2) ot1 .=. ot2
 
 
+
+inducedVertexEquivalences :: Gluing -> [(IVertex, IVertex)]
+inducedVertexEquivalences ((two,otwo') :: Gluing) = 
+                zip (vertexList two) (vertexList otwo')
+
+
+inducedEdgeEquivalences :: Gluing -> [(IEdge, IEdge)]
+inducedEdgeEquivalences ((two,otwo') :: Gluing) =
+                zip (edgeList two) (forgetVertexOrder <$> edgeList otwo')
+
+
+inducedOEdgeEquivalencesIrredundant :: Gluing -> [(OIEdge, OIEdge)]
+inducedOEdgeEquivalencesIrredundant ((two,otwo') :: Gluing) =
+                        zip (edgeList (packOrderedFace two S3abc))
+                                       (edgeList otwo')
+
+                                    :: [(OIEdge, OIEdge)]
+
+
+inducedOEdgeEquivalences :: Gluing -> [(OIEdge, OIEdge)]
+inducedOEdgeEquivalences g = do
+    pair0 <- inducedOEdgeEquivalencesIrredundant g 
+    [ pair0,  map2 (*. Flip) pair0 ]
 

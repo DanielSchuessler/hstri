@@ -13,15 +13,18 @@ import NormalDisc
 import PreRenderable
 import PrettyUtil
 import ShortShow
+import Simplicial.DeltaSet
 import Simplicial.SimplicialComplex
 import Test.QuickCheck
 import Triangulation
 import TriangulationCxtObject
 import qualified Data.List as L
 
+-- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
 
     spq_tr :: Triangulation,
+    -- | Need only be defined on the 'tIVertices' of the 'spq_tr'.
     spq_map :: IVertex -> v,
     spq_tets :: [Quadruple v]
 
@@ -54,28 +57,37 @@ mapTri (spq_map -> m) tri = map3 m (vertices tri)
 
 makeTriangleLabelling
   :: Ord v =>
-     SimplicialPartialQuotient v -> Triple v -> Maybe TriangleLabel
-makeTriangleLabelling spq = flip M.lookup (M.fromList (triangleLabelList spq))
+     SimplicialPartialQuotient v
+     -> (Gluing -> String) -> Tri (OTuple v) -> Maybe TriangleLabel
+makeTriangleLabelling spq gluingLabeller = triangleLabelsForSimplicial stlas
+    where
+        stlas = do
+            gl@(tri,otri) <- extraGluings spq
+
+            let lbl = gluingLabeller gl 
+
+                (l ,r ,t ) = mapTri spq tri
+                (l',r',t') = mapTri spq otri
+
+            [SimplicialTriangleLabelAssoc lbl l  r  t  defaultTriangleLabelUpDisplacement,
+             SimplicialTriangleLabelAssoc lbl l' r' t' defaultTriangleLabelUpDisplacement]
 
 
-triangleLabelList :: Ord v => SimplicialPartialQuotient v -> 
-    [(Triple v, TriangleLabel)]
-triangleLabelList spq = do
---            (lbl,(tri,otri)) <- zip labels extraGluings
-            (tri,otri) <- extraGluings spq
+defaultGluingLabeller
+  :: Gluing -> [Char]
+defaultGluingLabeller (tri,otri) = (show . getTIndex) tri ++ (show . getTIndex) otri
 
-            let lbl = (show . getTIndex) tri ++ (show . getTIndex) otri
 
-            -- find the permutation that makes 'tri' resp. 'otri' ordered by brute force
-            g <- allS3
-
-            let theLabel = TriangleLabel lbl (inv g) 0.1 
-                g_im_tri = g .* (mapTri spq tri)
-                g_im_otri = g .* (mapTri spq otri)
-
-            (++)
-                (guard (isOrdered3 g_im_tri)  >> [(g_im_tri ,theLabel)]) 
-                (guard (isOrdered3 g_im_otri) >> [(g_im_otri,theLabel)]) 
+--             -- find the permutation that makes 'tri' resp. 'otri' ordered by brute force
+--             g <- allS3
+-- 
+--             let theLabel = TriangleLabel lbl (inv g) 0.1 
+--                 g_im_tri = g .* (mapTri spq tri)
+--                 g_im_otri = g .* (mapTri spq otri)
+-- 
+--             (++)
+--                 (guard (isOrdered3 g_im_tri)  >> [(g_im_tri ,theLabel)]) 
+--                 (guard (isOrdered3 g_im_otri) >> [(g_im_otri,theLabel)]) 
 
 
 -- | Gluings of the original triangulation which are *not* implemented by 'spq_map'
@@ -125,7 +137,7 @@ prop_enoughGluings
      SimplicialPartialQuotient v -> Property
 prop_enoughGluings spq =
     let
-        _triangleLabel = makeTriangleLabelling spq 
+        _triangleLabel = makeTriangleLabelling spq defaultGluingLabeller . OT 
     in
         forAll (elements . tOriginalGluings . spq_tr $ spq)
             (\(tri,otri) ->
@@ -153,15 +165,16 @@ toSimplicialComplex
 toSimplicialComplex = fromTets . spq_tets   
 
 toPreRenderable
-  :: (Ord v, ShortShow v) => SPQWithCoords v -> PreRenderableSimplicialComplex v
-toPreRenderable (SPQWithCoords spq coords) = 
+  :: (Ord v, ShortShow v) =>
+     SPQWithCoords v -> PreRenderable (OTuple v)
+toPreRenderable (SPQWithCoords spq coords gluingLabeller) = 
     let pr0 =
             mkPreRenderable 
                 (coords . unOT)
                 (toSimplicialComplex spq)
     in pr0
         {
-            pr_triangleLabel = makeTriangleLabelling spq . unOT
+            pr_triangleLabel = makeTriangleLabelling spq gluingLabeller
         }
 
 
@@ -204,21 +217,26 @@ identitySPQ tr =
 
 data SPQWithCoords v = SPQWithCoords {
     spqwc_spq :: SimplicialPartialQuotient v,
-    spqwc_coords :: v -> Vec3
+    spqwc_coords :: v -> Vec3,
+    spqwc_gluingLabeller :: Gluing -> String
 }
 
 
-geometrifySingleTetTriang :: Triangulation -> SPQWithCoords Vertex
-geometrifySingleTetTriang tr = 
+geometrifySingleTetTriang
+  :: Triangulation -> (Gluing -> String) -> SPQWithCoords Vertex
+geometrifySingleTetTriang tr gluingLabeller = 
     assert (tNumberOfTetrahedra tr == 1)
     $
         SPQWithCoords 
             (SimplicialPartialQuotient tr forgetTIndex [allVertices'])
             vertexDefaultCoords
+            gluingLabeller
 
 -- | Creates a partial quotient for the given 2-tetrahedron triangulation which implements the gluing of the given triangle (and no others) 
-geometrifyTwoTetTriang :: Triangulation -> ITriangle -> SPQWithCoords TVertex
-geometrifyTwoTetTriang tr theTri = 
+geometrifyTwoTetTriang
+  :: Triangulation
+     -> ITriangle -> (Gluing -> String) -> SPQWithCoords (T IVertex)
+geometrifyTwoTetTriang tr theTri gluingLabeller = 
     assert (tNumberOfTetrahedra tr == 2)
     $
         SPQWithCoords 
@@ -227,6 +245,7 @@ geometrifyTwoTetTriang tr theTri =
                 p
                 (fmap (map4 p . vertices . tindex) [0,1]))
             (M.fromList a !)
+            gluingLabeller
 
 
     where
@@ -277,5 +296,8 @@ instance (Ord v, Pretty v) => Pretty (SPQWithCoords v) where
     pretty SPQWithCoords{..} =
         prettyRecord "SPQWithCoords"
             [("spqwc_spq",pretty spqwc_spq),
-             ("spqwc_coords",prettyFunction spqwc_coords (spq_verts spqwc_spq))]
+             ("spqwc_coords",prettyFunction spqwc_coords (spq_verts spqwc_spq)),
+             ("spqwc_gluingLabeller",prettyFunction spqwc_gluingLabeller (extraGluings spqwc_spq))
+             
+             ]
 

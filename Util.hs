@@ -22,6 +22,9 @@ import QuickCheckUtil
 import Data.Set as S
 import Control.Monad.State
 import Data.Functor
+import Data.Char
+import System.Process
+import System.Exit
 
 
 
@@ -244,3 +247,34 @@ dfs x0 outEdges = evalState (go x0) S.empty
         goEdge (e,n) = (e,) <$> go n
         
         
+uncurry3 :: (t1 -> t2 -> t3 -> t) -> (t1, t2, t3) -> t
+uncurry3 f (a,b,c) = f a b c
+
+
+
+subscriptify :: String -> String
+subscriptify = List.map (chr . (+n) . ord)
+    where
+        n = 8320 - ord '0'
+
+        
+showSubscript :: (Show a, Integral a) => a -> String
+showSubscript = subscriptify . show 
+
+rawSystemS :: String -> [String] -> IO ()
+rawSystemS p args = do
+    putStrLn (unwords (p:fmap q args))
+    ec <- rawSystem p args
+    when (ec /= ExitSuccess)
+        (error (show (p,args) ++ " -> "++show ec))
+
+ where
+    q x = "'" ++ concatMap (\c -> if c == '\'' then "''" else [c]) x ++ "'"
+
+systemS :: String -> IO ()
+systemS l = do
+    putStrLn l
+    ec <- system l
+    when (ec /= ExitSuccess)
+        (error (show l ++ " -> "++show ec))
+

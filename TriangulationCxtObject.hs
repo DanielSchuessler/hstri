@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
 -- {-# OPTIONS -ddump-splices #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall -fno-warn-orphans -fno-warn-missing-signatures #-}
 module TriangulationCxtObject(
     module Element,
     module Triangulation,
@@ -12,8 +12,7 @@ module TriangulationCxtObject(
     pMap,
 
     -- * Preimages
-    vertexPreimage,
-    edgePreimage,
+    preimageList,
     TrianglePreimage(..),
     trianglePreimage,
     NormalArcPreimage(..),
@@ -98,11 +97,82 @@ type TNormalDisc = T INormalDisc
 -- class TriangulationCxtObject a pre | a -> pre, pre -> a where
 --     preimage :: T a -> pre
 
-vertexPreimage :: TVertex -> EquivalenceClass IVertex
-vertexPreimage (UnsafeMakeT t x) = eqvClassOf (vertexEqv t) x
 
-edgePreimage :: TEdge -> EquivalenceClass OIEdge
-edgePreimage (UnsafeMakeT t x) = eqvClassOf (oEdgeEqv t) (toOrderedFace x)
+
+preimageList :: IsEquivalenceClass (T a) => T a -> [Element (T a)]
+preimageList = asList
+
+asList_T f y = eqvEquivalents (f (getTriangulation y)) (unT y)
+canonicalRep_T = unT
+ecMember_T f x y = eqvRep (f (getTriangulation y)) x == unT y
+ecSize_T f y = ecSize (eqvClassOf (f (getTriangulation y)) (unT y))
+
+type instance Element TVertex = IVertex
+
+instance HasEquivalence Triangulation TVertex IVertex where
+    eqvClassOf = pMap 
+    eqvClasses = vertices
+
+instance AsList TVertex where
+    asList = asList_T vertexEqv 
+
+instance IsEquivalenceClass TVertex where
+    canonicalRep = canonicalRep_T
+    ecMember = ecMember_T vertexEqv 
+    ecSize = ecSize_T vertexEqv
+
+type instance Element TEdge = COIEdge
+
+tEdgeOIEdgeClass :: TEdge -> SetBasedEquivalenceClass OIEdge
+tEdgeOIEdgeClass (y :: TEdge) = 
+    eqvClassOf 
+        (oEdgeEqv . getTriangulation $ y) 
+        (toOrderedFace . unT $ y)
+
+instance AsList TEdge where
+    asList = 
+        -- ok because @toOrderedFace (unT y)@ is the representative of its class
+        fmap UnsafeCanonOrdered . asList . tEdgeOIEdgeClass 
+
+
+instance IsEquivalenceClass TEdge where
+    canonicalRep = UnsafeCanonOrdered . toOrderedFace . unT
+    ecMember x y = 
+        ecMember (unCanonOrdered x) (tEdgeOIEdgeClass y)
+
+    ecSize y = ecSize (tEdgeOIEdgeClass y)
+            
+instance HasEquivalence Triangulation TEdge COIEdge where 
+    eqvClassOf tr = pMap tr . forgetVertexOrder . unCanonOrdered 
+    eqvClasses = edges
+
+type instance Element TTriangle = COITriangle
+
+instance AsList TTriangle where
+    asList y =
+      let
+        tri = unT y
+      in
+        fmap UnsafeCanonOrdered . 
+            maybe [toOrderedFace tri] (\(otri) -> [toOrderedFace tri, otri])
+                $
+                    lookupGluingOfTTriangle y
+
+instance IsEquivalenceClass TTriangle where
+    canonicalRep = UnsafeCanonOrdered . toOrderedFace . unT
+
+    ecMember x y = 
+        forgetVertexOrder (unCanonOrdered x) == unT y
+        ||
+        Just (unCanonOrdered x) == lookupGluingOfTTriangle y
+
+    ecSize = maybe 1 (const 2) . lookupGluingOfTTriangle 
+
+instance HasEquivalence Triangulation TTriangle COITriangle where
+    eqvClassOf tr = pMap tr . forgetVertexOrder . unCanonOrdered
+
+    eqvClasses = triangles
+                                      
 
 data TrianglePreimage = BoundaryTriangle ITriangle
                       | InnerTriangle ITriangle OITriangle
@@ -129,14 +199,13 @@ class MakeTNormalArc a where tnormalArc :: a -> TNormalArc
 instance MakeTEdge TNormalCorner where
     tedge (UnsafeMakeT t (viewI -> I i (edge -> e))) = UnsafeMakeT t (i ./ e) 
 
-normalCornerPreimage :: TNormalCorner -> EquivalenceClass INormalCorner
-normalCornerPreimage = ec_map iNormalCorner . edgePreimage . tedge
+normalCornerPreimage = fmap iNormalCorner . equivalentIEdges . tedge
 
--- instance TriangulationCxtObject IVertex (EquivalenceClass IVertex) where
+-- instance TriangulationCxtObject IVertex (SetBasedEquivalenceClass IVertex) where
 --     preimage (UnsafeMakeT t x) = eqvClassOf (vertexEqv t) x
 -- 
 -- 
--- instance TriangulationCxtObject IEdge (EquivalenceClass IEdge) where
+-- instance TriangulationCxtObject IEdge (SetBasedEquivalenceClass IEdge) where
 --     preimage (UnsafeMakeT t x) = eqvClassOf (edgeEqv t) x
 -- 
 -- 
@@ -180,10 +249,10 @@ instance NormalQuads Triangulation [T INormalQuad] where
 
 
 equivalentIVertices :: TVertex -> [IVertex]
-equivalentIVertices = ec_elementList . vertexPreimage
+equivalentIVertices = preimageList
 
 equivalentIEdges :: TEdge -> [OIEdge]
-equivalentIEdges = ec_elementList . edgePreimage
+equivalentIEdges = fmap unCanonOrdered . preimageList
 
 
 
@@ -202,19 +271,19 @@ instance Show TNormalQuad where showsPrec = prettyShowsPrec
 instance Show TNormalDisc where showsPrec = prettyShowsPrec
 
 instance ShortShow TVertex where 
-    shortShow = shortShowAsSet . vertexPreimage
+    shortShow = shortShowAsSet
 
 instance  Pretty TVertex where
-    pretty = prettyListAsSet . asList . vertexPreimage
+    pretty = prettyListAsSet . preimageList
 
 instance  Pretty TEdge where
-    pretty = prettyListAsSet . asList . edgePreimage
+    pretty = prettyListAsSet . preimageList
 
 instance  Pretty TTriangle where
     pretty = prettyListAsSet . asList . trianglePreimage
 
 instance  Pretty TNormalCorner where
-    pretty = prettyListAsSet . ec_elementList . normalCornerPreimage
+    pretty = prettyListAsSet . normalCornerPreimage
 
 instance  Pretty TNormalArc where
     pretty = prettyListAsSet . asList . normalArcPreimage
@@ -392,7 +461,7 @@ instance NormalCorners TNormalArc (Pair TNormalCorner) where
 
 
 vertexLinkingSurfaceTris :: TVertex -> [INormalTri]
-vertexLinkingSurfaceTris = fmap iNormalTri . asList . vertexPreimage
+vertexLinkingSurfaceTris = fmap iNormalTri . preimageList
 
 
 
@@ -416,7 +485,7 @@ instance Intersection TEdge TEdge TEdgeIntersection where
 
 -- | Maps a thing from the disjoint union of tetrahedra of a triangulation to its image in the quotient space
 pMap
-  :: TriangulationQuotientSpaceCanonicalizable a =>
+  :: TriangulationDSnakeItem a =>
      Triangulation -> a -> T a
 pMap t x = UnsafeMakeT t (canonicalize t x)
 
@@ -497,7 +566,8 @@ dfsVertexLink v = dfs nt0 (adjacentNormalTris (getTriangulation v))
 
 itrianglesContainingEdge :: TEdge -> [ITriangle]
 itrianglesContainingEdge =
-    concatMap (\e -> toList2 (star (forgetVertexOrder e) (TwoSkeleton AbsTet))) . asList . edgePreimage
+    concatMap (\e -> toList2 (star (forgetVertexOrder e) (TwoSkeleton AbsTet))) . 
+        equivalentIEdges
     
     
     

@@ -7,6 +7,7 @@ module OrderableFace(
     defaultRightActionForOrderedFace,
     defaultVerticesForOrderedFace,
     forgetVertexOrder,
+    getVertexOrder,
     toOrderedFace,
     defaultPackOrderedFaceI,
     defaultUnpackOrderedFaceI,
@@ -85,6 +86,9 @@ polyprop_OrderableFace _ =
 
 forgetVertexOrder ::  OrderableFace t ot => ot -> t
 forgetVertexOrder = fst . unpackOrderedFace
+
+getVertexOrder :: OrderableFace t ot => ot -> VertexSymGroup t
+getVertexOrder = snd . unpackOrderedFace
 
 -- | Equivalent to 'packOrderedFace mempty'
 toOrderedFace :: OrderableFace t ot => t -> ot

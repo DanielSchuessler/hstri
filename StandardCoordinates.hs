@@ -6,6 +6,7 @@ module StandardCoordinates(
     stc_toMap,
     stc_fromMap,
     stc_toDenseList,
+    stc_toDenseAssocs,
     stc_fromDenseList,
     stc_toAssocs,
     stc_fromAssocs,
@@ -24,6 +25,9 @@ module StandardCoordinates(
     satisfiesMatchingEquations,
     satisfiesQuadrilateralConstraints,
 
+    -- * Matching equations
+    MatchingEquationReason(..),
+    matchingEquationsWithReasons,
 
     -- * Vertex solutions
     getVertexSolutions,
@@ -69,6 +73,7 @@ import Data.Ratio
 import Data.Maybe
 import Quote
 import qualified Data.Foldable as Fold
+import QuickCheckUtil
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
@@ -101,9 +106,8 @@ stc_map f (SC m) =
 instance Pretty r => Pretty (StandardCoordinates r) where
     pretty sc = pretty (stc_toAssocs sc) 
 
-
 instance (Pretty r) => Show (StandardCoordinates r) where
-    show = prettyString
+    showsPrec = prettyShowsPrec
 
 class NormalSurface a where
     standardCoordinates :: Num r => a -> StandardCoordinates r
@@ -151,19 +155,25 @@ krBasis t = (mkTetrahedralSolution <$> tTetrahedra_ t) ++ (mkEdgeSolution <$> (e
 
 stc_coefficient
   :: (Num r, MakeINormalDisc a) => StandardCoordinates r -> a -> r
-stc_coefficient (SC nc) nd = fromMaybe 0 (lookup (iNormalDisc nd) nc)
+stc_coefficient (SC sc) nd = fromMaybe 0 (lookup (iNormalDisc nd) sc)
 
 
 stc_coefficientIsZero
   :: (Num r, MakeINormalDisc a) =>
      StandardCoordinates r -> a -> Bool
-stc_coefficientIsZero (SC nc) nd = maybe True (\r -> assert (r/=0) False) (lookup (iNormalDisc nd) nc)
+stc_coefficientIsZero (SC sc) nd = maybe True (\r -> assert (r/=0) False) (lookup (iNormalDisc nd) sc)
 
+stc_toDenseAssocs :: (Num r) => Triangulation -> StandardCoordinates r -> [(INormalDisc,r)] 
+stc_toDenseAssocs t sc = fmap (id &&& stc_coefficient sc) (tINormalDiscs t)
 
-
+-- | @stc_toDenseList tr sc !! i == 'stc_coefficient' sc ('tINormalDiscs' tr !! i)
 stc_toDenseList :: (Num r) => Triangulation -> StandardCoordinates r -> [r] 
-stc_toDenseList t nc = fmap (stc_coefficient nc) (tINormalDiscs t)
+stc_toDenseList t = fmap snd . stc_toDenseAssocs t 
 
+prop_stc_toDenseList
+  :: Num r => Triangulation -> StandardCoordinates r -> Property
+prop_stc_toDenseList t sc =
+    stc_toDenseList t sc .=. fmap (stc_coefficient sc) (tINormalDiscs t)
 
 
 
@@ -200,14 +210,15 @@ matchingEquationReasons t =
             ]
 
 matchingEquationReasonToVector
-  :: Num r => MatchingEquationReason -> StandardCoordinates r
+  :: Num r => MatchingEquationReason -> StandardCoordinateFunctional r
 matchingEquationReasonToVector (MatchingEquationReason x x' v v') =
                               (mkNormalTri (getTIndex x ./ v)
                           ^+^ mkNormalQuadByVertexAndTTriangle v x)
                           ^-^ mkNormalTri (getTIndex x' ./ v')
                           ^-^ mkNormalQuadByVertexAndTTriangle v' (forgetVertexOrder x')
 
-matchingEquationsWithReasons :: Num r => Triangulation -> [(StandardCoordinates r, MatchingEquationReason)]
+matchingEquationsWithReasons :: Num r => Triangulation -> 
+    [(StandardCoordinates r, MatchingEquationReason)]
 matchingEquationsWithReasons =
     fmap (matchingEquationReasonToVector &&& id) . matchingEquationReasons
     
@@ -288,7 +299,7 @@ stc_toAssocs :: StandardCoordinates r -> [(INormalDisc, r)]
 stc_toAssocs (SC m) = M.assocs m 
 
 stc_fromAssocs :: Num r => [(INormalDisc, r)] -> StandardCoordinates r
-stc_fromAssocs = SC . M.fromList . L.filter ((/=0) . snd) 
+stc_fromAssocs = sumV . fmap (SC . uncurry M.singleton) . L.filter ((/=0) . snd) 
 
 
 toFundamentalEdgeSurface :: Integral i => StandardCoordinates (Ratio i) -> StandardCoordinates i
@@ -322,20 +333,20 @@ instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
 -- Note that this is only well-defined in the disjoint union of tetrahedra, not in the quotient space!
 numberOfTrisContainingArcType
   :: Num r => StandardCoordinates r -> INormalArc -> r
-numberOfTrisContainingArcType nc arc = stc_coefficient nc (iNormalDisc $ iNormalTriByNormalArc arc) 
+numberOfTrisContainingArcType sc arc = stc_coefficient sc (iNormalDisc $ iNormalTriByNormalArc arc) 
 
 numberOfQuadsContainingArcType
   :: Num r => StandardCoordinates r -> INormalArc -> r
-numberOfQuadsContainingArcType nc arc = stc_coefficient nc (iNormalDisc $ iNormalQuadByNormalArc arc) 
+numberOfQuadsContainingArcType sc arc = stc_coefficient sc (iNormalDisc $ iNormalQuadByNormalArc arc) 
 
 numberOfArcsOfType
   :: Num r => StandardCoordinates r -> INormalArc -> r
-numberOfArcsOfType nc = liftM2 (+) (numberOfTrisContainingArcType nc) (numberOfQuadsContainingArcType nc) 
+numberOfArcsOfType sc = liftM2 (+) (numberOfTrisContainingArcType sc) (numberOfQuadsContainingArcType sc) 
 
 numberOfCornersOfType
   :: Num t => StandardCoordinates t -> INormalCorner -> t
-numberOfCornersOfType nc (viewI -> I i corn) =
-    $(foldr1Tuple 4) (+) (map4 (stc_coefficient nc . (i ./)) (normalDiscsContainingNormalCorner corn))
+numberOfCornersOfType sc (viewI -> I i corn) =
+    $(foldr1Tuple 4) (+) (map4 (stc_coefficient sc . (i ./)) (normalDiscsContainingNormalCorner corn))
 
 --     let
 --         e = normalCornerGetContainingEdge e

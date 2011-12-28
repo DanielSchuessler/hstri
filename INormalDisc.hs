@@ -55,7 +55,7 @@ instance MakeINormalArc (OITriangle,IVertex) where
     iNormalArc (t,v) = iNormalArc (forgetVertexOrder t,v)
 
 instance NormalCorners INormalArc (Pair INormalCorner) where
-    normalCorners (viewI -> I i a) = map2 (i ./) (normalCorners a) 
+    normalCorners = traverseI map2 normalCorners
 
 instance MakeINormalTri IVertex where
     iNormalTri = mapI normalTri
@@ -71,7 +71,7 @@ instance NormalCorners TIndex (Sextuple INormalCorner) where
     normalCorners ti = map6 (ti ./) allNormalCorners'
 
 instance NormalCorners ITriangle (Triple INormalCorner) where
-    normalCorners (viewI -> I ti d) = map3 (ti ./) (normalCorners d) 
+    normalCorners = traverseI map3 normalCorners
 
 instance NormalArcs TIndex [INormalArc] where
     normalArcs ti = map (ti ./) allNormalArcs
@@ -94,16 +94,16 @@ instance NormalTris OIEdge (Pair INormalTri) where
     normalTris = map2 iNormalTri . vertices 
 
 instance NormalArcs INormalDisc [INormalArc] where
-    normalArcs (viewI -> I ti d) = fmap (ti ./) (normalArcs d) 
+    normalArcs = traverseI fmap normalArcs
 
 instance NormalArcs INormalTri (Triple INormalArc) where
-    normalArcs (viewI -> I ti d) = map3 (ti ./) (normalArcs d) 
+    normalArcs = traverseI map3 normalArcs
 
 instance NormalArcs INormalQuad (Quadruple INormalArc) where
-    normalArcs (viewI -> I ti d) = map4 (ti ./) (normalArcs d) 
+    normalArcs = traverseI map4 normalArcs
 
 instance NormalArcs ITriangle (Triple INormalArc) where
-    normalArcs (viewI -> I ti d) = map3 (ti ./) (normalArcs d) 
+    normalArcs = traverseI map3 normalArcs
 
 -- | Constructs a normal quad specified by one of the two edges disjoint from it (in the same tetrahedron as the given edge)
 iNormalQuadByDisjointEdge :: IEdge -> INormalQuad
@@ -152,3 +152,9 @@ instance IsSubface INormalCorner IEdge where isSubface = liftIsSubface
 instance MakeINormalDisc INormalDisc where
     iNormalDisc = id
 
+
+iNormalTriGetVertex :: INormalTri -> IVertex
+iNormalTriGetVertex = mapI normalTriGetVertex
+
+iNormalQuadGetDisjointEdges :: I NormalQuad -> Pair IEdge
+iNormalQuadGetDisjointEdges = traverseI map2 normalQuadGetDisjointEdges

@@ -12,7 +12,7 @@ import Control.Exception
 import Control.Monad(when)
 import Data.Foldable
 import Data.Function
-import Data.Vect.Double hiding((.*),(.*.))
+import Data.Vect.Double hiding((*.),(.*.))
 import HomogenousTuples
 import MathUtil
 import PreRenderable
@@ -166,6 +166,8 @@ toBlender Scene{
             mapM_ (handleE ba grp1) (edges deltaSet)
             mapM_ (handleT ba grp2 grpTriLabels) (triangles deltaSet)
 
+            --ln "ops.view3d.viewnumpad(type='CAMERA')"
+
         
 
 
@@ -229,19 +231,19 @@ handleTriLabel ba grpTriLabels t =
                 Nothing -> return ()
 
                 Just (TriangleLabel lblstr g upDisplacementFactor) -> 
-                    let (cu0,cu1,cu2) = g .* cvs 
-                        right_ = normalize (cu1 &- cu0)
-                        basepoint = interpolate 0.5 cu0 cu1
-                        up1 = let up0 = (cu2 &- basepoint) 
-                                in up0 &- (dotprod right_ up0) *& right_
-                        height = norm up1
-                        up_ = up1 &* recip height 
+                    let (leftpoint,rightpoint,toppoint) = cvs *. g
+                        rightunit = normalize (rightpoint &- leftpoint)
+                        basepoint = interpolate 0.5 leftpoint rightpoint
+                        upvect = let up0 = (toppoint &- basepoint) 
+                                 in up0 &- (dotprod rightunit up0) *& rightunit
+                        height = norm upvect
+                        upunit = upvect &* recip height 
                         m = 
                             scalingUniformProj4 (0.4 * height)
                             .*.
-                            safeOrthogonal (Mat3 right_ up_ (crossprod right_ up_)) 
+                            safeOrthogonal (Mat3 rightunit upunit (crossprod rightunit upunit)) 
                             .*.
-                            translation (basepoint &+ upDisplacementFactor *& up1)
+                            translation (basepoint &+ upDisplacementFactor *& upvect)
 
 
 

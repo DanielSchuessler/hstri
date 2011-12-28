@@ -251,7 +251,7 @@ standardCoordinatesToPreRenderable
      SPQWithCoords v
      -> StandardCoordinates i
      -> PreRenderable (OTuple (Corn v))
-standardCoordinatesToPreRenderable (SPQWithCoords spq coords) nc =  
+standardCoordinatesToPreRenderable (SPQWithCoords spq coords _) nc =  
     let
         cns = mkConcrete (spq_tr spq) nc
 

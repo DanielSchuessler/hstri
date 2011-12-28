@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, TupleSections, FunctionalDependencies, MultiParamTypeClasses, ImplicitParams, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, TypeSynonymInstances, ScopedTypeVariables, FlexibleContexts, GeneralizedNewtypeDeriving, StandaloneDeriving, ExistentialQuantification #-}
-{-# OPTIONS -Wall #-}
-module FaceLattice where
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
+module FaceLattice(viewFL,test_FaceLattice,FaceLatticeRenderStyle(..),flrs_screen,flrs_paper) where
 
 import Control.DeepSeq
 import Control.Monad.Reader
@@ -17,7 +17,7 @@ import Data.GraphViz.Attributes.Complete
 import Data.GraphViz.Printing
 import Data.List(genericLength)
 import Data.Maybe
-import Data.Text.Lazy as Text
+import qualified Data.Text.Lazy as Text
 import IndexedSimplices
 import System.Process
 import System.SimpleArgs(getArgs)
@@ -26,56 +26,59 @@ import TriangulationCxtObject
 import qualified Data.Text.Lazy.IO as TextIO
 import AbstractTetrahedron
 import Control.Exception
-import System.Exit
 import QuickCheckUtil
+import System.Exit
+import Latexable
+import DotUtil hiding(mkNode)
 
-class GraphvizFormatable a y | a -> y where fmt :: a -> y
+class GraphvizFormatable a y | a -> y where 
+    fmt :: FaceLatticeRenderStyle -> a -> y
 
-i2fieldLabel :: (Show a, HasTIndex ia a) => ia -> RecordField
-i2fieldLabel (viewI -> I i a) = FieldLabel (Text.pack $ show i ++ "." ++ show a)
 
-instance GraphvizFormatable ITriangle RecordField where fmt = i2fieldLabel
-instance GraphvizFormatable OITriangle RecordField where fmt = i2fieldLabel
-instance GraphvizFormatable IEdge RecordField where fmt = i2fieldLabel
-instance GraphvizFormatable IVertex RecordField where fmt = i2fieldLabel
+--fmtI0 :: (Show a, HasTIndex ia a) => ia -> RecordField
+--fmtI0 (viewI -> I i a) = (FieldLabel . Text.pack) (show i ++ "." ++ show a)
+--fmtI0 (viewI -> I i a) = (FieldLabel . Text.pack) (show a ++ showSubscript i)
+-- fmtI0 :: Latexable a => a -> RecordField
+-- fmtI0 = FieldLabel . Text.pack . toLatex
+
+--fmtI :: (Show a, HasTIndex ia a) => FaceLatticeRenderStyle -> ia -> RecordField
+-- fmtI :: Latexable a => FaceLatticeRenderStyle -> a -> RecordField
+-- fmtI = const fmtI0 
+
+-- instance GraphvizFormatable ITriangle RecordField where fmt = fmtI
+-- instance GraphvizFormatable OITriangle RecordField where fmt = fmtI
+-- instance GraphvizFormatable IEdge RecordField where fmt = fmtI
+-- instance GraphvizFormatable OIEdge RecordField where fmt = fmtI
+-- instance GraphvizFormatable IVertex RecordField where fmt = fmtI
+
+theShape :: Shape
+theShape = Ellipse
 
 instance GraphvizFormatable (FL,Node,TIndex) Attributes where
-    fmt (_,_,i) = 
-            [ Label (StrLabel (Text.pack $ show i)) ]
+    fmt _ (_,_,i) = 
+            [ Shape theShape
+            , (Label . StrLabel . Text.pack . mathmode. show) i ]
 
 instance GraphvizFormatable (FL,Node,TTriangle) Attributes where
-    fmt (_,_,x) = 
-            [ Shape Record
-            , Label (RecordLabel (fmap fmt (asList $ trianglePreimage x)))
+    fmt o (_,_,x) = 
+            [ Shape theShape
+            , setlbl o (trianglePreimage x)
             ]
 
 instance GraphvizFormatable (FL,Node,TEdge) Attributes where
-    fmt (_,_,x) = 
-            [ Shape Record
-            , Label (RecordLabel (fmap fmt (equivalentIEdges x)))
+    fmt o (_,_,x) = 
+            [ Shape theShape
+            , setlbl o (equivalentIEdges x)
             ]
 
 instance GraphvizFormatable (FL,Node,TVertex) Attributes where
-    fmt (_,_,x) = 
-            [ Shape Record
-            , Label (RecordLabel (fmap fmt (equivalentIVertices x)))
+    fmt o (_,_,x) = 
+            [ Shape theShape
+            , setlbl o (equivalentIVertices x)
             ]
 
-class FLN_Id a where
-    flnId :: a -> Int
-
-tagBits :: Int
-tagBits = 3
-
-instance FLN_Id TIndex where
-    flnId i = shiftL (fromEnum i) tagBits .|. 3  
-
-faceLatticeNodeId' :: Enum b => Int -> T b -> Int
-faceLatticeNodeId' tag x = shiftL (fromEnum . unT $ x) tagBits .|. tag 
-
-instance FLN_Id TTriangle where flnId = faceLatticeNodeId' 2 
-instance FLN_Id TEdge where flnId = faceLatticeNodeId' 1 
-instance FLN_Id TVertex where flnId = faceLatticeNodeId' 0 
+setlbl :: (AsList a, Latexable (Element a)) => t -> a -> Attribute
+setlbl _ = Label . StrLabel . Text.pack . mathmode . latexSet
 
 -- | Face Lattice Node class
 class (Show a, GraphvizFormatable (FL,Node,a) Attributes) 
@@ -123,7 +126,10 @@ type FL = Gr FLN FLE
 instance Show FLN where show (FLN a _) = show a
     
 instance GraphvizFormatable (FL, LNode FLN) Attributes where 
-    fmt (fl, (i, FLN a colour)) = Color [color_] : FontColor color_ : fmt (fl,i,a) 
+    fmt opts (fl, (i, FLN a colour)) = 
+            (guard (flrs_doColor opts) >>
+                [Color [color_] , FontColor color_])
+            ++ fmt opts (fl,i,a) 
         where
             color_ = colour2color colour    
 
@@ -176,27 +182,36 @@ faceLattice = do
 gempty :: Gr FLN FLE
 gempty = G.empty
 
-dotGraph ::  Triangulation -> (DotGraph Node)
-dotGraph = do
+dotGraph
+  :: FaceLatticeRenderStyle -> Triangulation -> DotGraph Node
+dotGraph opts@FLRS{ flrs_doColor = doColor } = do
     fl <- faceLattice
 
     
     return $ graphToDot (nonClusteredParams { 
 
             fmtEdge = 
-                (\(_,_,colour2color -> c) -> [ Color [c] ]) 
+                (\(_,_,colour2color -> c) -> 
+                    (guard doColor >> [ Color [c] ])
+                ) 
             
             , 
-            fmtNode = fmt . (fl,) ,
+            fmtNode = fmt opts . (fl,) ,
             globalAttributes = 
-                [   EdgeAttrs [ Color [white], FontColor white, PenWidth 2 ] 
-                ,   GraphAttrs [ BgColor (X11Color Black)
-                               , RankDir FromBottom
-                               , RankSep [2.4] 
-                               , Overlap RemoveOverlaps
+                [   EdgeAttrs (
+                        (guard doColor >> [ Color [white], FontColor white ])
+                        ++ [PenWidth 2] 
+                    )
+                ,   GraphAttrs ( 
+                        (guard doColor >> [ BgColor (X11Color Black) ])
+                        ++
+                        [ 
+                                 RankDir FromBottom
+--                                , RankSep [2.4] 
+--                                , Overlap RemoveOverlaps
                                , Splines SplineEdges
-                               
-                               ] 
+                         ] 
+                         )
                 ,   NodeAttrs [ PenWidth 2 ]
                 ]
         
@@ -207,29 +222,22 @@ dotGraph = do
 white :: Color
 white = X11Color White
 
-test_FaceLattice :: IO ()
-test_FaceLattice = do
-    (nTets,nGluings) <- getArgs
-    t <- randomTriangulation nTets nGluings
-    viewFL t
+test_FaceLattice :: FaceLatticeRenderStyle -> IO ExitCode
+test_FaceLattice opt = testDot (dotGraph opt)
 
-viewFL ::  Triangulation -> IO ()
-viewFL t = do
-    putStrLn "\n\n=== TRIANGULATION ===\n"
-    print t
-    let dotGraph0 = dotGraph t 
---     putStrLn "\n\n=== DOTGRAPH ===\n"
---     print dotGraph0 
---     putStrLn "\n\n=== DOT CODE ===\n"
---     putStrLn =<< prettyPrint dotGraph0
-    TextIO.writeFile "out.dot" $ printIt dotGraph0
-
---     res <- runGraphviz dotGraph0 Svg "out.svg"
---     either error (\x -> rawSystem "gwenview" [x]) res
-    --runGraphvizCanvas Dot dotGraph0 Xlib
-    ec <- system "dot out.dot -Tsvg > out.svg && gwenview out.svg"
-    exitWith ec
+viewFL :: FaceLatticeRenderStyle -> Triangulation -> IO ExitCode
+viewFL opt tr = viewDot (dotGraph opt tr)
  
 instance NFData FLN where
     rnf (FLN x c) = x `seq` rnf c
 
+data FaceLatticeRenderStyle = 
+    FLRS {
+        flrs_doColor :: Bool
+
+    }
+
+flrs_screen :: FaceLatticeRenderStyle
+flrs_screen = FLRS True
+flrs_paper :: FaceLatticeRenderStyle
+flrs_paper = FLRS False

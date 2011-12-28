@@ -5,20 +5,27 @@ module Triangle(
 
     -- * Plain
     Triangle,
+    tBCD,tACD,tABD,tABC,
     allTriangles,allTriangles',
+    -- ** Construction
     MakeTriangle(..),
+    triangleByDualVertex,
+    ascVerticesToTriangle,
+
+    -- ** Properties
     edgeByOppositeVertexAndTriangle,
     vertexByOppositeEdge,
-    triangleByDualVertex,
     triangleDualVertex,
     isVertexOfTriangle,
     isEdgeOfTriangle,
-    tBCD,tACD,tABD,tABC,
 
     -- ** Vertex indices
     VertexIndexInTriangle(..),
     triangleGetVertexAt,
+    triangleGetEdgeAt,
     triangleGetIndexOf,
+    allTriangleVertexIndices,
+    allTriangleVertexIndices',
 
     -- * Ordered
     OTriangle,
@@ -59,6 +66,7 @@ import Test.QuickCheck
 import Util
 import Test.QuickCheck.All
 import ShortShow
+import Data.Proxy
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
@@ -105,7 +113,8 @@ instance Pretty Triangle where pretty = trianglePrettyColor . text . show
 class MakeTriangle a where
     triangle :: a -> Triangle
 
-
+-- | The vertices must be strictly ascending
+ascVerticesToTriangle :: Triple Vertex -> Triangle
 ascVerticesToTriangle vs = triangleByDualVertex . unviewVertex $
         case map3 viewVertex vs of
              (B,C,D) -> A
@@ -116,7 +125,7 @@ ascVerticesToTriangle vs = triangleByDualVertex . unviewVertex $
 
 -- | The Vertices must be distinct (but needn't be ordered)
 instance MakeTriangle (Vertex,Vertex,Vertex) where
-    triangle vs = ascVerticesToTriangle . sort3
+    triangle = ascVerticesToTriangle . sort3
 
 prop_MakeTriangle_VVV ::  Vertex -> Property
 prop_MakeTriangle_VVV v0 = 
@@ -192,7 +201,7 @@ class MakeOTriangle a where
     otriangle :: a -> OTriangle
 
 instance MakeOTriangle Triangle where
-    otriangle = curry otriangle S3abc
+    otriangle = toOrderedFace
 
 instance MakeOTriangle (Triangle,S3) where
     otriangle = uncurry packOrderedFace 
@@ -206,13 +215,17 @@ instance Lift OTriangle where
 type OITriangle = I OTriangle
 
 trivialHasTIndexInstance [t|OTriangle|]
+trivialHasTIndexInstance [t|Pair OTriangle|]
 
-instance  (OrderableFace ITriangle OITriangle) where
+
+instance OrderableFace ITriangle OITriangle where
     type VertexSymGroup ITriangle = S3
     type VertexTuple ITriangle = Triple IVertex
     unpackOrderedFace = defaultUnpackOrderedFaceI
     packOrderedFace = defaultPackOrderedFaceI
 
+prop_OrderableFace_ITriangle :: Property
+prop_OrderableFace_ITriangle = polyprop_OrderableFace (undefined :: Proxy ITriangle)
 
 
 
@@ -221,8 +234,11 @@ instance RightAction S3 OITriangle where (*.) = defaultRightActionForOrderedFace
 instance OrderableFace Triangle OTriangle where
     type VertexSymGroup Triangle = S3
     type VertexTuple Triangle = Triple Vertex
-    unpackOrderedFace (OTriangle g x) = (g,x)
+    unpackOrderedFace (OTriangle x g) = (x,g)
     packOrderedFace = OTriangle
+
+prop_OrderableFace_Triangle :: Property
+prop_OrderableFace_Triangle = polyprop_OrderableFace (undefined :: Proxy Triangle)
 
 
 instance RightAction S3 OTriangle where
@@ -247,7 +263,7 @@ instance MakeOTriangle (Triple Vertex) where
 verticesToOTriangle ::  (Vertex, Vertex, Vertex) -> OTriangle
 verticesToOTriangle vs =
     case sort3WithPermutation vs of
-         (vs',g) -> packOrderedFace (ascVerticesToTriangle vs')
+         (vs',g) -> packOrderedFace (ascVerticesToTriangle vs') g
 
 -- | Triangles containing a given edge
 instance Star Edge (TwoSkeleton AbsTet) (Pair Triangle) where
@@ -356,6 +372,16 @@ instance OEdges OTriangle (Triple OEdge) where
 data VertexIndexInTriangle = VT0 | VT1 | VT2
     deriving(Eq,Show)
 
+allTriangleVertexIndices'
+  :: (VertexIndexInTriangle,
+      VertexIndexInTriangle,
+      VertexIndexInTriangle)
+allTriangleVertexIndices' = (VT0,VT1,VT2)
+allTriangleVertexIndices :: [VertexIndexInTriangle]
+allTriangleVertexIndices = asList allTriangleVertexIndices'
+
+triangleGetEdgeAt :: Triangle -> VertexIndexInTriangle -> Edge
+triangleGetEdgeAt t vi = edgeByOppositeVertexAndTriangle (triangleGetVertexAt t vi) t
 
 triangleGetVertexAt
   :: Vertices a (t, t, t) => a -> VertexIndexInTriangle -> t

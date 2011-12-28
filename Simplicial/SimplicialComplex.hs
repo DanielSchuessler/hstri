@@ -21,6 +21,9 @@ import Simplicial.GraphComplex
 import TupleTH
 import PrettyUtil
 import ShortShow
+import QuickCheckUtil
+import Test.QuickCheck
+import Control.Applicative
 
 
 type Plus4 n = S (S (S (S n)))
@@ -80,7 +83,18 @@ simplicialFaces =
                          
                          
                          )
+
+
+instance (Ord a, Arbitrary a) => Arbitrary (OTuple a N2) where 
+    arbitrary =
+        OT <$> (arbitrary `suchThat` isOrdered3)
+
+
+
     
+prop_faces20Ascending :: OTuple Int N2 -> Property
+prop_faces20Ascending xs =
+    unOT xs .=. map3 unOT (faces20Ascending (fromTris [unOT xs] :: SimplicialComplex Int) xs)
     
     
 

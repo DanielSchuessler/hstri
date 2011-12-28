@@ -21,18 +21,19 @@ import Data.Maybe
 import Control.Monad
 import SimplicialPartialQuotient
 import PrettyUtil
+import ShortShow
 
 data EdgeNeighborhoodVertex =
     Bottom |
     Top |
     EquatorVertex Int
 
-    deriving(Eq,Ord)
+    deriving(Show,Eq,Ord)
 
-instance Show EdgeNeighborhoodVertex where
-    show Bottom = "B"
-    show Top = "T"
-    show (EquatorVertex i) = show i
+instance ShortShow EdgeNeighborhoodVertex where
+    shortShow Bottom = "B"
+    shortShow Top = "T"
+    shortShow (EquatorVertex i) = show i
 
 instance Pretty EdgeNeighborhoodVertex where
     pretty = black . text . show
@@ -120,10 +121,13 @@ makeEdgeNeighborhoodMap tr oiEdge =
 
 
 
-makeEdgeNeighborhood :: Triangulation -> OIEdge -> 
-    (SPQWithCoords EdgeNeighborhoodVertex) 
 
-makeEdgeNeighborhood tr oiEdge =
+makeEdgeNeighborhood
+  :: Triangulation
+     -> OIEdge
+     -> (Gluing -> String)
+     -> SPQWithCoords EdgeNeighborhoodVertex
+makeEdgeNeighborhood tr oiEdge gluingLabeller =
     let
 
         m = makeEdgeNeighborhoodMap tr oiEdge
@@ -155,11 +159,9 @@ makeEdgeNeighborhood tr oiEdge =
 --         labels = fmap return letters ++ join (liftM2 (\x y -> [x,y])) letters ++ error "out of labels :("
 --         letters = "FGJPQR?" 
 
-        spqwc = SPQWithCoords m coords
+    in    
+        SPQWithCoords m coords gluingLabeller
             
-    in
-        spqwc
-
 
 
 prop_edgeIsGlued

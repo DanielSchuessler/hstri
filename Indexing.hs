@@ -6,7 +6,9 @@ import qualified Data.Vector as V
 import Control.Arrow
 import Test.QuickCheck
 import Control.Applicative
+import QuickCheckUtil
 
+-- | A bijection from a subset of @a@ to @{ 0, ..., n-1}@ for some @n@
 data Indexing a = Indexing {
     indexing_map :: M.Map a Int,
     indexing_v ::   V.Vector a
@@ -15,15 +17,13 @@ data Indexing a = Indexing {
     deriving (Show)
 
 propIndexingInvariant1 :: (Eq a, Show a) => Indexing a -> Property
-propIndexingInvariant1 (Indexing m v) | M.null m = property (V.null v)
 propIndexingInvariant1 (Indexing m v) = 
-    forAll (elements (M.assocs m))
+    forAllElements (M.assocs m)
     (\(a,i) -> v V.! i == a)
 
 propIndexingInvariant2 :: Ord a => Indexing a -> Property
-propIndexingInvariant2 (Indexing m v) | V.null v = property (M.null m)
 propIndexingInvariant2 (Indexing m v) = 
-    forAll (elements [0..V.maxIndex v])
+    forAllElements [0..V.maxIndex v]
     (\i -> m M.! (v V.! i) == i)
 
 fromDistinctList :: Ord a => [a] -> Indexing a

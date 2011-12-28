@@ -3,10 +3,9 @@
 
 -- | Utility functions for Patrick Bahr's /equivalence/ package
 module Equivalence(
-    -- * Typeclasses
-    IsEquivalenceClass(..),HasEquivalence(..), eqvRep, eqvEquivalents,
+    module Equivalence.Class,
     -- * Equivalence classes
-    EquivalenceClass, ec_elements, ec_map, ec_mapMonotonic, 
+    SetBasedEquivalenceClass, ec_elements, ec_map, ec_mapMonotonic, 
     ec_singleton, ec_union, ec_join, ec_elementList,
     -- * Equivalence relations
     Equivalence, eqv_classmap, eqv_classes, eqv_eq, mkEquivalence, eqv_classcount,
@@ -27,40 +26,26 @@ import Test.QuickCheck.All
 import PrettyUtil
 import QuickCheckUtil
 import Element
+import Equivalence.Class
 
 
-#define KEYCLASS(A) Ord(A)
 
-class IsEquivalenceClass cls elt | cls -> elt where
-    canonicalRep :: cls -> elt
-    equivalents :: cls -> [elt] 
-    ecMember :: elt -> cls -> Bool
-    ecSize :: cls -> Int
-
-class IsEquivalenceClass cls elt => HasEquivalence t cls elt | cls -> elt, elt t -> cls where
-    eqvClasses :: t -> [cls]
-    -- | Throws an error if the element is not in the domain of the equivalence
-    eqvClassOf :: t -> elt -> cls
-
-eqvRep ::  HasEquivalence t cls elt => t -> elt -> elt
-eqvRep e x = canonicalRep $! eqvClassOf e x 
-
-eqvEquivalents ::  HasEquivalence t cls elt => t -> elt -> [elt]
-eqvEquivalents e x = equivalents $! eqvClassOf e x
-
-data EquivalenceClass a = EquivalenceClass {
+data SetBasedEquivalenceClass a = SetBasedEquivalenceClass {
     -- | INVARIANT: This contains 'ec_rep'
     ec_elements :: Set a,
     -- | An arbitraily chosen Representative of the equivalence class 
     ec_rep :: !a
 }
 
-ec_elementList :: EquivalenceClass a -> [a]
+ec_elementList :: SetBasedEquivalenceClass a -> [a]
 ec_elementList = setToList . ec_elements 
 
-instance KEYCLASS(a) => IsEquivalenceClass (EquivalenceClass a) a where
-    equivalents = setToList . ec_elements
+type instance Element (SetBasedEquivalenceClass a) = a
 
+instance AsList (SetBasedEquivalenceClass a) where
+    asList = ec_elementList
+
+instance Ord a => IsEquivalenceClass (SetBasedEquivalenceClass a) where
     canonicalRep = ec_rep 
 
     ecMember x ec = x `member` ec_elements ec
@@ -70,48 +55,48 @@ instance KEYCLASS(a) => IsEquivalenceClass (EquivalenceClass a) a where
 
 
 
-ec_map :: (KEYCLASS(a), KEYCLASS(b)) => (a -> b) -> EquivalenceClass a -> EquivalenceClass b
-ec_map f EquivalenceClass{ec_elements,ec_rep} = EquivalenceClass{ec_elements= mapSet f ec_elements, ec_rep=f ec_rep}
+ec_map :: (Ord a, Ord b) => (a -> b) -> SetBasedEquivalenceClass a -> SetBasedEquivalenceClass b
+ec_map f SetBasedEquivalenceClass{ec_elements,ec_rep} = SetBasedEquivalenceClass{ec_elements= mapSet f ec_elements, ec_rep=f ec_rep}
 
-ec_mapMonotonic :: (KEYCLASS(a), KEYCLASS(b)) => (a -> b) -> EquivalenceClass a -> EquivalenceClass b
-ec_mapMonotonic f EquivalenceClass{ec_elements,ec_rep} = 
-    EquivalenceClass{ec_elements= mapSetMonotonic f ec_elements, ec_rep=f ec_rep}
+ec_mapMonotonic :: (Ord a, Ord b) => (a -> b) -> SetBasedEquivalenceClass a -> SetBasedEquivalenceClass b
+ec_mapMonotonic f SetBasedEquivalenceClass{ec_elements,ec_rep} = 
+    SetBasedEquivalenceClass{ec_elements= mapSetMonotonic f ec_elements, ec_rep=f ec_rep}
 
-deriving instance (Show a, KEYCLASS(a)) => Show (EquivalenceClass a)
+deriving instance (Show a, Ord a) => Show (SetBasedEquivalenceClass a)
 
-instance Eq a => Eq (EquivalenceClass a) where
+instance Eq a => Eq (SetBasedEquivalenceClass a) where
     (==) = (==) `on` ec_rep
 
-instance Ord a => Ord (EquivalenceClass a) where
+instance Ord a => Ord (SetBasedEquivalenceClass a) where
     compare = compare `on` ec_rep
 
 
 
-ec_singleton :: KEYCLASS(a) => a -> EquivalenceClass a
-ec_singleton a = EquivalenceClass (singletonSet a) a
+ec_singleton :: Ord a => a -> SetBasedEquivalenceClass a
+ec_singleton a = SetBasedEquivalenceClass (singletonSet a) a
 
-ec_union :: KEYCLASS(a) => EquivalenceClass a -> EquivalenceClass a -> EquivalenceClass a
-ec_union (EquivalenceClass es1 r1) (EquivalenceClass es2 _) = EquivalenceClass (es1 `mappend` es2) r1
+ec_union :: Ord a => SetBasedEquivalenceClass a -> SetBasedEquivalenceClass a -> SetBasedEquivalenceClass a
+ec_union (SetBasedEquivalenceClass es1 r1) (SetBasedEquivalenceClass es2 _) = SetBasedEquivalenceClass (es1 `mappend` es2) r1
 
 data Equivalence a = Equivalence {
-    eqv_classmap :: Map a (EquivalenceClass a),
+    eqv_classmap :: Map a (SetBasedEquivalenceClass a),
     -- | Distinct.
-    eqv_classes :: [EquivalenceClass a],
+    eqv_classes :: [SetBasedEquivalenceClass a],
     eqv_generators :: [(a,a)]
 }
 
-deriving instance (Show a, KEYCLASS(a)) => Show (Equivalence a)
+deriving instance (Show a, Ord a) => Show (Equivalence a)
 
-instance KEYCLASS(a) => HasEquivalence (Equivalence a) (EquivalenceClass a) a where
+instance Ord a => HasEquivalence (Equivalence a) (SetBasedEquivalenceClass a) a where
     eqvClasses = eqv_classes
     eqvClassOf = eqv_classOf
     
-eqv_classOf :: Ord k => Equivalence k -> k -> EquivalenceClass k
+eqv_classOf :: Ord k => Equivalence k -> k -> SetBasedEquivalenceClass k
 eqv_classOf e x = eqv_classmap e ! x
 
 
 -- | Checks whether the given elements are equivalent. Throws an error if the first argument is not in the domain of the equivalence.
-eqv_eq :: (KEYCLASS(a)) => Equivalence a -> a -> a -> Bool
+eqv_eq :: (Ord a) => Equivalence a -> a -> a -> Bool
 eqv_eq e x y = x `ecMember` eqvClassOf e y 
 
 eqv_classcount ::  Equivalence a -> Int
@@ -119,14 +104,14 @@ eqv_classcount = length . eqv_classes
 
 
 -- | Gets the representative of the equivalence class of the given element. Throws an error if the element is not in the domain of the equivalence.
-eqv_rep :: (KEYCLASS(a)) => Equivalence a -> a -> a
+eqv_rep :: (Ord a) => Equivalence a -> a -> a
 eqv_rep !e !x = ec_rep (eqv_classOf e x)
 
 
 -- insertUnlessExists = Map.insertWith (curry snd)
 
 
-mkEquivalence :: forall a. (KEYCLASS(a)) => 
+mkEquivalence :: forall a. (Ord a) => 
     [(a,a)]  -- ^ Gluings
     -> [a]   -- ^ Additional elements that should be present in the returned relation (will only be equivalent to themselves
              -- if they don't occur in the first argument)
@@ -134,23 +119,23 @@ mkEquivalence :: forall a. (KEYCLASS(a)) =>
 mkEquivalence pairs extraElements = mkEquivalence0 (pairs ++ [(a,a) | a <- extraElements])
 
  
-mkEquivalence0 :: forall a. (KEYCLASS(a)) => [(a,a)] -> Equivalence a
+mkEquivalence0 :: forall a. (Ord a) => [(a,a)] -> Equivalence a
 mkEquivalence0 pairs = (runEquivM ec_singleton ec_union go)
                             -- this is semantically redundant but makes it possible to retrieve eqv_generators without
                             -- computing the other stuff
                             { eqv_generators = pairs }
                         
     where
-        go :: forall s. EquivM s (EquivalenceClass a) a (Equivalence a)
+        go :: forall s. EquivM s (SetBasedEquivalenceClass a) a (Equivalence a)
         go = do
             mapM_ (uncurry equate) pairs
 
             -- Now capture the information contained in the state of the EquivM monad into our pure
             -- Equivalence structure
             
-            let f :: EquivM s (EquivalenceClass a) a (Equivalence a) 
+            let f :: EquivM s (SetBasedEquivalenceClass a) a (Equivalence a) 
                   -> a 
-                  -> EquivM s (EquivalenceClass a) a (Equivalence a)
+                  -> EquivM s (SetBasedEquivalenceClass a) a (Equivalence a)
                 f mr a = do
 
                     -- Get the recursive result
@@ -236,7 +221,7 @@ prop_classmap_classes = mkProp (\_ _ e -> naiveECSetEq
                                             (elems (eqv_classmap e))
                                             (eqv_classes e))
     where
-        naiveECSetEq = (==) `on`  (setFromList . fmap (\(EquivalenceClass es1 r1) -> (es1,r1))) 
+        naiveECSetEq = (==) `on`  (setFromList . fmap (\(SetBasedEquivalenceClass es1 r1) -> (es1,r1))) 
 
 -- | The key set of 'eqv_classmap' equals the set of elements occuring in the input pairs
 prop_domain ::  Property
@@ -261,20 +246,22 @@ prop_classes_distinct = mkProp (\_ _ e -> let cs = eqv_classes e in setSize (set
 qc_Equivalence ::  IO Bool
 qc_Equivalence = $(quickCheckAll)
 
-instance (KEYCLASS(a), Pretty a) => Pretty (EquivalenceClass a) where pretty = pretty . ec_elements
-instance (KEYCLASS(a), Pretty a) => Pretty (Equivalence a) where 
+instance (Ord a, Pretty a) => Pretty (SetBasedEquivalenceClass a) where 
+    pretty = pretty . ec_elements
+
+instance (Ord a, Pretty a) => Pretty (Equivalence a) where 
     pretty e =
         vsep 
             (text "Equivalence, classes = {"
              : fmap (indent 2 . pretty) (eqv_classes e) 
              ++ [rbrace])
 
-ec_join :: KEYCLASS(a) => EquivalenceClass (EquivalenceClass a) -> EquivalenceClass a
-ec_join ecs = EquivalenceClass { ec_elements = (foldr1 setUnion . fmap ec_elements . setToList . ec_elements) ecs
+ec_join :: Ord a => SetBasedEquivalenceClass (SetBasedEquivalenceClass a) -> SetBasedEquivalenceClass a
+ec_join ecs = SetBasedEquivalenceClass { ec_elements = (foldr1 setUnion . fmap ec_elements . setToList . ec_elements) ecs
                                , ec_rep = (ec_rep . ec_rep) ecs
                                }
 
-eqv_map :: (KEYCLASS(a), KEYCLASS(b)) => (a -> b) -> Equivalence a -> Equivalence b
+eqv_map :: (Ord a, Ord b) => (a -> b) -> Equivalence a -> Equivalence b
 eqv_map f e = mkEquivalence0 (fmap (map2 f) (eqv_generators e))
 
 mkWellDefinednessProp :: (Eq y, Eq a, Show a, Show y) => (a -> [a]) -> (a -> y) -> a -> Property
@@ -307,20 +294,16 @@ mkWellDefinednessProp2 equivalentXs equivalentYs f =
 
 
 
-instance Hashable a => Hashable (EquivalenceClass a) where hash = hash . ec_rep
+instance Hashable a => Hashable (SetBasedEquivalenceClass a) where hash = hash . ec_rep
 
-eqv_class_elements :: (KEYCLASS(a)) => Equivalence a -> a -> Set a
+eqv_class_elements :: (Ord a) => Equivalence a -> a -> Set a
 eqv_class_elements e = ec_elements . eqvClassOf e
 
-eqv_equivalents :: (KEYCLASS(a)) => Equivalence a -> a -> [a]
-eqv_equivalents e = equivalents . eqvClassOf e
+eqv_equivalents :: (Ord a) => Equivalence a -> a -> [a]
+eqv_equivalents e = asList . eqvClassOf e
 
 -- | Returns a list containing a represenative of each class 
 eqv_reps ::  Equivalence b -> [b]
 eqv_reps e = ec_rep `fmap` eqv_classes e 
 
 
-type instance Element (EquivalenceClass a) = a
-
-instance AsList (EquivalenceClass a) where
-    asList = ec_elementList

@@ -1,22 +1,20 @@
 {-# LANGUAGE NoMonomorphismRestriction, ViewPatterns, TemplateHaskell #-}    
-module ParseJvx where
+module ParseJvx(parseJvx) where
 
 import Control.Monad
 import Control.Monad.Compose.Class
-import Control.Monad.Error.Class
-import Control.Monad.Reader.Class
-import Control.Monad.Trans.Error
 import Data.Functor
 import Data.List(sort)
 import Data.Map as Map
 import Data.Maybe
 import HomogenousTuples
-import Text.XML.Light hiding(parseXMLDoc,strContent)
 import Text.XML.Monad
 import Triangulation
 import TupleTH
 import qualified Data.ByteString as BS
 
+readJvxFile
+  :: FilePath -> IO (Either XmlError Triangulation)
 readJvxFile fn = do
     s <- BS.readFile fn 
     return (runXml (parseXMLDoc >>> parseJvx) s)
@@ -55,8 +53,8 @@ convertToTriangulation tets = fromRight $ mkTriangulationG tets gluings
         gluings = catMaybes . fmap f . Map.toList $ glueHelperMap 
 
         f (_,[_]) = Nothing
-        f (_,[(tet1,t1),(tet2,t2)]) = Just (tet1,t1,tet2,S3abc,t2)
-        f (triple,tets) = error ("Triangle "++show tets++" is contained in more than two tetrahedra: "++show tets)
+        f (_,[(tet1,t1),(tet2,t2)]) = Just ((tet1,t1),(tet2,toOrderedFace t2))
+        f (triple,tets_) = error ("Triangle "++show triple++" is contained in more than two tetrahedra: "++show tets_)
 
 
 

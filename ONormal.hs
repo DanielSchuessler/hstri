@@ -10,7 +10,7 @@ import PrettyUtil
 
 -- | Ordered 'NormalArc'
 newtype ONormalArc = ONormalArc (Pair NormalCorner) 
-    deriving(LeftAction S2, MakeNormalArc, Eq, Ord, Pretty, Show)
+    deriving(RightAction S2, MakeNormalArc, Eq, Ord, Pretty, Show)
 
 class MakeONormalArc a where
     oNormalArc :: a -> ONormalArc 

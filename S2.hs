@@ -44,3 +44,9 @@ instance Finite S2
 instance Lift S2 where
     lift x = conE (mkName (show x))
 
+sort2WithPermutation :: Ord t => (t, t) -> ((t, t), S2)
+sort2WithPermutation (x,y) =
+    if (x<=y) 
+       then ((x,y),NoFlip)
+       else ((y,x),Flip)
+
