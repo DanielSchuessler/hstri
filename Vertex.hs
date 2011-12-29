@@ -15,6 +15,7 @@ module Vertex
     vertexToWord8,
     vertexFromWord8,
     vertexDefaultCoords,
+    vertexMemo,
 
     Link(..),
     Star(..),
@@ -191,3 +192,20 @@ instance Link IVertex (ZeroSkeleton AbsTet) (Triple IVertex) where
     link v p = traverseI map3 (flip link p) v
 
 instance ShortShow Vertex where shortShow = show
+
+vertexMemo :: (Vertex -> r) -> Vertex -> r
+vertexMemo f = 
+    let
+        fA = f vA
+        fB = f vB
+        fC = f vC
+        fD = f vD
+    in
+        \v -> case viewVertex v of
+                   A -> fA
+                   B -> fB
+                   C -> fC
+                   D -> fD
+
+
+

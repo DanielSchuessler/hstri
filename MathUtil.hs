@@ -106,25 +106,6 @@ matrixApproxEq :: MatrixNorms m => m -> m -> Bool
 matrixApproxEq m1 m2 = matrixDistance m1 m2 < 1E-10
 
 
--- | Absent keys are taken to have coefficient zero
-instance (Ord k, Num r) => AdditiveGroup (Map k r) where
-    zeroV = mempty
-    xs ^+^ ys = unionMaybeWith f xs ys
-        where
-            f x y = case x + y of
-                         0 -> Nothing
-                         s -> Just s
-    negateV = fmap negate
-
--- | Absent keys are taken to have coefficient zero
-instance (Ord k, Num r) => VectorSpace (Map k r) where
-    type Scalar (Map k r) = r
-    0 *^ _ = zeroV
-    r *^ x = fmap (r*) x 
-
--- | Absent keys are taken to have coefficient zero
-instance (Ord k, Num r) => InnerSpace (Map k r) where
-    x <.> y = Fold.foldl' (+) 0 (intersectionWith (*) x y)
 
 
 ratioToIntegral :: Integral a => Ratio a -> Maybe a

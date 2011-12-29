@@ -211,3 +211,5 @@ instance Lift NormalArc where
 
 instance MakeVertex NormalArc where
     vertex = normalArcGetVertex
+
+normalArcsAroundVertex v = 

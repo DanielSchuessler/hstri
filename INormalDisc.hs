@@ -130,9 +130,8 @@ iNormalArcByTriangleAndVertexIndex
 iNormalArcByTriangleAndVertexIndex (viewI -> I ti t) vi = 
     ti ./ normalArcByTriangleAndVertexIndex t vi
     
-
 eitherIND
-  :: (INormalTri -> c) -> (INormalQuad -> c) -> INormalDisc -> c
+  :: (INormalTri -> r) -> (INormalQuad -> r) -> INormalDisc -> r
 eitherIND kt kq (viewI -> I i x) = eitherND (kt . (i ./)) (kq . (i ./)) x
 
 iNormalTriByNormalArc :: INormalArc -> INormalTri
@@ -156,5 +155,8 @@ instance MakeINormalDisc INormalDisc where
 iNormalTriGetVertex :: INormalTri -> IVertex
 iNormalTriGetVertex = mapI normalTriGetVertex
 
-iNormalQuadGetDisjointEdges :: I NormalQuad -> Pair IEdge
+iNormalQuadGetDisjointEdges :: INormalQuad -> Pair IEdge
 iNormalQuadGetDisjointEdges = traverseI map2 normalQuadGetDisjointEdges
+
+iNormalArcsAroundVertex :: IVertex -> Triple INormalArc
+iNormalArcsAroundVertex = traverseI map3 normalArcs

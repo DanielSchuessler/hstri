@@ -1,38 +1,48 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TemplateHaskell, GeneralizedNewtypeDeriving, TypeFamilies, NoMonomorphismRestriction #-}
+{-# LANGUAGE ViewPatterns, RecordWildCards, FlexibleInstances, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, TemplateHaskell, GeneralizedNewtypeDeriving, TypeFamilies, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module QuadCoordinates where
 
 import AbstractTetrahedron
-import INormalDisc
-import StandardCoordinates
-import Data.Map as M hiding(mapMaybe)
-import qualified Data.List as L
-import Data.Maybe as May
-import Test.QuickCheck
-import TriangulationCxtObject
-import Test.QuickCheck.All
-import PrettyUtil
-import Control.Monad.State
+import Control.Arrow((&&&))
 import Control.Exception
+import Control.Monad.State
+import Data.Foldable(Foldable)
+import Data.Function
+import Data.Map as M hiding(mapMaybe)
+import Data.Maybe as May
 import HomogenousTuples
+import INormalDisc
+import PrettyUtil
 import QuickCheckUtil
+import StandardCoordinates
+import Test.QuickCheck
+import Test.QuickCheck.All
+import TriangulationCxtObject
+import ZeroDefaultMap
+import qualified Data.List as L
 
-newtype QuadCoordinates r = QC { quad_toMap :: Map INormalQuad r }
-    deriving(AdditiveGroup,InnerSpace)
+newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
+    deriving(AdditiveGroup,InnerSpace,Eq)
 
-quad_fromMap :: Map INormalQuad r -> QuadCoordinates r
-quad_fromMap = QC
+quad_toMap :: QuadCoordinates r -> Map INormalQuad r
+quad_toMap = zdm_toMap . quad_toZDM 
+quad_fromMap :: Num r => Map INormalQuad r -> QuadCoordinates r
+quad_fromMap = QC . zdm_fromMap 
+quad_fromAssocs
+  :: (Functor f, Num r, Foldable f) =>
+     f (INormalQuad, r) -> QuadCoordinates r
+quad_fromAssocs = QC . zdm_fromAssocs
 
 instance Num r => VectorSpace (QuadCoordinates r) where 
     type Scalar (QuadCoordinates r) = r
     r *^ QC x = QC (r *^ x)
 
 quad_coefficient :: Num r => QuadCoordinates r -> INormalQuad -> r
-quad_coefficient (QC m) q = fromMaybe 0 (M.lookup q m) 
+quad_coefficient = zdm_get . quad_toZDM
 
-standardToQuad :: StandardCoordinates r -> Map INormalQuad r
+standardToQuad :: (Num r) => StandardCoordinates r -> QuadCoordinates r
 standardToQuad = 
-      M.fromList
+      quad_fromAssocs
     . May.mapMaybe (\(d,r) -> eitherIND (const Nothing) (\q -> Just (q,r)) d) 
     . stc_toAssocs
 
@@ -92,15 +102,29 @@ quadToStandard tr qc =
             
 
 
-data EdgeNeighborhood = 
-    ENTet TIndex (OTriangle,Maybe EdgeNeighborhood) (OTriangle,Maybe EdgeNeighborhood)
-                
-                
+data EdgeNeighborhoodTet = 
+    ENTet {
+        ent_top, ent_bot, ent_left, ent_right :: Vertex
+    }
+    deriving Show
 
+trivialHasTIndexInstance [t| EdgeNeighborhoodTet |]                
+type IEdgeNeighborhoodTet = I EdgeNeighborhoodTet
 
+instance Eq EdgeNeighborhoodTet where
+    (==) = (==) `on` (ent_top &&& ent_bot &&& ent_left) 
+
+instance Pretty EdgeNeighborhoodTet where
+    prettyPrec prec (ENTet a b c d) = prettyPrecApp prec (text "ENTet") [a,b,c,d] 
+
+ent_leftTri :: IEdgeNeighborhoodTet -> OITriangle
+ent_leftTri  = mapI (\ent -> otriangle (ent_top ent, ent_bot ent, ent_left  ent))
+ent_rightTri :: IEdgeNeighborhoodTet -> OITriangle
+ent_rightTri = mapI (\ent -> otriangle (ent_top ent, ent_bot ent, ent_right ent))
+                
 
                         
-abstractEdgeNeighborhood :: S2 -> TEdge -> [I (Pair OTriangle)]
+abstractEdgeNeighborhood :: S2 -> TEdge -> [IEdgeNeighborhoodTet]
 abstractEdgeNeighborhood dir te = 
     let
         tr = getTriangulation te
@@ -108,39 +132,42 @@ abstractEdgeNeighborhood dir te =
         e = unT te
         i0 = getTIndex e        
 
-        (_S0,_T0) = map2 otriangle ((v0,v1,v2), (v0,v1,v3))
+        ient0 = i0 ./ ENTet {..}
             where
-                (v0,v1) = vertices (forgetTIndex e)
-                (v2,v3) = vertices (oppositeEdge (forgetTIndex e)) *. dir
+                (ent_top,ent_bot) = vertices (forgetTIndex e)
+                (ent_left,ent_right) = vertices (oppositeEdge (forgetTIndex e)) *. dir
     in 
-        (I i0 (_S0,_T0)) :
+        ient0 :
 
-        L.unfoldr (\_Tprev -> do
-                        _S <- lookupGluingOfOITriangle tr _Tprev
+        L.unfoldr (\prev -> do
+                        _S <- lookupGluingOfOITriangle tr (ent_rightTri prev)
 
                         let I i _S' = viewI _S
 
-                            _T = case vertices _S' of
-                                   (v0,v1,_) ->
-                                       otriangle (v0,v1,otriangleDualVertex _S')
-                            
-                        Just (I i (_S',_T), 
-                              i ./ _T))
+                            (v0,v1,v2) = vertices _S'
 
-                  (i0 ./ _T0)
+                            this = i ./ ENTet {
+                                            ent_top = v0
+                                        ,   ent_bot = v1
+                                        ,   ent_left = v2 
+                                        ,   ent_right = otriangleDualVertex _S'
+
+                                        }
+                            
+                        Just (this,this))
+
+                  ient0
 
 
 
 
     
-innerEdgeNeighborhood :: TEdge -> Maybe [I (OTriangle, OTriangle)]
+innerEdgeNeighborhood :: TEdge -> Maybe [IEdgeNeighborhoodTet]
 innerEdgeNeighborhood te = 
     let
         x0 : xs = abstractEdgeNeighborhood NoFlip te
-        iS0 = mapI fst x0
-
     in
-        case break (\x -> mapI fst x == iS0) xs of
+        case break (== x0) xs of
 
              (l,_:_) -> Just (x0:l)
              (_,[]) -> Nothing
@@ -160,38 +187,47 @@ prop_innerEdgeNeighborhood (tr :: Triangulation) =
         
         
         
-qMatchingEquationForEdge
+qMatchingEquation
   :: Num r => TEdge -> Maybe (QuadCoordinates r)
-qMatchingEquationForEdge te = do
+qMatchingEquation = fmap (quad_fromAssocs . concatMap (toList2 . snd)) . qMatchingEquation0
+
+
+qMatchingEquation0
+  :: (Num r) =>
+     TEdge
+     -> Maybe
+          [(IEdgeNeighborhoodTet, ((INormalQuad, r), (INormalQuad, r)))]
+qMatchingEquation0 te = do
     triPairs <- innerEdgeNeighborhood te
-    (return . quad_fromAssocs
-     .  concatMap (\(a,b,c) ->
-            let 
-                q = fmap iNormalQuadByDisjointEdge . iEdgeByVertices
-            in
-                [   ( q a c, 1 ) 
-                ,   ( q b c, -1 ) 
-                ])
-         
-     . fmap (vertices . mapI fst)) 
-     
-            triPairs
+    (return . fmap f ) triPairs
         
+  where
+    f = id &&&
+        (\(viewI -> I i ENTet{ ent_top=a, ent_bot=b, ent_left=c }) ->
+            let 
+                q = curry ((i./) . normalQuadByDisjointEdge . edge)
+            in
+                (   ( q a c, 1 ) 
+                ,   ( q b c, -1 ) 
+                ))
+
         
 type QuadCoordinateFunctional = QuadCoordinates
 
 qMatchingEquations :: Num r => Triangulation -> [QuadCoordinateFunctional r]
-qMatchingEquations = mapMaybe qMatchingEquationForEdge . edges
+qMatchingEquations = mapMaybe qMatchingEquation . edges
+
+qMatchingEquations0
+  :: (Num r) =>
+     Triangulation
+     -> [[(IEdgeNeighborhoodTet, ((INormalQuad, r), (INormalQuad, r)))]]
+qMatchingEquations0 = mapMaybe qMatchingEquation0 . edges
 
 quad_toAssocs :: QuadCoordinates r -> [(INormalQuad, r)]
 quad_toAssocs = M.assocs . quad_toMap
 
-quad_fromAssocs :: Num r => [(INormalQuad, r)] -> QuadCoordinates r
-quad_fromAssocs = sumV . fmap (uncurry quad_singleton)
-
 quad_singleton :: Num r => INormalQuad -> r -> QuadCoordinates r
-quad_singleton _ 0 = zeroV
-quad_singleton q r = QC (M.singleton q r)
+quad_singleton = fmap QC . zdm_singleton
 
 
 instance Pretty r => Pretty (QuadCoordinates r) where
@@ -200,3 +236,12 @@ instance Pretty r => Pretty (QuadCoordinates r) where
 instance (Pretty r) => Show (QuadCoordinates r) where
     showsPrec = prettyShowsPrec
 
+
+quad_toDenseAssocs
+  :: Num r =>
+     Triangulation -> QuadCoordinates r -> [(INormalQuad, r)]
+quad_toDenseAssocs tr qc = fmap (id &&& quad_coefficient qc) (tINormalQuads tr)
+
+quad_toDenseList
+  :: Num r => Triangulation -> QuadCoordinates r -> [r]
+quad_toDenseList tr = fmap snd . quad_toDenseAssocs tr

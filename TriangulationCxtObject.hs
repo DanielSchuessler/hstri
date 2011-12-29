@@ -13,8 +13,6 @@ module TriangulationCxtObject(
 
     -- * Preimages
     preimageList,
-    TrianglePreimage(..),
-    trianglePreimage,
     NormalArcPreimage(..),
     normalArcPreimage,
 
@@ -61,6 +59,8 @@ import Triangulation
 import TupleTH
 import UPair
 import ShortShow
+import Data.Graph.Inductive.Graph hiding(edges)
+import Control.Arrow((&&&))
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -174,20 +174,6 @@ instance HasEquivalence Triangulation TTriangle COITriangle where
     eqvClasses = triangles
                                       
 
-data TrianglePreimage = BoundaryTriangle ITriangle
-                      | InnerTriangle ITriangle OITriangle
-                      deriving Show
-                    
-type instance Element TrianglePreimage = OITriangle
-
-instance AsList TrianglePreimage where
-    asList (BoundaryTriangle tri) = [toOrderedFace tri]
-    asList (InnerTriangle tri otri) = [toOrderedFace tri, otri] 
-
-trianglePreimage :: TTriangle -> TrianglePreimage
-trianglePreimage (UnsafeMakeT t x) = maybe (BoundaryTriangle x)
-                                 (InnerTriangle x)
-                                 (lookup x (tGlueMap_ t))
 
 
 class MakeTVertex a where tvertex :: a -> TVertex
@@ -280,7 +266,7 @@ instance  Pretty TEdge where
     pretty = prettyListAsSet . preimageList
 
 instance  Pretty TTriangle where
-    pretty = prettyListAsSet . asList . trianglePreimage
+    pretty = prettyListAsSet . preimageList
 
 instance  Pretty TNormalCorner where
     pretty = prettyListAsSet . normalCornerPreimage
@@ -314,12 +300,7 @@ innerTriangles = filter (not . isBoundaryTriangle) . triangles
 
 
 isBoundaryTriangle :: TTriangle -> Bool
-isBoundaryTriangle tri = case trianglePreimage tri of
-                                BoundaryTriangle _ -> True
-                                _ -> False
-
-
-
+isBoundaryTriangle = (==1) . ecSize
 
                 
 
@@ -569,5 +550,12 @@ itrianglesContainingEdge =
     concatMap (\e -> toList2 (star (forgetVertexOrder e) (TwoSkeleton AbsTet))) . 
         equivalentIEdges
     
-    
-    
+instance NormalTris TVertex [INormalTri] where
+    normalTris = map iNormalTri . asList 
+
+tNormalArcsAroundVertex v = nub' ( 
+
+vertexLinkGraph (v :: TVertex) = 
+    mkGraph (map (fromEnum &&& id) (normalTris v)) [] 
+
+

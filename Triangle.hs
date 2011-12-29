@@ -11,13 +11,19 @@ module Triangle(
     MakeTriangle(..),
     triangleByDualVertex,
     ascVerticesToTriangle,
+    trianglesContainingVertex,
+    trianglesContainingEdge,
 
     -- ** Properties
+    verticesOfTriangle,
+    edgesOfTriangle,
+    oEdgesOfTriangle,
     edgeByOppositeVertexAndTriangle,
     vertexByOppositeEdge,
     triangleDualVertex,
     isVertexOfTriangle,
     isEdgeOfTriangle,
+    triangleMemo,
 
     -- ** Vertex indices
     VertexIndexInTriangle(..),
@@ -36,6 +42,7 @@ module Triangle(
     -- * Indexed
     ITriangle,
     itriangleDualVertex,
+    iVerticesOfTriangle,
 
     -- * Ordered and indexed
     OITriangle,
@@ -76,7 +83,7 @@ triangleByDualVertex :: Vertex -> Triangle
 triangleByDualVertex = Triangle
 
 instance Show Triangle where
-    show (triangleVertices -> (v0,v1,v2)) = show v0 ++ show v1 ++ show v2
+    show (verticesOfTriangle -> (v0,v1,v2)) = show v0 ++ show v1 ++ show v2
 
 deriving instance Eq Triangle 
 deriving instance Ord Triangle 
@@ -89,8 +96,14 @@ instance Bounded Triangle where
     minBound = tABC
     maxBound = tBCD
 
-triangleVertices :: Triangle -> (Vertex, Vertex, Vertex)
-triangleVertices t = fromList3 ( filter4 (`isVertexOfTriangle` t) allVertices' )
+
+triangleMemo :: (Triangle -> c) -> Triangle -> c
+triangleMemo f = vertexMemo (f . Triangle) . triangleDualVertex
+
+-- | Vertices contained in a given triangle
+verticesOfTriangle :: Triangle -> (Triple Vertex)
+verticesOfTriangle = 
+    triangleMemo (\t -> fromList3 ( filter4 (`isVertexOfTriangle` t) allVertices'))
               
 
 tABC, tABD, tACD, tBCD :: Triangle
@@ -132,7 +145,7 @@ prop_MakeTriangle_VVV v0 =
     forAll (elements vs') $ 
         \v1 -> forAll (elements (vs' \\ [v1])) $ 
             \v2 -> 
-                let v012 = (v0,v1,v2) in asList v012 `setEq` (asList . triangleVertices) (triangle v012)
+                let v012 = (v0,v1,v2) in asList v012 `setEq` (asList . verticesOfTriangle) (triangle v012)
     where
         vs' = allVertices \\ [v0]
 
@@ -248,11 +261,7 @@ instance RightAction S3 OTriangle where
 
 -- | Ordered edges contained in a given triangle, in order
 instance Edges OTriangle (Triple OEdge) where
-    edges x = case vertices x of
-                   (v0,v1,v2) -> ( verticesToOEdge (v0,v1)
-                                 , verticesToOEdge (v1,v2)
-                                 , verticesToOEdge (v2,v0)
-                                 )
+    edges = oEdgesOfTriangle
     
 
 
@@ -260,24 +269,43 @@ instance MakeOTriangle (Triple Vertex) where
     otriangle = verticesToOTriangle
 
 -- | Inverse function to @vertices :: O (Triangle) -> Triple Vertex@
-verticesToOTriangle ::  (Vertex, Vertex, Vertex) -> OTriangle
+verticesToOTriangle ::  (Triple Vertex) -> OTriangle
 verticesToOTriangle vs =
     case sort3WithPermutation vs of
          (vs',g) -> packOrderedFace (ascVerticesToTriangle vs') g
 
+
+trianglesContainingEdge :: Edge -> (Pair Triangle)
+trianglesContainingEdge e = fromList2 ( filter4 (e `isEdgeOfTriangle`) allTriangles' ) 
+
 -- | Triangles containing a given edge
 instance Star Edge (TwoSkeleton AbsTet) (Pair Triangle) where
-    star e _ = fromList2 ( filter4 (e `isEdgeOfTriangle`) allTriangles' ) 
+    star = const . trianglesContainingEdge 
+
+gedgesOfTriangle
+  :: Vertices t (Triple v) => ((v, v) -> e) -> t -> Triple e
+gedgesOfTriangle f t = map3 f ((v0,v1),(v1,v2),(v2,v0)) 
+        where
+            (v0,v1,v2) = vertices t 
+
 
 -- | Edges contained in a given triangle
-instance Edges Triangle (Triple Edge) where
-    edges t = map3 edge ((v0,v1),(v1,v2),(v2,v0)) 
-        where
-            (v0,v1,v2) = vertices t
+edgesOfTriangle
+  :: (Vertices t (Triple v), MakeEdge (v, v)) => t -> Triple Edge
+edgesOfTriangle = gedgesOfTriangle edge
 
--- | Vertices contained in a given triangle
+-- | Ordered edges contained in a given triangle (result is a cycle)
+oEdgesOfTriangle :: Vertices t (Triple Vertex) => t -> Triple OEdge
+oEdgesOfTriangle = gedgesOfTriangle verticesToOEdge 
+
+
+-- | = 'edgesOfTriangle'
+instance Edges Triangle (Triple Edge) where
+    edges = edgesOfTriangle 
+
+-- | = 'verticesOfTriangle'
 instance Vertices Triangle (Triple Vertex) where
-    vertices = triangleVertices
+    vertices = verticesOfTriangle
 
 -- | Vertices contained in a given ordered facet (in order) 
 --
@@ -300,12 +328,21 @@ instance Bounded OTriangle where
     minBound = OTriangle minBound minBound
     maxBound = OTriangle maxBound maxBound
 
-instance Finite OTriangle
-instance Vertices ITriangle (Triple IVertex) where 
-    vertices z = map3 ((./) (getTIndex z)) (vertices (forgetTIndex z)) 
 
+iVerticesOfTriangle
+  :: (Vertices a (Triple b), HasTIndex ia a, HasTIndex ib b) =>
+     ia -> Triple ib
+iVerticesOfTriangle = traverseI map3 vertices 
+
+instance Finite OTriangle
+
+-- | = 'iVerticesOfTriangle'
+instance Vertices ITriangle (Triple IVertex) where 
+    vertices = iVerticesOfTriangle
+
+-- | = 'iVerticesOfTriangle'
 instance Vertices OITriangle (Triple IVertex) where 
-    vertices z = map3 ((./) (getTIndex z)) (vertices (forgetTIndex z)) 
+    vertices = iVerticesOfTriangle
 
 instance Edges OITriangle (Triple OIEdge) where
     edges (viewI -> I i t) = map3 (i ./) (edges t)
@@ -315,8 +352,12 @@ instance Edges ITriangle (Triple IEdge) where
 
 
 -- | Triangles containing a given vertex
+trianglesContainingVertex
+  :: Vertex -> Triple Triangle
+trianglesContainingVertex v = fromList3 (filter4 (isVertexOfTriangle v) allTriangles')
+
 instance Star Vertex (TwoSkeleton AbsTet) (Triple Triangle) where
-    star v _ = fromList3 (filter4 (isVertexOfTriangle v) allTriangles')
+    star = const . trianglesContainingVertex 
 
 -- | Gets the edge which is contained in the given triangle and does /not/ contain the given vertex. 
 --
@@ -330,7 +371,7 @@ edgeByOppositeVertexAndTriangle v t =
          [e0] -> e0
          _ -> error ("edgeByOppositeVertexAndTriangle is not defined for args "++show v++", "++show t)
 
--- | Equivalent to 'edgeByOppositeVertexAndTriangle'
+-- | = 'edgeByOppositeVertexAndTriangle'
 instance Link Vertex Triangle Edge where
     link = edgeByOppositeVertexAndTriangle
 
@@ -347,7 +388,7 @@ vertexByOppositeEdge e t =
          [v0] -> v0
          _ -> error ("vertexByOppositeEdge is not defined for args "++show e++", "++show t)
 
--- | Equivalent to 'vertexByOppositeEdge'
+-- | = 'vertexByOppositeEdge'
 instance Link Edge Triangle Vertex where
     link = vertexByOppositeEdge
 
@@ -431,19 +472,19 @@ oitriangleDualVertex = mapI otriangleDualVertex
 itriangleByDualVertex :: IVertex -> ITriangle
 itriangleByDualVertex = mapI triangleByDualVertex
 
--- Equivalent to 'triangleDualVertex'
+-- = 'triangleDualVertex'
 instance Link Triangle AbsTet Vertex where 
     link t _ = triangleDualVertex t
 
--- Equivalent to 'itriangleDualVertex'
+-- = 'itriangleDualVertex'
 instance Link ITriangle AbsTet IVertex where 
     link t _ = itriangleDualVertex t
 
--- Equivalent to 'triangleByDualVertex'
+-- = 'triangleByDualVertex'
 instance Link Vertex AbsTet Triangle where 
     link v _ = triangleByDualVertex v
 
--- Equivalent to 'itriangleByDualVertex'
+-- = 'itriangleByDualVertex'
 instance Link IVertex AbsTet ITriangle where 
     link v _ = itriangleByDualVertex v
 

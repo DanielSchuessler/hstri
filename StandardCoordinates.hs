@@ -74,14 +74,18 @@ import Data.Maybe
 import Quote
 import qualified Data.Foldable as Fold
 import QuickCheckUtil
+import ZeroDefaultMap
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
-newtype StandardCoordinates r = SC { stc_toMap :: Map INormalDisc r } 
+newtype StandardCoordinates r = SC { stc_toZDM :: ZeroDefaultMap INormalDisc r } 
     deriving(AdditiveGroup,InnerSpace)
 
-stc_fromMap :: Map INormalDisc r -> StandardCoordinates r
-stc_fromMap = SC
+stc_toMap :: StandardCoordinates r -> Map INormalDisc r
+stc_toMap = zdm_toMap . stc_toZDM
+
+stc_fromMap :: Num r => Map INormalDisc r -> StandardCoordinates r
+stc_fromMap = SC . zdm_fromMap
 
 instance Num r => VectorSpace (StandardCoordinates r) where 
     type Scalar (StandardCoordinates r) = r
@@ -91,12 +95,7 @@ instance Num r => VectorSpace (StandardCoordinates r) where
 stc_map
   :: Num r' =>
      (r -> r') -> StandardCoordinates r -> StandardCoordinates r'
-stc_map f (SC m) = 
-    SC $
-        M.mapMaybe (\r -> let fr = f r
-                        in
-                            if fr == 0 then Nothing else Just fr) 
-                   m
+stc_map f = SC . zdm_map f . stc_toZDM
 
 
 
@@ -113,7 +112,7 @@ class NormalSurface a where
     standardCoordinates :: Num r => a -> StandardCoordinates r
 
 instance NormalSurface INormalDisc where
-    standardCoordinates x = SC (singleton x 1)
+    standardCoordinates x = SC (zdm_singleton x 1)
 
 instance NormalSurface INormalTri where
     standardCoordinates = standardCoordinates . iNormalDisc
@@ -155,13 +154,13 @@ krBasis t = (mkTetrahedralSolution <$> tTetrahedra_ t) ++ (mkEdgeSolution <$> (e
 
 stc_coefficient
   :: (Num r, MakeINormalDisc a) => StandardCoordinates r -> a -> r
-stc_coefficient (SC sc) nd = fromMaybe 0 (lookup (iNormalDisc nd) sc)
+stc_coefficient (SC sc) = zdm_get sc . iNormalDisc
 
 
 stc_coefficientIsZero
   :: (Num r, MakeINormalDisc a) =>
      StandardCoordinates r -> a -> Bool
-stc_coefficientIsZero (SC sc) nd = maybe True (\r -> assert (r/=0) False) (lookup (iNormalDisc nd) sc)
+stc_coefficientIsZero (SC sc) = zdm_isZero sc . iNormalDisc
 
 stc_toDenseAssocs :: (Num r) => Triangulation -> StandardCoordinates r -> [(INormalDisc,r)] 
 stc_toDenseAssocs t sc = fmap (id &&& stc_coefficient sc) (tINormalDiscs t)
@@ -296,10 +295,10 @@ getFundamentalEdgeSurfaces tr =
 
 
 stc_toAssocs :: StandardCoordinates r -> [(INormalDisc, r)]
-stc_toAssocs (SC m) = M.assocs m 
+stc_toAssocs = zdm_toAssocs . stc_toZDM
 
 stc_fromAssocs :: Num r => [(INormalDisc, r)] -> StandardCoordinates r
-stc_fromAssocs = sumV . fmap (SC . uncurry M.singleton) . L.filter ((/=0) . snd) 
+stc_fromAssocs = SC . zdm_fromAssocs
 
 
 toFundamentalEdgeSurface :: Integral i => StandardCoordinates (Ratio i) -> StandardCoordinates i
@@ -317,14 +316,13 @@ normalArcCounts
 normalArcCounts (SC m) = 
     M.fromListWith (+)
     . concatMap (\(d,r) -> fmap (,r) (normalArcList d)) 
-    . M.toList
+    . zdm_toAssocs
     $ m
 
 
 
 instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
-    arbitrary = 
-        (SC . M.filter (/= 0) . M.fromListWith (+)) <$> arbitrary 
+    arbitrary = stc_fromAssocs <$> arbitrary 
 
 
 --prop_normalArcCounts_welldefined ::
@@ -404,6 +402,6 @@ vertexLinkingSurface :: TVertex -> StandardCoordinates Integer
 vertexLinkingSurface = standardCoordinates . vertexLinkingSurfaceTris
 
 stc_set
-  :: MakeINormalDisc a =>
+  :: (Num r, MakeINormalDisc a) =>
      a -> r -> StandardCoordinates r -> StandardCoordinates r
-stc_set d r (SC m) = SC (insert (iNormalDisc d) r m)
+stc_set d r (SC m) = SC (zdm_set (iNormalDisc d) r m)

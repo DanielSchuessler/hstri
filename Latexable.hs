@@ -1,16 +1,24 @@
-{-# LANGUAGE NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
-module Latexable(Latex,Latexable(..),listToLatex,latexSet,mathmode,latexifyStandardMatchingEquations) where
+{-# LANGUAGE TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# OPTIONS -Wall #-}
+module Latexable(Latex,Latexable(..),listToLatex,latexSet,mathmode
+    ,latexifyStandardMatchingEquations
+    ,latexifyQMatchingEquations
+    
+    ) where
 
-import Data.List as List
-import Data.Function
-import Data.Monoid
-import Element
-import Triangulation
-import StandardCoordinates
-import INormalDisc
-import Data.Semigroup
-import Data.Ord
 import Control.Arrow(first)
+import Data.Function
+import Data.List(intercalate,sort,sortBy,groupBy)
+import Data.Monoid
+import Data.Ord
+import Data.Semigroup
+import Element
+import INormalDisc
+import QuadCoordinates
+import StandardCoordinates
+import Triangulation
+import TriangulationCxtObject
+import Data.Maybe(mapMaybe)
 
 type Latex = String
 
@@ -20,6 +28,7 @@ class Latexable a where
 
 op1 :: String -> Latex -> Latex
 op1 f x = "\\"<>f<>"{"<>x<>"}"
+op2 :: String -> Latex -> Latex -> Latex
 op2 f x y = op1 f (x<>"}{"<>y)
 
 
@@ -67,7 +76,7 @@ instance Latexable Triangulation where
             <>
             [end "matrix"]
      where
-            gss = List.groupBy ((==) `on` (getTIndex . fst)) . sort . tGluingsIrredundant $ tr
+            gss = groupBy ((==) `on` (getTIndex . fst)) . sort . tGluingsIrredundant $ tr
 
 instance Latexable a => Latexable (CanonOrdered a) where
     toLatex = toLatex . unCanonOrdered
@@ -84,65 +93,99 @@ instance Latexable INormalDisc where
 instance Latexable Integer where
     toLatex = show
 
-latexIntegral = toLatex . toInteger
+-- latexIntegral :: Integral a => a -> Latex
+-- latexIntegral = toLatex . toInteger
 
+begin :: Latex -> Latex
 begin = op1 "begin"
+end :: Latex -> Latex
 end = op1 "end"
 
 -- | Left: verbatim row (not followed by @\\\\@)
 -- Right: cells (@&@ and @\\\\@ added) 
-tabularLike :: String -> [Latex] -> [Either Latex [Latex]] -> String
-tabularLike env colSpecs rows_ = 
+tabularLike :: String -> [Latex] -> Latex -> String
+tabularLike env colSpecs body = 
     unlines
-        (
-            (begin env <> "{" <> concat colSpecs <> "}")
-          : fmap hr rows_
-          <> [end env]
-        )
+        [
+            begin env <> "{" <> concat colSpecs <> "}"
+          , body
+          , end env
+        ]
 
-  where
-    hr (Right row_) = intercalate "&" row_ ++ "\\\\"
-    hr (Left row_) = row_
 
-zeroAsBlank :: (Num a, Latexable a) => a -> Latex
-zeroAsBlank 0 = mempty
-zeroAsBlank n = toLatex n
+amps :: [Latex] -> Latex
+amps = intercalate "&"
+slashes :: [Latex] -> Latex
+slashes [] = ""
+slashes xs = foldr1 (\\) xs
 
-briefDiscType :: INormalDisc -> Latex
+(\\) :: Latex -> Latex -> Latex
+x \\ y = x <> "\\\\\n" <> y
+
+briefDiscType :: MakeINormalDisc a => a -> Latex
 briefDiscType =
     eitherIND
         (toLatex . iNormalTriGetVertex)
         (toLatex . fst . iNormalQuadGetDisjointEdges)
+    . iNormalDisc
 
+zeroAsBlank :: (Num a, Latexable a) => a -> Latex
+zeroAsBlank x = if x == 0
+                          then mempty
+                          else mathmode (toLatex x)
+
+tabular :: [Latex] -> Latex -> String
+tabular = tabularLike "tabular" 
+
+small :: Latex -> Latex
+small x = "{\\small"<> x <> "}"
+
+meHeader :: MakeINormalDisc a => [a] -> Latex
+meHeader discs = amps (fmap headerCell discs)
+    where
+                headerCell = small . mathmode . briefDiscType 
 
 latexifyStandardMatchingEquations :: Triangulation -> Latex
 latexifyStandardMatchingEquations tr =
     let
         mes = 
-            sortBy (comparing (fmap (/= 0) . fst)) .
+            sortBy (comparing (fmap (/= (0::Integer)) . fst)) .
             fmap (first (stc_toDenseList tr)) .
             matchingEquationsWithReasons $ tr
 
         colSpecs = replicate (fi $ tNumberOfNormalDiscTypes tr) "r"
-        rows_ = header ++ fmap mkRow mes
 
-        header = [ 
-                    Right $ fmap headerCell (tINormalDiscs tr),
-                    Left "\\hline"
-                 ]
-            where
-                --headerCell x = "{\\tiny"<>mathmode(toLatex x)<>"}"
-                headerCell x = 
-                    "{\\small"<> (mathmode . briefDiscType) x <> "}"
+        body = meHeader (tINormalDiscs tr) \\ 
+               ("\\hline" <> slashes (fmap mkRow mes))
 
-        mkRow (sc,mer) = Right $
-            fmap 
-                (\x -> if x == 0
-                          then mempty
-                          else mathmode (toLatex (x :: Integer)))
 
-                sc
+        mkRow (sc,_) = amps (fmap zeroAsBlank sc)
     in
-        tabularLike "tabular" colSpecs rows_
+        tabular colSpecs body
             
+latexifyQMatchingEquations :: Triangulation -> Latex
+latexifyQMatchingEquations tr =
+    let
+        mes = 
+                sortBy (comparing (fmap (/= (0::Integer)) . fst))
+            .   mapMaybe 
+                    (\e -> fmap ((,e) . quad_toDenseList tr) . qMatchingEquation $ e) 
+            .   edges $ tr
 
+        colSpecs = "l" : "|" : replicate (fi $ tNumberOfNormalQuadTypes tr) "r"
+
+        body = ("Kante&"<>meHeader (tINormalQuads tr)) \\ 
+               ("\\hline " <> slashes (fmap mkRow mes))
+
+
+        mkRow (me,e) = mathmode (toLatex e) <> "&" <> amps (fmap zeroAsBlank me)
+    in
+        tabular colSpecs body
+
+toLatexT :: (IsEquivalenceClass (T a), Latexable (Element (T a))) =>
+     T a -> [Char]
+toLatexT x = "p("<>toLatex (canonicalRep x)<>")"
+
+instance Latexable TTriangle where toLatex = toLatexT
+instance Latexable TEdge where toLatex = toLatexT
+instance Latexable TVertex where toLatex = toLatexT

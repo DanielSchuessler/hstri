@@ -130,8 +130,6 @@ deleteTuple3 (a,b,c) x
     | c==x = Just (a,b)
     | otherwise = Nothing
 
-
-
 {-# SPECIALIZE indexInTriple :: (Show t, Eq t) => t -> (t,t,t)-> Int #-}
 -- | Returns the first index if more than one element of the triple is equal to the element. Errors if none is.
 indexInTriple ::  (Show t, Num a, Eq t) => t -> (t, t, t) -> a

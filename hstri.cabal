@@ -90,6 +90,9 @@ Library
     ShortShow
     DotUtil
     Equivalence.Class
+    VectorUtil
+    InnerProductRepresentation
+    DD
 
 
 

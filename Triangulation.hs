@@ -28,6 +28,7 @@ module Triangulation(
     gluedNormalArc,
     boundaryITriangles,
     tNumberOfNormalDiscTypes,
+    tNumberOfNormalQuadTypes,
     -- * Construction 
     mkTriangulation,mkTriangulationG,triang,randomTriangulation,randT,
     -- * Transformation
@@ -37,6 +38,8 @@ module Triangulation(
     CanonicallyOrderable(..),isCanonicallyOrdered,tCOIEdges,
     -- * Canonical representatives for things that are glued
     TriangulationDSnakeItem(..),
+    -- * Examples
+    tr_l31,
 
 
 
@@ -67,6 +70,7 @@ import Element
 import Quote
 import QuickCheckUtil
 import Data.Proxy
+import Control.Arrow((&&&))
 
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
@@ -588,3 +592,14 @@ prop_CanonicallyOrderable_Edge = polyprop_CanonicallyOrderable (undefined :: Pro
 
 tNumberOfNormalDiscTypes :: Triangulation -> Word
 tNumberOfNormalDiscTypes = liftM (7*) tNumberOfTetrahedra
+
+tNumberOfNormalQuadTypes :: Triangulation -> Word
+tNumberOfNormalQuadTypes = liftM (3*) tNumberOfTetrahedra
+
+tr_l31 :: Triangulation
+tr_l31 = fromRight $ mkTriangulation 2 
+    ((0./tABC,1./oBCA) 
+     :
+     fmap ((0./) &&& ((1./) . toOrderedFace)) [tABD,tACD,tBCD])
+                        
+

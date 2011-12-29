@@ -16,6 +16,7 @@ import Data.Vect.Double.Base
 import Latexable
 import EqvGraphs
 import QuadCoordinates
+import DD
 
 
 
@@ -26,6 +27,7 @@ spqwc = spqwc_l31
 smes :: IO ()
 smes = putStr (latexifyStandardMatchingEquations tr)
 
+qmes = putStr (latexifyQMatchingEquations tr)
 
 main = (testBlender . setCams [twoTetCam])
         (defaultScene $

@@ -70,8 +70,7 @@ class MakeNormalDisc a where
     normalDisc :: a -> NormalDisc
     
 
-newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary)
-
+newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary,Finite)
 
 instance Show NormalTri where
     showsPrec = prettyShowsPrec 

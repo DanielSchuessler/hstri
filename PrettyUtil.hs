@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module PrettyUtil(
     -- * Reexports
@@ -12,6 +12,7 @@ module PrettyUtil(
     pr,
     prettyStringMatrix,
     prettyMatrix,
+    prettyVector,
     prMatrix,
     prettyRecord,
     prettyShowsPrec,
@@ -22,6 +23,10 @@ module PrettyUtil(
     anyPretty,AnyPretty,
     prettyEqs,
     docToString,
+    hencloseSep,
+    htupled,
+    showRational,
+    pad,
     -- * Class
     Pretty(..)
     
@@ -43,6 +48,10 @@ import HomogenousTuples
 import GHC.Show
 import TupleTH
 import TypeLevel.TF.List(List,lToList)
+
+import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as VU
+
 --import GHC.Generics hiding(prec)
 
 spacedEncloseSep ::  Doc -> Doc -> Doc -> [Doc] -> Doc
@@ -68,26 +77,59 @@ prettyString = ($"") . displayS . renderPretty 0.5 116 . pretty
 pr ::  Pretty a => a -> IO ()
 pr = putStrLn . prettyString
                                    
-
-prettyStringMatrix :: [[String]] -> String
-prettyStringMatrix xss = unlines . fmap (intercalate "  " . fmap fmtCell) $ xss 
+prettyStringMatrix
+  :: (AsList (Element a), AsList a, Element (Element a) ~ String) =>
+     a -> String
+prettyStringMatrix (asListOfLists -> xss) = 
+            intercalate "\n"
+        .   map (intercalate "  " . map fmtCell) 
+        $   xss 
     where
-        maxWidth = maximum . fmap length . concat $ xss
-        fmtCell x = replicate (maxWidth - length x) ' ' ++ x
+        maxWidth = maximum . map (maximum . map length)  $ xss
+        fmtCell = pad maxWidth
+
+pad :: Int -> [Char] -> [Char]
+pad l x = replicate (l - length x) ' ' ++ x
 
 class PrettyScalar a where
     prettyScalar :: a -> String
 
+showRational :: Integral a => Ratio a -> [Char]
+showRational 0 = "0"
+showRational x = 
+        let 
+            n = numerator x
+            d = denominator x 
+        in
+            if d==1 
+               then show n
+               else show n ++ "/" ++ show d
+                                
+
 instance PrettyScalar Rational where
-    prettyScalar 0 = ""
-    prettyScalar x = show (numerator x) ++ "/" ++ show (denominator x)
+    prettyScalar = showRational
 
 instance PrettyScalar Double where
-    prettyScalar 0 = ""
+    prettyScalar 0 = "0"
     prettyScalar x = showFFloat (Just 4) x "" 
 
-prettyMatrix :: PrettyScalar a => [[a]] -> String
+prettyMatrix
+  :: (Functor f,
+      Functor f1,
+      AsList (Element (f (f1 String))),
+      AsList (f (f1 String)),
+      PrettyScalar a,
+      Element (Element (f (f1 String))) ~ String) =>
+     f (f1 a) -> String
 prettyMatrix = prettyStringMatrix . (fmap . fmap) prettyScalar
+
+prettyVector
+  :: (Functor f,
+      AsList (f String),
+      PrettyScalar a,
+      Element (f String) ~ String) =>
+     f a -> String
+prettyVector = prettyMatrix . (:[]) 
 
 prMatrix :: PrettyScalar a => [[a]] -> IO ()
 prMatrix = putStrLn . prettyMatrix 
@@ -160,9 +202,6 @@ instance Pretty () where pretty () = text "()"
 instance Pretty Bool where pretty b = bool b
 instance Pretty Int where pretty i = int i
 
-instance (Integral a, Show a) => Pretty (Ratio a) where
-    pretty = text . show
-
 instance (Ord a, Pretty a) => Pretty (Set a) where
     pretty = prettyListAsSet . setToList 
 
@@ -222,3 +261,32 @@ prettyEqs xs = lbrace <+> align bod <+> rbrace
 --     gpp prec (K1 c) = prettyPrec prec c 
 -- 
 -- 
+--
+
+instance Pretty a => Pretty (V.Vector a) where
+    pretty x = char 'V' <> align (pretty . asList $ x) 
+
+instance (VU.Unbox a, Pretty a) => Pretty (VU.Vector a) where
+    pretty x = char 'V' <> align (pretty . asList $ x) 
+
+
+instance (Eq a, Integral a, Pretty a) => Pretty (Ratio a) where
+    pretty 0 = char '0'
+    pretty x = 
+        let 
+            n = pretty (numerator x)
+            d = denominator x 
+        in
+            if d==1 
+               then n
+               else n <> char '/' <> pretty d
+
+
+-- | Like 'encloseSep' but single-line
+hencloseSep :: Doc -> Doc -> Doc -> [Doc] -> Doc
+hencloseSep l r sep_ xs =
+    l <> hcat (punctuate sep_ xs) <> r
+
+-- | Like 'tupled' but single-line
+htupled :: [Doc] -> Doc
+htupled = hencloseSep lbrace rbrace (text ", ")

@@ -62,19 +62,19 @@ instance GraphvizFormatable (FL,Node,TIndex) Attributes where
 instance GraphvizFormatable (FL,Node,TTriangle) Attributes where
     fmt o (_,_,x) = 
             [ Shape theShape
-            , setlbl o (trianglePreimage x)
+            , setlbl o x
             ]
 
 instance GraphvizFormatable (FL,Node,TEdge) Attributes where
     fmt o (_,_,x) = 
             [ Shape theShape
-            , setlbl o (equivalentIEdges x)
+            , setlbl o x
             ]
 
 instance GraphvizFormatable (FL,Node,TVertex) Attributes where
     fmt o (_,_,x) = 
             [ Shape theShape
-            , setlbl o (equivalentIVertices x)
+            , setlbl o x
             ]
 
 setlbl :: (AsList a, Latexable (Element a)) => t -> a -> Attribute
