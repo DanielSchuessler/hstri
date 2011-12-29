@@ -123,12 +123,12 @@ rotate4_1 :: (t1, t2, t3, t) -> (t, t1, t2, t3)
 rotate4_1 = $(rotateTuple 4 1)
 
 
-deleteTuple3 :: Eq a => (a, a, a) -> a -> Maybe (a, a)
-deleteTuple3 (a,b,c) x 
-    | a==x = Just (b,c)  
-    | b==x = Just (a,c)
-    | c==x = Just (a,b)
-    | otherwise = Nothing
+deleteTuple3 :: Eq a => a -> (a, a, a) -> Maybe (a, a)
+deleteTuple3 = $(safeDeleteTuple 3)
+
+deleteTuple4 :: Eq a => a -> (a, a, a, a) -> Maybe (a, a, a)
+deleteTuple4 = $(safeDeleteTuple 4)
+
 
 {-# SPECIALIZE indexInTriple :: (Show t, Eq t) => t -> (t,t,t)-> Int #-}
 -- | Returns the first index if more than one element of the triple is equal to the element. Errors if none is.

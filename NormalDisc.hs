@@ -342,7 +342,7 @@ normalDiscsContainingNormalCorner = liftM2 ($(catTuples 2 2))
 instance Link NormalCorner NormalTri (Pair NormalCorner) where
     link nc nt = 
              fromMaybe err
-                (normalCorners nt `deleteTuple3` nc)
+                (deleteTuple3 nc (normalCorners nt))
 
 
                 where

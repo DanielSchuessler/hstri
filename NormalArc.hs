@@ -3,12 +3,24 @@
 module NormalArc(
         module NormalCorner,
 
-        NormalArc, normalArcGetTriangle, normalArcGetVertex, allNormalArcs,
-            normalArcGetParallelEdge, normalArcGetVertexIndex, normalArcByTriangleAndVertexIndex,
-            normalArcByTriangleAndVertex,normalArcGetAngle,
+        NormalArc, 
+        -- * Construction
+        allNormalArcs,
+        normalArcsAroundVertex,
+        normalArcByTriangleAndVertexIndex,
+        normalArcByTriangleAndVertex,
         MakeNormalArc(..),
         NormalArcs(..),
         normalArcList,
+
+        -- * Properties
+        normalArcGetTriangle,
+        normalArcGetVertex,
+        normalArcGetParallelEdge,
+        normalArcGetVertexIndex,
+        normalArcGetAngle,
+
+        -- * Testing
         qc_NormalArc
     )
 
@@ -212,4 +224,12 @@ instance Lift NormalArc where
 instance MakeVertex NormalArc where
     vertex = normalArcGetVertex
 
+normalArcsAroundVertex :: Vertex -> Triple NormalArc
 normalArcsAroundVertex v = 
+    map3 (`normalArcByTriangleAndVertex` v) (trianglesContainingVertex v)
+
+prop_normalArcsAroundVertex :: Vertex -> Property
+prop_normalArcsAroundVertex v =
+    setEq
+        (asList . normalArcsAroundVertex $ v)
+        (filter ((==v) . normalArcGetVertex) allNormalArcs)

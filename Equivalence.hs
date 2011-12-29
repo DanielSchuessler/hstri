@@ -85,11 +85,16 @@ data Equivalence a = Equivalence {
     eqv_generators :: [(a,a)]
 }
 
+type instance EquivalenceClassOf (Equivalence a) = SetBasedEquivalenceClass a
+type instance Element (Equivalence a) = a
+
 deriving instance (Show a, Ord a) => Show (Equivalence a)
 
-instance Ord a => HasEquivalence (Equivalence a) (SetBasedEquivalenceClass a) a where
-    eqvClasses = eqv_classes
+instance Ord a => IsEquivalence (Equivalence a) where
     eqvClassOf = eqv_classOf
+
+instance Ord a => EnumerableEquivalence (Equivalence a) where
+    eqvClasses = eqv_classes
     
 eqv_classOf :: Ord k => Equivalence k -> k -> SetBasedEquivalenceClass k
 eqv_classOf e x = eqv_classmap e ! x

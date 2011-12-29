@@ -74,6 +74,7 @@ import Util
 import Test.QuickCheck.All
 import ShortShow
 import Data.Proxy
+import Data.Maybe
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
@@ -100,10 +101,15 @@ instance Bounded Triangle where
 triangleMemo :: (Triangle -> c) -> Triangle -> c
 triangleMemo f = vertexMemo (f . Triangle) . triangleDualVertex
 
--- | Vertices contained in a given triangle
+-- | Vertices contained in a given triangle, ascending
 verticesOfTriangle :: Triangle -> (Triple Vertex)
-verticesOfTriangle = 
-    triangleMemo (\t -> fromList3 ( filter4 (`isVertexOfTriangle` t) allVertices'))
+verticesOfTriangle = otherVertices . triangleDualVertex
+
+prop_verticesOfTriangle :: Triangle -> Property
+prop_verticesOfTriangle t =
+    asList (verticesOfTriangle t)  
+    .=.
+    sort (filter (`isVertexOfTriangle` t) allVertices)
               
 
 tABC, tABD, tACD, tBCD :: Triangle
@@ -354,7 +360,13 @@ instance Edges ITriangle (Triple IEdge) where
 -- | Triangles containing a given vertex
 trianglesContainingVertex
   :: Vertex -> Triple Triangle
-trianglesContainingVertex v = fromList3 (filter4 (isVertexOfTriangle v) allTriangles')
+trianglesContainingVertex = map3 triangleByDualVertex . otherVertices
+
+prop_trianglesContainingVertex :: Vertex -> Property
+prop_trianglesContainingVertex v =
+   setEq 
+    (asList (trianglesContainingVertex v))  
+    (filter (isVertexOfTriangle v) allTriangles)
 
 instance Star Vertex (TwoSkeleton AbsTet) (Triple Triangle) where
     star = const . trianglesContainingVertex 

@@ -7,6 +7,7 @@ import NormalDisc
 import Triangulation
 import TriangulationCxtObject
 import QuadCoordinates
+import AbstractNeighbordhood
 
 
 main = do
@@ -27,6 +28,7 @@ main = do
         qc_TriangulationCxtObject,
         qc_Equivalence,
         qc_Util,
-        qc_QuadCoordinates
+        qc_QuadCoordinates,
+        qc_AbstractNeighbordhood
         ]
     print (and res)

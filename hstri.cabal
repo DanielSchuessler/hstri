@@ -93,6 +93,7 @@ Library
     VectorUtil
     InnerProductRepresentation
     DD
+    AbstractNeighborhood
 
 
 

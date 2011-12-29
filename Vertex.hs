@@ -4,7 +4,7 @@ module Vertex
     (
     module FaceClasses,
     module TIndex,
-    Vertex,
+    Vertex(..),
     vA,vB,vC,vD,
     allVertices,allVertices',
     MakeVertex(..),
@@ -16,12 +16,13 @@ module Vertex
     vertexFromWord8,
     vertexDefaultCoords,
     vertexMemo,
+    otherVertices,
 
     Link(..),
     Star(..),
 
     -- * View
-    VertexView(..),
+    VertexView,
     viewVertex,unviewVertex,
 
     -- * Testing
@@ -33,7 +34,6 @@ module Vertex
     where
 
 import Collections
-import Control.Exception
 import Data.BitSet.Word8
 import Data.Word
 import Element
@@ -52,41 +52,50 @@ import Data.Vect.Double.Base((&-))
 import QuickCheckUtil
 import Test.QuickCheck.All
 import ShortShow
+import THUtil
+import Data.Maybe
+import Data.List(sort)
 
--- | Vertex of an abstract tetrahedron
-newtype Vertex = Vertex Word8 deriving(Eq,Ord)
+data Vertex = A | B | C | D
+    deriving(Eq,Ord,Enum,Bounded)
 
-data VertexView = A | B | C | D
-    deriving(Eq,Ord,Show)
+type VertexView = Vertex
 
 vA,vB,vC,vD :: Vertex
-vA = Vertex 0
-vB = Vertex 1
-vC = Vertex 2
-vD = Vertex 3
+vA = A
+vB = B
+vC = C
+vD = D
 
 viewVertex :: Vertex -> VertexView
-viewVertex (Vertex v) = case v of
+viewVertex = id
+
+vertexFromWord8 :: Word8 -> Vertex
+vertexFromWord8 w = case w of
                            0 -> A
                            1 -> B
                            2 -> C
                            3 -> D
-                           _ -> error ("viewVertex: Invalid Vertex (tag "++show v++")")
+                           _ -> error ("vertexFromWord8: Invalid tag: "++show w)
+
+vertexToWord8 :: Vertex -> Word8
+vertexToWord8 v = case v of
+                       A -> 0
+                       B -> 1
+                       C -> 2
+                       D -> 3
+
 
 unviewVertex :: VertexView -> Vertex
-unviewVertex A = vA
-unviewVertex B = vB
-unviewVertex C = vC
-unviewVertex D = vD
+unviewVertex = id
 
 prop_viewUnviewVertex :: Vertex -> Property
 prop_viewUnviewVertex v = v .=. unviewVertex (viewVertex v) 
 
-instance BitSetable Vertex
+prop_toFromWord8 :: Vertex -> Property
+prop_toFromWord8 v = v .=. vertexFromWord8 (vertexToWord8 v) 
 
-instance Bounded Vertex where
-    minBound = vA
-    maxBound = vD
+instance BitSetable Vertex
 
 instance Show Vertex where
     show v = case viewVertex v of
@@ -94,10 +103,6 @@ instance Show Vertex where
                            B -> "B"
                            C -> "C"
                            D -> "D"
-
-instance Enum Vertex where
-    fromEnum (Vertex v) = fromEnum v
-    toEnum n = assert (n >= 0 && n < 4) (Vertex (toEnum n))
 
 class MakeVertex a where
     vertex :: a -> Vertex
@@ -118,7 +123,7 @@ instance Pretty Vertex where pretty = vertexPrettyColor . text . show
 instance Arbitrary Vertex where arbitrary = elements allVertices
 
 instance Lift Vertex where
-    lift (Vertex v) = [| Vertex $(Syntax.lift v) |]
+    lift = liftByShow
 
 
 instance Finite Vertex
@@ -164,12 +169,6 @@ instance Arbitrary IVertex where
 instance Vertices AbsTet (Quadruple Vertex) where
     vertices = const allVertices'
 
-vertexToWord8 :: Vertex -> Word8
-vertexToWord8 (Vertex w) = w
-
-vertexFromWord8 :: Word8 -> Vertex
-vertexFromWord8 = Vertex
-
 -- | Embeds the abstract tetrahedron into R^3 symmetrically
 vertexDefaultCoords :: Vertex -> Vec3
 vertexDefaultCoords = (\x -> f x &- center_) . viewVertex 
@@ -208,4 +207,10 @@ vertexMemo f =
                    D -> fD
 
 
+-- | Other vertices, ascending
+otherVertices :: Vertex -> (Triple Vertex)
+otherVertices = fromJust . flip deleteTuple4 allVertices'
 
+prop_otherVertices :: Vertex -> Bool
+prop_otherVertices v = 
+    asList (otherVertices v) == sort (filter (/= v) allVertices) 

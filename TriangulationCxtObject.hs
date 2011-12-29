@@ -1,38 +1,77 @@
 {-# LANGUAGE TupleSections, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
 -- {-# OPTIONS -ddump-splices #-}
-{-# OPTIONS -Wall -fno-warn-orphans -fno-warn-missing-signatures #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 module TriangulationCxtObject(
     module Element,
     module Triangulation,
     module NormalDisc,
     module INormalDisc,
 
+
+
+    -- * Generic
     T,getTriangulation,unT,
-    TVertex,TEdge,TTriangle,TNormalCorner,TNormalArc,TNormalTri,TNormalQuad,TNormalDisc,
     pMap,
-
-    -- * Preimages
     preimageList,
-    NormalArcPreimage(..),
-    normalArcPreimage,
 
+    -- * Vertices
+    TVertex,
+    vertexEquivalence,
+    -- ** Construction
     MakeTVertex(..),
+    NormalArcPreimage(..),
+    -- ** Properties
+    equivalentIVertices,
+    vertexLinkingSurfaceTris,
+    dfsVertexLink,
+    preimageListOfVertex,
+    degreeOfVertex,
+
+    -- * Edges
+    TEdge,
+    edgeEquivalence,
+    -- ** Construction
     MakeTEdge(..),
+    -- ** Properties
+    equivalentIEdges,
+    TEdgeIntersection(..),
+    itrianglesContainingEdge,
+    degreeOfEdge,
+    preimageListOfEdge,
+
+    -- * Triangles
+    TTriangle,
+    triangleEquivalence,
+    -- ** Construction
     MakeTTriangle(..),
-    MakeTNormalCorner(..),
-    MakeTNormalArc(..),
     boundaryTriangles,
     innerTriangles,
+    -- ** Properties
     isBoundaryTriangle,
-    equivalentIVertices,
-    equivalentIEdges,
-    vertexLinkingSurfaceTris,
-    TEdgeIntersection(..),
-    isBoundaryNormalArc,
+    preimageListOfTriangle,
+
+
+    -- * Normal corners
+    TNormalCorner,
+    -- ** Construction
+    MakeTNormalCorner(..),
+    -- ** Properties
+
+    -- * Normal arcs
+    TNormalArc,
+    -- ** Construction
+    MakeTNormalArc(..),
     boundaryNormalArcs,
     innerNormalArcs,
-    dfsVertexLink,
-    itrianglesContainingEdge,
+    tNormalArcsAroundVertex,
+    -- ** Properties
+    normalArcPreimage,
+    isBoundaryNormalArc,
+
+    -- * Normal dics
+    TNormalTri,
+    TNormalQuad,
+    TNormalDisc,
     
     -- * Testing
     qc_TriangulationCxtObject 
@@ -102,24 +141,25 @@ type TNormalDisc = T INormalDisc
 preimageList :: IsEquivalenceClass (T a) => T a -> [Element (T a)]
 preimageList = asList
 
-asList_T f y = eqvEquivalents (f (getTriangulation y)) (unT y)
-canonicalRep_T = unT
-ecMember_T f x y = eqvRep (f (getTriangulation y)) x == unT y
-ecSize_T f y = ecSize (eqvClassOf (f (getTriangulation y)) (unT y))
+preimageListOfVertex :: TVertex -> [IVertex]
+preimageListOfVertex y = eqvEquivalents (vertexEqv (getTriangulation y)) (unT y)
+ecMember_T :: IVertex -> TVertex -> Bool
+ecMember_T x y = eqvRep (vertexEqv (getTriangulation y)) x == unT y
+degreeOfVertex :: TVertex -> Int
+degreeOfVertex y = ecSize (eqvClassOf (vertexEqv (getTriangulation y)) (unT y))
 
 type instance Element TVertex = IVertex
 
-instance HasEquivalence Triangulation TVertex IVertex where
-    eqvClassOf = pMap 
-    eqvClasses = vertices
+vertexEquivalence :: Triangulation -> EqvImpl TVertex
+vertexEquivalence tr = EqvImpl (pMap tr) (vertices tr)
 
 instance AsList TVertex where
-    asList = asList_T vertexEqv 
+    asList = preimageListOfVertex
 
 instance IsEquivalenceClass TVertex where
-    canonicalRep = canonicalRep_T
-    ecMember = ecMember_T vertexEqv 
-    ecSize = ecSize_T vertexEqv
+    canonicalRep = unT
+    ecMember = ecMember_T
+    ecSize = degreeOfVertex
 
 type instance Element TEdge = COIEdge
 
@@ -129,27 +169,34 @@ tEdgeOIEdgeClass (y :: TEdge) =
         (oEdgeEqv . getTriangulation $ y) 
         (toOrderedFace . unT $ y)
 
-instance AsList TEdge where
-    asList = 
-        -- ok because @toOrderedFace (unT y)@ is the representative of its class
-        fmap UnsafeCanonOrdered . asList . tEdgeOIEdgeClass 
 
+preimageListOfEdge :: TEdge -> [COIEdge]
+preimageListOfEdge = fmap UnsafeCanonOrdered . asList . tEdgeOIEdgeClass 
+    -- ok because @toOrderedFace (unT y)@ is the representative of its class
+
+instance AsList TEdge where
+    asList = preimageListOfEdge
+
+degreeOfEdge :: TEdge -> Int
+degreeOfEdge y = ecSize (tEdgeOIEdgeClass y)
 
 instance IsEquivalenceClass TEdge where
     canonicalRep = UnsafeCanonOrdered . toOrderedFace . unT
     ecMember x y = 
         ecMember (unCanonOrdered x) (tEdgeOIEdgeClass y)
 
-    ecSize y = ecSize (tEdgeOIEdgeClass y)
+    ecSize = degreeOfEdge 
             
-instance HasEquivalence Triangulation TEdge COIEdge where 
-    eqvClassOf tr = pMap tr . forgetVertexOrder . unCanonOrdered 
-    eqvClasses = edges
+
+edgeEquivalence :: Triangulation -> EqvImpl TEdge
+edgeEquivalence tr = EqvImpl (pMap tr . forgetVertexOrder . unCanonOrdered) (edges tr)
+    
 
 type instance Element TTriangle = COITriangle
 
-instance AsList TTriangle where
-    asList y =
+
+preimageListOfTriangle :: TTriangle -> [COITriangle]
+preimageListOfTriangle y =
       let
         tri = unT y
       in
@@ -157,6 +204,9 @@ instance AsList TTriangle where
             maybe [toOrderedFace tri] (\(otri) -> [toOrderedFace tri, otri])
                 $
                     lookupGluingOfTTriangle y
+
+instance AsList TTriangle where
+    asList = preimageListOfTriangle
 
 instance IsEquivalenceClass TTriangle where
     canonicalRep = UnsafeCanonOrdered . toOrderedFace . unT
@@ -168,10 +218,12 @@ instance IsEquivalenceClass TTriangle where
 
     ecSize = maybe 1 (const 2) . lookupGluingOfTTriangle 
 
-instance HasEquivalence Triangulation TTriangle COITriangle where
-    eqvClassOf tr = pMap tr . forgetVertexOrder . unCanonOrdered
 
-    eqvClasses = triangles
+triangleEquivalence :: Triangulation -> EqvImpl TTriangle
+triangleEquivalence tr =
+    EqvImpl 
+        (pMap tr . forgetVertexOrder . unCanonOrdered)
+        (triangles tr)
                                       
 
 
@@ -185,23 +237,8 @@ class MakeTNormalArc a where tnormalArc :: a -> TNormalArc
 instance MakeTEdge TNormalCorner where
     tedge (UnsafeMakeT t (viewI -> I i (edge -> e))) = UnsafeMakeT t (i ./ e) 
 
+normalCornerPreimage :: MakeTEdge a => a -> [INormalCorner]
 normalCornerPreimage = fmap iNormalCorner . equivalentIEdges . tedge
-
--- instance TriangulationCxtObject IVertex (SetBasedEquivalenceClass IVertex) where
---     preimage (UnsafeMakeT t x) = eqvClassOf (vertexEqv t) x
--- 
--- 
--- instance TriangulationCxtObject IEdge (SetBasedEquivalenceClass IEdge) where
---     preimage (UnsafeMakeT t x) = eqvClassOf (edgeEqv t) x
--- 
--- 
--- instance TriangulationCxtObject ITriangle (Maybe Gluing) where
---     preimage (UnsafeMakeT t x) =  
-
-
-
-
-
 
 
 instance MakeTNormalCorner TEdge where
@@ -216,7 +253,8 @@ instance Vertices Triangulation [TVertex] where
     vertices t = fmap (UnsafeMakeT t . canonicalRep) (eqvClasses (vertexEqv t))
 
 instance Edges Triangulation [TEdge] where
-    edges t = fmap (UnsafeMakeT t . canonicalRep) (eqvClasses (edgeEqv t))
+    edges t = fmap (UnsafeMakeT t . forgetVertexOrder . canonicalRep) 
+                (eqvClasses (oEdgeEqv t))
 
 instance Triangles Triangulation [TTriangle] where
     triangles t = nub' (pMap t <$> tITriangles t)
@@ -285,9 +323,10 @@ instance  Pretty TNormalDisc where
 
 
 prop_VerticesOfEdge_welldefined :: Triangulation -> Property
-prop_VerticesOfEdge_welldefined t = forAllElements (unT <$> edges t)
-            (mkWellDefinednessProp (eqvEquivalents (edgeEqv t))
-               (uncurry uPair . vertices_E t)) 
+prop_VerticesOfEdge_welldefined tr = 
+    polyprop_respects (vertexEquivalence tr) trivialEquivalence 
+       (elements (tIVertices tr))
+       (uncurry uPair . tVerticesOfIEdge tr) 
                 
                 
 
@@ -324,10 +363,14 @@ instance (Ord a) => Ord (T a) where
 
 
 isSubface_VE :: TVertex -> IEdge -> Bool
-isSubface_VE x y = any2 (\x' -> x == pMap (getTriangulation x) x') (vertices y)
+isSubface_VE x y = any2 (\x' -> x == p x') (vertices y)
+    where
+        p = pMap (getTriangulation x)
 
 isSubface_ET ::  TEdge -> ITriangle -> Bool
-isSubface_ET x y = $(anyTuple 3) (\x' -> x == pMap (getTriangulation x) x') (edges y)
+isSubface_ET x y = any3 (\x' -> x == p x') (edges y)
+    where
+        p = pMap (getTriangulation x)
 
 isSubface_TTet :: Triangulation -> ITriangle -> TIndex -> Bool
 isSubface_TTet t x i  = any (`isSubface` i) (eqvTriangles t x :: [ITriangle]) 
@@ -352,9 +395,7 @@ prop_IsSubface_TTet_welldefined t =
 
 prop_IsSubface_VE_welldefined :: Triangulation -> Property
 prop_IsSubface_VE_welldefined t = 
-    forAllElements2 (unT <$> vertices t) (unT <$> edges t)
-        (mkWellDefinednessProp2 (eqvEquivalents (vertexEqv t)) (eqvEquivalents (edgeEqv t))
-            (\x y -> isSubface_VE (pMap t x) y))  
+    polyprop_respects
 
 
 
@@ -382,11 +423,11 @@ eqvTriangles t x = x : case lookup x (tGlueMap_ t) of
 
 
 
-vertices_E :: Triangulation -> IEdge -> Pair TVertex
-vertices_E t rep = map2 (pMap t) (vertices rep)
+tVerticesOfIEdge :: Triangulation -> IEdge -> Pair TVertex
+tVerticesOfIEdge t rep = map2 (pMap t) (vertices rep)
 
 instance Vertices (TEdge) (Pair TVertex) where 
-    vertices (UnsafeMakeT t x) = vertices_E t x
+    vertices e = tVerticesOfIEdge (getTriangulation e) (unT e)
 
 instance Edges (TTriangle) (Triple (TEdge)) where 
     edges (UnsafeMakeT t rep) = map3 (pMap t) (edges rep)
@@ -553,8 +594,16 @@ itrianglesContainingEdge =
 instance NormalTris TVertex [INormalTri] where
     normalTris = map iNormalTri . asList 
 
-tNormalArcsAroundVertex v = nub' ( 
+tNormalArcsAroundVertex :: TVertex -> [I NormalArc]
+tNormalArcsAroundVertex v = nub' (concatMap (asList . iNormalArcsAroundVertex) (asList v)) 
 
+-- prop_tNormalArcsAroundVertex tr =
+--     forAllElements (vertices tr) $ \v ->
+--         setEq
+--             (tNormalArcsAroundVertex v)
+--             (filter 
+
+vertexLinkGraph :: Graph gr => TVertex -> gr INormalTri b
 vertexLinkGraph (v :: TVertex) = 
     mkGraph (map (fromEnum &&& id) (normalTris v)) [] 
 

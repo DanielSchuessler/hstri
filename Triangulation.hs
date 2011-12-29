@@ -8,7 +8,7 @@ module Triangulation(
     Triangulation,
     
     -- * Properties 
-    tNumberOfTetrahedra,tTetrahedra_,tOriginalGluings, tGlueMap_, edgeEqv,oEdgeEqv,vertexEqv,triangTetCount,
+    tNumberOfTetrahedra,tTetrahedra_,tOriginalGluings, tGlueMap_, oEdgeEqv,vertexEqv,triangTetCount,
     lookupGluingOfITriangle,
     lookupGluingOfOITriangle,
     tIVertices,
@@ -66,7 +66,6 @@ import PrettyUtil
 import FacetGluing
 import INormalDisc
 import NormalDisc
-import Element
 import Quote
 import QuickCheckUtil
 import Data.Proxy
@@ -122,7 +121,6 @@ data Triangulation = Triangulation {
     tGlueMap_ :: Map ITriangle OITriangle,
 
 
-    edgeEqv :: Equivalence IEdge, 
     oEdgeEqv :: Equivalence OIEdge, 
     vertexEqv :: Equivalence IVertex
 --    normalArcEqv :: Equivalence INormalArc
@@ -208,12 +206,6 @@ mkTriangulation tNumberOfTetrahedra tOriginalGluings
                         (inducedVertexEquivalences =<< tOriginalGluings)
                         allIVertices
 
-        edgeEqv :: Equivalence IEdge
-        edgeEqv = mkEquivalence
-                        (inducedEdgeEquivalences =<< tOriginalGluings)
-                        allIEdges
-
-
         oEdgeEqv = mkEquivalence
                     (inducedOEdgeEquivalences =<< tOriginalGluings)
                     _allOIEdges
@@ -222,7 +214,7 @@ mkTriangulation tNumberOfTetrahedra tOriginalGluings
 
     checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv
                             
-    return Triangulation{ tNumberOfTetrahedra, tGlueMap_, edgeEqv, oEdgeEqv, vertexEqv, tOriginalGluings })
+    return Triangulation{ tNumberOfTetrahedra, tGlueMap_, oEdgeEqv, vertexEqv, tOriginalGluings })
 
 
 checkForEdgeGluedToSelfInReverse :: [IEdge] -> Equivalence OIEdge -> Either String ()
@@ -452,7 +444,7 @@ instance TriangulationDSnakeItem IVertex where
     canonicalize t x = eqvRep (vertexEqv t) x
 
 instance TriangulationDSnakeItem IEdge where
-    canonicalize t x = (eqvRep (edgeEqv t) x)
+    canonicalize t = forgetVertexOrder . canonicalize t . toOrderedFace
 
 instance TriangulationDSnakeItem OIEdge where
     canonicalize t x = (eqvRep (oEdgeEqv t) x)
@@ -603,3 +595,6 @@ tr_l31 = fromRight $ mkTriangulation 2
      fmap ((0./) &&& ((1./) . toOrderedFace)) [tABD,tACD,tBCD])
                         
 
+iEdgeEqv tr = 
+    EnumEqvImpl 
+        (\e -> eqvClassOf (toOrderedFace e)

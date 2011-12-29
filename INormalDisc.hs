@@ -159,4 +159,4 @@ iNormalQuadGetDisjointEdges :: INormalQuad -> Pair IEdge
 iNormalQuadGetDisjointEdges = traverseI map2 normalQuadGetDisjointEdges
 
 iNormalArcsAroundVertex :: IVertex -> Triple INormalArc
-iNormalArcsAroundVertex = traverseI map3 normalArcs
+iNormalArcsAroundVertex = traverseI map3 normalArcsAroundVertex
