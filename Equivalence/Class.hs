@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, FunctionalDependencies, BangPatterns, NoMonomorphismRestriction, ScopedTypeVariables, StandaloneDeriving, TemplateHaskell, NamedFieldPuns, FlexibleContexts, TypeFamilies, OverlappingInstances#-} 
+{-# LANGUAGE UndecidableInstances, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, FunctionalDependencies, BangPatterns, NoMonomorphismRestriction, ScopedTypeVariables, StandaloneDeriving, TemplateHaskell, NamedFieldPuns, FlexibleContexts, TypeFamilies, OverlappingInstances#-} 
 {-# OPTIONS -Wall #-}
 
 -- | Utility functions for Patrick Bahr's /equivalence/ package
@@ -10,10 +10,13 @@ module Equivalence.Class(
     EnumerableEquivalence(..),
     eqvRep, 
     eqvEquivalents,
+    prettyClass,
+    prettyEquivalence,
+    ecMap,
     -- * Universal impls
     EqvClassImpl(..), toEqvClassImpl,
     EqvImpl(..), toEqvImpl,
-    EnumEqvImpl(..), toEnumEqvImpl,
+    EnumEqvImpl(..), enumEqvImpl, toEnumEqvImpl,
     -- * Basic impls
     TrivialEquivalenceClass(..),
     TrivialEquivalence,
@@ -23,57 +26,50 @@ module Equivalence.Class(
     -- * Testing
     polyprop_EquivalenceClass,
     polyprop_Equivalence,
+    polyprop_Equivalence',
     polyprop_respects,
     polyprop_respects2
     )   where
 
 import Element
 import Control.Applicative
-import qualified Data.Set as S
 import QuickCheckUtil
 import Test.QuickCheck
+import PrettyUtil
 
 
 class AsList cls => IsEquivalenceClass cls where
     canonicalRep :: cls -> Element cls
-    ecMember :: Element cls -> cls -> Bool
     ecSize :: cls -> Int
 
 type family EquivalenceClassOf er :: * 
 
 polyprop_EquivalenceClass
-  :: (Ord (Element cls),
-      Show (Element cls),
-      Arbitrary (Element cls),
-      IsEquivalenceClass cls) =>
-     cls -> Property
+  :: (Eq (Element cls), IsEquivalenceClass cls) => cls -> Property
 polyprop_EquivalenceClass ec = 
-    let
-        lst = asList ec
-        s = S.fromList lst
-    in
-        conjoin [
-            property (S.member (canonicalRep ec) s)
-          , ecSize ec .=. S.size s 
-          , forAllElements lst (`ecMember` ec) 
-          , property (\x -> not (S.member x s) ==> not (ecMember x ec))
+        conjoin' [
+            property (elem (canonicalRep ec) l)
+          , ecSize ec .=. length l
           ]
+
+    where
+        l = asList ec
 
 
 class   (   IsEquivalenceClass (EquivalenceClassOf er)
-        ,   Element er ~ Element (EquivalenceClassOf er)) => IsEquivalence er where
+        ,   Element er ~ Element (EquivalenceClassOf er)
+        ,   Eq (Element er)) => IsEquivalence er where
 
     -- | Throws an error if the element is not in the domain of the equivalence
     eqvClassOf :: er -> Element er -> EquivalenceClassOf er
 
     eqvEquivalent :: er -> Element er -> Element er -> Bool
-    eqvEquivalent er x y = ecMember x (eqvClassOf er y) 
+    eqvEquivalent er x y = eqvRep er x == eqvRep er y
 
 
 polyprop_Equivalence
   :: (Ord (Element (EquivalenceClassOf er)),
       Show (Element (EquivalenceClassOf er)),
-      Arbitrary (Element (EquivalenceClassOf er)),
       IsEquivalence er) =>
      er -> Gen (Element (EquivalenceClassOf er)) -> Property
 polyprop_Equivalence er dom =
@@ -82,17 +78,25 @@ polyprop_Equivalence er dom =
             let
                 cls_x = eqvClassOf er x
             in
-                conjoin [
-                      polyprop_EquivalenceClass cls_x
-                    , forAllElements (asList cls_x) 
-                        (\x' -> clsEql cls_x (eqvClassOf er x'))
-                    , property (eqv x x)
-                    , forAll dom (\y -> eqv x y .=. eqv y x)
-                    , forAll2 dom dom (\y z -> (eqv x y && eqv y z) ==> eqv x z)
+                conjoin' [
+                      label "Check class" $ polyprop_EquivalenceClass cls_x
+                    , 
+                      forAllElements (asList cls_x) 
+                        (\x' -> 
+                            label "Class of elements of class" $ 
+                            clsEql cls_x (eqvClassOf er x'))
+                    , label "Reflexivity" (eqv x x)
+                    , forAll dom (\y -> label "Symmetry" $ eqv x y .=. eqv y x)
+                    , forAll2 dom dom (\y z -> label "Transitivity" $ 
+                        if eqv x y && eqv y z 
+                           then eqv x z 
+                           else True)
 
                     , forAll dom (\y -> 
-                        label "Consistency of eqvEquivalent,ecMember,eqvClassOf" $ 
-                            eqvEquivalent er x y .=. ecMember x (eqvClassOf er y))
+                        label "Consistency of eqvEquivalent,canonicalRep,eqvClassOf" $ 
+                        let e = eqvEquivalent er x y
+                        in classify e "eqvEquivalent er x y" $
+                            e .=. (eqvRep er x == eqvRep er y))
                     ])
 
   where
@@ -104,6 +108,12 @@ polyprop_Equivalence er dom =
         setEq (asList ec1) (asList ec2)
 
 
+polyprop_Equivalence'
+  :: (Ord (Element (EquivalenceClassOf er)),
+      Show (Element (EquivalenceClassOf er)),
+      IsEquivalence er) =>
+     er -> [Element (EquivalenceClassOf er)] -> Property
+polyprop_Equivalence' er = polyprop_Equivalence er . elements 
 
 class IsEquivalence er => EnumerableEquivalence er where
     eqvClasses :: er -> [EquivalenceClassOf er]
@@ -120,12 +130,12 @@ eqvEquivalents e x = asList $ eqvClassOf e x
 data EqvClassImpl elt = EqvClassImpl {
     eci_elements :: [elt]
 ,   eci_canonicalRep :: elt
-,   eci_Member :: elt -> Bool
 ,   eci_Size :: Int
 }
+    deriving Show
 
 toEqvClassImpl :: IsEquivalenceClass xs => xs -> EqvClassImpl (Element xs)
-toEqvClassImpl = EqvClassImpl <$> asList <*> canonicalRep <*> flip ecMember <*> ecSize
+toEqvClassImpl = EqvClassImpl <$> asList <*> canonicalRep <*> ecSize
 
 type instance Element (EqvClassImpl elt) = elt
 
@@ -133,7 +143,6 @@ instance AsList (EqvClassImpl elt) where asList = eci_elements
 
 instance IsEquivalenceClass (EqvClassImpl elt) where
     canonicalRep = eci_canonicalRep
-    ecMember = flip eci_Member
     ecSize = eci_Size
 
 newtype EqvImpl cls = EqvImpl { 
@@ -146,7 +155,7 @@ toEqvImpl = EqvImpl <$> eqvClassOf
 type instance Element (EqvImpl cls) = Element cls
 type instance EquivalenceClassOf (EqvImpl cls) = cls
 
-instance IsEquivalenceClass cls => IsEquivalence (EqvImpl cls) where
+instance (Eq (Element cls), IsEquivalenceClass cls) => IsEquivalence (EqvImpl cls) where
     eqvClassOf = eqvi_ClassOf
 
 data EnumEqvImpl cls = EnumEqvImpl { 
@@ -160,10 +169,10 @@ toEnumEqvImpl = EnumEqvImpl <$> toEqvImpl <*> eqvClasses
 type instance Element (EnumEqvImpl cls) = Element cls
 type instance EquivalenceClassOf (EnumEqvImpl cls) = cls
 
-instance IsEquivalenceClass cls => IsEquivalence (EnumEqvImpl cls) where
+instance (Eq (Element cls), IsEquivalenceClass cls) => IsEquivalence (EnumEqvImpl cls) where
     eqvClassOf = eqvClassOf . eeqvi_eqvi
 
-instance IsEquivalenceClass cls => EnumerableEquivalence (EnumEqvImpl cls) where
+instance (Eq (Element cls), IsEquivalenceClass cls) => EnumerableEquivalence (EnumEqvImpl cls) where
     eqvClasses = eeqvi_Classes
 
 
@@ -175,7 +184,6 @@ instance AsList (TrivialEquivalenceClass a) where asList = (:[]) . runTrivialEqu
 
 instance Eq a => IsEquivalenceClass (TrivialEquivalenceClass a) where 
     ecSize = const 1
-    ecMember a = (== a) . runTrivialEquivalenceClass
     canonicalRep = runTrivialEquivalenceClass
 
 type TrivialEquivalence a = EqvImpl (TrivialEquivalenceClass a)
@@ -228,7 +236,6 @@ ecProduct ec1 ec2 =
     EqvClassImpl 
         (asList ec1 `cart` asList ec2) 
         (canonicalRep ec1, canonicalRep ec2)
-        (\(x1,x2) -> ecMember x1 ec1 && ecMember x2 ec2)
         (ecSize ec1 * ecSize ec2)
 
 eqvProduct
@@ -257,3 +264,37 @@ polyprop_respects2
      -> Property
 polyprop_respects2 er1 er1' er2 dom1 dom2 f =
     polyprop_respects (eqvProduct er1 er1') er2 (cart dom1 dom2) (uncurry f)
+
+
+prettyClass :: (AsList a, Pretty (Element a)) => a -> Doc
+prettyClass = prettyListAsSet . asList
+
+prettyEquivalence
+  :: (EnumerableEquivalence er, Pretty (EquivalenceClassOf er)) =>
+     er -> Doc
+prettyEquivalence e = vsep 
+            (text "Equivalence, classes = {"
+             : fmap (indent 2 . pretty) (eqvClasses e) 
+             ++ [rbrace])
+
+
+instance (Pretty elt) => Pretty (EqvClassImpl elt) where
+    pretty = prettyClass
+
+instance (Pretty cls, Eq (Element cls), IsEquivalenceClass cls) => Pretty (EnumEqvImpl cls) where
+    pretty = prettyEquivalence
+
+
+enumEqvImpl :: (Element cls -> cls) -> [cls] -> EnumEqvImpl cls
+enumEqvImpl = EnumEqvImpl . EqvImpl
+
+ecMap
+  :: IsEquivalenceClass cls =>
+     (Element cls -> elt) -> cls -> EqvClassImpl elt
+ecMap f c =
+    EqvClassImpl
+                                (fmap f (asList c))
+                                (f (canonicalRep c))
+                                (ecSize c)
+
+

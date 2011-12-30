@@ -141,7 +141,7 @@ vertexTripleToString (u,v,w) = concatMap show [u,v,w]
 
 
 -- | A 'Vertex' with a tetrahedron index attached to it
-data IVertex = IVertex {-# UNPACK #-} !TIndex {-# UNPACK #-} !Vertex
+data IVertex = IVertex {-# UNPACK #-} !TIndex {- UNPACK -} !Vertex
     deriving(Eq,Ord)
 
 instance HasTIndex IVertex Vertex where

@@ -56,6 +56,7 @@ import PrettyUtil
 import Language.Haskell.TH.Syntax
 import THUtil
 import Quote
+import QuickCheckUtil
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)
@@ -372,7 +373,7 @@ prop_link_nc_nq nc nq =
         let
             (nc0,nc1) = link nc nq 
         in
-            conjoin [
+            conjoin' [
                 isSubface nc0 nq,
                 isSubface nc1 nq,
                 nc0 /= nc,

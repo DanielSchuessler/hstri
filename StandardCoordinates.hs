@@ -238,7 +238,7 @@ prop_krBasisMatchingEquations t =
             krB = krBasis t :: [StandardCoordinates Int]
             mE = matchingEquations t
          in
-            conjoin [ (x <.> y) == 0 
+            conjoin' [ (x <.> y) == 0 
                         | x <- krB
                         , y <- mE ])
 

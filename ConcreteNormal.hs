@@ -22,23 +22,23 @@ import PrettyUtil
 import Simplicial.AnySimplex
 import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
-import TriangulationCxtObject hiding(VertexView(..))
+import TriangulationCxtObject
 import ShortShow
 
 -- | Quads are numbered away from their 'firstDisjointEdge'
 firstDisjointEdge :: NormalQuad -> Edge
 firstDisjointEdge q = uncurry min (normalQuadGetDisjointEdges q)
 
-data Concrete a = C !Int !a
+data Concrete a = Concrete !Int !a
     deriving(Eq,Ord,Show)
 
 instance Pretty a => Pretty (Concrete a) where
-    prettyPrec prec (C u a) = prettyPrecApp prec "C" [anyPretty u, anyPretty a] 
+    prettyPrec prec (Concrete u a) = prettyPrecApp prec "Concrete" [anyPretty u, anyPretty a] 
 
 c_unique :: Concrete t -> Int
-c_unique (C u _) = u
+c_unique (Concrete u _) = u
 c_type ::  Concrete t -> t
-c_type (C _ a) = a
+c_type (Concrete _ a) = a
 
 type ArcPosition = Int
 type CornerPosition = Int
@@ -70,7 +70,7 @@ discPosToCornerPos_helper cns_x_arcPos nc x corner linkCornerSelector =
         I i x' = viewI (c_type x)
         arc = normalArc (corner, linkCornerSelector (link corner x'))
         arcPos = cns_x_arcPos nc x arc
-        result = arcPosToCornerPos nc (C arcPos (i ./ arc)) corner
+        result = arcPosToCornerPos nc (Concrete arcPos (i ./ arc)) corner
     in
 --         trace (unwords ["discPosToCornerPos_helper _ _ _",
 --                             showsPrec 11 x "",
@@ -127,7 +127,7 @@ quadPosToCornerPos nc x c =
 
 arcPosToCornerPos :: Integral i => StandardCoordinates i -> 
                     Concrete INormalArc -> NormalCorner -> CornerPosition 
-arcPosToCornerPos nc (C arcPos arc) corner =
+arcPosToCornerPos nc (Concrete arcPos arc) corner =
                 let
                     icorner = getTIndex arc ./ corner
                     cornPos_max = fi (numberOfCornersOfType nc icorner - 1)
@@ -146,11 +146,11 @@ arcPosToCornerPos nc (C arcPos arc) corner =
 
 
 triPosToArcPos :: Integral i => StandardCoordinates i -> Concrete INormalTri -> NormalArc -> ArcPosition 
-triPosToArcPos _ (C u _) _ = u
+triPosToArcPos _ (Concrete u _) _ = u
 
 quadPosToArcPos :: Integral i => StandardCoordinates i -> 
                         Concrete INormalQuad -> NormalArc -> ArcPosition 
-quadPosToArcPos nc (C u quad) arc =
+quadPosToArcPos nc (Concrete u quad) arc =
   let
     iarc = getTIndex quad ./ arc
   in
@@ -175,7 +175,7 @@ concreteTris tr nc = do
             tri <- tINormalTris tr
             u <- [ 0 .. fi (stc_coefficient nc (iNormalDisc tri)-1) ]
 
-            return (C u tri)
+            return (Concrete u tri)
 
 concreteQuads
   :: Integral i =>
@@ -184,7 +184,7 @@ concreteQuads tr nc = do
             quad <- tINormalQuads tr
             u <- [0 .. fi (stc_coefficient nc (iNormalDisc quad)-1) ]
 
-            return (C u quad) 
+            return (Concrete u quad) 
                     
 
 mkConcrete :: Integral i => Triangulation -> StandardCoordinates i -> ConcreteNormalSurface
@@ -194,21 +194,21 @@ mkConcrete (tr :: Triangulation) nc =
         cns_quads = concreteQuads tr nc 
 
         cns_arcsOfTri cnt =
-            map3 (\arc -> C (triPosToArcPos nc cnt (forgetTIndex arc)) arc) (normalArcs . c_type $ cnt) 
+            map3 (\arc -> Concrete (triPosToArcPos nc cnt (forgetTIndex arc)) arc) (normalArcs . c_type $ cnt) 
 
 
 
 
         cns_arcsOfQuad cnq =
                     map4 
-                        (\arc -> C (quadPosToArcPos nc cnq (forgetTIndex arc)) arc)
+                        (\arc -> Concrete (quadPosToArcPos nc cnq (forgetTIndex arc)) arc)
                         (normalArcs . c_type $ cnq) 
 
 
         cns_cornersOfArc cna =
                 map2 
                     (\icorner -> 
-                            C (arcPosToCornerPos nc cna (forgetTIndex icorner)) icorner)  
+                            Concrete (arcPosToCornerPos nc cna (forgetTIndex icorner)) icorner)  
                     (normalCorners . c_type $ cna)
 
 
@@ -257,7 +257,7 @@ standardCoordinatesToPreRenderable (SPQWithCoords spq coords _) nc =
 
         tris :: [Triple (Corn v)]
         tris = do
-            cx@(C _ (viewI -> I i x)) <- cns_tris cns 
+            cx@(Concrete _ (viewI -> I i x)) <- cns_tris cns 
             let f corner = 
                     mkCorn 
                         (triPosToCornerPos nc cx corner)
@@ -267,7 +267,7 @@ standardCoordinatesToPreRenderable (SPQWithCoords spq coords _) nc =
 
         quads :: [Quadruple (Corn v)]
         quads = do
-            cx@(C _ (viewI -> I i x)) <- cns_quads cns 
+            cx@(Concrete _ (viewI -> I i x)) <- cns_quads cns 
             let f corner = 
                     mkCorn 
                         (quadPosToCornerPos nc cx corner)

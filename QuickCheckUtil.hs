@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE ViewPatterns, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module QuickCheckUtil where
 
@@ -7,6 +7,7 @@ import Control.Monad
 import qualified Data.Set as S
 import Data.Graph.Inductive.Tree
 import Data.Graph.Inductive.Graph
+import qualified Data.Vector as V
 
 cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
 cart = liftM2 (,)
@@ -64,3 +65,9 @@ instance (Arbitrary a, Arbitrary b) => Arbitrary (Gr a b) where
         return (mkGraph lns les)
 
 
+
+conjoin' :: Testable a => [a] -> Gen Prop
+conjoin' [] = label "conjoin' []" True
+conjoin' ((V.fromList . fmap property) -> ps) =
+      (ps V.!) =<< choose (0,V.length ps-1) 
+        

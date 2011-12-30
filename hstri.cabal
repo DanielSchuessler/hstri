@@ -94,6 +94,8 @@ Library
     InnerProductRepresentation
     DD
     AbstractNeighborhood
+    ZeroDefaultMap
+    Triangulation.CanonOrdered
 
 
 

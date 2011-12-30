@@ -5,9 +5,10 @@ import Test.QuickCheck
 import StandardCoordinates
 import NormalDisc
 import Triangulation
+import Triangulation.CanonOrdered
 import TriangulationCxtObject
 import QuadCoordinates
-import AbstractNeighbordhood
+import AbstractNeighborhood
 
 
 main = do
@@ -29,6 +30,7 @@ main = do
         qc_Equivalence,
         qc_Util,
         qc_QuadCoordinates,
-        qc_AbstractNeighbordhood
+        qc_AbstractNeighbordhood,
+        qc_CanonOrdered
         ]
     print (and res)

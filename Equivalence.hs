@@ -48,8 +48,6 @@ instance AsList (SetBasedEquivalenceClass a) where
 instance Ord a => IsEquivalenceClass (SetBasedEquivalenceClass a) where
     canonicalRep = ec_rep 
 
-    ecMember x ec = x `member` ec_elements ec
-
     ecSize = setSize . ec_elements
 
 
@@ -102,7 +100,7 @@ eqv_classOf e x = eqv_classmap e ! x
 
 -- | Checks whether the given elements are equivalent. Throws an error if the first argument is not in the domain of the equivalence.
 eqv_eq :: (Ord a) => Equivalence a -> a -> a -> Bool
-eqv_eq e x y = x `ecMember` eqvClassOf e y 
+eqv_eq = eqvEquivalent
 
 eqv_classcount ::  Equivalence a -> Int
 eqv_classcount = length . eqv_classes
@@ -218,7 +216,7 @@ prop_hull = mkProp (\_ pairs e ->
 -- | A representative is contained in its own class
 prop_rep ::  Property
 prop_rep = mkProp (\_ _ e -> 
-                forAll (elements (eqv_classes e)) (\ec -> ec_rep ec `ecMember` ec))
+                forAll (elements (eqv_classes e)) (\ec -> ec_rep ec `Set.member` ec_elements ec))
 
 -- | The value set of 'eqv_classmap' equals 'eqv_classes'
 prop_classmap_classes ::  Property
@@ -252,14 +250,10 @@ qc_Equivalence ::  IO Bool
 qc_Equivalence = $(quickCheckAll)
 
 instance (Ord a, Pretty a) => Pretty (SetBasedEquivalenceClass a) where 
-    pretty = pretty . ec_elements
+    pretty = prettyClass
 
 instance (Ord a, Pretty a) => Pretty (Equivalence a) where 
-    pretty e =
-        vsep 
-            (text "Equivalence, classes = {"
-             : fmap (indent 2 . pretty) (eqv_classes e) 
-             ++ [rbrace])
+    pretty = prettyEquivalence
 
 ec_join :: Ord a => SetBasedEquivalenceClass (SetBasedEquivalenceClass a) -> SetBasedEquivalenceClass a
 ec_join ecs = SetBasedEquivalenceClass { ec_elements = (foldr1 setUnion . fmap ec_elements . setToList . ec_elements) ecs
@@ -276,7 +270,7 @@ mkWellDefinednessProp getEquivalents f x =
                                ,"=== FUNCTION VALUE AT FIRST ELEMENT"
                                ,show fx ])
 
-        (conjoin (fmap sameValue (getEquivalents x)))
+        (conjoin' (fmap sameValue (getEquivalents x)))
     where                                           
         !fx = f x
         sameValue x' = classify (x==x') ("trivial (same representative)") $ 

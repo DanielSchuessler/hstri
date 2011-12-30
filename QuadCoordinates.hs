@@ -18,7 +18,7 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import TriangulationCxtObject
 import ZeroDefaultMap
-import AbstractNeighbordhood
+import AbstractNeighborhood
 
 newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
     deriving(AdditiveGroup,InnerSpace,Eq)

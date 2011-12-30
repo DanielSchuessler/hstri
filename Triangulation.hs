@@ -8,7 +8,7 @@ module Triangulation(
     Triangulation,
     
     -- * Properties 
-    tNumberOfTetrahedra,tTetrahedra_,tOriginalGluings, tGlueMap_, oEdgeEqv,vertexEqv,triangTetCount,
+    tNumberOfTetrahedra,tTetrahedra_,tOriginalGluings, tGlueMap_, triangTetCount,
     lookupGluingOfITriangle,
     lookupGluingOfOITriangle,
     tIVertices,
@@ -29,13 +29,15 @@ module Triangulation(
     boundaryITriangles,
     tNumberOfNormalDiscTypes,
     tNumberOfNormalQuadTypes,
+    adjacentNormalTris,
+    isCanonicallyOrderedClass,
+    -- ** Equivalences
+    oEdgeEqv,vertexEqv,
+    iEdgeEqv,
     -- * Construction 
     mkTriangulation,mkTriangulationG,triang,randomTriangulation,randT,
     -- * Transformation
     addGluings,
-    -- * Canonical vertex ordering for faces
-    CanonOrdered(..),COIEdge,COITriangle,
-    CanonicallyOrderable(..),isCanonicallyOrdered,tCOIEdges,
     -- * Canonical representatives for things that are glued
     TriangulationDSnakeItem(..),
     -- * Examples
@@ -68,8 +70,9 @@ import INormalDisc
 import NormalDisc
 import Quote
 import QuickCheckUtil
-import Data.Proxy
 import Control.Arrow((&&&))
+import HomogenousTuples
+import Data.Maybe
 
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
@@ -148,24 +151,6 @@ instance Pretty Triangulation where
 
 
 
-
--- instance TIndex => Show Triangulation where
---     show (Triangulation count gluings _) = 
---         unlines (("Triangulation with "++show count++" tetrahedr"++(if count==1 then "on" else "a")++" {")
---                 : gluingsStr
---                 ++ ["}"])
---             where
---                 gluingsStr = [ $(printf "\tindex %H ~ %H") 
---                                     two
---                                     otwo
--- 
---                         | (two,otwo) <- assocs gluings ] 
---
-
-
-
-
-
 mkTriangulation :: Word -> [Gluing] -> Either String Triangulation
 mkTriangulation tNumberOfTetrahedra tOriginalGluings
         =
@@ -179,9 +164,6 @@ mkTriangulation tNumberOfTetrahedra tOriginalGluings
 
         allIVertices :: [IVertex]
         allIVertices = concatMap vertexList allIEdges
-
---         allINormalArcs :: [INormalArc]
---         allINormalArcs = [ i ./ na | i <- tTetrahedra_ , na <- allNormalArcs ]
 
     let addGluing mrec (t,f1) = mrec >>= (\r -> case lookup t r of
                                                         Nothing -> return (mapInsert t f1 r)
@@ -238,16 +220,6 @@ triang gluings = fromRight $ mkTriangulation n gluings
           | otherwise = maximum (concatMap (\(t,o) -> 
                                     [ fi $ getTIndex t, fi $ getTIndex o ]) gluings) + 1
 
--- tt3a = ti tt3 1 A
--- tt3d = ti tt3 1 D
--- tt3ac = ti tt3 1 AC
-
-
--- ti ::  Triangulation -> TIndex -> a -> T (I a)
--- ti t i a = T t (I i a)
-
-
-
 instance Show Triangulation where
     showsPrec = prettyShowsPrec 
 
@@ -268,13 +240,8 @@ instance Arbitrary Triangulation where
 --            concatMap removeTet (tTetrahedra_ t) ++ 
             fmap removeGluing (tOriginalGluings t)
         where
---             -- we can remove a tetrahedron iff it is isolated
---             removeTet tet =
---                 if $(allTuple 4) (isBoundaryITriangle t) (triangles tet)
---                 then [ fromRight $ mkTriangulation (List.delete tet (tTetrahedra_ t)) (tOriginalGluings t) ]
---                 else []
--- 
-            removeGluing g = fromRight $ mkTriangulation (tNumberOfTetrahedra t) (List.delete g (tOriginalGluings t))
+            removeGluing g = fromRight $ 
+                mkTriangulation (tNumberOfTetrahedra t) (List.delete g (tOriginalGluings t))
 
 generateUntilRight :: Show a => Gen (Either a b) -> Gen b
 generateUntilRight g = fromRight <$> (g `suchThat` isRight)
@@ -305,11 +272,6 @@ randT nTets nGluings = assert (nGluings <= 2*nTets) generateUntilRight go
             pairs <- evalStateT (loop [] nGluings) (setFromList ((./) <$> tets <*> allTriangles))
             
             return $ mkTriangulation (fi nTets) pairs
-
-        
-        
-
-
 
 
 isBoundaryITriangle ::  Triangulation -> ITriangle -> Bool
@@ -446,6 +408,16 @@ instance TriangulationDSnakeItem IVertex where
 instance TriangulationDSnakeItem IEdge where
     canonicalize t = forgetVertexOrder . canonicalize t . toOrderedFace
 
+iEdgeEqv :: Triangulation -> EnumEqvImpl (EqvClassImpl IEdge)
+iEdgeEqv tr = 
+    EnumEqvImpl 
+        (EqvImpl
+            (\e -> disorderEquivalenceClass (eqvClassOf (oEdgeEqv tr) (toOrderedFace e))))
+
+        (fmap disorderEquivalenceClass . filter isCanonicallyOrderedClass
+            . eqvClasses . oEdgeEqv $ tr) 
+
+
 instance TriangulationDSnakeItem OIEdge where
     canonicalize t x = (eqvRep (oEdgeEqv t) x)
 
@@ -506,80 +478,6 @@ boundaryITriangles :: Triangulation -> [ITriangle]
 boundaryITriangles tr = filter (isBoundaryITriangle tr) (tITriangles tr)
 
 
-newtype CanonOrdered a = UnsafeCanonOrdered { unCanonOrdered :: a }
-    deriving(Show,Eq,Ord,TriangulationDSnakeItem,Pretty )
-
-type COITriangle = CanonOrdered OITriangle
-type COIEdge = CanonOrdered OIEdge
-
-class OrderableFace t ot => CanonicallyOrderable t ot where
-    orderCanonically :: Triangulation -> t -> CanonOrdered ot
-    allCanonicallyOrdered :: Triangulation -> [CanonOrdered ot] 
-
-isCanonicallyOrdered
-  :: (Eq ot, CanonicallyOrderable t ot) => Triangulation -> ot -> Bool
-isCanonicallyOrdered tr x =
-    x == (unCanonOrdered . orderCanonically tr . forgetVertexOrder) x
-
-instance CanonicallyOrderable ITriangle OITriangle where
-    allCanonicallyOrdered tr = UnsafeCanonOrdered <$> do
-        tri <- tITriangles tr
-        case lookupGluingOfITriangle tr tri of
-            Nothing -> [ toOrderedFace tri ]
-            Just otri
-                | tri < forgetVertexOrder otri -> [ toOrderedFace tri, otri ]
-                | otherwise -> []
-
-    orderCanonically tr tri = UnsafeCanonOrdered $
-        case lookupGluingOfITriangle tr tri of
-            Nothing -> toOrderedFace tri
-            Just otri
-                | tri < forgetVertexOrder otri -> toOrderedFace tri
-                | otherwise -> snd (flipGluing (tri,otri))
-
-
-isCanonicallyOrderedClass
-  :: (Eq (VertexSymGroup t),
-      IsEquivalenceClass cls,
-      OrderableFace t (Element cls)) =>
-     cls -> Bool
-isCanonicallyOrderedClass cl = getVertexOrder (canonicalRep cl) == mempty
-
-tCOIEdges
-  :: Triangulation -> [COIEdge]
-tCOIEdges tr = UnsafeCanonOrdered <$> do
-        cl <- eqvClasses (oEdgeEqv tr)
-        guard (isCanonicallyOrderedClass cl) 
-        ec_elementList cl       
-            
-instance CanonicallyOrderable IEdge OIEdge where
-    allCanonicallyOrdered = tCOIEdges 
-
-    orderCanonically tr e = UnsafeCanonOrdered $
-        let
-            oe = toOrderedFace e
-        in
-            oe *. (getVertexOrder (eqvRep (oEdgeEqv tr) oe))
-
-
---polyprop_CanonicallyOrderable :: CanonicallyOrderable t ot => Proxy ot -> Triangulation -> Property
-polyprop_CanonicallyOrderable
-  :: (Eq ot, Show ot, CanonicallyOrderable t ot) =>
-     Proxy ot -> Triangulation -> Property
-polyprop_CanonicallyOrderable (_ :: Proxy ot) tr =
-    forAllElements (allCanonicallyOrdered tr :: [CanonOrdered ot])
-        (isCanonicallyOrdered tr . unCanonOrdered)
-
---     .&.
--- 
---     forAllElements 
-
-
-prop_CanonicallyOrderable_Triangle :: Triangulation -> Property
-prop_CanonicallyOrderable_Triangle = polyprop_CanonicallyOrderable (undefined :: Proxy OITriangle)
-
-prop_CanonicallyOrderable_Edge :: Triangulation -> Property
-prop_CanonicallyOrderable_Edge = polyprop_CanonicallyOrderable (undefined :: Proxy OIEdge)
 
 
 tNumberOfNormalDiscTypes :: Triangulation -> Word
@@ -595,6 +493,35 @@ tr_l31 = fromRight $ mkTriangulation 2
      fmap ((0./) &&& ((1./) . toOrderedFace)) [tABD,tACD,tBCD])
                         
 
-iEdgeEqv tr = 
-    EnumEqvImpl 
-        (\e -> eqvClassOf (toOrderedFace e)
+
+
+disorderEquivalenceClass
+  :: (IsEquivalenceClass cls, OrderableFace elt (Element cls)) =>
+     cls -> EqvClassImpl elt
+disorderEquivalenceClass = ecMap forgetVertexOrder
+
+prop_iEdgeEqv :: Triangulation -> Property
+prop_iEdgeEqv tr = polyprop_Equivalence' (iEdgeEqv tr) (tIEdges tr) 
+
+-- | Returns the normal triangles adjacent to the given one, and the arcs witnessing the adjacencies (the first arc of each pair is the arc of the input triangle) 
+adjacentNormalTris
+  :: 
+     Triangulation -> INormalTri -> [(Pair INormalArc, INormalTri)]
+adjacentNormalTris tr nt =
+    let
+        arcs = normalArcList nt
+    in
+        mapMaybe (\arc -> do
+            arc' <- gluedNormalArc tr arc
+            return ((arc, arc'), iNormalTriByNormalArc arc'))
+
+            arcs
+
+isCanonicallyOrderedClass
+  :: (Eq (VertexSymGroup t),
+      IsEquivalenceClass cls,
+      OrderableFace t (Element cls)) =>
+     cls -> Bool
+isCanonicallyOrderedClass cl = getVertexOrder (canonicalRep cl) == mempty
+
+
