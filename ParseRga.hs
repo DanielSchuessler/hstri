@@ -43,8 +43,7 @@ getRequiredAttrValue a =
 
 translateGluings :: Word -> [[Int]] -> Triangulation
 translateGluings ntet gluingRows = 
-    assert (ntet == fi (length gluingRows)) $
-        either error id res
+    assert (ntet == fi (length gluingRows)) $ res
     where
         res =
                 mkTriangulation 

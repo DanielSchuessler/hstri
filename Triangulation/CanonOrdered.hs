@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, TypeSynonymInstances, FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall #-}
--- * Canonical vertex ordering for faces of a triangulation
+-- | Canonical vertex ordering for faces of a triangulation
 module Triangulation.CanonOrdered(
     module Triangulation,
     CanonOrdered(..),COIEdge,COITriangle,

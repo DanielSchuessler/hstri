@@ -45,7 +45,7 @@ Library
     Homology
     HsTri
     IndexedSimplices
-    Indexing
+    Numbering
     INormalDisc
     Latexable
     MathUtil
@@ -96,6 +96,7 @@ Library
     AbstractNeighborhood
     ZeroDefaultMap
     Triangulation.CanonOrdered
+    TriArcGraph
 
 
 
@@ -136,6 +137,7 @@ Library
         tagged,
         template-haskell,
         text,
+        time,
         transformers,
         transformers-compose,
         tuple-th,

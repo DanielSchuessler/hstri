@@ -35,7 +35,8 @@ module Triangulation(
     oEdgeEqv,vertexEqv,
     iEdgeEqv,
     -- * Construction 
-    mkTriangulation,mkTriangulationG,triang,randomTriangulation,randT,
+    mkTriangulation,mkTriangulationSafe,mkTriangulationG,triang,randomTriangulation,randT,
+    randomClosed,
     -- * Transformation
     addGluings,
     -- * Canonical representatives for things that are glued
@@ -53,26 +54,27 @@ module Triangulation(
 import AbstractTetrahedron
 import Collections
 import Control.Applicative
+import Control.Arrow((&&&))
 import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Function
-import qualified Data.List as List
+import Data.Maybe
 import Equivalence
+import FacetGluing
+import HomogenousTuples
+import INormalDisc
+import NormalDisc
 import Prelude hiding(catch,lookup)
+import PrettyUtil
+import QuickCheckUtil
+import Quote
 import System.Random
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Test.QuickCheck.Gen
-import PrettyUtil
-import FacetGluing
-import INormalDisc
-import NormalDisc
-import Quote
-import QuickCheckUtil
-import Control.Arrow((&&&))
-import HomogenousTuples
-import Data.Maybe
+import qualified Data.List as List
+import THUtil
 
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
@@ -97,7 +99,7 @@ tGluingsIrredundant tr =
 
 prop_tGluingsIrredundant :: Triangulation -> Bool
 prop_tGluingsIrredundant tr = 
-    tGlueMap_ tr == tGlueMap_ (fromRight $ mkTriangulation 
+    tGlueMap_ tr == tGlueMap_ (mkTriangulation
                         (tNumberOfTetrahedra tr) 
                         (tGluingsIrredundant tr)) 
 
@@ -150,9 +152,11 @@ instance Pretty Triangulation where
                      ]
 
 
+mkTriangulation :: Word -> [Gluing] -> Triangulation
+mkTriangulation = (fmap . fmap) fromRight mkTriangulationSafe 
 
-mkTriangulation :: Word -> [Gluing] -> Either String Triangulation
-mkTriangulation tNumberOfTetrahedra tOriginalGluings
+mkTriangulationSafe :: Word -> [Gluing] -> Either String Triangulation
+mkTriangulationSafe tNumberOfTetrahedra tOriginalGluings
         =
             (do
 
@@ -214,7 +218,7 @@ checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv = mapM_ go allIEdges
 
 -- | Convenience function for the special case that there are no isolated tetrahedra
 triang ::  [Gluing] -> Triangulation
-triang gluings = fromRight $ mkTriangulation n gluings
+triang gluings = mkTriangulation n gluings
     where
         n | null gluings = 0
           | otherwise = maximum (concatMap (\(t,o) -> 
@@ -240,14 +244,19 @@ instance Arbitrary Triangulation where
 --            concatMap removeTet (tTetrahedra_ t) ++ 
             fmap removeGluing (tOriginalGluings t)
         where
-            removeGluing g = fromRight $ 
+            removeGluing g = 
                 mkTriangulation (tNumberOfTetrahedra t) (List.delete g (tOriginalGluings t))
 
 generateUntilRight :: Show a => Gen (Either a b) -> Gen b
 generateUntilRight g = fromRight <$> (g `suchThat` isRight)
 
 randT :: Int -> Int -> Gen Triangulation
-randT nTets nGluings = assert (nGluings <= 2*nTets) generateUntilRight go
+randT nTets nGluings = 
+        $(assrt [| nTets > 0 |] 'nTets) $
+        $(assrt [| nGluings >= 0 |] 'nGluings) $
+        $(assrt [| nGluings <= 2*nTets |] ['nGluings,'nTets]) $
+            
+            generateUntilRight go
     where
         go = do
             let 
@@ -271,18 +280,20 @@ randT nTets nGluings = assert (nGluings <= 2*nTets) generateUntilRight go
 
             pairs <- evalStateT (loop [] nGluings) (setFromList ((./) <$> tets <*> allTriangles))
             
-            return $ mkTriangulation (fi nTets) pairs
+            return $ mkTriangulationSafe (fi nTets) pairs
 
 
 isBoundaryITriangle ::  Triangulation -> ITriangle -> Bool
 isBoundaryITriangle t x = not (x `memberOfMap` tGlueMap_ t)
 
 
+randomClosed :: Int -> IO Triangulation
+randomClosed n = randomTriangulation n (2*n)
 
 randomTriangulation :: Int -> Int -> IO Triangulation
 randomTriangulation nTets nGluings = do
     g <- newStdGen 
-    return $ unGen (randT nTets nGluings) g 0 
+    return $ unGen (randT nTets nGluings) g 0 --(error "randomTriangulation: undefined") 
 
 triangTetCount :: Triangulation -> Int
 triangTetCount = length `liftM` tTetrahedra_
@@ -313,14 +324,14 @@ mkTriangulationG tets gluings =
             ((tetIxMap ! tet) ./ tri, (tetIxMap ! tet') ./ otri)
 
     in
-        mkTriangulation (fi $ length tets) (translateGluing <$> gluings) 
+        mkTriangulationSafe (fi $ length tets) (translateGluing <$> gluings) 
 
 
 
 
 
 instance Quote Triangulation where
-    quotePrec prec t = quoteParen (prec >= 11) ("mkTriangulation "
+    quotePrec prec t = quoteParen (prec >= 11) ("mkTriangulationSafe "
                                                     ++ quotePrec 11 (tNumberOfTetrahedra t)
                                                     ++ " "
                                                     ++ quotePrec 11 (tOriginalGluings t))
@@ -469,7 +480,7 @@ addGluings :: Triangulation -> [Gluing] -> Either String Triangulation
 addGluings tr gluings = 
     assert (all (\g -> getTIndex (fst g) < tindex n && getTIndex (snd g) < tindex n) gluings) $
 
-    mkTriangulation n (tOriginalGluings tr ++ gluings)
+    mkTriangulationSafe n (tOriginalGluings tr ++ gluings)
   where
     n = tNumberOfTetrahedra tr
 
@@ -487,7 +498,7 @@ tNumberOfNormalQuadTypes :: Triangulation -> Word
 tNumberOfNormalQuadTypes = liftM (3*) tNumberOfTetrahedra
 
 tr_l31 :: Triangulation
-tr_l31 = fromRight $ mkTriangulation 2 
+tr_l31 = mkTriangulation 2 
     ((0./tABC,1./oBCA) 
      :
      fmap ((0./) &&& ((1./) . toOrderedFace)) [tABD,tACD,tBCD])

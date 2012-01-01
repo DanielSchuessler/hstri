@@ -27,6 +27,7 @@ module PrettyUtil(
     htupled,
     showRational,
     pad,
+    prettyPrecFromShow,
     -- * Class
     Pretty(..)
     
@@ -244,7 +245,7 @@ instance Pretty v => Pretty (List v n) where
     pretty = tupled . fmap pretty . lToList
 
 
-prettyEqs :: (Pretty a, Pretty a1) => [(a, a1)] -> Doc
+prettyEqs :: [(String, Doc)] -> Doc
 prettyEqs xs = lbrace <+> align bod <+> rbrace
     where
         bod = fillSep (punctuate (comma <> char ' ') ys)
@@ -290,3 +291,6 @@ hencloseSep l r sep_ xs =
 -- | Like 'tupled' but single-line
 htupled :: [Doc] -> Doc
 htupled = hencloseSep lbrace rbrace (text ", ")
+
+prettyPrecFromShow :: Show a => Int -> a -> Doc
+prettyPrecFromShow = (fmap . fmap) (string . ($"")) showsPrec

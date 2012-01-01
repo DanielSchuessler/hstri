@@ -8,3 +8,8 @@ module HsTri(
 import Triangulation
 import TriangulationCxtObject
 import FaceLattice
+
+import Blender
+import Blenderable
+import ExampleTriangulations
+import Latexable

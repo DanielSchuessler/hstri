@@ -140,6 +140,9 @@ type QuadCoordinateFunctional = QuadCoordinates
 qMatchingEquations :: Num r => Triangulation -> [QuadCoordinateFunctional r]
 qMatchingEquations = mapMaybe qMatchingEquation . edges
 
+qMatchingEquationsInteger :: Triangulation -> [QuadCoordinateFunctional Integer]
+qMatchingEquationsInteger = qMatchingEquations
+
 qMatchingEquations0
   :: (Num r) =>
      Triangulation

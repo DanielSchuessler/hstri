@@ -29,6 +29,9 @@ isOrdered3 (v0,v1,v2) = v0 < v1 && v1 < v2
 isOrdered4 :: Ord a => (a, a, a, a) -> Bool
 isOrdered4 (v0,v1,v2,v3) = isOrdered3 (v0,v1,v2) && v2 < v3
 
+isNondecreasing2 :: Ord a => (a, a) -> Bool
+isNondecreasing2 (v0,v1) = v0 <= v1
+
 list4 :: a -> b -> c -> d -> (a, b, c, d)
 list4 = (,,,) 
 

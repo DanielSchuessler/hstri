@@ -26,7 +26,6 @@ module TriangulationCxtObject(
     dfsVertexLink,
     preimageListOfVertex,
     degreeOfVertex,
-    vertexLinkGraph,
 
     -- * Edges
     TEdge,
@@ -60,19 +59,26 @@ module TriangulationCxtObject(
 
     -- * Normal arcs
     TNormalArc,
+    InnNA(..),
     -- ** Construction
     MakeTNormalArc(..),
     boundaryNormalArcs,
     innerNormalArcs,
     tNormalArcsAroundVertex,
+    toInnNA,
+    innNAs,
     -- ** Properties
     normalArcPreimage,
     isBoundaryNormalArc,
+    normalTrisContainingInnNA,
 
     -- * Normal dics
     TNormalTri,
     TNormalQuad,
     TNormalDisc,
+
+    -- * Misc
+    triArcGraph,
     
     -- * Testing
     qc_TriangulationCxtObject 
@@ -85,7 +91,6 @@ import Control.Exception
 import Control.Monad.Reader
 import Data.Function
 import Data.Functor
-import Data.Graph.Inductive.Basic
 import Data.Graph.Inductive.Graph hiding(edges)
 import Data.Graph.Inductive.Tree
 import Data.Maybe
@@ -279,8 +284,8 @@ instance Vertices Triangulation [TVertex] where
     vertices t = fmap (UnsafeMakeT t . canonicalRep) (eqvClasses (vertexEqv t))
 
 instance Edges Triangulation [TEdge] where
-    edges t = fmap (UnsafeMakeT t . forgetVertexOrder . canonicalRep) 
-                (eqvClasses (oEdgeEqv t))
+    edges t = fmap (UnsafeMakeT t . canonicalRep) 
+                (eqvClasses (iEdgeEqv t))
 
 instance Triangles Triangulation [TTriangle] where
     triangles t = nub' (pMap t <$> tITriangles t)
@@ -626,20 +631,33 @@ tNormalArcsAroundVertex v =
 --             (tNormalArcsAroundVertex v)
 --             (filter 
 
-vertexLinkGraph :: TVertex -> Gr INormalTri TNormalArc
-vertexLinkGraph (v :: TVertex) = 
-    undir $
-    mkGraph 
-        (map (fromEnum &&& id) (normalTris v)) 
-        (mapMaybe f (tNormalArcsAroundVertex v)) 
+normalTrisContainingInnNA :: InnNA -> Pair INormalTri
+normalTrisContainingInnNA (InnNA ina1 ina2) = 
+                        map2 iNormalTriByNormalArc (ina1, ina2)
 
-  where
-    f tna = case normalArcPreimage tna of
+data InnNA = InnNA { innNA_fst, innNA_snd :: INormalArc }
+    deriving Show
+
+toInnNA :: TNormalArc -> Maybe InnNA
+toInnNA tna = 
+    case normalArcPreimage tna of
                 BoundaryNormalArc _ -> Nothing
                 InnerNormalArc ina1 ina2 ->
-                    let
-                        g = fromEnum . iNormalTriByNormalArc
-                    in
-                        Just (g ina1, g ina2, tna)
+                        Just (InnNA ina1 ina2)
+                                    
 
+innNAs :: Triangulation -> [InnNA]
+innNAs = mapMaybe toInnNA . normalArcs
 
+triArcGraph :: Triangulation -> Gr INormalTri InnNA
+triArcGraph tr = 
+--    undir $
+    mkGraph 
+        (map (fromEnum &&& id) (tINormalTris tr)) 
+        (map f (innNAs tr)) 
+
+  where
+    f tna = 
+        let
+            (t1,t2) = normalTrisContainingInnNA tna
+        in (fromEnum t1,fromEnum t2,tna)

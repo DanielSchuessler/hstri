@@ -119,7 +119,7 @@ iNormalArcGetVertex :: INormalArc -> IVertex
 iNormalArcGetVertex = mapI normalArcGetVertex 
 
 iNormalArcGetVertexIndex
-  :: I NormalArc -> Maybe VertexIndexInTriangle
+  :: I NormalArc -> VertexIndexInTriangle
 iNormalArcGetVertexIndex = normalArcGetVertexIndex . unI
 
 iNormalArcGetTriangle :: INormalArc -> ITriangle

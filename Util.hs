@@ -70,9 +70,9 @@ toEither ::  EnumEither b t -> Either b b
 toEither (EnumLeft a) = Left a
 toEither (EnumRight a) = Right a
 
-toEitherEnum ::  Either a a -> EnumEither a b
-toEitherEnum (Left a) = EnumLeft a
-toEitherEnum (Right a) = EnumRight a
+toEnumEither ::  Either a a -> EnumEither a b
+toEnumEither (Left a) = EnumLeft a
+toEnumEither (Right a) = EnumRight a
 
 
 either' ::  (b -> c) -> (b -> c) -> EnumEither b t -> c
@@ -130,7 +130,7 @@ instance (Finite a, Finite b) => Finite (EnumPair a b)
 instance Finite Bool
 instance Finite ()
 
-instance (Arbitrary a, Arbitrary b) => Arbitrary (EnumEither a b) where arbitrary = toEitherEnum `fmap` arbitrary
+instance (Arbitrary a, Arbitrary b) => Arbitrary (EnumEither a b) where arbitrary = toEnumEither `fmap` arbitrary
 instance (Arbitrary a, Arbitrary b) => Arbitrary (EnumPair a b) where arbitrary = EnumPair `fmap` arbitrary `ap` arbitrary
 
 -- prop_EnumEither ::  EnumEither Int16 Char -> Bool
@@ -279,3 +279,8 @@ systemS l = do
         (error (show l ++ " -> "++show ec))
 
 
+ 
+
+
+extend :: Monad m => (a -> m b) -> m a -> m b
+extend = (=<<)

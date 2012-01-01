@@ -260,7 +260,7 @@ geometrifyTwoTetTriang tr theTri gluingLabeller =
 
 
         -- | Triangulation containing only the chosen gluing
-        tr' = fromRight $ mkTriangulation 2 [(theTri,theGluedTri)]
+        tr' = mkTriangulation 2 [(theTri,theGluedTri)]
 
         p = pMap tr' 
 

@@ -8,7 +8,7 @@ import Control.Applicative
 import Control.Monad
 import GraphUtil
 import Simplicial.DeltaSet
-import Indexing
+import Numbering
 import Simplicial.AnySimplex
 import Either1
 import GHC.Generics

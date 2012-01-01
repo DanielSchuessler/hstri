@@ -17,7 +17,7 @@ import Data.Typeable
 import FaceClasses as F
 import FaceIx
 import HomogenousTuples
-import Indexing
+import Numbering
 import PrettyUtil
 import Simplicial.AnySimplex
 import Simplicial.StrictlyIncreasingMap
@@ -74,7 +74,7 @@ data DeltaSet a = DeltaSet {
     -- | Convention: Edges are directed from subfaces to superfaces
     faceGraph :: FaceGraph a,
     nodeMap :: SimplexNodeMap a,
-    simpsIndexing :: forall n. Nat n => Indexing (a n) 
+    simpsIndexing :: forall n. Nat n => Numbering (a n) 
 }
 
 data SimplexNotMemberOfDeltaSet = SimplexNotMemberOfDeltaSet
@@ -143,7 +143,7 @@ mkSupers nodeMap_ faceGraph_ (x :: a n) = do
                                             ++"; Actual dimension: "++show n'))))
 
 
-data AnyIndexing a = forall n. Nat n => AnyIndexing (Indexing (a n))
+data AnyIndexing a = forall n. Nat n => AnyIndexing (Numbering (a n))
                             
 mkDeltaSet :: forall a. OrdN a => FaceFunction a -> SimpsFunction a -> Dim -> DeltaSet a                            
 mkDeltaSet face_ simps_ dimension_ = r
@@ -156,22 +156,22 @@ mkDeltaSet face_ simps_ dimension_ = r
 
         indexingsVector = V.fromList (mapDimensions0 (\(_ :: n) -> 
                         AnyIndexing (getOrd (undefined :: Proxy (a n)) 
-                                        (Indexing.fromDistinctList (simps_ undefined :: [a n])))
+                                        (Numbering.fromDistinctList (simps_ undefined :: [a n])))
                             :: AnyIndexing a
                         
                             ) 
                                               (dimMax dimension_))
 
-        indexing :: forall n. Nat n => Indexing (a n)
+        indexing :: forall n. Nat n => Numbering (a n)
         indexing =
             let
                 n = (undefined :: n)
             in
                 case indexingsVector V.! natToInt n of
-                           AnyIndexing (is :: Indexing (a n')) ->
+                           AnyIndexing (is :: Numbering (a n')) ->
                                caseEqNat n (undefined :: n') 
-                                (is :: Indexing (a n)) 
-                                (error "mkDeltaSet/indexing: Internal error" :: Indexing (a n))
+                                (is :: Numbering (a n)) 
+                                (error "mkDeltaSet/indexing: Internal error" :: Numbering (a n))
 
 mkHomogenousDeltaSet :: forall a n. (Nat n, OrdN a) => 
     FaceFunction a -> [a n] -> DeltaSet a                            

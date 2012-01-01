@@ -423,7 +423,7 @@ instance OEdges OTriangle (Triple OEdge) where
     oedges (vertices -> (v0,v1,v2)) = (oedge (v0,v1), oedge (v1,v2), oedge(v2,v0)) 
 
 data VertexIndexInTriangle = VT0 | VT1 | VT2
-    deriving(Eq,Show)
+    deriving(Eq,Show,Enum)
 
 allTriangleVertexIndices'
   :: (VertexIndexInTriangle,

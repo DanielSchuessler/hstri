@@ -38,6 +38,7 @@ import PrettyUtil
 import Quote
 import QuickCheckUtil
 import Language.Haskell.TH.Syntax
+import Data.Maybe
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
     deriving (Eq,Ord)
@@ -96,8 +97,10 @@ normalArcGetVertex ::  NormalArc -> Vertex
 normalArcGetVertex (NormalArc _ v) = v
 
 
-normalArcGetVertexIndex :: NormalArc -> Maybe VertexIndexInTriangle
-normalArcGetVertexIndex (NormalArc t v) = triangleGetIndexOf t v
+normalArcGetVertexIndex :: NormalArc -> VertexIndexInTriangle
+normalArcGetVertexIndex (NormalArc t v) = 
+    fromMaybe (assert False undefined)
+    (triangleGetIndexOf t v)
 
 normalArcByTriangleAndVertexIndex :: Triangle -> VertexIndexInTriangle -> NormalArc
 normalArcByTriangleAndVertexIndex t i = NormalArc t (triangleGetVertexAt t i) 
