@@ -1,4 +1,5 @@
-{-# LANGUAGE NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
+{-# LANGUAGE GADTs, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
+{-# LANGUAGE Rank2Types #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module NormalDisc(
@@ -10,6 +11,16 @@ module NormalDisc(
         MakeNormalDisc(..),   allNormalDiscs, 
         NormalDiscs(..),normalDiscList,
         normalDiscsContainingNormalCorner,
+        normalDiscsContainingNormalArc,
+        adjacentNormalCorners,
+
+        -- ** GADT sillyness
+        DiscShape(..),
+        IsDiscShape(..),
+        getShape,
+        getShape1,
+        eitherND',
+
           
 
         -- * Normal triangles
@@ -17,6 +28,7 @@ module NormalDisc(
         allNormalTris, allNormalTris', normalTriGetVertex, 
         MakeNormalTri(..),
         NormalTris(..),normalTriList,normalTriByNormalArc,
+        adjacentNormalCornersInTri,
 
 
         -- * Normal quadrilaterals
@@ -29,6 +41,7 @@ module NormalDisc(
         normalQuadGetDisjointEdges,
         otherNormalQuads,
         NormalQuads(..),normalQuadList,
+        adjacentNormalCornersInQuad,
 
 
 
@@ -57,6 +70,8 @@ import Language.Haskell.TH.Syntax
 import THUtil
 import Quote
 import QuickCheckUtil
+import Control.Arrow((&&&))
+import Control.Applicative
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)
@@ -339,9 +354,10 @@ normalDiscsContainingNormalCorner = liftM2 ($(catTuples 2 2))
 
 
 
-
-instance Link NormalCorner NormalTri (Pair NormalCorner) where
-    link nc nt = 
+adjacentNormalCornersInTri
+  :: (Eq a, Show a, Show a1, NormalCorners a1 (a, a, a)) =>
+     a -> a1 -> (a, a)
+adjacentNormalCornersInTri nc nt = 
              fromMaybe err
                 (deleteTuple3 nc (normalCorners nt))
 
@@ -350,9 +366,9 @@ instance Link NormalCorner NormalTri (Pair NormalCorner) where
                     err = (error (unwords ["link",show nc,show nt]
                                     ++": Normal corner not contained in normal tri"))
 
-
-instance Link NormalCorner NormalQuad (Pair NormalCorner) where
-    link nc nq = 
+adjacentNormalCornersInQuad
+  :: NormalCorner -> NormalQuad -> (NormalCorner, NormalCorner)
+adjacentNormalCornersInQuad nc nq = 
         case normalQuadGetNormalCornersInOrder nq of
              (a,b,c,d)
                 | nc == a -> (d,b)
@@ -363,6 +379,19 @@ instance Link NormalCorner NormalQuad (Pair NormalCorner) where
 
                         error (unwords ["link",show nc,show nq]
                                     ++": Normal corner not contained in normal quad")
+                   
+
+adjacentNormalCorners
+  :: NormalCorner -> NormalDisc -> (NormalCorner, NormalCorner)
+adjacentNormalCorners = liftA2 eitherND adjacentNormalCornersInTri adjacentNormalCornersInQuad
+
+-- | = 'adjacentNormalCornersInTri'
+instance Link NormalCorner NormalTri (Pair NormalCorner) where
+    link = adjacentNormalCornersInTri 
+
+-- | = 'adjacentNormalCornersInQuad'
+instance Link NormalCorner NormalQuad (Pair NormalCorner) where
+    link = adjacentNormalCornersInQuad
 
 instance Link NormalCorner NormalDisc (Pair NormalCorner) where
     link nc = eitherND (link nc) (link nc) 
@@ -397,3 +426,33 @@ instance Quote NormalDisc where
     quotePrec prec x = 
         quoteParen (prec > 10) $
             "normalDisc " ++ (eitherND (quotePrec 11) (quotePrec 11) x)
+
+instance Finite NormalQuad
+instance Finite NormalDisc
+
+normalDiscsContainingNormalArc
+  :: NormalArc -> (Pair NormalDisc)
+normalDiscsContainingNormalArc = 
+    normalDisc . normalTriByNormalArc &&& 
+    normalDisc . normalQuadByNormalArc 
+
+
+data DiscShape :: (* -> *) where
+    Tri :: DiscShape NormalTri
+    Quad :: DiscShape NormalQuad
+
+class MakeNormalDisc a => IsDiscShape a where isDiscShapeProof :: DiscShape a 
+
+instance IsDiscShape NormalTri where isDiscShapeProof = Tri
+instance IsDiscShape NormalQuad where isDiscShapeProof = Quad
+
+-- | Convenience function; ignores its first arg
+getShape :: IsDiscShape a => a -> DiscShape a
+getShape = const isDiscShapeProof
+
+-- | Convenience function; ignores its first arg
+getShape1 :: IsDiscShape a => f a -> DiscShape a
+getShape1 = const isDiscShapeProof
+
+eitherND' :: (forall a. IsDiscShape a => a -> r) -> NormalDisc -> r
+eitherND' k = eitherND k k

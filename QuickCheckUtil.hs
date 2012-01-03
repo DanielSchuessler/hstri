@@ -41,7 +41,7 @@ conjoinMap2 xs ys p = conjoinMap (xs `cart` ys) p
 
 (.=.) ::  (Show a, Eq a) => a -> a -> Property
 x .=. y = 
-    printTestCase (unlines ["Equality failed:","=== FIRST ELEMENT ===",show x,"=== SECOND ELEMENT ===",show y])
+    printTestCase (unlines ["(.=.):","=== FIRST ELEMENT ===",show x,"=== SECOND ELEMENT ===",show y])
     (x==y)
 
 infix 4 .=.
@@ -49,7 +49,7 @@ infix 4 .=.
 
 setEq :: (Show a, Ord a) => [a] -> [a] -> Property
 setEq x y = 
-    printTestCase (unlines ["Sets aren't equal:","=== FIRST SET ===",show x,"=== SECOND SET ===",show y])
+    printTestCase (unlines ["setEq:","=== FIRST SET ===",show x,"=== SECOND SET ===",show y])
     (S.fromList x == S.fromList y)
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (Gr a b) where

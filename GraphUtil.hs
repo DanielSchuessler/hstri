@@ -9,6 +9,22 @@ import Data.GraphViz.Printing(printIt)
 import Data.GraphViz.Commands.IO
 import Control.Monad
 import Data.Text.Lazy.IO
+import Numbering2
+
+idGr :: Gr a b -> Gr a b
+idGr = id
+
+mkGraphWithNu
+  :: Graph gr => Numbering a -> [a] -> [(a, a, b)] -> gr a b
+mkGraphWithNu nu ns es =
+    mkGraph 
+        (map (ti &&& id) ns)
+        (map (\(n1,n2,e) -> (ti n1, ti n2, e)) es)
+
+  where
+    ti = toInt nu
+
+
 
 mapCxt :: (Node -> Node) -> (a -> a') -> (b -> b') -> Context a b -> Context a' b'
 mapCxt fn fa fb (adj, n, a, adj') = 

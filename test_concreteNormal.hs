@@ -1,15 +1,15 @@
 import NormalEverything
-import ConcreteNormal
+import ConcreteNormal.PreRenderable
 import Blender
 import Triangulation
 import SimplicialPartialQuotient
 import DisjointUnion
 
 
-tr = fromRight $ mkTriangulation [0] [ (0 ./ tABC, 0 ./ oDAB) ]
+tr = mkTriangulation 1 [ (0 ./ tABC, 0 ./ oDAB) ]
 
 
-spqwc = geometrifySingleTetTriang tr
+spqwc = geometrifySingleTetTriang tr show
 
 
 ntA' = standardCoordinates (0 ./ ntA)
@@ -25,8 +25,8 @@ ns = 2 *^ sumV [ ntA', ntB', ntC', ntD'
 
 main = testBlender
         (defaultScene
-            (pesudomanifoldStye (toPreRenderable spqwc)
+            (fromSPQWC spqwc
                 `disjointUnion`
-             normalSurfaceStyle (standardCoordinatesToPreRenderable spqwc ns))) 
+             fromStandardCoordinatesInteger spqwc ns)) 
                 
         

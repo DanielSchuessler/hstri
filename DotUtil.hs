@@ -1,6 +1,12 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, StandaloneDeriving, GeneralizedNewtypeDeriving, NoMonomorphismRestriction, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module DotUtil(
+    -- * Reex
+    module Data.GraphViz,
+    module Data.GraphViz.Attributes.Complete,
+    PrintDot,
+
+    -- * Misc
     bendMultiedges, bendMultiedges',
     testDot,
     viewDot,
@@ -9,40 +15,42 @@ module DotUtil(
     mkNode,
     dot2texBasicFlags,
     mathLabelValue,
+    mathLabel,
+    seed,
     -- * Backslash issues
     backslashPlaceholder,
     printIt',
     -- * Dot2tex attributes
     D2tAttribute(..),
-    d2t
+    d2t,
+    style
     ) where
 
 
+import Control.Applicative
+import Control.Exception
 import Control.Monad
 import Data.Bits
+import Data.GraphViz  hiding(style)
 import Data.GraphViz.Attributes.Complete
 import Data.GraphViz.Printing(printIt,PrintDot)
-import Data.GraphViz.Types.Canonical
+import Data.List
+import Data.Maybe
+import Data.Text.Lazy(pack)
+import Data.Text.Lazy(replace,Text)
 import Data.Text.Lazy.IO(writeFile)
+import Data.Time.Clock.POSIX
+import HomogenousTuples
 import Latexable
 import Prelude hiding(writeFile)
+import PrettyUtil
 import System.Exit
 import System.SimpleArgs
+import THUtil
 import Triangulation.CanonOrdered
 import TriangulationCxtObject
-import qualified Data.Text.Lazy as Text
-import Data.Text.Lazy(replace,Text)
-import Control.Exception
-import HomogenousTuples
-import Data.List
 import qualified Data.Map as M
-import Data.Text.Lazy(pack)
-import Data.Maybe
-import Control.Applicative
-import Data.Time.Clock.POSIX
-import THUtil
-import PrettyUtil
-import Data.GraphViz.Attributes
+import qualified Data.Text.Lazy as Text
 
 testDot :: PrintDot a => (Triangulation -> a) -> IO ExitCode
 testDot mkdotGraph_ = do
@@ -60,6 +68,7 @@ dot2texBasicFlags = [
     "-traw",
     "--usepdflatex",
     "--nominsize"
+    ,"--debug"
 
 --     "--valignmode=dot",
 --     "--graphstyle=anchor=base"
@@ -73,7 +82,7 @@ viewDot dotGraph0 = do
 --     putStrLn "\n\n=== DOT CODE ===\n"
 --     putStrLn =<< prettyPrint dotGraph0
      
-    fbase <- ("/tmp/viewDot" ++) . show . fromEnum <$> getPOSIXTime
+    fbase <- tmpfn "viewDot"
 
     let 
         dotfile = fbase++".dot"
@@ -90,7 +99,7 @@ viewDot dotGraph0 = do
         (\mode -> do
                 rawSystemS "dot2tex" (dot2texBasicFlags++["-f",mode,"-o",texfile,dotfile])
                 rawSystemS "ln" ["-sf",texfile,"/tmp/it.tex"]
-                rawSystemS "pdflatex" ["-interaction","batchmode","-output-directory","/tmp",texfile]
+                runPdfLatex texfile
                 rawSystemS "ln" ["-sf",pdffile,"/tmp/it.pdf"]
                 rawSystemS "okular" [pdffile])
 
@@ -166,7 +175,7 @@ multiplyLen :: Double -> Double -> [Attribute] -> [Attribute]
 multiplyLen _ 1 attrs_ = attrs_ 
 multiplyLen default_ factor_ attrs_ = 
     case lenLens attrs_ of
-        (v,s) -> s (factor_ * fromMaybe default_ v)
+        (v,s) -> s (factor_ *  fromMaybe default_ (fmap (trace "multiplyLen: modifying Len") v))
  
 bendMultiedges :: (Ord n, Show n, Pretty n) => [DotEdge n] -> [DotEdge n]
 bendMultiedges edges_ = 
@@ -194,7 +203,7 @@ bendMultiedges edges_ =
             where 
               (extraAttrs,lenFactor) =
                 case edgeCount M.! endpoints e of
-                     [_] -> ([],0.82)
+                     [_] -> ([],1)--0.82)
                      is -> 
                         let
                             kmax = length is - 1
@@ -205,9 +214,9 @@ bendMultiedges edges_ =
                                      | kmax == 2 = 60
                                      | otherwise = 90
 
-                            len_ | kmax == 1 = 1
-                                 | kmax == 2 = 1.08
-                                 | otherwise = 1.2
+                            len_ | kmax == 1 = (1/0.82)
+                                 | kmax == 2 = (1.08/0.82)
+                                 | otherwise = (1.2/0.82)
 
                             angle = (-maxAngle) + (2*maxAngle*(kmax-k) `div` kmax)
                         in
@@ -261,11 +270,16 @@ instance Pretty n => Pretty (DotEdge n) where
             [anyPretty a, anyPretty b, anyPretty c]
 
 
+d2t' :: D2tAttribute -> Attribute
+d2t' (FigPreamble x) = UnknownAttribute "d2tfigpreamble" x
+d2t' (DocPreamble x) = UnknownAttribute "d2tdocpreamble" x
+d2t' (LblStyle x) = UnknownAttribute "lblstyle" x
+d2t' (ToPath x) = UnknownAttribute "topath" x
+
 d2t :: D2tAttribute -> Attribute
-d2t (FigPreamble x) = UnknownAttribute "d2tfigpreamble" x
-d2t (DocPreamble x) = UnknownAttribute "d2tdocpreamble" x
-d2t (LblStyle x) = UnknownAttribute "lblstyle" x
-d2t (ToPath x) = UnknownAttribute "topath" x
+d2t a = case d2t' a of
+             UnknownAttribute b c -> UnknownAttribute b (replace "\\" backslashPlaceholder c)
+             _ -> assert False undefined
 
 data D2tAttribute = 
     FigPreamble Text |
@@ -278,3 +292,12 @@ data D2tAttribute =
 
 mathLabelValue :: Latexable a => a -> Label
 mathLabelValue = toLabelValue . mathmode
+
+mathLabel :: Latexable a => a -> Attribute
+mathLabel = Label . mathLabelValue
+
+seed :: Int -> Attribute
+seed s = Start (StartStyleSeed RandomStyle s)
+
+style :: Text -> Attribute
+style = UnknownAttribute "style" . replace "\\" backslashPlaceholder

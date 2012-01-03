@@ -12,21 +12,21 @@ type Sextuple a = (a,a,a,a,a,a)
 type Septuple a = (a,a,a,a,a,a,a)
 type Dodecatuple a = (a,a,a,a,a,a,a,a,a,a,a,a)
 
-toList2 ::  (t, t) -> [t]
+toList2 ::  (Pair t) -> [t]
 toList2 (x1,x2) = [x1,x2]
-toList3 ::  (t, t, t) -> [t]
+toList3 ::  (Triple t) -> [t]
 toList3 (x1,x2,x3) = [x1,x2,x3]
-toList4 ::  (t, t, t, t) -> [t]
+toList4 ::  (Quadruple t) -> [t]
 toList4 (x1,x2,x3,x4) = [x1,x2,x3,x4]
-toList6 :: (a,a,a,a,a,a) -> [a]
+toList6 :: (Sextuple a) -> [a]
 toList6 = $(tupleToList 6)
 
 
-isOrdered2 :: Ord a => (a, a) -> Bool
+isOrdered2 :: Ord a => (Pair a) -> Bool
 isOrdered2 (v0,v1) = v0 < v1
-isOrdered3 :: Ord a => (a, a, a) -> Bool
+isOrdered3 :: Ord a => (Triple a) -> Bool
 isOrdered3 (v0,v1,v2) = v0 < v1 && v1 < v2 
-isOrdered4 :: Ord a => (a, a, a, a) -> Bool
+isOrdered4 :: Ord a => (Quadruple a) -> Bool
 isOrdered4 (v0,v1,v2,v3) = isOrdered3 (v0,v1,v2) && v2 < v3
 
 isNondecreasing2 :: Ord a => (a, a) -> Bool
@@ -44,10 +44,10 @@ map2 = $(mapTuple 2)
 map3 :: (a -> b) -> Triple a -> Triple b
 map3 = $(mapTuple 3)
 
-map4 ::  (t -> t1) -> (t, t, t, t) -> (t1, t1, t1, t1)
+map4 ::  (a -> b) -> (Quadruple a) -> (Quadruple b)
 map4 = $(mapTuple 4)
 
-map6 :: (t2 -> t3) -> (t2, t2, t2, t2, t2, t2) -> (t3, t3, t3, t3, t3, t3)
+map6 :: (a -> b) -> (Sextuple a) -> (Sextuple b)
 map6 = $(mapTuple 6)
 
 elem2 ::  Eq a => a -> (a, a) -> Bool
@@ -145,3 +145,13 @@ indexInTriple x (x1,x2,x3) | x == x1 = 0
 intersect2_2 :: Eq a => (a, a) -> (a, a) -> [a]
 intersect2_2 xs ys = filter2 (`elem2` ys) xs 
     
+
+sum4 :: Num a => Quadruple a -> a
+sum4 = $(sumTuple 4)
+
+zipTupleWith3
+  :: (t -> t1 -> t2) -> Triple t -> Triple t1 -> Triple t2
+zipTupleWith3 = $(zipTupleWith 3)
+
+deleteAt3 :: Num a => a -> (t, t, t) -> (t, t)
+deleteAt3 = $(deleteAtTuple 3)

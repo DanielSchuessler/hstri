@@ -26,6 +26,7 @@ module TriangulationCxtObject(
     dfsVertexLink,
     preimageListOfVertex,
     degreeOfVertex,
+    innNAsAroundVertex,
 
     -- * Edges
     TEdge,
@@ -38,6 +39,8 @@ module TriangulationCxtObject(
     itrianglesContainingEdge,
     degreeOfEdge,
     preimageListOfEdge,
+    -- ** Misc
+    prettyEdgeEquivalence,
 
     -- * Triangles
     TTriangle,
@@ -71,6 +74,8 @@ module TriangulationCxtObject(
     normalArcPreimage,
     isBoundaryNormalArc,
     normalTrisContainingInnNA,
+    -- ** Misc
+    innNANU,
 
     -- * Normal dics
     TNormalTri,
@@ -99,6 +104,7 @@ import Equivalence
 import HomogenousTuples
 import INormalDisc
 import NormalDisc
+import Numbering2
 import Prelude hiding(catch,lookup)
 import PrettyUtil
 import QuickCheckUtil
@@ -621,7 +627,7 @@ instance NormalTris TVertex [INormalTri] where
 
 tNormalArcsAroundVertex :: TVertex -> [TNormalArc]
 tNormalArcsAroundVertex v = 
-    nub' . fmap p . concatMap (asList . iNormalArcsAroundVertex) . asList $ v
+    nub' . fmap p . concatMap (asList . iNormalArcsAroundVertex) . preimageList $ v
   where
     p = pMap (getTriangulation v)
 
@@ -638,6 +644,10 @@ normalTrisContainingInnNA (InnNA ina1 ina2) =
 data InnNA = InnNA { innNA_fst, innNA_snd :: INormalArc }
     deriving Show
 
+innNANU :: Triangulation -> Numbering InnNA
+innNANU = join (prodNu innNA_fst innNA_snd InnNA) . tINormalArcNu
+        
+
 toInnNA :: TNormalArc -> Maybe InnNA
 toInnNA tna = 
     case normalArcPreimage tna of
@@ -649,9 +659,11 @@ toInnNA tna =
 innNAs :: Triangulation -> [InnNA]
 innNAs = mapMaybe toInnNA . normalArcs
 
+innNAsAroundVertex :: TVertex -> [InnNA]
+innNAsAroundVertex = mapMaybe toInnNA . tNormalArcsAroundVertex
+
 triArcGraph :: Triangulation -> Gr INormalTri InnNA
 triArcGraph tr = 
---    undir $
     mkGraph 
         (map (fromEnum &&& id) (tINormalTris tr)) 
         (map f (innNAs tr)) 
@@ -661,3 +673,7 @@ triArcGraph tr =
         let
             (t1,t2) = normalTrisContainingInnNA tna
         in (fromEnum t1,fromEnum t2,tna)
+
+
+prettyEdgeEquivalence :: Triangulation -> Doc
+prettyEdgeEquivalence = prettyEquivalence . edgeEquivalence

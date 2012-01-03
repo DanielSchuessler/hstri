@@ -133,9 +133,6 @@ zeroSetAdmissible z =
                 
 
 
-atLeastTwo :: Bool -> Bool -> Bool -> Bool
-atLeastTwo a b c = 
-    (if a then (||) else (&&)) b c
 
 
 disproveAdjacency :: Vector IPR -> IPR -> IPR -> Maybe IPR 

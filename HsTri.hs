@@ -1,14 +1,15 @@
 {-# OPTIONS -Wall #-}
 module HsTri(
-    module Triangulation,
     module TriangulationCxtObject,
-    module FaceLattice
+    module FaceLattice,
+    module Blender,
+    module Blenderable,
+    module ExampleTriangulations,
+    module Latexable,
     ) where
 
-import Triangulation
 import TriangulationCxtObject
 import FaceLattice
-
 import Blender
 import Blenderable
 import ExampleTriangulations

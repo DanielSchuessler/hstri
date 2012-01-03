@@ -1,26 +1,21 @@
-{-# LANGUAGE TupleSections, ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, TupleSections, ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module StandardCoordinates(
     module Data.VectorSpace,
+    module NormalSurface,
     StandardCoordinates,
     stc_toMap,
     stc_fromMap,
-    stc_toDenseList,
-    stc_toDenseAssocs,
     stc_fromDenseList,
     stc_toAssocs,
     stc_fromAssocs,
-    NormalSurface(..),
+    ToStandardCoordinates(..),
     vertexLinkingSurface,
     -- * Properties
     stc_coefficient,
     stc_coefficientIsZero,
     stc_set,
     normalArcCounts,
-    numberOfTrisContainingArcType,
-    numberOfQuadsContainingArcType,
-    numberOfArcsOfType,
-    numberOfCornersOfType,
     admissible,
     satisfiesMatchingEquations,
     satisfiesQuadrilateralConstraints,
@@ -47,34 +42,35 @@ module StandardCoordinates(
     ) where
 
 import AbstractTetrahedron as Abstract
-import Data.Map
-import qualified Data.Map as M
-import qualified Data.List as L
 import Control.Arrow
 import Control.Exception
 import Control.Monad.Reader
 import Data.AdditiveGroup hiding(Sum)
 import Data.Functor
+import Data.Map
+import Data.Maybe
+import Data.Ratio
 import Data.VectorSpace hiding(Sum)
 import HomogenousTuples
 import INormalDisc
 import IndexedSimplices
 import MathUtil
+import MathUtil()
+import NormalSurface
 import PolymakeInterface
 import Prelude hiding(lookup)
 import PrettyUtil
+import QuickCheckUtil
+import Quote
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Triangulation
 import TriangulationCxtObject
 import TupleTH
-import MathUtil()
-import Data.Ratio
-import Data.Maybe
-import Quote
-import qualified Data.Foldable as Fold
-import QuickCheckUtil
 import ZeroDefaultMap
+import qualified Data.Foldable as Fold
+import qualified Data.List as L
+import qualified Data.Map as M
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
@@ -108,16 +104,16 @@ instance Pretty r => Pretty (StandardCoordinates r) where
 instance (Pretty r) => Show (StandardCoordinates r) where
     showsPrec = prettyShowsPrec
 
-class NormalSurface a where
+class ToStandardCoordinates a where
     standardCoordinates :: Num r => a -> StandardCoordinates r
 
-instance NormalSurface INormalDisc where
+instance ToStandardCoordinates INormalDisc where
     standardCoordinates x = SC (zdm_singleton x 1)
 
-instance NormalSurface INormalTri where
+instance ToStandardCoordinates INormalTri where
     standardCoordinates = standardCoordinates . iNormalDisc
 
-instance NormalSurface INormalQuad where
+instance ToStandardCoordinates INormalQuad where
     standardCoordinates = standardCoordinates . iNormalDisc
 
 mkNormalTri :: (Num r) => IVertex -> StandardCoordinates r
@@ -156,23 +152,14 @@ stc_coefficient
   :: (Num r, MakeINormalDisc a) => StandardCoordinates r -> a -> r
 stc_coefficient (SC sc) = zdm_get sc . iNormalDisc
 
+instance Num i => NormalSurface (StandardCoordinates i) i where
+    discCount = stc_coefficient
 
 stc_coefficientIsZero
   :: (Num r, MakeINormalDisc a) =>
      StandardCoordinates r -> a -> Bool
 stc_coefficientIsZero (SC sc) = zdm_isZero sc . iNormalDisc
 
-stc_toDenseAssocs :: (Num r) => Triangulation -> StandardCoordinates r -> [(INormalDisc,r)] 
-stc_toDenseAssocs t sc = fmap (id &&& stc_coefficient sc) (tINormalDiscs t)
-
--- | @stc_toDenseList tr sc !! i == 'stc_coefficient' sc ('tINormalDiscs' tr !! i)
-stc_toDenseList :: (Num r) => Triangulation -> StandardCoordinates r -> [r] 
-stc_toDenseList t = fmap snd . stc_toDenseAssocs t 
-
-prop_stc_toDenseList
-  :: Num r => Triangulation -> StandardCoordinates r -> Property
-prop_stc_toDenseList t sc =
-    stc_toDenseList t sc .=. fmap (stc_coefficient sc) (tINormalDiscs t)
 
 
 
@@ -252,14 +239,14 @@ qc_StandardCoordinates = $(quickCheckAll)
 getVertexSolutions :: forall s. PmScalar s => Triangulation -> IO [[s]]
 getVertexSolutions t = do 
     let k = triangTetCount t
-        matchingEquations_ = fmap ( (0 :) . stc_toDenseList t ) (matchingEquations t)
+        matchingEquations_ = fmap ( (0 :) . ns_toDenseList t ) (matchingEquations t)
 
     liftIO (putStrLn ("matching equations = "++show matchingEquations_))
     
     let
         nonNegativityConditions :: [[s]]
         nonNegativityConditions = 
-            [ 0 : stc_toDenseList t (standardCoordinates x) | x <- tINormalDiscs t ]
+            [ 0 : ns_toDenseList t (standardCoordinates x) | x <- tINormalDiscs t ]
 
         sumOne :: [s]
         sumOne =
@@ -327,24 +314,6 @@ instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
 
 --prop_normalArcCounts_welldefined ::
 
--- The number of normal triangles in the first arg containing a normal arc of the given type.
--- Note that this is only well-defined in the disjoint union of tetrahedra, not in the quotient space!
-numberOfTrisContainingArcType
-  :: Num r => StandardCoordinates r -> INormalArc -> r
-numberOfTrisContainingArcType sc arc = stc_coefficient sc (iNormalDisc $ iNormalTriByNormalArc arc) 
-
-numberOfQuadsContainingArcType
-  :: Num r => StandardCoordinates r -> INormalArc -> r
-numberOfQuadsContainingArcType sc arc = stc_coefficient sc (iNormalDisc $ iNormalQuadByNormalArc arc) 
-
-numberOfArcsOfType
-  :: Num r => StandardCoordinates r -> INormalArc -> r
-numberOfArcsOfType sc = liftM2 (+) (numberOfTrisContainingArcType sc) (numberOfQuadsContainingArcType sc) 
-
-numberOfCornersOfType
-  :: Num t => StandardCoordinates t -> INormalCorner -> t
-numberOfCornersOfType sc (viewI -> I i corn) =
-    $(foldr1Tuple 4) (+) (map4 (stc_coefficient sc . (i ./)) (normalDiscsContainingNormalCorner corn))
 
 --     let
 --         e = normalCornerGetContainingEdge e
@@ -394,7 +363,7 @@ instance Quote r => Quote (StandardCoordinates r) where
 
 
 -- | Sum of the coordinates of the elements
-instance NormalSurface a => NormalSurface [a] where
+instance ToStandardCoordinates a => ToStandardCoordinates [a] where
     standardCoordinates xs = sumV (fmap standardCoordinates xs)
 
 

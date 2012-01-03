@@ -225,7 +225,7 @@ data SPQWithCoords v = SPQWithCoords {
 geometrifySingleTetTriang
   :: Triangulation -> (Gluing -> String) -> SPQWithCoords Vertex
 geometrifySingleTetTriang tr gluingLabeller = 
-    assert (tNumberOfTetrahedra tr == 1)
+    assert (tNumberOfTetrahedra tr == (1::Integer))
     $
         SPQWithCoords 
             (SimplicialPartialQuotient tr forgetTIndex [allVertices'])
@@ -237,7 +237,7 @@ geometrifyTwoTetTriang
   :: Triangulation
      -> ITriangle -> (Gluing -> String) -> SPQWithCoords (T IVertex)
 geometrifyTwoTetTriang tr theTri gluingLabeller = 
-    assert (tNumberOfTetrahedra tr == 2)
+    assert (tNumberOfTetrahedra tr == (2::Integer))
     $
         SPQWithCoords 
             (SimplicialPartialQuotient 

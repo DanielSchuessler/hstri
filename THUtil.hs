@@ -4,9 +4,9 @@ module THUtil(
     liftByShow,
     mkConstantDecls,
     showVars,
-    prVars,
-    prVars',
     Printees(..),
+    showExps,
+    traceExps,
     assrt) where
 
 import Language.Haskell.TH
@@ -63,19 +63,6 @@ showVars ns =
     x = foldr1 (\e e' -> [| $(e) ++ ", " ++ $(e') |]) (fmap showVar ns)
 
 
-prettyEqsE :: ExpQ -> ExpQ
-prettyEqsE x = [| prettyEqs $(x) |]
-
-prVars :: [Name] -> Q Exp
-prVars ns = prettyEqsE $ 
-    listE (fmap (\n ->
-                        [| ( $(lift (nameBase n))
-                           , pretty $(varE n) )  |])
-                    ns)
-
-prVars' :: [Name] -> Q Exp
-prVars' ns = [| docToString $(prVars ns) |]
-
 class Printees a where
     toLabelExpressionPairs :: a -> Q [(String,Exp)]
 
@@ -104,13 +91,19 @@ assrt e printees = do
     let 
         msg = "Assertion failed: "++pprint e' 
 
-    let eqs = toLabelExpressionPairsE printees
-
 
     [| if $(return e')
           then id
           else error (msg
                         ++"\n"
-                        ++docToString (prettyEqs $(eqs))) |]
+                        ++docToString (prettyEqs $(toLabelExpressionPairsE printees))) |]
 
     
+showExps :: Printees a => a -> Q Exp
+showExps printees =
+
+    [| docToString (prettyEqs $(toLabelExpressionPairsE printees)) |]
+
+traceExps :: Printees a => [Char] -> a -> Q Exp
+traceExps msg printees = [| trace (msg ++ " " ++ $(showExps printees)) |]
+

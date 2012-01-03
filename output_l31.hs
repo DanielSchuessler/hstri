@@ -5,7 +5,7 @@ import Element
 import Blenderable
 import Blender
 import DisjointUnion
-import ConcreteNormal
+import ConcreteNormal.PreRenderable
 import Simplicial.DeltaSet
 import Simplicial.AnySimplex
 import TriangulationCxtObject

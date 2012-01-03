@@ -94,7 +94,7 @@ gGraphAttrs =
 --                               , Splines SplineEdges
                                , Layout "neato"
                                , Pack (PackMargin 4)
-                               , Start (StartStyleSeed RandomStyle 1)
+                               , seed 1
                                , d2t (FigPreamble $
                                     (backslashPlaceholder `mappend` "footnotesize"))
                          ] 
@@ -112,6 +112,7 @@ equivalenceEdge' ((tri,otri) :: Gluing) (x, y) =
         [
             (Label . mkLabel)
                 (latexTwoRows (toLatex tri ++ "\\sim") otri)
+        , Len 0.82
         ]
 
 

@@ -19,6 +19,9 @@ import Test.QuickCheck.All
 import TriangulationCxtObject
 import ZeroDefaultMap
 import AbstractNeighborhood
+import qualified Data.Vector as V
+import QuickCheckUtil
+import Control.Applicative
 
 newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
     deriving(AdditiveGroup,InnerSpace,Eq)
@@ -143,6 +146,9 @@ qMatchingEquations = mapMaybe qMatchingEquation . edges
 qMatchingEquationsInteger :: Triangulation -> [QuadCoordinateFunctional Integer]
 qMatchingEquationsInteger = qMatchingEquations
 
+qMatchingEquationsRat :: Triangulation -> [QuadCoordinateFunctional Rational]
+qMatchingEquationsRat = qMatchingEquations
+
 qMatchingEquations0
   :: (Num r) =>
      Triangulation
@@ -171,3 +177,47 @@ quad_toDenseAssocs tr qc = fmap (id &&& quad_coefficient qc) (tINormalQuads tr)
 quad_toDenseList
   :: Num r => Triangulation -> QuadCoordinates r -> [r]
 quad_toDenseList tr = fmap snd . quad_toDenseAssocs tr
+
+quad_fromDenseList
+  :: Num r => Triangulation -> [r] -> QuadCoordinates r
+quad_fromDenseList tr = quad_fromAssocs . zip (tINormalQuads tr) 
+
+unrestrictedQC
+  :: (Num r, Arbitrary r) => Triangulation -> Gen (QuadCoordinates r)
+unrestrictedQC tr = QC <$> zdm_gen (tINormalQuads tr) 
+
+prop_toFromDenseList :: Triangulation -> Property
+prop_toFromDenseList tr =
+        forAll (unrestrictedQC tr) 
+            (\(qc :: QuadCoordinates Int) -> 
+                quad_fromDenseList tr (quad_toDenseList tr qc) .=. qc)
+
+qMatchingEquationsMatrix
+  :: Num a =>
+     Triangulation
+     -> V.Vector (V.Vector a)
+qMatchingEquationsMatrix tr = 
+      V.fromList 
+    . (fmap (V.fromList . quad_toDenseList tr)) 
+    . qMatchingEquations  
+    $ tr
+
+qMatchingEquationsMatrixRat
+  :: Triangulation
+     -> V.Vector (V.Vector Rational)
+qMatchingEquationsMatrixRat = qMatchingEquationsMatrix
+
+-- test :: Triangulation -> IO ()
+-- test tr = do
+--     print tr
+--     let testm = qMatchingEquationsMatrixRat tr
+--     putStrLn . prettyMatrix $ testm
+--     let (makeIntegral -> mtx',erts) = toReducedEchelon testm
+--     $(assrt [| isEchelon mtx' |] ['mtx','erts]) (putStrLn "~>")
+--     --mapM_ print . snd $ r
+--     putStrLn . prettyMatrix $ mtx'
+--     putStrLn ""        
+
+quad_toNonzeroAssocs
+  :: Num b => QuadCoordinates b -> [(INormalQuad, b)]
+quad_toNonzeroAssocs = zdm_toNonzeroAssocs . quad_toZDM

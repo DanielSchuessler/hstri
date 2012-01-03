@@ -2,28 +2,25 @@
 {-# OPTIONS -Wall #-}
 module ConcreteNormal(
     module StandardCoordinates,
-    module SimplicialPartialQuotient,
-    module PreRenderable,
-    module Simplicial.SimplicialComplex,
     Concrete,c_unique,c_type,
-    Corn,
-    standardCoordinatesToPreRenderable,
+    concreteTris,
+    concreteQuads,
+    posOfCornerOfTri,
+    posOfCornerOfQuad,
+    CornerPosition,ArcPosition,
+
+    cns_arcsOfTri,
+    cns_arcsOfQuad,
+    cns_cornersOfArc
 
     )
     where
 
 import Control.Exception
-import Data.Set as Set
-import Data.Vect.Double(interpolate)
 import HomogenousTuples
 import StandardCoordinates
-import PreRenderable
 import PrettyUtil
-import Simplicial.AnySimplex
-import Simplicial.SimplicialComplex
-import SimplicialPartialQuotient
 import TriangulationCxtObject
-import ShortShow
 
 -- | Quads are numbered away from their 'firstDisjointEdge'
 firstDisjointEdge :: NormalQuad -> Edge
@@ -43,34 +40,26 @@ c_type (Concrete _ a) = a
 type ArcPosition = Int
 type CornerPosition = Int
 
-data ConcreteNormalSurface = CNS {
-    cns_tris :: [Concrete INormalTri],
-    cns_quads :: [Concrete INormalQuad],
 
-    cns_arcsOfTri :: Concrete INormalTri -> Triple (Concrete INormalArc),
-    cns_arcsOfQuad :: Concrete INormalQuad -> Quadruple (Concrete INormalArc),
-    cns_cornersOfArc :: Concrete INormalArc -> Pair (Concrete INormalCorner)
-}
-
+-- cns_arcsOfDisc :: (IsDiscShape d, HasTIndex id d) => ConcreteNormalSurface -> Concrete id ->  
+-- cns_arcsOfDisc cns d = 
+--     case isDiscShapeProof :: DiscShape d of
+--          Tri -> cns_arcsOfTri
 
 discPosToCornerPos_helper
-  :: (Link NormalCorner disc (Pair NormalCorner),
-      HasTIndex idisc disc,
-      Show idisc,
-      Integral i) =>
-
-     (StandardCoordinates i -> Concrete idisc -> NormalArc -> Int)
-     -> StandardCoordinates i
-     -> Concrete idisc
-     -> NormalCorner
-     -> (Pair NormalCorner -> NormalCorner)
-     -> CornerPosition
-discPosToCornerPos_helper cns_x_arcPos nc x corner linkCornerSelector =
+  :: (Integral i,
+      HasTIndex ia a,
+      MakeNormalDisc a,
+      NormalSurface s i) =>
+     (s -> Concrete ia -> NormalArc -> ArcPosition)
+     -> s -> Concrete ia -> NormalCorner -> Bool -> CornerPosition
+discPosToCornerPos_helper cns_x_arcPos nc x corner takeFst =
     let
         I i x' = viewI (c_type x)
-        arc = normalArc (corner, linkCornerSelector (link corner x'))
+        arc = normalArc (corner, (if takeFst then fst else snd) 
+                                        (adjacentNormalCorners corner (normalDisc x')) :: NormalCorner)
         arcPos = cns_x_arcPos nc x arc
-        result = arcPosToCornerPos nc (Concrete arcPos (i ./ arc)) corner
+        result = posOfCornerOfArc nc (Concrete arcPos (i ./ arc)) corner
     in
 --         trace (unwords ["discPosToCornerPos_helper _ _ _",
 --                             showsPrec 11 x "",
@@ -81,53 +70,31 @@ discPosToCornerPos_helper cns_x_arcPos nc x corner linkCornerSelector =
 
               result
          
-triPosToCornerPos_helper
-  :: Integral i =>
-        StandardCoordinates i
-     -> Concrete INormalTri
-     -> NormalCorner
-     -> (Pair NormalCorner -> NormalCorner)
-     -> CornerPosition
-triPosToCornerPos_helper = discPosToCornerPos_helper triPosToArcPos
 
-quadPosToCornerPos_helper
-  :: Integral i =>
-        StandardCoordinates i
-     -> Concrete INormalQuad
-     -> NormalCorner
-     -> (Pair NormalCorner -> NormalCorner)
-     -> CornerPosition
-quadPosToCornerPos_helper = discPosToCornerPos_helper quadPosToArcPos
-
-triPosToCornerPos
-  :: Integral i =>
-        StandardCoordinates i
-     -> Concrete INormalTri
-     -> NormalCorner
-     -> CornerPosition
-triPosToCornerPos nc x c = assert (r1==r2) $ r1
+posOfCornerOfTri
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalTri -> NormalCorner -> CornerPosition
+posOfCornerOfTri nc x c = assert (r1==r2) $ r1
   where
-    (r1,r2) = map2 (triPosToCornerPos_helper nc x c) (fst,snd)
+    (r1,r2) = map2 (discPosToCornerPos_helper triPosToArcPos nc x c) (True,False)
 
-quadPosToCornerPos
-  :: Integral i =>
-        StandardCoordinates i
-     -> Concrete INormalQuad
-     -> NormalCorner
-     -> CornerPosition
-quadPosToCornerPos nc x c = 
+posOfCornerOfQuad
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalQuad -> NormalCorner -> CornerPosition
+posOfCornerOfQuad nc x c = 
   let
-    (r1,r2) = map2 (quadPosToCornerPos_helper nc x c) (fst,snd)
+    (r1,r2) = map2 (discPosToCornerPos_helper quadPosToArcPos nc x c) (True,False)
   in
     if (r1==r2)
        then r1
-       else error ("quadPosToCornerPos: (x,c,r1,r2) = "++show (x,c,r1,r2))
+       else error ("posOfCornerOfQuad: (x,c,r1,r2) = "++show (x,c,r1,r2))
         
 
 
-arcPosToCornerPos :: Integral i => StandardCoordinates i -> 
-                    Concrete INormalArc -> NormalCorner -> CornerPosition 
-arcPosToCornerPos nc (Concrete arcPos arc) corner =
+posOfCornerOfArc
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalArc -> NormalCorner -> Int
+posOfCornerOfArc nc (Concrete arcPos arc) corner =
                 let
                     icorner = getTIndex arc ./ corner
                     cornPos_max = fi (numberOfCornersOfType nc icorner - 1)
@@ -138,18 +105,21 @@ arcPosToCornerPos nc (Concrete arcPos arc) corner =
                                         Flip -> cornPos_max - arcPos
                 in
 
---                     trace (unwords ["arcPosToCornerPos",
+--                     trace (unwords ["posOfCornerOfArc",
 --                                         $(prVars' ['arcPos,'arc,'corner,'cornPos_max,'sense,'result])])
 
                           result
 
 
 
-triPosToArcPos :: Integral i => StandardCoordinates i -> Concrete INormalTri -> NormalArc -> ArcPosition 
+triPosToArcPos
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalTri -> NormalArc -> ArcPosition
 triPosToArcPos _ (Concrete u _) _ = u
 
-quadPosToArcPos :: Integral i => StandardCoordinates i -> 
-                        Concrete INormalQuad -> NormalArc -> ArcPosition 
+quadPosToArcPos
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalQuad -> NormalArc -> ArcPosition
 quadPosToArcPos nc (Concrete u quad) arc =
   let
     iarc = getTIndex quad ./ arc
@@ -169,52 +139,57 @@ quadPosToArcPos nc (Concrete u quad) arc =
 
 
 concreteTris
-  :: Integral i =>
-     Triangulation -> StandardCoordinates i -> [Concrete INormalTri]
-concreteTris tr nc = do
+  :: (Integral a, NormalSurface s a) =>
+     Triangulation -> s -> [Concrete INormalTri]
+concreteTris tr ns = do
             tri <- tINormalTris tr
-            u <- [ 0 .. fi (stc_coefficient nc (iNormalDisc tri)-1) ]
+            u <- [ 0 .. fi (triCount ns tri-1) ]
 
             return (Concrete u tri)
 
 concreteQuads
-  :: Integral i =>
-     Triangulation -> StandardCoordinates i -> [Concrete INormalQuad]
-concreteQuads tr nc = do
+  :: (Integral a, NormalSurface s a) =>
+     Triangulation -> s -> [Concrete INormalQuad]
+concreteQuads tr ns = do
             quad <- tINormalQuads tr
-            u <- [0 .. fi (stc_coefficient nc (iNormalDisc quad)-1) ]
+            u <- [ 0 .. fi (quadCount ns quad-1) ]
 
             return (Concrete u quad) 
                     
 
-mkConcrete :: Integral i => Triangulation -> StandardCoordinates i -> ConcreteNormalSurface
-mkConcrete (tr :: Triangulation) nc =
-    let
-        cns_tris = concreteTris tr nc
-        cns_quads = concreteQuads tr nc 
+cns_arcsOfTri
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalTri -> Triple (Concrete INormalArc)
+cns_arcsOfTri nc cnt =
+            map3 
+                (\arc -> 
+                    Concrete 
+                        (triPosToArcPos nc cnt (forgetTIndex arc)) 
+                        arc) 
+                (normalArcs . c_type $ cnt) 
 
-        cns_arcsOfTri cnt =
-            map3 (\arc -> Concrete (triPosToArcPos nc cnt (forgetTIndex arc)) arc) (normalArcs . c_type $ cnt) 
 
 
 
-
-        cns_arcsOfQuad cnq =
+cns_arcsOfQuad
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalQuad -> Quadruple (Concrete INormalArc)
+cns_arcsOfQuad nc cnq =
                     map4 
                         (\arc -> Concrete (quadPosToArcPos nc cnq (forgetTIndex arc)) arc)
                         (normalArcs . c_type $ cnq) 
 
 
-        cns_cornersOfArc cna =
+cns_cornersOfArc
+  :: (Integral i, NormalSurface s i) =>
+     s -> Concrete INormalArc -> Pair (Concrete INormalCorner)
+cns_cornersOfArc nc cna =
                 map2 
                     (\icorner -> 
-                            Concrete (arcPosToCornerPos nc cna (forgetTIndex icorner)) icorner)  
+                            Concrete (posOfCornerOfArc nc cna (forgetTIndex icorner)) icorner)  
                     (normalCorners . c_type $ cna)
 
 
-
-    in
-        CNS{..}
 
 
 getArcNumberingVsCornerNumberingSense
@@ -231,100 +206,5 @@ getArcNumberingVsCornerNumberingSense narc ncorner =
            else assert (v1==v) Flip
 
         
-
-
--- | An interior point of an edge of the 'SimplicialPartialQuotient'
-data Corn v = Corn CornerPosition Int v v
-    deriving(Eq,Ord,Show)
-
-instance ShortShow v => ShortShow (Corn v) where
-    shortShow (Corn _ _ v0 v1) = shortShow (v0,v1)
-
-
-instance Pretty v => Pretty (Corn v) where
-    prettyPrec prec (Corn u n v0 v1) = 
-        prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty v0,anyPretty v1] 
-
-
-standardCoordinatesToPreRenderable
-  :: forall v i. (Integral i, Ord v, Pretty i, ShortShow v) =>
-     SPQWithCoords v
-     -> StandardCoordinates i
-     -> PreRenderable (OTuple (Corn v))
-standardCoordinatesToPreRenderable (SPQWithCoords spq coords _) nc =  
-    let
-        cns = mkConcrete (spq_tr spq) nc
-
-        tris :: [Triple (Corn v)]
-        tris = do
-            cx@(Concrete _ (viewI -> I i x)) <- cns_tris cns 
-            let f corner = 
-                    mkCorn 
-                        (triPosToCornerPos nc cx corner)
-                        (i ./ corner)
-
-            [ map3 f (normalCorners x) ]
-
-        quads :: [Quadruple (Corn v)]
-        quads = do
-            cx@(Concrete _ (viewI -> I i x)) <- cns_quads cns 
-            let f corner = 
-                    mkCorn 
-                        (quadPosToCornerPos nc cx corner)
-                        (i ./ corner)
-
-            [ map4 f (normalCorners x) ]
-
-
-        (sc,quadDiagonals) = fromTrisAndQuads tris quads
-
-        mkCorn :: CornerPosition -> INormalCorner -> Corn v
-        mkCorn pos nonCanonicalINormalCorner =
-            let
-                n = numberOfCornersOfType nc nonCanonicalINormalCorner
-                (u0,u1) = map2 (spq_map spq)
-                               (vertices (iNormalCornerGetContainingEdge nonCanonicalINormalCorner))
-            in
-                if u0 <= u1
-                   then Corn (fi pos)         (fi n) u0 u1
-                   else Corn (fi n - pos - 1) (fi n) u1 u0
-
-        cornerCoords (Corn pos n v0 v1) = 
-                interpolate (fi (1+pos) / fi (1+n)) (coords v0) (coords v1)
-
-        
-    in
-
---         case admissible tr nc of
---              Left err -> error ("standardCoordinatesToPreRenderable: Input surface "++show nc
---                                     ++" not admissible: "++err)
---              Right () ->
-
-                (mkPreRenderable
-                    (cornerCoords . unOT)
-                    sc)
-
-                    { pr_visible = \asi -> elimAnySimplexWithNat asi (\n ->
-                            caseNat2 n
-                                (const True)
-                                (\e -> not (Set.member e quadDiagonals))
-                                (const (const True))) 
-                    }
-
-
---         ds = mkHomogenousDeltaSet
---                 (mkTuply2dFaceFunc 
---                     (\x -> 
---                         case x of
---                             NSTSArc a -> map2 canonCorn (cns_cornersOfArc a)
---                             NSTSQuadDiagonal q -> 
---                                 case cns_arcsOfQuad of
---                                      (
-                    
-                        
-                
-                
-
-
 
 

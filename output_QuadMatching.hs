@@ -5,7 +5,7 @@ import Element
 import Blenderable
 import Blender
 import DisjointUnion
-import ConcreteNormal
+import ConcreteNormal.PreRenderable
 import Simplicial.DeltaSet
 import Simplicial.AnySimplex
 import TriangulationCxtObject
@@ -30,10 +30,11 @@ is = [ 0.. 3]
 
 upQuads = standardCoordinates [i./Q_ac | i <- is]
 downQuads = standardCoordinates [i./Q_ad | i <- is]
+irrQuads = standardCoordinates [i./Q_ab | i <- is]
 
 irrelevants = 
     sumV
-    (standardCoordinates [i./Q_ab | i <- is]
+    ( irrQuads
      :
      [ vertexLinkingSurface (pMap tr (i ./ vC)) | i <- is]) 
 
@@ -43,7 +44,8 @@ main = (testBlender . setCams [octahedronCam1])
             (
                 (fromSPQWC spqwc)
                 `disjointUnion`
-                fromStandardCoordinates spqwc (standardCoordinates [0./Q_ac,1./Q_ac,2./Q_ad,3./Q_ad])
+                fromStandardCoordinates spqwc 
+                    (irrQuads ^+^ linkBot ^+^ linkTop)
             )
         )
     

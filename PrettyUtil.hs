@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeFamilies, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module PrettyUtil(
     -- * Reexports
@@ -28,6 +30,7 @@ module PrettyUtil(
     showRational,
     pad,
     prettyPrecFromShow,
+    PrettyMatrix(..),
     -- * Class
     Pretty(..)
     
@@ -35,21 +38,21 @@ module PrettyUtil(
 
     where
 
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>),Pretty(..))
-import Data.Word
-import Data.Ratio
-import Data.List
 import Collections
-import qualified Data.Map as M
-import Numeric
 import Control.Arrow((***),(&&&))
-import Element
+import Data.List(intercalate)
+import Data.Ratio
 import Data.Vect.Double.Base
-import HomogenousTuples
+import Data.Word
+import Element
 import GHC.Show
+import HomogenousTuples
+import Numeric
+import Test.QuickCheck(Arbitrary)
+import Text.PrettyPrint.ANSI.Leijen hiding((<$>),Pretty(..))
 import TupleTH
 import TypeLevel.TF.List(List,lToList)
-
+import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 
@@ -60,7 +63,15 @@ spacedEncloseSep l r separator = encloseSep (l <> space) (space <> r) (separator
 
 
 prettyListAsSet ::  Pretty a => [a] -> Doc
-prettyListAsSet = spacedEncloseSep lbrace rbrace comma . fmap pretty
+prettyListAsSet [] = char '∅' 
+prettyListAsSet (x:xs) = 
+    align (
+        fillCat 
+            ((lbrace<>space<>pretty x)
+            :
+            map (((comma<>space)<>) . pretty) xs)
+            </> rbrace
+         )
 
 
 
@@ -110,6 +121,12 @@ showRational x =
 instance PrettyScalar Rational where
     prettyScalar = showRational
 
+instance PrettyScalar Integer where
+    prettyScalar = show
+
+instance PrettyScalar Int where
+    prettyScalar = show
+
 instance PrettyScalar Double where
     prettyScalar 0 = "0"
     prettyScalar x = showFFloat (Just 4) x "" 
@@ -123,6 +140,21 @@ prettyMatrix
       Element (Element (f (f1 String))) ~ String) =>
      f (f1 a) -> String
 prettyMatrix = prettyStringMatrix . (fmap . fmap) prettyScalar
+
+newtype PrettyMatrix a = PrettyMatrix { unPrettyMatrix :: a }
+    deriving Arbitrary
+
+instance
+     (Functor f,
+      Functor f1,
+      AsList (Element (f (f1 String))),
+      AsList (f (f1 String)),
+      PrettyScalar a,
+      Element (Element (f (f1 String))) ~ String) =>
+
+     Show (PrettyMatrix (f (f1 a))) where
+
+     show = prettyMatrix . unPrettyMatrix
 
 prettyVector
   :: (Functor f,

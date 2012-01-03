@@ -16,7 +16,7 @@ import PreRenderable
 import GHC.Generics
 import SimplicialPartialQuotient
 import Simplicial.SimplicialComplex
-import ConcreteNormal
+import ConcreteNormal.PreRenderable
 import NormalEverything
 import Simplicial.AnySimplex
 import Control.Exception
@@ -225,6 +225,12 @@ fromStandardCoordinates
      -> StandardCoordinates i
      -> Blenderable (OTuple (Corn v))
 fromStandardCoordinates spqwc stc = normalSurfaceStyle (standardCoordinatesToPreRenderable spqwc stc) 
+
+fromStandardCoordinatesInteger
+  :: (Ord v, ShortShow v) =>
+     SPQWithCoords v
+     -> StandardCoordinates Integer -> Blenderable (OTuple (Corn v))
+fromStandardCoordinatesInteger = fromStandardCoordinates
 
 
 instance (Pretty (Vert a), ShowN a) => Pretty (Blenderable a) where

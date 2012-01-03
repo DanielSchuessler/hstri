@@ -16,22 +16,28 @@ Build-type:          Simple
 Cabal-version:       >=1.2
 
 Library
+  Extensions: PatternGuards
   Exposed-modules:     
     
-    AbstractTetrahedron2
+    AbstractNeighborhood
     AbstractTetrahedron
+    AbstractTetrahedron2
     BarySD
-    Blenderable
     Blender
+    Blenderable
     Collections
     Command
     ConcreteNormal
+    ConcreteNormal.PreRenderable
+    DD
     DisjointUnion
-    EdgeCentered
+    DotUtil
     Edge
+    EdgeCentered
     Either1
     Element
     Equivalence
+    Equivalence.Class
     ExampleComplexes
     ExampleTriangulations
     FaceClasses
@@ -42,21 +48,24 @@ Library
     GraphUtil
     Group
     HomogenousTuples
-    Homology
     HsTri
-    IndexedSimplices
-    Numbering
     INormalDisc
+    IndexedSimplices
+    InnerProductRepresentation
+    Interactive.Floor
+    Interactive.ReadInput
+    Interactive.Utils
     Latexable
     MathUtil
     NormalArc
-    StandardCoordinates
-    QuadCoordinates
     NormalConstants
     NormalCorner
     NormalDisc
     NormalEverything
+    NormalSurface
     Normalizable
+    Numbering
+    Numbering2
     ONormal
     OrderableFace
     ParseJvx
@@ -64,43 +73,37 @@ Library
     PolymakeInterface
     PreRenderable
     PrettyUtil
+    QuadCoordinates
     QuickCheckUtil
     Quote
     S2
     S3
+    ShortShow
     Simplicial.AnySimplex
     Simplicial.DeltaSet
     Simplicial.GraphComplex
     Simplicial.Layout
-    SimplicialPartialQuotient
     Simplicial.SimplicialComplex
     Simplicial.StrictlyIncreasingMap
+    SimplicialPartialQuotient
+    StandardCoordinates
     THUtil
     TIndex
     ToPython
+    TriArcGraph
     Triangle
-    TriangulationCxtObject
     Triangulation
+    Triangulation.CanonOrdered
+    TriangulationCxtObject
     UPair
     Util
-    Vertex
-    Interactive.Utils
-    Interactive.Floor
-    Interactive.ReadInput
-    ShortShow
-    DotUtil
-    Equivalence.Class
     VectorUtil
-    InnerProductRepresentation
-    DD
-    AbstractNeighborhood
+    Vertex
     ZeroDefaultMap
-    Triangulation.CanonOrdered
-    TriArcGraph
 
 
 
-  Build-depends: 
+  Build-depends: dlist, 
   
         GLFW-b,
         MissingH,

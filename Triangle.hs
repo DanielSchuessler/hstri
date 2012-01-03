@@ -36,7 +36,7 @@ module Triangle(
     -- * Ordered
     OTriangle,
     MakeOTriangle(..),
-    verticesToOTriangle,
+    oTriangleByVertices,
     otriangleDualVertex,
 
     -- * Indexed
@@ -272,11 +272,11 @@ instance Edges OTriangle (Triple OEdge) where
 
 
 instance MakeOTriangle (Triple Vertex) where
-    otriangle = verticesToOTriangle
+    otriangle = oTriangleByVertices
 
 -- | Inverse function to @vertices :: O (Triangle) -> Triple Vertex@
-verticesToOTriangle ::  (Triple Vertex) -> OTriangle
-verticesToOTriangle vs =
+oTriangleByVertices ::  (Triple Vertex) -> OTriangle
+oTriangleByVertices vs =
     case sort3WithPermutation vs of
          (vs',g) -> packOrderedFace (ascVerticesToTriangle vs') g
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module INormalDisc where
 
@@ -7,6 +8,7 @@ import HomogenousTuples
 import ONormal
 import Control.Exception
 import AbstractTetrahedron()
+import Control.Applicative
 
 type INormalCorner = I NormalCorner
 type INormalArc = I NormalArc
@@ -160,3 +162,22 @@ iNormalQuadGetDisjointEdges = traverseI map2 normalQuadGetDisjointEdges
 
 iNormalArcsAroundVertex :: IVertex -> Triple INormalArc
 iNormalArcsAroundVertex = traverseI map3 normalArcsAroundVertex
+
+iNormalDiscsContainingNormalArc
+  :: INormalArc -> Pair (INormalDisc)
+iNormalDiscsContainingNormalArc = traverseI map2 normalDiscsContainingNormalArc
+
+isTri :: INormalDisc -> Bool
+isTri = eitherIND (const True) (const False)
+
+getShapeI :: (HasTIndex ib b, IsDiscShape b) => ib -> DiscShape b
+getShapeI = getShape . forgetTIndex
+
+
+iNormalDiscsContainingNormalCorner
+  :: INormalCorner -> Quadruple INormalDisc
+iNormalDiscsContainingNormalCorner = traverseI map4 normalDiscsContainingNormalCorner 
+
+adjacentINormalCorners
+  :: NormalCorner -> INormalDisc -> Pair INormalCorner
+adjacentINormalCorners = traverseI map2 <$> adjacentNormalCorners

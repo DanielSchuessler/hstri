@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
-{-# OPTIONS -Wall #-}
+-- {-# OPTIONS -Wall #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
     ,latexifyStandardMatchingEquations
@@ -7,24 +7,30 @@ module Latexable(
     ,latexTwoRows
     ,op1,op2
     ,textcolor
+    ,verboseTri,verboseQuad,verboseArc
+    ,runPdfLatex
     
     ) where
 
+import Control.Applicative
 import Control.Arrow(first)
 import Data.Function
 import Data.List(intercalate,sort,sortBy,groupBy)
+import Data.Maybe(mapMaybe)
 import Data.Monoid
 import Data.Ord
+import Data.Ratio
 import Data.Semigroup
 import Element
 import INormalDisc
+import MathUtil
 import QuadCoordinates
 import StandardCoordinates
 import Triangulation
 import Triangulation.CanonOrdered
 import TriangulationCxtObject
-import Data.Maybe(mapMaybe)
-import Control.Applicative
+import ZeroDefaultMap
+import Util
 
 type Latex = String
 
@@ -111,20 +117,36 @@ instance Latexable a => Latexable (CanonOrdered a) where
 tuple :: Latexable a => [a] -> Latex
 tuple xs = "("<>intercalate "," (toLatex <$> xs)<>")"
 
+
+verboseTri :: INormalTri -> Latex
+verboseTri tri = operatorname "Tri" <> tuple [ iNormalTriGetVertex tri ]
+
+verboseQuad :: INormalQuad -> Latex
+verboseQuad x = operatorname "Quad" <> tuple [ fst (iNormalQuadGetDisjointEdges x) ]
+
 instance Latexable INormalTri where
-    toLatex tri = operatorname "Tri" <> tuple [ iNormalTriGetVertex tri ]
+    toLatex = toLatex . iNormalTriGetVertex 
 
 instance Latexable INormalQuad where
-    toLatex tri = operatorname "Quad" <> tuple [ fst (iNormalQuadGetDisjointEdges tri) ]
+    toLatex = toLatex . fst . iNormalQuadGetDisjointEdges
 
 instance Latexable INormalDisc where
     toLatex = eitherIND toLatex toLatex
 
-instance Latexable INormalArc where
-    toLatex ina = operatorname "Arc" <> tuple [
+
+verboseArc :: INormalArc -> Latex
+verboseArc ina = operatorname "Arc" <> tuple [
                         latexTriangleBrief $ iNormalArcGetTriangle ina 
                      ,  toLatex (iNormalArcGetVertexIndex ina)
                     ]
+
+instance Latexable INormalArc where
+    toLatex ina = 
+                        latexTriangleBrief (iNormalArcGetTriangle ina) 
+                        <>
+                            ","
+                        <>
+                        toLatex (iNormalArcGetVertexIndex ina)
 
 instance Latexable TNormalArc where
     toLatex tna = case normalArcPreimage tna of
@@ -132,7 +154,10 @@ instance Latexable TNormalArc where
                      InnerNormalArc ina1 ina2 -> toLatex (InnNA ina1 ina2)
                      
 instance Latexable InnNA where
-    toLatex (InnNA ina1 ina2) = "\\{"<>latexTwoRows ina1 ina2<>"\\}" 
+    toLatex (InnNA ina1 ina2) = latexTwoRows (toLatex ina1 <> sim) ina2
+
+sim :: Latex
+sim = "\\sim"
 
 instance Latexable Integer where toLatex = show
 instance Latexable Int where toLatex = show
@@ -202,10 +227,10 @@ latexifyStandardMatchingEquations tr =
     let
         mes = 
             sortBy (comparing (fmap (/= (0::Integer)) . fst)) .
-            fmap (first (stc_toDenseList tr)) .
+            fmap (first (ns_toDenseList tr)) .
             matchingEquationsWithReasons $ tr
 
-        colSpecs = replicate (fi $ tNumberOfNormalDiscTypes tr) "r"
+        colSpecs = replicate (tNumberOfNormalDiscTypes tr) "r"
 
         body = meHeader (tINormalDiscs tr) \\ 
                ("\\hline" <> slashes (fmap mkRow mes))
@@ -224,7 +249,7 @@ latexifyQMatchingEquations tr =
                     (\e -> fmap ((,e) . quad_toDenseList tr) . qMatchingEquation $ e) 
             .   edges $ tr
 
-        colSpecs = "l" : "|" : replicate (fi $ tNumberOfNormalQuadTypes tr) "r"
+        colSpecs = "l" : "|" : replicate (tNumberOfNormalQuadTypes tr) "r"
 
         body = ("Kante&"<>meHeader (tINormalQuads tr)) \\ 
                ("\\hline " <> slashes (fmap mkRow mes))
@@ -255,3 +280,24 @@ textcolor = op2 "textcolor"
 
 matrix :: Latex -> Latex
 matrix = latexEnv "matrix"
+
+instance (Integral i, Latexable i) => Latexable (Ratio i) where
+
+    toLatex x 
+        | Just i <- ratioToIntegral x = toLatex i 
+        | otherwise = (op2 "frac" <$> numerator <*> denominator) x
+
+
+instance (Latexable k, Latexable r, Num r, Ord r) => Latexable (ZeroDefaultMap k r) where
+
+    toLatex = zdm_showWith id "" (++) toLatex toLatex 
+
+instance Latexable Variable where toLatex = variableName
+
+
+runPdfLatex :: FilePath -> IO ()
+runPdfLatex texfile =
+                 rawSystemS "pdflatex" ["-interaction","nonstopmode"
+                                        ,"-halt-on-error"
+                                        ,"-output-directory","/tmp",texfile]
+

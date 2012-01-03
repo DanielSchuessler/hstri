@@ -218,7 +218,9 @@ prop_normalArcGetAngle_corners na =
 
 instance Quote NormalArc where
     quote (normalArcGetAngle -> (v0,v,v1)) =
-        "na" ++ concatMap show [v0,v,v,v1]
+        "na" ++ concatMap show [v0',v,v1']
+      where
+        (v0',v1') = sort2 (v0,v1)
 
 
 instance Lift NormalArc where
@@ -236,3 +238,5 @@ prop_normalArcsAroundVertex v =
     setEq
         (asList . normalArcsAroundVertex $ v)
         (filter ((==v) . normalArcGetVertex) allNormalArcs)
+
+instance Finite NormalArc

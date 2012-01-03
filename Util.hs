@@ -25,6 +25,7 @@ import Data.Functor
 import Data.Char
 import System.Process
 import System.Exit
+import Data.Time.Clock.POSIX
 
 
 
@@ -284,3 +285,10 @@ systemS l = do
 
 extend :: Monad m => (a -> m b) -> m a -> m b
 extend = (=<<)
+
+atLeastTwo :: Bool -> Bool -> Bool -> Bool
+atLeastTwo a b c = 
+    (if a then (||) else (&&)) b c
+
+tmpfn :: String -> IO FilePath
+tmpfn stem = (("/tmp/" ++ stem) ++) . show . fromEnum <$> getPOSIXTime

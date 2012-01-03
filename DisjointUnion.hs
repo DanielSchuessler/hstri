@@ -36,7 +36,7 @@ instance DisjointUnionable (AnySimplex a -> r) (AnySimplex a' -> r) (AnySimplex 
 instance DisjointUnionable (DeltaSet a) (DeltaSet b) (DeltaSet (Either1 a b)) where
 
     disjointUnion a b = DeltaSet face' simps'_ supers' dimension' faceGraph' nodeMap'
-        (disjointUnionIndexing (simpsIndexing a) (simpsIndexing b) Left1 Right1)
+        (sumNumbering (simpsIndexing a) (simpsIndexing b) Left1 Right1)
                             
      where
 

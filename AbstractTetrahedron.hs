@@ -129,7 +129,7 @@ prop_VerticesToOTriangle v0 =
     forAll (arbitrary `suchThat` (/= v0)) $ \v1 ->
     forAll (arbitrary `suchThat` (liftM2 (&&) (/= v0) (/= v1))) $ \v2 ->
         
-        let vs = (v0,v1,v2) in vs .=. vertices (verticesToOTriangle vs) 
+        let vs = (v0,v1,v2) in vs .=. vertices (oTriangleByVertices vs) 
 
 
 prop_VerticesToOEdge ::  Vertex -> Property

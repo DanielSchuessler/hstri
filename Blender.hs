@@ -207,7 +207,7 @@ handleE ba grp e = handleSimplex
 
     where
         (v1,v0) = faces10 (ba_ds ba) e
-        handleErr err = error (err++"\n"++"In handleE\n"++ $(prVars' ['ba,'e]))
+        handleErr err = error (err++"\n"++"In handleE\n"++ $(showExps ['ba,'e]))
 
 
 handleT :: Blenderable a -> BlenderGroup -> BlenderGroup -> Tri a -> Python ()

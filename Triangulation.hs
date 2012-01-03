@@ -31,6 +31,8 @@ module Triangulation(
     tNumberOfNormalQuadTypes,
     adjacentNormalTris,
     isCanonicallyOrderedClass,
+    tINormalDiscNu,
+    tINormalArcNu,
     -- ** Equivalences
     oEdgeEqv,vertexEqv,
     iEdgeEqv,
@@ -75,7 +77,8 @@ import Test.QuickCheck.All
 import Test.QuickCheck.Gen
 import qualified Data.List as List
 import THUtil
-
+import Numbering2
+import {-# SOURCE #-} TriangulationCxtObject
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
 forAllNonEmptyIntTriangulations f = property (\t ->
@@ -111,7 +114,7 @@ tTetrahedra_ tr = if n==0 then [] else [0..tindex (n - 1)]
 -- Note: All fields except the first two ('triangTets_', 'triangGluings_') are semantically redundant, 
 -- but kept in this data structure for memoization purposes
 data Triangulation = Triangulation { 
-    tNumberOfTetrahedra :: Word,
+    tNumberOfTetrahedra_ :: Word,
 
     -- | The original gluings as passed to 'mkTriangulation'
     tOriginalGluings :: [Gluing],
@@ -131,7 +134,8 @@ data Triangulation = Triangulation {
 --    normalArcEqv :: Equivalence INormalArc
 }
 
-
+tNumberOfTetrahedra :: Num c => Triangulation -> c
+tNumberOfTetrahedra = fi . tNumberOfTetrahedra_
         
 
 
@@ -142,12 +146,11 @@ instance Pretty Triangulation where
 
           where
             fields = [ ("Quote", text (quote tr))
-                     , ("Number of tetrahedra", pretty tNumberOfTetrahedra)
+                     , ("Number of tetrahedra", pretty tNumberOfTetrahedra_)
                      , ("Triangle gluings", pretty tOriginalGluings)
 --                     , ("Edges", pretty edgeEqv)
                      , ("Canonically ordered edges", 
-                            prettyListAsSet (filter isCanonicallyOrderedClass $ 
-                                                eqv_classes oEdgeEqv))
+                            prettyEdgeEquivalence tr)
                      , ("Vertices", pretty vertexEqv)
                      ]
 
@@ -156,11 +159,11 @@ mkTriangulation :: Word -> [Gluing] -> Triangulation
 mkTriangulation = (fmap . fmap) fromRight mkTriangulationSafe 
 
 mkTriangulationSafe :: Word -> [Gluing] -> Either String Triangulation
-mkTriangulationSafe tNumberOfTetrahedra tOriginalGluings
+mkTriangulationSafe tNumberOfTetrahedra_ tOriginalGluings
         =
             (do
 
-    let tets = [0..tindex (tNumberOfTetrahedra-1)] 
+    let tets = [0..tindex (tNumberOfTetrahedra_-1)] 
     
         allIEdges :: [IEdge]
         allIEdges = concatMap edgeList tets
@@ -200,7 +203,7 @@ mkTriangulationSafe tNumberOfTetrahedra tOriginalGluings
 
     checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv
                             
-    return Triangulation{ tNumberOfTetrahedra, tGlueMap_, oEdgeEqv, vertexEqv, tOriginalGluings })
+    return Triangulation{ tNumberOfTetrahedra_, tGlueMap_, oEdgeEqv, vertexEqv, tOriginalGluings })
 
 
 checkForEdgeGluedToSelfInReverse :: [IEdge] -> Equivalence OIEdge -> Either String ()
@@ -331,8 +334,8 @@ mkTriangulationG tets gluings =
 
 
 instance Quote Triangulation where
-    quotePrec prec t = quoteParen (prec >= 11) ("mkTriangulationSafe "
-                                                    ++ quotePrec 11 (tNumberOfTetrahedra t)
+    quotePrec prec t = quoteParen (prec >= 11) ("mkTriangulation "
+                                                    ++ quotePrec 11 (tNumberOfTetrahedra_ t)
                                                     ++ " "
                                                     ++ quotePrec 11 (tOriginalGluings t))
 
@@ -491,16 +494,16 @@ boundaryITriangles tr = filter (isBoundaryITriangle tr) (tITriangles tr)
 
 
 
-tNumberOfNormalDiscTypes :: Triangulation -> Word
+tNumberOfNormalDiscTypes :: Num r => Triangulation -> r
 tNumberOfNormalDiscTypes = liftM (7*) tNumberOfTetrahedra
 
-tNumberOfNormalQuadTypes :: Triangulation -> Word
+tNumberOfNormalQuadTypes :: Num r => Triangulation -> r
 tNumberOfNormalQuadTypes = liftM (3*) tNumberOfTetrahedra
 
 tr_l31 :: Triangulation
 tr_l31 = mkTriangulation 2 
     ((0./tABC,1./oBCA) 
-     :
+    :
      fmap ((0./) &&& ((1./) . toOrderedFace)) [tABD,tACD,tBCD])
                         
 
@@ -536,3 +539,8 @@ isCanonicallyOrderedClass
 isCanonicallyOrderedClass cl = getVertexOrder (canonicalRep cl) == mempty
 
 
+tINormalDiscNu :: Triangulation -> Numbering INormalDisc
+tINormalDiscNu tr = enumNu' 0 (tNumberOfNormalDiscTypes tr-1)
+
+tINormalArcNu :: Triangulation -> Numbering INormalArc
+tINormalArcNu tr = enumNu' 0 (12*tNumberOfTetrahedra tr - 1)

@@ -31,6 +31,7 @@ main = do
         qc_Util,
         qc_QuadCoordinates,
         qc_AbstractNeighbordhood,
-        qc_CanonOrdered
+        qc_CanonOrdered,
+        qc_MathUtil
         ]
     print (and res)

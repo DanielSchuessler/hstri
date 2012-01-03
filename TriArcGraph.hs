@@ -1,24 +1,49 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances, TupleSections, FunctionalDependencies, MultiParamTypeClasses, ImplicitParams, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, TypeSynonymInstances, ScopedTypeVariables, FlexibleContexts, GeneralizedNewtypeDeriving, StandaloneDeriving, ExistentialQuantification #-}
-module TriArcGraph where
+module TriArcGraph(test) where
 
 
-import Control.Applicative
-import Data.GraphViz as GraphViz
-import Data.GraphViz.Attributes.Complete
-import Data.Maybe
+import Data.AdditiveGroup
+import Data.Char
+import Data.Graph.Inductive
+import Data.Vector(Vector)
 import DotUtil
-import HomogenousTuples
 import Latexable
+import MathUtil
 import Prelude hiding(writeFile)
-import System.Exit
+import QuadCoordinates
 import Triangulation.CanonOrdered
 import TriangulationCxtObject
-import Data.Graph.Inductive
-import QuadCoordinates
-import Control.Arrow((&&&))
+import ZeroDefaultMap
+import qualified Data.Vector as V
+import qualified Data.Text.Lazy as Text
+import PrettyUtil
 
-ta_toDot gr me = bendMultiedges' $ graphToDot params gr
+
+
+quadVar i = Variable [chr (ord 'a' + i)]
+
+-- symbolicSolution :: (Ord r, Fractional r) => 
+--     QuadCoordinateFunctional r -> QuadCoordinates (ZeroDefaultMap Variable r)
+-- symbolicSolution me =
+--     case quad_toNonzeroAssocs me of
+--          [] -> error "matching equation is zero" 
+--          ((q0,r0):qrs) -> 
+-- 
+--             quad_fromAssocs (
+--                 (q0, zdm_fromAssocs [ (quadVar q, -r/r0) | (q,r) <- qrs ])
+-- 
+--                     :
+--                 [ (q, zdm_singleton (quadVar q) 1) | (q,_) <- qrs ]
+--                 )
+
+
+ta_toDot
+  :: (Num a, Ord a, AdditiveGroup a, Graph gr, Latexable a) =>
+     gr INormalTri InnNA
+     -> Vector (ZeroDefaultMap Variable a) -> DotGraph Node
+ta_toDot gr symSol = graphToDot params gr
     where
+
         params = nonClusteredParams {
 
             isDirected = True,
@@ -37,63 +62,62 @@ ta_toDot gr me = bendMultiedges' $ graphToDot params gr
 
         gattrs = [ Layout "neato" 
                  , FontSize 10 
+                 , d2t (DocPreamble (
+                            Text.unwords [
+                              "\\input{/usr/local/share/tikztri.tex}"
+                             ,"\\usetikzlibrary{decorations.markings}" 
+                             ] 
+                             ))
+                            
                  ]
 
         eattrs = [ 
+--                      Dir NoDir
+--                     , 
+                    d2t (LblStyle "red,above,sloped")
+                  , style "decoration={markings,mark=between positions 0 and 1 step 0.1 with {\\arrow{stealth}}},postaction=decorate"
+--                    , style "decoration={expanding waves,angle=4,segment length=2pt},decorate" 
                  ]
 
         nattrs = [ Shape Triangle
                  , Margin (DVal 0)
                  ]
 
-        fmtEdge_ (_,_,na@(InnNA ina1 ina2)) =
+        fmtEdge_ (_,_,(InnNA ina1 ina2)) =
+
+
+
                 [ 
                   Len 1.3
 --                , Label (mathLabelValue (toLatex (coeffArc ina1) ++ " \\to " ++ toLatex (coeffArc ina2)))
                 , Label (mathLabelValue 
-                            (prCoeff (coeffArc ina1) "x_{q_t}"
-                             ++
-                             prCoeff (coeffArc ina1) "x_{q_h}"))
-                , d2t (LblStyle "sloped,above,allow upside down")
+                            (coeffArc ina2 ^-^ coeffArc ina1))
+
                 ]
                 
-        coeff = quad_coefficient me
+        coeff q = symSol V.! fromEnum q
 
         coeffArc = coeff . iNormalQuadByNormalArc
                 
 
-        addMeToLabel ina1 ina2 lbl = f ina1 ++ "," ++ f ina2
-            where
-                f ina = 
-                    case coeffArc ina of
-                        r | r == 0 -> ""
-                          | otherwise -> colorBySign r
 
 
-prCoeff c = case () of 
-                                 _ | c == 0 -> const ""
-                                   | c == -1 -> ("-" ++)
-                                   | c == 1 -> ("+" ++)
-                                   | c < 0 -> (("-" ++ toLatex (-c)) ++)
-                                   | otherwise -> (("+" ++ toLatex c) ++)
 
-colorBySign r | r < 0 = textcolor ("red"::String) r 
-              | otherwise = toLatex r
-
-ta_tr tr me = ta_toDot (triArcGraph tr) me
-
-test_tr tr i = viewDot (ta_tr tr (qMatchingEquationsInteger tr !! i))
-
-test = test_tr tr_l31
+ta_tr tr me = ta_toDot (triArcGraph tr) (snd $ symbolicSolution me quadVar)
 
 
-normalStuffGraph tr =
+test i tr = 
     let
-        ns = (Left <$> tINormalDiscs tr)
-             ++
-             (Right <$> innNAs tr)
-    in
-        mkGraph (map (fromEnum&&&id) ns) 
+        mes = (qMatchingEquationsMatrixRat tr)
+    in do
+        case symbolicSolution mes quadVar of
+             ((mtx,_,_),s) -> do
+                viewDot $ ta_toDot (triArcGraph tr) s
+                print tr
+                putStrLn (prettyMatrix mes)
+                putStrLn "~>"
+                putStrLn (prettyMatrix mtx)
+                putStrLn "s="
+                print s
 
-
-
+odd_tr = mkTriangulation 1 [(0 ./ tABD, 0 ./ oCAD), (0 ./ tABC, 0 ./ oCBD)]

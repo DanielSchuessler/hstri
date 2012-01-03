@@ -9,7 +9,7 @@ import Data.Vect.Double
 import PreRenderable
 import PrettyUtil
 import DisjointUnion
-import ConcreteNormal
+import ConcreteNormal.PreRenderable
 import Control.Monad
 import ExampleTriangulations
 
