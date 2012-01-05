@@ -25,8 +25,8 @@ ns = 2 *^ sumV [ ntA', ntB', ntC', ntD'
 
 main = testBlender
         (defaultScene
-            (fromSPQWC spqwc
+            (fromSpqwc spqwc
                 `disjointUnion`
-             fromStandardCoordinatesInteger spqwc ns)) 
+             fromIntegerNormalSurface spqwc ns)) 
                 
         

@@ -9,6 +9,7 @@ import Triangulation.CanonOrdered
 import TriangulationCxtObject
 import QuadCoordinates
 import AbstractNeighborhood
+import MathUtil
 
 
 main = do
@@ -32,6 +33,7 @@ main = do
         qc_QuadCoordinates,
         qc_AbstractNeighbordhood,
         qc_CanonOrdered,
-        qc_MathUtil
+        qc_MathUtil,
+        qc_FacetGluing
         ]
     print (and res)

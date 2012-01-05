@@ -155,3 +155,6 @@ zipTupleWith3 = $(zipTupleWith 3)
 
 deleteAt3 :: Num a => a -> (t, t, t) -> (t, t)
 deleteAt3 = $(deleteAtTuple 3)
+
+deleteAt4 :: Num a => a -> (t, t, t, t) -> (t, t, t)
+deleteAt4 = $(deleteAtTuple 4)

@@ -1,20 +1,22 @@
 {-# LANGUAGE PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
 module DD where
 
-import TriangulationCxtObject
-import QuadCoordinates
-import qualified Data.Vector as V
-import Data.Vector(Vector)
-import qualified Data.Vector.Unboxed as VU
+import Control.Applicative
+import Control.Exception
+import Control.Monad.State
+import Data.Function
 import Data.List as L
 import Data.Ord
+import Data.Vector(Vector)
 import InnerProductRepresentation
-import Control.Monad.State
-import Control.Applicative
-import Data.Function
-import Control.Exception
-import VectorUtil
 import PrettyUtil
+import QuadCoordinates
+import TriangulationCxtObject
+import VectorUtil
+import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as VU
+import Latexable
+import MathUtil
 
 data PairFate = 
     PairFate {
@@ -48,6 +50,17 @@ nextIndex = do
     put (succ i)
     return i
 
+type DDResult = (Vector IPR, [(Vector PairFate, Vector IPR)])
+
+ipr_init d k meColumn ix =
+ IPR 
+                            ix 
+                            (VU.generate d (/=k))
+                            (V.fromList meColumn)
+                            (V.generate d (\j -> if j==k then 1 else 0)) 
+
+dd
+  :: Triangulation -> DDResult 
 dd tr =
     let
         d = fi $ tNumberOfNormalQuadTypes tr 
@@ -57,11 +70,7 @@ dd tr =
         mes' = transpose mes
 
         go = do
-            _V0 <- V.zipWithM (\k meColumn ->
-                        IPR 
-                            <$> nextIndex 
-                            <*> pure (VU.generate d (/=k))
-                            <*> pure (V.fromList meColumn))
+            _V0 <- V.zipWithM (\k meColumn -> ipr_init d k meColumn <$> nextIndex)
 
                         (V.enumFromN 0 d) (V.fromList mes')
 
@@ -102,7 +111,7 @@ dd tr =
 
                                 pairFates
                     
-                    (:) (i,pairFates,_V) <$> loop (i+1) _V
+                    (:) (pairFates,_V) <$> loop (i+1) _V
 
             
 
@@ -150,3 +159,34 @@ disproveAdjacency _Vp x y =
 
             _Vp
 
+
+vsepVec = vsep . V.toList
+
+ppDDRes :: DDResult -> Doc
+ppDDRes (vs0,steps) =
+        ppVecs vs0 <> line <> 
+        vsep (zipWith ppStep [1..] steps)
+
+    where
+        ppStep i (pairFates,vs) =
+
+                line <> text "Step" <+> int i
+                <> line 
+                <> indent 2 (
+                                indent 2 (vsepVec (pretty <$> pairFates))
+                                <> line
+                                <> text "V_" <> int i <+> text "="
+                                <> line
+                                <> indent 2 (ppVecs vs))
+
+ppVecs vs =
+    let 
+        maxWidth = V.maximum (V.map ipr_maxScalarWidth vs)
+    in 
+        vsepVec (ipr_pretty maxWidth <$> vs)
+
+
+ddSolutions :: DDResult -> Vector (Vector Rational)
+ddSolutions = V.map ipr_value . snd . last . snd 
+
+ddSolutions' = V.map makeVecIntegral . ddSolutions

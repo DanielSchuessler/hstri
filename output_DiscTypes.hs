@@ -27,9 +27,9 @@ main =
        setCams [Cam (-2.8 *& vec3Y) ((pi/2) *& vec3X) defaultFOV] . 
        defaultScene .
        transformCoords rot $
-       (fromSPQWC spqwc_oneTet
+       (fromSpqwc spqwc_oneTet
         `disjointUnion` 
-        fromStandardCoordinates spqwc_oneTet (stc :: StandardCoordinates Int)
+        fromNormalSurface spqwc_oneTet (stc :: StandardCoordinates Int)
        
 
        

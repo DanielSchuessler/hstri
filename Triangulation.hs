@@ -8,7 +8,7 @@ module Triangulation(
     Triangulation,
     
     -- * Properties 
-    tNumberOfTetrahedra,tTetrahedra_,tOriginalGluings, tGlueMap_, triangTetCount,
+    tNumberOfTetrahedra_,tNumberOfTetrahedra,tTetrahedra_,tOriginalGluings, tGlueMap_, triangTetCount,
     lookupGluingOfITriangle,
     lookupGluingOfOITriangle,
     tIVertices,
@@ -45,6 +45,8 @@ module Triangulation(
     TriangulationDSnakeItem(..),
     -- * Examples
     tr_l31,
+    -- * Labelled
+    labelledTriangulation,LabelledTriangulation,
 
 
 
@@ -544,3 +546,9 @@ tINormalDiscNu tr = enumNu' 0 (tNumberOfNormalDiscTypes tr-1)
 
 tINormalArcNu :: Triangulation -> Numbering INormalArc
 tINormalArcNu tr = enumNu' 0 (12*tNumberOfTetrahedra tr - 1)
+
+type LabelledTriangulation = (String,Triangulation)
+
+labelledTriangulation :: String -> Triangulation -> LabelledTriangulation
+labelledTriangulation = (,) 
+

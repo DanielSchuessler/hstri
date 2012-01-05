@@ -127,10 +127,22 @@ iNormalArcGetVertexIndex = normalArcGetVertexIndex . unI
 iNormalArcGetTriangle :: INormalArc -> ITriangle
 iNormalArcGetTriangle = mapI normalArcGetTriangle 
 
+
+iNormalArcByTriangleAndVertex
+  :: ITriangle -> IVertex -> INormalArc
+iNormalArcByTriangleAndVertex (viewI -> I ti t) (viewI -> I ti' v) = 
+    assert(ti==ti') $
+    ti ./ normalArcByTriangleAndVertex t v 
+
+iNormalArcByOTriangleAndVertex
+  :: OITriangle -> IVertex -> I NormalArc
+iNormalArcByOTriangleAndVertex = iNormalArcByTriangleAndVertex . forgetVertexOrder
+
 iNormalArcByTriangleAndVertexIndex
   :: ITriangle -> VertexIndexInTriangle -> I NormalArc
 iNormalArcByTriangleAndVertexIndex (viewI -> I ti t) vi = 
     ti ./ normalArcByTriangleAndVertexIndex t vi
+
     
 eitherIND
   :: (INormalTri -> r) -> (INormalQuad -> r) -> INormalDisc -> r
@@ -181,3 +193,4 @@ iNormalDiscsContainingNormalCorner = traverseI map4 normalDiscsContainingNormalC
 adjacentINormalCorners
   :: NormalCorner -> INormalDisc -> Pair INormalCorner
 adjacentINormalCorners = traverseI map2 <$> adjacentNormalCorners
+

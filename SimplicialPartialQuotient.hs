@@ -161,11 +161,11 @@ prop_enoughGluings spq =
 
 
 toSimplicialComplex
-  :: Ord v => SimplicialPartialQuotient v -> SimplicialComplex v
+  :: (Pretty v, Ord v) => SimplicialPartialQuotient v -> SimplicialComplex v
 toSimplicialComplex = fromTets . spq_tets   
 
 toPreRenderable
-  :: (Ord v, ShortShow v) =>
+  :: (Ord v, ShortShow v, Pretty v) =>
      SPQWithCoords v -> PreRenderable (OTuple v)
 toPreRenderable (SPQWithCoords spq coords gluingLabeller) = 
     let pr0 =
@@ -301,3 +301,6 @@ instance (Ord v, Pretty v) => Pretty (SPQWithCoords v) where
              
              ]
 
+
+spqwc_tr :: SPQWithCoords v -> Triangulation
+spqwc_tr = spq_tr . spqwc_spq

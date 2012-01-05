@@ -23,10 +23,10 @@ import Triangulation.CanonOrdered
 
 
 graphHelper
-  :: (Latexable a, FLN_Id a, FLN_Id b, Ord b) =>
+  :: (Ord a1, Latexable a, FLN_Id a, FLN_Id a1) =>
      (Triangulation -> [a])
-     -> (Gluing -> [(b, b)]) -> Triangulation -> DotGraph Int
-graphHelper things inducedEquivalences tr = 
+     -> (Gluing -> [(a1, a1)]) -> Triangulation -> Seed -> DotGraph Int
+graphHelper things inducedEquivalences tr theseed = 
     DotGraph {
         strictGraph = False,
         directedGraph = False,
@@ -35,7 +35,7 @@ graphHelper things inducedEquivalences tr =
 
             attrStmts = 
                 [   EdgeAttrs gEdgeAttrs
-                ,   GraphAttrs gGraphAttrs 
+                ,   GraphAttrs (gGraphAttrs++[seed theseed]) 
                 ,   NodeAttrs gNodeAttrs
                 ],
 
@@ -45,10 +45,9 @@ graphHelper things inducedEquivalences tr =
                 (mkNode [] <$> things tr),
 
             edgeStmts = 
-                bendMultiedges 
                     (
 
-                tOriginalGluings tr >>=
+                tGluingsIrredundant tr >>=
                     (\gl -> 
                         fmap (equivalenceEdge gl) (inducedEquivalences gl)
                         )
@@ -60,10 +59,10 @@ graphHelper things inducedEquivalences tr =
 
 
 
-edgeEqvGraph :: Triangulation -> DotGraph Int
+edgeEqvGraph :: Triangulation -> Seed -> DotGraph Int
 edgeEqvGraph = graphHelper tCOIEdges inducedEdgeEquivalences 
 
-vertexEqvGraph :: Triangulation -> DotGraph Int
+vertexEqvGraph :: Triangulation -> Seed -> DotGraph Int
 vertexEqvGraph = graphHelper tIVertices inducedVertexEquivalences
 
 
@@ -81,22 +80,21 @@ gNodeAttrs :: [Attribute]
 gNodeAttrs = 
     [
         let hor = 0.02 in Margin (PVal (createPoint hor (hor*2/3))) 
-    ,   PenWidth 2
+    ,   Shape Triangle
     ]
 
 
 gGraphAttrs :: [Attribute]
 gGraphAttrs =
                         [ 
-                                 RankDir FromLeft
+--                                 RankDir FromLeft
 --                                , RankSep [2.4] 
-                               , Overlap RemoveOverlaps
+--                               , Overlap RemoveOverlaps
 --                               , Splines SplineEdges
-                               , Layout "neato"
-                               , Pack (PackMargin 4)
-                               , seed 1
+                                 Layout "neato"
+--                               , Pack (PackMargin 4)
                                , d2t (FigPreamble $
-                                    (backslashPlaceholder `mappend` "footnotesize"))
+                                    ("\\footnotesize"))
                          ] 
 
 equivalenceEdge
@@ -112,24 +110,25 @@ equivalenceEdge' ((tri,otri) :: Gluing) (x, y) =
         [
             (Label . mkLabel)
                 (latexTwoRows (toLatex tri ++ "\\sim") otri)
-        , Len 0.82
+        , Len 1.6
         ]
 
 
 
-viewEdgeEqvGraph :: Triangulation -> IO ExitCode
-viewEdgeEqvGraph = viewDot . edgeEqvGraph
+viewEdgeEqvGraph :: Triangulation -> Seed -> IO ExitCode
+viewEdgeEqvGraph = fmap viewDot . edgeEqvGraph
 
-viewVertexEqvGraph :: Triangulation -> IO ExitCode
-viewVertexEqvGraph = viewDot . vertexEqvGraph
+viewVertexEqvGraph :: Triangulation -> Seed -> IO ExitCode
+viewVertexEqvGraph = fmap viewDot . vertexEqvGraph
 
-veg :: Triangulation -> IO ExitCode
+veg :: Triangulation -> Seed -> IO ExitCode
 veg = viewVertexEqvGraph
 
-productionEqvGraphs :: [Char] -> Triangulation -> IO ()
-productionEqvGraphs trName tr = do
-    go "EdgeGraph" edgeEqvGraph
-    go "VertexGraph" vertexEqvGraph
+productionEqvGraphs
+  :: Seed -> Seed -> [Char] -> Triangulation -> IO ()
+productionEqvGraphs seedE seedV trName tr = do
+    go "EdgeGraph" edgeEqvGraph seedE
+    go "VertexGraph" vertexEqvGraph seedV
   where
-    go n f = productionGraph (trName ++ n) (f tr)
+    go n f s = productionGraph (trName ++ n) (f tr s)
 

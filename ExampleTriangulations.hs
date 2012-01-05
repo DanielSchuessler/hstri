@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell, ViewPatterns #-}
 {-# OPTIONS -Wall #-}
 module ExampleTriangulations where
 
@@ -7,6 +7,7 @@ import EdgeCentered
 import Blenderable
 import Data.Vect.Double
 import Control.Exception
+import THUtil
 
 tr_aroundEdge :: Word -> Triangulation
 tr_aroundEdge n =
@@ -67,3 +68,18 @@ twoTetCam =
      defaultFOV
 
 
+oneTetCam :: Cam
+oneTetCam = 
+ Cam (uncurry3 Vec3 (-0.23205919563770294+0.2, -3.6175613403320312, 0.15333208441734314+0.28))
+     (uncurry3 Vec3 (1.4570116996765137, -8.902474064598209e-07, -0.0009973797714337707))
+     defaultFOV
+
+l41 :: SPQWithCoords Vertex
+l41 = geometrifySingleTetTriang 
+        (mkTriangulation 1 [(0./tBCD,0./oCDA),(0./tABD,0./oBCA)])
+        (\gl@(forgetTIndex -> t,_) -> 
+            case () of
+                    _ | t==tABC -> "F"
+                      | t==tACD -> "G"
+                      | otherwise -> error ("l41 "++ $(showExps 'gl)) 
+                      )

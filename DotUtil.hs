@@ -16,6 +16,7 @@ module DotUtil(
     dot2texBasicFlags,
     mathLabelValue,
     mathLabel,
+    Seed(..),
     seed,
     -- * Backslash issues
     backslashPlaceholder,
@@ -27,7 +28,6 @@ module DotUtil(
     ) where
 
 
-import Control.Applicative
 import Control.Exception
 import Control.Monad
 import Data.Bits
@@ -39,7 +39,6 @@ import Data.Maybe
 import Data.Text.Lazy(pack)
 import Data.Text.Lazy(replace,Text)
 import Data.Text.Lazy.IO(writeFile)
-import Data.Time.Clock.POSIX
 import HomogenousTuples
 import Latexable
 import Prelude hiding(writeFile)
@@ -68,7 +67,7 @@ dot2texBasicFlags = [
     "-traw",
     "--usepdflatex",
     "--nominsize"
-    ,"--debug"
+--    ,"--debug"
 
 --     "--valignmode=dot",
 --     "--graphstyle=anchor=base"
@@ -101,7 +100,7 @@ viewDot dotGraph0 = do
                 rawSystemS "ln" ["-sf",texfile,"/tmp/it.tex"]
                 runPdfLatex texfile
                 rawSystemS "ln" ["-sf",pdffile,"/tmp/it.pdf"]
-                rawSystemS "okular" [pdffile])
+                runOkularAsync pdffile)
 
     return ExitSuccess
 
@@ -296,8 +295,12 @@ mathLabelValue = toLabelValue . mathmode
 mathLabel :: Latexable a => a -> Attribute
 mathLabel = Label . mathLabelValue
 
-seed :: Int -> Attribute
-seed s = Start (StartStyleSeed RandomStyle s)
+
+newtype Seed = Seed Int
+    deriving(Eq,Show,Num)
+
+seed :: Seed -> Attribute
+seed (Seed s) = Start (StartStyleSeed RandomStyle s)
 
 style :: Text -> Attribute
 style = UnknownAttribute "style" . replace "\\" backslashPlaceholder

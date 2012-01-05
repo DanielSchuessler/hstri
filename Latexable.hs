@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 -- {-# OPTIONS -Wall #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
@@ -8,8 +8,10 @@ module Latexable(
     ,op1,op2
     ,textcolor
     ,verboseTri,verboseQuad,verboseArc
-    ,runPdfLatex
+    ,quad_latex
     
+    -- * Program invocation
+    ,runPdfLatex,runOkularAsync
     ) where
 
 import Control.Applicative
@@ -31,6 +33,7 @@ import Triangulation.CanonOrdered
 import TriangulationCxtObject
 import ZeroDefaultMap
 import Util
+import Data.String.Interpolation
 
 type Latex = String
 
@@ -297,7 +300,19 @@ instance Latexable Variable where toLatex = variableName
 
 runPdfLatex :: FilePath -> IO ()
 runPdfLatex texfile =
-                 rawSystemS "pdflatex" ["-interaction","nonstopmode"
+                 rawSystemS "pdflatex" ["-interaction","nonstopmode","-file-line-error" 
                                         ,"-halt-on-error"
                                         ,"-output-directory","/tmp",texfile]
+
+
+quad_latex
+  :: (Num a, Latexable a) =>
+     Triangulation -> QuadCoordinates a -> Latex
+quad_latex tr qc = 
+    case quad_toDenseList tr qc of
+         lst -> latexEnv "pmatrix" (amps . fmap toLatex $ lst)
+
+
+runOkularAsync pdffile =
+                 rawSystemS "zsh" ["-c", "okular $1 &", "arg0", pdffile]
 

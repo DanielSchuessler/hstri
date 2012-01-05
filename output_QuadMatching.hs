@@ -42,9 +42,9 @@ irrelevants =
 main = (testBlender . setCams [octahedronCam1])
         (defaultScene
             (
-                (fromSPQWC spqwc)
+                (fromSpqwc spqwc)
                 `disjointUnion`
-                fromStandardCoordinates spqwc 
+                fromNormalSurface spqwc 
                     (irrQuads ^+^ linkBot ^+^ linkTop)
             )
         )

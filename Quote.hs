@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
 module Quote where
 import Data.List
 import Data.Word
@@ -22,6 +24,7 @@ instance (Quote a, Quote b) => Quote (a,b) where
 
 instance Quote Word where quote = show
 
+instance Quote String where quote = show
 
 quoteApp :: Quote a => [Char] -> a -> [Char]
 quoteApp x y = x ++ " (" ++ quotePrec 11 y ++ ")"

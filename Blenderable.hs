@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, FlexibleContexts, FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns, RecordWildCards #-}
+{-# LANGUAGE FunctionalDependencies, StandaloneDeriving, FlexibleContexts, FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns, RecordWildCards #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module Blenderable where
@@ -181,8 +181,8 @@ normalSurfaceStyle = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickn
 
 
 -- | Points cam at positive y dir
-defaultScene ::  Blenderable a -> Scene a
-defaultScene a = Scene a defaultWorldProps [defaultCam]
+defaultScene :: ToBlenderable x a => x -> Scene a
+defaultScene a = Scene (toBlenderable a) defaultWorldProps [defaultCam]
 
 defaultCam :: Cam
 defaultCam = Cam (Vec3 0.66 (-2.3) 0.52) (eulerAnglesXYZ (pi/2) 0 0) defaultFOV
@@ -213,25 +213,6 @@ instance DisjointUnionable (Blenderable a) (Blenderable b) (Blenderable (Either1
 
 --normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
 
-fromSPQWC
-  :: (Ord v, ShortShow v) =>
-     SPQWithCoords v
-     -> Blenderable (OTuple v)
-fromSPQWC = pseudomanifoldStyle . toPreRenderable
-
-fromStandardCoordinates
-  :: (Ord v, Integral i, Pretty i, ShortShow v) =>
-     SPQWithCoords v
-     -> StandardCoordinates i
-     -> Blenderable (OTuple (Corn v))
-fromStandardCoordinates spqwc stc = normalSurfaceStyle (standardCoordinatesToPreRenderable spqwc stc) 
-
-fromStandardCoordinatesInteger
-  :: (Ord v, ShortShow v) =>
-     SPQWithCoords v
-     -> StandardCoordinates Integer -> Blenderable (OTuple (Corn v))
-fromStandardCoordinatesInteger = fromStandardCoordinates
-
 
 instance (Pretty (Vert a), ShowN a) => Pretty (Blenderable a) where
     pretty Blenderable{..} = prettyRecord "Blenderable"
@@ -244,3 +225,47 @@ instance (Pretty (Vert a), ShowN a) => Show (Blenderable a) where
     showsPrec = prettyShowsPrec
 
 
+
+-- * Conversion
+
+class ToBlenderable x a | x -> a where
+    toBlenderable :: x -> Blenderable a
+
+instance ToBlenderable (Blenderable a) a where
+    toBlenderable = id
+
+fromSpqwc
+  :: (Ord v, ShortShow v,Pretty v) =>
+     SPQWithCoords v
+     -> Blenderable (OTuple v)
+fromSpqwc = pseudomanifoldStyle . toPreRenderable
+
+-- | = 'fromSpqwc'
+instance (Ord v, ShortShow v, Pretty v) => ToBlenderable (SPQWithCoords v) (OTuple v) where
+    toBlenderable = fromSpqwc
+
+fromNormalSurface
+  :: (Integral i, Ord v, Pretty i, ShortShow v, NormalSurface s i) =>
+     SPQWithCoords v -> s -> Blenderable (OTuple (Corn v))
+fromNormalSurface spqwc stc = normalSurfaceStyle (normalSurfaceToPreRenderable spqwc stc) 
+
+fromIntegerNormalSurface
+  :: (Ord v, ShortShow v, NormalSurface s Integer) =>
+     SPQWithCoords v -> s -> Blenderable (OTuple (Corn v))
+fromIntegerNormalSurface = fromNormalSurface
+
+
+fromSpqwcAndIntegerNormalSurface
+  :: (Ord v, ShortShow v, NormalSurface s Integer, Pretty v) =>
+     SPQWithCoords v
+     -> s -> Blenderable (Either1 (OTuple v) (OTuple (Corn v)))
+fromSpqwcAndIntegerNormalSurface spqwc s = 
+    fromSpqwc spqwc `disjointUnion`
+    fromIntegerNormalSurface spqwc s 
+
+
+-- | = @uncurry 'fromSpqwcAndIntegerNormalSurface'@
+instance (Ord v, ShortShow v, NormalSurface s Integer, Pretty v) => 
+    ToBlenderable (SPQWithCoords v, s) (Either1 (OTuple v) (OTuple (Corn v))) where
+
+    toBlenderable = uncurry fromSpqwcAndIntegerNormalSurface

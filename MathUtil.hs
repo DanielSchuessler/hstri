@@ -330,15 +330,15 @@ qc_MathUtil :: IO Bool
 qc_MathUtil = $quickCheckAll
 
         
-makeIntegral
+makeMatrixIntegral
   :: (Integral b, VG.Vector v (Ratio b), VG.Vector v b) =>
      Vector (v (Ratio b)) -> Vector (v b)
-makeIntegral = V.map makeRowIntegral
+makeMatrixIntegral = V.map makeVecIntegral
 
-makeRowIntegral
+makeVecIntegral
   :: (Integral b, VG.Vector v (Ratio b), VG.Vector v b) =>
      v (Ratio b) -> v b
-makeRowIntegral ro =
+makeVecIntegral ro =
     let
         l = VG.foldl' lcm 1 . VG.map denominator $ ro
 

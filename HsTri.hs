@@ -1,16 +1,47 @@
 {-# OPTIONS -Wall #-}
+-- | Reexport module
 module HsTri(
-    module TriangulationCxtObject,
-    module FaceLattice,
     module Blender,
     module Blenderable,
     module ExampleTriangulations,
+    module FaceLattice,
+    module INormalDisc,
     module Latexable,
+    module NormalConstants,
+    module NormalDisc,
+    module NormalSurface,
+    module StandardCoordinates,
+    module TriangulationCxtObject,
+    module Either1,
+    module PreRenderable,
+    module ConcreteNormal.PreRenderable,
+    module HomogenousTuples,
+    module DisjointUnion,
+    module PrettyUtil,
+    module Simplicial.DeltaSet,
+    module Data.Vect.Double.Base,
+    module THUtil,
+
     ) where
 
-import TriangulationCxtObject
-import FaceLattice
+
 import Blender
 import Blenderable
+import ConcreteNormal.PreRenderable
+import Data.Vect.Double.Base(Vec3)
+import DisjointUnion
+import Either1
 import ExampleTriangulations
+import FaceLattice
+import HomogenousTuples
+import INormalDisc
 import Latexable
+import NormalConstants
+import NormalDisc
+import NormalSurface
+import PreRenderable
+import PrettyUtil
+import Simplicial.DeltaSet
+import StandardCoordinates
+import THUtil
+import TriangulationCxtObject

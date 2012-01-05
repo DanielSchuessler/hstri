@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
 module FacetGluing where
 
 import AbstractTetrahedron
@@ -11,6 +11,8 @@ import Control.Exception
 import Control.Monad
 import QuickCheckUtil
 import Test.QuickCheck
+import THUtil
+import Test.QuickCheck.All
 
 type Gluing = (ITriangle,OITriangle)
 
@@ -115,3 +117,25 @@ inducedOEdgeEquivalences g = do
     pair0 <- inducedOEdgeEquivalencesIrredundant g 
     [ pair0,  map2 (*. Flip) pair0 ]
 
+
+-- | Is the first triangle smaller than the second?
+isGluingNormalized
+  :: Gluing -> Bool
+isGluingNormalized (tri,otri) = 
+    case compare tri (forgetVertexOrder otri) of
+         EQ -> error ("isGluingNormalized: Invalid gluing "
+                        ++ $(showExps ['tri,'otri]))
+         LT -> True
+         GT -> False
+
+normalizeGluing :: Gluing -> Gluing
+normalizeGluing gl = if isGluingNormalized gl then gl else flipGluing gl
+
+gluingGen :: Gen Gluing
+gluingGen = arbitrary `suchThat` \gl -> fst gl /= forgetVertexOrder (snd gl)
+
+prop_normalizeGluing :: Property
+prop_normalizeGluing = forAll gluingGen (\gl -> isGluingNormalized (normalizeGluing gl))
+
+qc_FacetGluing :: IO Bool
+qc_FacetGluing = $quickCheckAll

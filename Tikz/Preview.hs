@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, ViewPatterns, QuasiQuotes, ScopedTypeVariables, NoMonomorphismRestriction #-}
 
-module Tikz.Preview(previewTikz,previewTikzFile) where
+module Tikz.Preview(Tikz,previewTikz,previewTikzFile) where
 
 import Data.String.Interpolation
 import qualified Data.Map as M
@@ -27,7 +27,7 @@ previewTikzFile texfile pdffile = do
 
     runPdfLatex texfile
 
-    rawSystemS "okular" [pdffile]
+    runOkularAsync pdffile
 
 
 wrap :: Tikz -> Tikz

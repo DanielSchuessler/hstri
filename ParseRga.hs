@@ -1,35 +1,53 @@
-{-# LANGUAGE DeriveDataTypeable, NoMonomorphismRestriction, ViewPatterns, TemplateHaskell, Arrows #-}    
+{-# LANGUAGE DeriveDataTypeable, NoMonomorphismRestriction, ViewPatterns, Arrows #-}    
 {-# OPTIONS -Wall #-}
-module ParseRga(readRgaFile,test,RequiredAttributeNotPresentException(..)) where
+module ParseRga(readRgaFile,readRgaZip,RequiredAttributeNotPresentException(..)) where
 
 import Control.Monad
 import Data.Maybe
 import HomogenousTuples
 --import Text.XML.Light hiding(parseXMLDoc,strContent)
 import Triangulation
-import TupleTH
 import Text.XML.HXT.Core
 import Control.Exception
 import Data.Typeable
 import Data.List.Split
+import Data.ByteString.Lazy(readFile)
+import Prelude hiding(readFile)
+import Codec.Compression.GZip(decompress)
+import Data.ByteString.Lazy.UTF8(toString)
 
-readRgaFile :: String -> IO [Triangulation]
+
+readRgaZip :: FilePath -> IO [LabelledTriangulation]
+readRgaZip fn = do
+    inp <- readFile fn
+    runX (readString syscfg (toString . decompress $ inp) >>> parseRga)
+
+readRgaFile :: String -> IO [LabelledTriangulation]
 readRgaFile fn =
-    runX (readDocument opts fn >>> parseRga)
-  where
-    opts = [ withTrace 0 ]
+    runX (readDocument syscfg fn >>> parseRga)
+
+syscfg :: [SysConfig]
+syscfg = [ withTrace 0 ]
 
 
 parseRga
   :: ArrowXml cat =>
-     cat XmlTree Triangulation
-parseRga =      getChildren 
-            >>> getChildren
-            >>> hasName "packet" 
-            >>> hasAttrValue "type" (=="Triangulation")
-            >>> getChildren
+     cat XmlTree LabelledTriangulation
+parseRga =      deep (hasAttrValue "type" (=="Triangulation"))
+            >>> parseTriangulationPacket
+
+parseTriangulationPacket
+  :: ArrowXml t => t XmlTree LabelledTriangulation
+parseTriangulationPacket = proc x -> do
+    lbl <- getRequiredAttrValue "label" -< x
+    tr <- (     getChildren
             >>> hasName "tetrahedra"
-            >>> proc x -> do
+            >>> parseTetrahedraTag
+          ) -< x
+    returnA -< labelledTriangulation lbl tr
+        
+parseTetrahedraTag :: ArrowXml t => t XmlTree Triangulation
+parseTetrahedraTag = proc x -> do
                     n <- getRequiredAttrValue "ntet" -< x 
                     tets <- listA (arr (fmap read . words) <<< getText <<< getChildren 
                                     <<< isElem <<< getChildren) -< x
@@ -77,7 +95,7 @@ translateGluings ntet gluingRows =
                         (d,c) = divMod4 dc
 
                         vis :: Triple Int
-                        vis = $(deleteAtTuple 4) faceIx (0,1,2,3)
+                        vis = deleteAt4 faceIx (0,1,2,3)
 
                         vs,us :: Triple Vertex
                         vs = map3 toEnum vis
@@ -109,6 +127,6 @@ instance Exception RequiredAttributeNotPresentException
 
     
 
-test :: IO [Triangulation]
-test = readRgaFile "/h/dev/regina-things/sfsHakenExample2Triang.rga"
+-- test :: IO [Triangulation]
+-- test = readRgaFile "/h/dev/regina-things/sfsHakenExample2Triang.rga"
 

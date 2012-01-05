@@ -24,6 +24,7 @@ import ShortShow
 import QuickCheckUtil
 import Test.QuickCheck
 import Control.Applicative
+import THUtil
 
 
 type Plus4 n = S (S (S (S n)))
@@ -107,11 +108,11 @@ fromSimplices s _dim =
 
 
 
-fromTets :: Ord v => [Quadruple v] -> SimplicialComplex v
+fromTets :: (Pretty v, Ord v) => [Quadruple v] -> SimplicialComplex v
 fromTets = fromOrderedTets . fmap sort4
 
-fromOrderedTets :: forall v. Ord v => [Quadruple v] -> SimplicialComplex v
-fromOrderedTets xs = assert (all isOrdered4 xs) $ fromSimplices s (HomogenousDim 3)
+fromOrderedTets :: forall v. (Pretty v, Ord v) => [Quadruple v] -> SimplicialComplex v
+fromOrderedTets xs = $(assrt [|all isOrdered4 xs|] 'xs) $ fromSimplices s (HomogenousDim 3)
     where
 
         s :: SimpsFunction (OTuple v)

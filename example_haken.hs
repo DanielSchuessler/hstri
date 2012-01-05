@@ -38,7 +38,7 @@ main = do
 
     testBlender . 
         setCams cams .
-       defaultScene $ fromSPQWC spqwc
+       defaultScene $ fromSpqwc spqwc
     --   transformCoords rot $
 
 cams = [Cam (Vec3 (-0.22153916954994202) (-0.8245114088058472) (3.923537492752075))

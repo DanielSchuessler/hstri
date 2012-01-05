@@ -34,4 +34,5 @@ class Star a b c | a b -> c where
     -- | The faces of the second arg containing the first arg.
     star :: a -> b -> c
 
-
+class Dual a b | a -> b, b -> a where
+    dual :: a -> b

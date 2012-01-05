@@ -5,8 +5,9 @@ module ConcreteNormal.PreRenderable(
     module SimplicialPartialQuotient,
     module PreRenderable,
     module Simplicial.SimplicialComplex,
-    Corn,
-    standardCoordinatesToPreRenderable
+    Corn,corn,
+    normalSurfaceToPreRenderable,
+    CornerPosition,CornerCount,
 
     ) where
 
@@ -23,13 +24,15 @@ import TriangulationCxtObject
 import ShortShow
 import ConcreteNormal
 
+type CornerCount = Int
 
 -- | An interior point of an edge of the 'SimplicialPartialQuotient'
-data Corn v = Corn CornerPosition Int v v
+data Corn v = Corn CornerPosition CornerCount v v
+                    -- INVARIANT: Third field <= fourth field
     deriving(Eq,Ord,Show)
 
 instance ShortShow v => ShortShow (Corn v) where
-    shortShow (Corn _ _ v0 v1) = shortShow (v0,v1)
+    shortShow (Corn cp _ v0 v1) = shortShow (v0,v1) ++ show cp
 
 
 instance Pretty v => Pretty (Corn v) where
@@ -37,12 +40,18 @@ instance Pretty v => Pretty (Corn v) where
         prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty v0,anyPretty v1] 
 
 
-standardCoordinatesToPreRenderable
+corn :: (Ord v) => CornerPosition -> CornerCount -> v -> v -> Corn v
+corn pos n u0 u1 =
+                if u0 <= u1
+                   then Corn pos           n u0 u1
+                   else Corn (n - pos - 1) n u1 u0
+
+normalSurfaceToPreRenderable
   :: forall s v i. (Integral i, Ord v, Pretty i, ShortShow v, NormalSurface s i) =>
      SPQWithCoords v
      -> s
      -> PreRenderable (OTuple (Corn v))
-standardCoordinatesToPreRenderable (SPQWithCoords spq coords _) ns =  
+normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =  
     let
         tr = spq_tr spq
 
@@ -79,9 +88,7 @@ standardCoordinatesToPreRenderable (SPQWithCoords spq coords _) ns =
                 (u0,u1) = map2 (spq_map spq)
                                (vertices (iNormalCornerGetContainingEdge nonCanonicalINormalCorner))
             in
-                if u0 <= u1
-                   then Corn (fi pos)         (fi n) u0 u1
-                   else Corn (fi n - pos - 1) (fi n) u1 u0
+                corn pos (fromIntegral n) u0 u1
 
         cornerCoords (Corn pos n v0 v1) = 
                 interpolate (fi (1+pos) / fi (1+n)) (coords v0) (coords v1)

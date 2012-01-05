@@ -43,6 +43,7 @@ module Triangle(
     ITriangle,
     itriangleDualVertex,
     iVerticesOfTriangle,
+    iTriangleByVertices,
 
     -- * Ordered and indexed
     OITriangle,
@@ -510,3 +511,16 @@ instance Star IVertex (OneSkeleton ITriangle) (Pair IEdge) where
          (map2 (i ./) (star v (OneSkeleton t)))
 
 instance ShortShow Triangle where shortShow = show 
+
+
+iTriangleByVertices :: Triple IVertex -> ITriangle
+iTriangleByVertices = forgetVertexOrder . oiTriangleByVertices
+
+
+-- | = 'triangleDualVertex'
+instance Dual Triangle Vertex where
+    dual = triangleDualVertex
+    
+-- | = 'triangleDualVertex'
+instance Dual Vertex Triangle where
+    dual = triangleByDualVertex
