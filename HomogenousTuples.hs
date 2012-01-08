@@ -158,3 +158,6 @@ deleteAt3 = $(deleteAtTuple 3)
 
 deleteAt4 :: Num a => a -> (t, t, t, t) -> (t, t, t)
 deleteAt4 = $(deleteAtTuple 4)
+
+reverse3 :: (t2, t1, t) -> (t, t1, t2)
+reverse3 = $(reverseTuple 3)

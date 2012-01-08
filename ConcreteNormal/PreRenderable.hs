@@ -23,6 +23,7 @@ import SimplicialPartialQuotient
 import TriangulationCxtObject
 import ShortShow
 import ConcreteNormal
+import Data.Function
 
 type CornerCount = Int
 
@@ -108,3 +109,5 @@ normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =
                     }
 
 
+instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
+    gluingMap glu (Corn i n v1 v2) = (corn i n `on` gluingMap glu) v1 v2

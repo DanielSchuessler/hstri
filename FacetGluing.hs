@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
+{-# LANGUAGE StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
+{-# LANGUAGE UndecidableInstances #-}
 module FacetGluing where
 
 import AbstractTetrahedron
@@ -13,6 +14,10 @@ import QuickCheckUtil
 import Test.QuickCheck
 import THUtil
 import Test.QuickCheck.All
+import PrettyUtil
+import Either1
+import Simplicial.SimplicialComplex
+import PreRenderable.TriangleLabel
 
 type Gluing = (ITriangle,OITriangle)
 
@@ -128,14 +133,45 @@ isGluingNormalized (tri,otri) =
          LT -> True
          GT -> False
 
-normalizeGluing :: Gluing -> Gluing
-normalizeGluing gl = if isGluingNormalized gl then gl else flipGluing gl
+normalizeGluing :: Gluing -> NormalizedGluing
+normalizeGluing gl = uncurry UnsafeNormalizedGluing (if isGluingNormalized gl then gl else flipGluing gl)
 
 gluingGen :: Gen Gluing
 gluingGen = arbitrary `suchThat` \gl -> fst gl /= forgetVertexOrder (snd gl)
 
 prop_normalizeGluing :: Property
-prop_normalizeGluing = forAll gluingGen (\gl -> isGluingNormalized (normalizeGluing gl))
+prop_normalizeGluing = forAll gluingGen (isGluingNormalized . ngToGluing . normalizeGluing)
 
 qc_FacetGluing :: IO Bool
 qc_FacetGluing = $quickCheckAll
+
+
+-- | INVARIANT: @ngDom < 'forgetVertexOrder' ngCod@
+data NormalizedGluing = UnsafeNormalizedGluing {
+    ngDom :: ITriangle,
+    ngCod :: OITriangle
+}
+    deriving Show
+
+instance Pretty NormalizedGluing where
+    prettyPrec = prettyPrecFromShow
+
+ngToGluing :: NormalizedGluing -> (ITriangle, OITriangle)
+ngToGluing ng = (ngDom ng, ngCod ng)
+
+ngMap = gluingMap . ngToGluing 
+
+instance (GluingMappable (a n), GluingMappable (b n)) => GluingMappable (Either1 a b n) where
+    gluingMap = bimap1 <$> gluingMap <*> gluingMap
+
+
+deriving instance (GluingMappable (OTuple' v n)) => GluingMappable (OTuple v n)
+
+instance (GluingMappable v) => GluingMappable (SimplicialTriangleLabelAssoc v) where
+    gluingMap gl stla =
+        stla {
+            stla_left = f (stla_left stla),
+            stla_right = f (stla_right stla),
+            stla_top = f (stla_top stla)
+        }
+        where f = gluingMap gl

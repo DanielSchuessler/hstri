@@ -62,7 +62,7 @@ module TriangulationCxtObject(
 
     -- * Normal arcs
     TNormalArc,
-    InnNA(..),
+    InnNA(..),innNA_fst,innNA_snd,
     -- ** Construction
     MakeTNormalArc(..),
     boundaryNormalArcs,
@@ -94,6 +94,7 @@ import Collections
 import Control.Arrow((&&&))
 import Control.Exception
 import Control.Monad.Reader
+import Data.EdgeLabelledTree
 import Data.Function
 import Data.Functor
 import Data.Graph.Inductive.Graph hiding(edges)
@@ -114,6 +115,7 @@ import Test.QuickCheck.All
 import Triangulation
 import Triangulation.CanonOrdered
 import UPair
+import THUtil
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -286,14 +288,20 @@ instance MakeTNormalCorner TEdge where
              
     
 
-instance Vertices Triangulation [TVertex] where
+instance Vertices Triangulation where
+    type Verts Triangulation = [TVertex]
+
     vertices t = fmap (UnsafeMakeT t . canonicalRep) (eqvClasses (vertexEqv t))
 
-instance Edges Triangulation [TEdge] where
+instance Edges Triangulation where
+    type Eds Triangulation = [TEdge] 
+
     edges t = fmap (UnsafeMakeT t . canonicalRep) 
                 (eqvClasses (iEdgeEqv t))
 
-instance Triangles Triangulation [TTriangle] where
+instance Triangles Triangulation where
+    type Tris Triangulation = [TTriangle] 
+
     triangles t = nub' (pMap t <$> tITriangles t)
 
 instance NormalCorners Triangulation [TNormalCorner] where
@@ -469,13 +477,16 @@ eqvTriangles t x = x : case lookup x (tGlueMap_ t) of
 tVerticesOfIEdge :: Triangulation -> IEdge -> Pair TVertex
 tVerticesOfIEdge t rep = map2 (pMap t) (vertices rep)
 
-instance Vertices (TEdge) (Pair TVertex) where 
+instance Vertices TEdge where 
+    type Verts TEdge = Pair TVertex
     vertices e = tVerticesOfIEdge (getTriangulation e) (unT e)
 
-instance Edges (TTriangle) (Triple (TEdge)) where 
+instance Edges TTriangle  where 
+    type Eds TTriangle = Triple (TEdge)
     edges (UnsafeMakeT t rep) = map3 (pMap t) (edges rep)
 
-instance Triangles (Triangulation, TIndex) (Quadruple (TTriangle)) where
+instance Triangles (Triangulation, TIndex)  where
+    type Tris (Triangulation,TIndex) = Quadruple (TTriangle)
     triangles (t,i) = map4 (pMap t) (triangles i)
 
 
@@ -616,6 +627,21 @@ dfsVertexLink v = dfs nt0 (adjacentNormalTris (getTriangulation v))
         nt0 = iNormalTri (unT v)
         
 
+prop_dfsVertexLink :: Triangulation -> Property
+prop_dfsVertexLink tr = forAllElements (vertices tr)
+    (\v -> case dfsVertexLink v of
+                elt -> $(ppTestCase 'elt) 
+                
+                        ((noDupes . eltNodes) elt
+                         .&.
+                         setEq (eltNodes elt) (vertexLinkingSurfaceTris v)
+                         .&.
+                         isSubset 
+                            (map (uncurry innNAFromPreimage) . eltEdges $ elt) 
+                            (innNAsAroundVertex $ v)
+                        
+                        ))
+
 itrianglesContainingEdge :: TEdge -> [ITriangle]
 itrianglesContainingEdge =
     concatMap (\e -> toList2 (star (forgetVertexOrder e) (TwoSkeleton AbsTet))) . 
@@ -625,9 +651,13 @@ itrianglesContainingEdge =
 instance NormalTris TVertex [INormalTri] where
     normalTris = vertexLinkingSurfaceTris
 
+iNormalArcsAroundTVertex :: TVertex -> [INormalArc]
+iNormalArcsAroundTVertex =
+ concatMap (asList . iNormalArcsAroundVertex) . preimageList 
+
 tNormalArcsAroundVertex :: TVertex -> [TNormalArc]
 tNormalArcsAroundVertex v = 
-    nub' . fmap p . concatMap (asList . iNormalArcsAroundVertex) . preimageList $ v
+    nub' . fmap p . iNormalArcsAroundTVertex $ v
   where
     p = pMap (getTriangulation v)
 
@@ -641,8 +671,19 @@ normalTrisContainingInnNA :: InnNA -> Pair INormalTri
 normalTrisContainingInnNA (InnNA ina1 ina2) = 
                         map2 iNormalTriByNormalArc (ina1, ina2)
 
-data InnNA = InnNA { innNA_fst, innNA_snd :: INormalArc }
-    deriving Show
+data InnNA = InnNA INormalArc INormalArc 
+    deriving (Eq,Ord,Show)
+
+innNA_fst :: InnNA -> INormalArc
+innNA_fst (InnNA x _) = x
+
+innNA_snd :: InnNA -> INormalArc
+innNA_snd (InnNA _ x) = x
+
+innNAFromPreimage :: INormalArc -> INormalArc -> InnNA
+innNAFromPreimage ina1 ina2 = 
+    $(assrt [|ina1/=ina2|] ['ina1,'ina2])
+    (uncurry InnNA (sort2 (ina1,ina2)))
 
 innNANU :: Triangulation -> Numbering InnNA
 innNANU = join (prodNu innNA_fst innNA_snd InnNA) . tINormalArcNu
@@ -653,7 +694,7 @@ toInnNA tna =
     case normalArcPreimage tna of
                 BoundaryNormalArc _ -> Nothing
                 InnerNormalArc ina1 ina2 ->
-                        Just (InnNA ina1 ina2)
+                        Just (innNAFromPreimage ina1 ina2)
                                     
 
 innNAs :: Triangulation -> [InnNA]

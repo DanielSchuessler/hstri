@@ -5,7 +5,7 @@ import Graphics.Rendering.OpenGL
 import Interactive.Utils
 import Control.Monad
 import Data.Vect.Double.OpenGL
-import Command
+import Interactive.Command
 import Graphics.UI.GLFW
 
 

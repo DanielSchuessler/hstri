@@ -53,7 +53,7 @@ spqwc_oneTet = geometrifySingleTetTriang tr_oneTet show
 
 spqwc_l31 :: SPQWithCoords TVertex
 spqwc_l31 = geometrifyTwoTetTriang tr_l31 (0./tABC)
-                (\(viewI -> I i tri,_) ->
+                (\(ngDom -> (viewI -> I i tri)) ->
                     assert (i==0) $
                         case tri of
                              _ | tri == tABD -> "F"
@@ -77,9 +77,24 @@ oneTetCam =
 l41 :: SPQWithCoords Vertex
 l41 = geometrifySingleTetTriang 
         (mkTriangulation 1 [(0./tBCD,0./oCDA),(0./tABD,0./oBCA)])
-        (\gl@(forgetTIndex -> t,_) -> 
+        (\gl@(ngDom -> forgetTIndex -> t) -> 
             case () of
-                    _ | t==tABC -> "F"
-                      | t==tACD -> "G"
+                    _ | t==tBCD -> "F"
+                      | t==tABD -> "G"
                       | otherwise -> error ("l41 "++ $(showExps 'gl)) 
                       )
+
+
+
+torus3 :: SPQWithCoords EdgeNeighborhoodVertex
+torus3 = makeEdgeNeighborhood tr oiedge show
+    where
+        oiedge = 0 ./ oedge (vA,vB) :: OIEdge
+
+        -- modified (oriented?) version of tr_184'
+        tr = mkTriangulation 6 [(0 ./ tBCD, 1 ./ oCBD), (0 ./ tACD, 2 ./ oCDB), (0 ./ tABD, 3 ./ oDCB), (0 ./ tABC, 4 ./ oCDB), (1 ./ tBCD, 0 ./ oCBD), (1 ./ tACD, 2 ./ oDCA), (1 ./ tABD, 3 ./ oCDA), (1 ./ tABC, 5 ./ oCDB), (2 ./ tBCD, 0 ./ oDAC), (2 ./ tACD, 1 ./ oDCA), (2 ./ tABD, 4 ./ oCDA), (2 ./ tABC, 5 ./ oDCA), (3 ./ tBCD, 0 ./ oDBA), (3 ./ tACD, 1 ./ oDAB), (3 ./ tABD, 5 ./ oBCA), (3 ./ tABC, 4 ./ oCBA), (4 ./ tBCD, 0 ./ oCAB), (4 ./ tACD, 2 ./ oDAB), (4 ./ tABD, 5 ./ oADB), (4 ./ tABC, 3 ./ oCBA), (5 ./ tBCD, 1 ./ oCAB), (5 ./ tACD, 2 ./ oCBA), (5 ./ tABD, 4 ./ oADB), (5 ./ tABC, 3 ./ oDAB)]
+
+-- | Equals tr_184 in ClosedOrCensus6
+tr_184' :: LabelledTriangulation
+tr_184' = ("T x S1 : #1", mkTriangulation 6 [(0 ./ tBCD, 1 ./ oCBD), (0 ./ tACD, 2 ./ oCDB), (0 ./ tABD, 3 ./ oCDB), (0 ./ tABC, 4 ./ oDCB), (1 ./ tBCD, 0 ./ oCBD), (1 ./ tACD, 2 ./ oDCA), (1 ./ tABD, 3 ./ oDCA), (1 ./ tABC, 5 ./ oDCB), (2 ./ tBCD, 0 ./ oDAC), (2 ./ tACD, 1 ./ oDCA), (2 ./ tABD, 4 ./ oDCA), (2 ./ tABC, 5 ./ oCDA), (3 ./ tBCD, 0 ./ oDAB), (3 ./ tACD, 1 ./ oDBA), (3 ./ tABD, 4 ./ oDBA), (3 ./ tABC, 5 ./ oBDA), (4 ./ tBCD, 0 ./ oCBA), (4 ./ tACD, 2 ./ oDBA), (4 ./ tABD, 3 ./ oDBA), (4 ./ tABC, 5 ./ oACB), (5 ./ tBCD, 1 ./ oCBA), (5 ./ tACD, 2 ./ oCAB), (5 ./ tABD, 3 ./ oCAB), (5 ./ tABC, 4 ./ oACB)])
+

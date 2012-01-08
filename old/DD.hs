@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns, NoMonomorphismRestriction, RecordWildCards, ViewPatterns #-}
-module DD where
+module VerboseDD where
 import Control.Exception
 import Test.QuickCheck(Arbitrary(..),Gen)
 import Control.Applicative

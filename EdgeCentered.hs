@@ -125,7 +125,7 @@ makeEdgeNeighborhoodMap tr oiEdge =
 makeEdgeNeighborhood
   :: Triangulation
      -> OIEdge
-     -> (Gluing -> String)
+     -> GluingLabeller
      -> SPQWithCoords EdgeNeighborhoodVertex
 makeEdgeNeighborhood tr oiEdge gluingLabeller =
     let

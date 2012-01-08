@@ -31,8 +31,9 @@ module PrettyUtil(
     pad,
     prettyPrecFromShow,
     PrettyMatrix(..),
+    ZeroPrinting(..),
     -- * Class
-    Pretty(..)
+    Pretty(..),
     
     ) 
 
@@ -106,20 +107,39 @@ pad l x = replicate (l - length x) ' ' ++ x
 class PrettyScalar a where
     prettyScalar :: a -> String
 
-showRational :: Integral a => Ratio a -> [Char]
-showRational 0 = "0"
-showRational x = 
-        let 
-            n = numerator x
-            d = denominator x 
-        in
-            if d==1 
-               then show n
-               else show n ++ "/" ++ show d
+
+data ZeroPrinting = ShowZeros | BlankZeros
+
+showRational :: Integral a => ZeroPrinting -> Ratio a -> [Char]
+showRational ShowZeros 0 = "0"
+showRational BlankZeros 0 = ""
+showRational _ x = if x < 0 then "-"++showPositiveRational (-x) else showPositiveRational x
+
+
+showPositiveRational :: Integral a => Ratio a -> String
+showPositiveRational x =
+                case (numerator x,denominator x) of
+                     (1,2) -> "½"
+                     (1,3) -> "⅓"
+                     (2,3) -> "⅔"
+                     (1,4) -> "¼"
+                     (3,4) -> "¾"
+                     (1,5) -> "⅕"
+                     (2,5) -> "⅖"
+                     (3,5) -> "⅗"
+                     (4,5) -> "⅘"
+                     (1,6) -> "⅙"
+                     (5,6) -> "⅚"
+                     (1,8) -> "⅛"
+                     (3,8) -> "⅜"
+                     (5,8) -> "⅝"
+                     (n,1) -> show n
+                     (1,d) -> "⅟"++show d
+                     (n,d) -> show n ++ "/" ++ show d
                                 
 
 instance PrettyScalar Rational where
-    prettyScalar = showRational
+    prettyScalar = showRational ShowZeros
 
 instance PrettyScalar Integer where
     prettyScalar = show
@@ -326,3 +346,4 @@ htupled = hencloseSep lbrace rbrace (text ", ")
 
 prettyPrecFromShow :: Show a => Int -> a -> Doc
 prettyPrecFromShow = (fmap . fmap) (string . ($"")) showsPrec
+

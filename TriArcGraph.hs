@@ -49,6 +49,8 @@ ta_toDot gr mbQuadVector = graphToDot params gr
                             Text.unwords [
 --                              "\\input{/usr/local/share/tikztri.tex}"
                               "\\usetikzlibrary{decorations.markings}" 
+                            , "\\usepackage[a2paper]{geometry}"
+
                              ] 
                              ))
                             
@@ -92,8 +94,6 @@ ta_toDot gr mbQuadVector = graphToDot params gr
                                 c = coeffArc ina2 ^-^ coeffArc ina1
                             in
                                 Len 1.3 
-                                : d2t (LblStyle "fill=gray!30,circle")
-                                : mathLabel c 
                                 :
                                 if c==zeroV
                                    then
@@ -102,7 +102,9 @@ ta_toDot gr mbQuadVector = graphToDot params gr
                                     ]
                                    else
                                     [ 
-                                        style markings
+                                      style markings
+                                    , d2t (LblStyle "fill=gray!30,circle")
+                                    , mathLabel c 
                                     ]
 
                 

@@ -1,6 +1,7 @@
-{-# LANGUAGE UndecidableInstances, FlexibleInstances, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric, UndecidableInstances, FlexibleInstances, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 {-# OPTIONS -Wall #-}
 module TIndex where
+
 import Data.Word
 import Language.Haskell.TH
 import Util
@@ -9,6 +10,9 @@ import Control.Applicative
 import PrettyUtil -- Pretty Word orphan instance
 import Quote
 import ShortShow
+import Data.Binary
+import Data.Binary.Derive
+import GHC.Generics(Generic)
 
 
 
@@ -16,7 +20,7 @@ import ShortShow
 
 -- | Tetrahedron index
 newtype TIndex = TIndex Word
-    deriving(Eq,Ord,Pretty,Enum,Num,Real,Integral)
+    deriving(Eq,Ord,Pretty,Enum,Num,Real,Integral,Binary)
 
 tindex ::  Word -> TIndex
 tindex = TIndex
@@ -31,7 +35,11 @@ tindex = TIndex
 
 -- | Thing with a tetrahedron index attached to it
 data I a = I TIndex a 
-    deriving(Eq,Ord)
+    deriving(Eq,Ord,Generic)
+
+instance Binary a => Binary (I a) where
+    put = derivePut
+    get = deriveGet
 
 
 -- | Instances of this class essentially say that @ia@ is isomorphic to @('TIndex',a)@ (but the representation is left open to for optimization)
@@ -43,13 +51,6 @@ class HasTIndex ia a | ia -> a, a -> ia where
 
 infix 9 ./
 
-
-data AbsTet = AbsTet
-    deriving(Eq,Ord,Show)
-
-instance HasTIndex TIndex AbsTet where
-    viewI = flip I AbsTet 
-    (./) = const
 
 getTIndex ::  HasTIndex a a' => a -> TIndex
 getTIndex (viewI -> I i _) = i

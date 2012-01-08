@@ -21,6 +21,9 @@ module HsTri(
     module Simplicial.DeltaSet,
     module Data.Vect.Double.Base,
     module THUtil,
+    module VerboseDD,
+    module EqvGraphs,
+    module QuadCoordinates
 
     ) where
 
@@ -45,3 +48,6 @@ import Simplicial.DeltaSet
 import StandardCoordinates
 import THUtil
 import TriangulationCxtObject
+import VerboseDD
+import EqvGraphs
+import QuadCoordinates

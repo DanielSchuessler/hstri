@@ -27,7 +27,7 @@ import Simplicial.AnySimplex
 import THUtil
 import PrettyUtil(Pretty)
 
-#define CONSTRAINTS(a) Pretty (Vert a), ShowN a, Pretty (Arc a)
+#define CONSTRAINTS(a) Pretty (Vert a), ShowN a, Pretty (Arc a), Pretty (Tri a)
 
 
 sceneVar,worldVar,camVar,objVar,lightVar :: Python ()
@@ -110,8 +110,6 @@ toBlender Scene{
         scene_blenderable = ba@Blenderable{..},
         scene_cams} = result
     where
-        deltaSet = ba_ds
-
         result = do
             ln "from bpy import *"
             ln "from pprint import pprint"
@@ -162,9 +160,9 @@ toBlender Scene{
                 methodCallExpr1 bpy_props "StringProperty" (str "Simplex label")
 
 
-            mapM_ (handleV ba grp0) (vertices deltaSet)
-            mapM_ (handleE ba grp1) (edges deltaSet)
-            mapM_ (handleT ba grp2 grpTriLabels) (triangles deltaSet)
+            mapM_ (handleV ba grp0) (vertices ba_ds)
+            mapM_ (handleE ba grp1) (edges ba_ds)
+            mapM_ (handleT ba grp2 grpTriLabels) (triangles ba_ds)
 
             --ln "ops.view3d.viewnumpad(type='CAMERA')"
 
@@ -210,7 +208,7 @@ handleE ba grp e = handleSimplex
         handleErr err = error (err++"\n"++"In handleE\n"++ $(showExps ['ba,'e]))
 
 
-handleT :: Blenderable a -> BlenderGroup -> BlenderGroup -> Tri a -> Python ()
+handleT :: Pretty (Tri a) => Blenderable a -> BlenderGroup -> BlenderGroup -> Tri a -> Python ()
 handleT ba grp grpTriLabels t = when (ba_visible ba (AnySimplex t)) $ do
             blenderTriangle cv0 cv1 cv2 
             objVar <.> "show_transparent" .= True
@@ -225,32 +223,69 @@ handleT ba grp grpTriLabels t = when (ba_visible ba (AnySimplex t)) $ do
         FaceInfo{..} = ba_faceInfo ba (AnySimplex t)
 
         
-handleTriLabel :: Blenderable a -> BlenderGroup -> Tri a -> Python ()
+handleTriLabel :: (Pretty (Tri a)) => Blenderable a -> BlenderGroup -> Tri a -> Python ()
 handleTriLabel ba grpTriLabels t =
             case ba_triangleLabel ba t of
                 Nothing -> return ()
 
-                Just (TriangleLabel lblstr g upDisplacementFactor) -> 
-                    let (leftpoint,rightpoint,toppoint) = cvs *. g
-                        rightunit = normalize (rightpoint &- leftpoint)
-                        basepoint = interpolate 0.5 leftpoint rightpoint
-                        upvect = let up0 = (toppoint &- basepoint) 
-                                 in up0 &- (dotprod rightunit up0) *& rightunit
-                        height = norm upvect
-                        upunit = upvect &* recip height 
-                        m = 
-                            scalingUniformProj4 (0.4 * height)
+                Just tl -> 
+                    let
+                        text = tl_text tl
+                        perm = tl_transform tl
+
+                    in let 
+                        (leftpoint,rightpoint,toppoint) = cvs *. perm
+
+                        rightvect = rightpoint &- leftpoint
+                        rightunit = normalize rightvect
+
+                        upvect = let up0 = (toppoint &- leftpoint) 
+                                 in up0 &- (dotprod rightunit up0 *& rightunit)
+
+                        upunit = normalize upvect
+
+                    in let
+                        
+                        -- | Horizontal center point at the height of the text baseline
+                        textCenterBase =
+                                let
+                                    baryc = (leftpoint &+ rightpoint &+ toppoint)&/3
+                                    barybase = baryc &+ 
+                                                (dotprod (leftpoint &- baryc) upunit *& upunit) 
+                                in
+                                    barybase 
+                                        &+ tl_up tl *& upvect
+                                        &+ tl_rightdispl tl *& rightvect 
+                                    
+
+
+
+                        thescale = 
+                            (
+                                        let
+                                            r = norm rightvect
+                                        in
+                                            1.2 * incircleRadius r 
+                                                        (norm (toppoint-leftpoint))
+                                                        (norm (toppoint-rightpoint))
+                                    )
+                                
+                                * tl_scale tl
+
+                        m = -- $(traceExps "tri" ['t,'text,'textCenterBase,'thescale]) $ 
+
+                            scalingUniformProj4 thescale 
                             .*.
                             safeOrthogonal (Mat3 rightunit upunit (crossprod rightunit upunit)) 
                             .*.
-                            translation (basepoint &+ upDisplacementFactor *& upvect)
+                            translation textCenterBase
 
 
 
                     in do
-                        newTextObj lblstr
+                        newTextObj text
                         objVar <.> matrix_basis .= m
-                        objCommon grpTriLabels (lblstr ++ " on "++show g ++" "++faceName) triLabelMat 
+                        objCommon grpTriLabels (text ++ " on "++show perm++" "++faceName) triLabelMat 
 
 
     where

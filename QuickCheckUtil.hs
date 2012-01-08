@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, NoMonomorphismRestriction #-}
+{-# LANGUAGE FlexibleContexts, ViewPatterns, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module QuickCheckUtil where
 
@@ -8,6 +8,7 @@ import qualified Data.Set as S
 import Data.Graph.Inductive.Tree
 import Data.Graph.Inductive.Graph
 import qualified Data.Vector as V
+import Element
 
 cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
 cart = liftM2 (,)
@@ -52,6 +53,12 @@ setEq x y =
     printTestCase (unlines ["setEq:","=== FIRST SET ===",show x,"=== SECOND SET ===",show y])
     (S.fromList x == S.fromList y)
 
+
+isSubset :: (Show a, Ord a) => [a] -> [a] -> Property
+isSubset x y = 
+    printTestCase (unlines ["isSubset:","=== FIRST SET ===",show x,"=== SECOND SET ===",show y])
+    (S.fromList x `S.isSubsetOf` S.fromList y)
+
 instance (Arbitrary a, Arbitrary b) => Arbitrary (Gr a b) where
     arbitrary = do
         ns <- (S.toList . S.fromList) `fmap` arbitrary :: Gen [Node]
@@ -71,3 +78,13 @@ conjoin' [] = label "conjoin' []" True
 conjoin' ((V.fromList . fmap property) -> ps) =
       (ps V.!) =<< choose (0,V.length ps-1) 
         
+
+noDupes
+  :: (Ord (Element xs), Show (Element xs), AsList xs) =>
+     xs -> Property
+noDupes (asList -> xs) = 
+    printTestCase ("Checking duplicate-freeness of "++ show xs) $
+
+    S.size (S.fromList xs) .=. length xs 
+
+

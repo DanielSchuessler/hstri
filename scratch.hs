@@ -1,24 +1,51 @@
-import MathUtil
-import Test.QuickCheck
-import System.Random
-import TriArcGraph
-import ClosedOrCensus6
-import DotUtil
-import TriangulationCxtObject
-import EqvGraphs
-import DD
-import PrettyUtil
-import Control.Monad
+import HsTri
 import qualified Data.Vector as V
+import DotUtil
+import TriArcGraph
+import EdgeCentered
+import Data.Char
 
-go i = do
-        --viewDot (vertexEqvGraph tr s)
-        putStrLn ("\n"++lbl)
+incom :: StandardCoordinates Integer
+incom = 
+      stc_fromDenseList tr
+    . map (read . return :: Char -> Integer)
+    . filter isDigit
+    $ "0010; 000||0000; 100||0001; 000||1000; 000||0000; 100||0100; 000"
+
+
+viewIncom =
+                testBlender 
+                (defaultScene
+                    (fromSpqwcAndIntegerNormalSurface spqwc incom))
+
+main = do
         let ddRes = dd tr
-        pr . indent 2 . ppDDRes $ ddRes 
+        pr . ppDDRes $ ddRes 
         V.forM_ (ddSolutions' ddRes)
-            (\sol -> viewDot (ta tr (Just sol)))
+            --(\sol -> viewDot (ta tr (Just sol)))
+            (\w -> 
+               let
+                    ns = canonExtDbg tr (quad_fromVector tr w)
+                in
+                testBlender 
+                (defaultScene
+                    (fromSpqwcAndIntegerNormalSurface spqwc ns)))
+
+        putStrLn "ok"
+            
 
 
+
+(_,tr) = tr_184'
+
+spqwc = makeEdgeNeighborhood tr oiedge glab
     where
-        (lbl,tr) = closedOrCensus6 !! i
+        oiedge = 0 ./ oedge (vA,vB) :: OIEdge
+
+        glab ng =
+                  (show . getTIndex . ngDom) ng
+                  ++
+                  (show . getTIndex . ngCod) ng
+                 
+
+

@@ -9,7 +9,14 @@ module Simplicial.AnySimplex(
     module TypeLevel.TF.Nat.Small,
 
     ShowN(..),showN,showsPrecN,
-    OrdN(..),compareN
+    OrdN(..),compareN,
+
+    foldAnySimplex3,
+
+
+    Vert,Arc,Tri,Tet
+
+
 
  ) where
 
@@ -19,6 +26,7 @@ import TypeLevel.TF.Nat.Small
 import Data.Proxy
 import PrettyUtil
 import Either1
+import Simplicial.DeltaSet3
 
 data AnySimplex a = forall n. Nat n => AnySimplex (a n)
 
@@ -96,3 +104,20 @@ instance (OrdN s1, OrdN s2) => OrdN (Either1 s1 s2) where
             (getOrd (prox (undefined :: s2 n))
                 r)
 
+
+
+
+
+-- | Does case analysis on the dimension of the simplex: 0,1,2 or greater
+foldAnySimplex3 :: 
+        (a N0 -> r)
+    ->  (a N1 -> r)
+    ->  (a N2 -> r)
+    ->  (forall n. Nat n => n -> a (S (S (S n))) -> r)
+    ->  (AnySimplex a -> r)
+foldAnySimplex3 k0 k1 k2 k3 = foldAnySimplexWithNat
+    (\n x -> caseNat3 n 
+                (k0 x) 
+                (k1 x)
+                (k2 x) 
+                (\n' -> k3 n' x))

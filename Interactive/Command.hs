@@ -1,4 +1,4 @@
-module Command where
+module Interactive.Command where
 import Graphics.UI.GLFW
 import Data.BitSet
 import Data.List(foldl')

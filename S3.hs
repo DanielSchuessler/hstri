@@ -6,20 +6,21 @@ module S3(module Group, S3(..),allS3,sort3WithPermutation,
     qc_S3
     ) where
 
+import Control.Monad
+import Data.Binary
 import Data.Hashable
+import Data.Maybe
 import Data.Monoid
+import Data.Proxy
+import Group
 import Language.Haskell.TH.Syntax
+import PrettyUtil
+import QuickCheckUtil
+import Quote
+import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
-import PrettyUtil
 import Util
-import Group
-import THUtil
-import Quote
-import Data.Maybe
-import QuickCheckUtil
-import Data.Proxy
-import Control.Monad
 
 -- | Symmetric group / permutation group on 3 elements
 data S3 = S3abc | S3bca | S3cab | S3acb | S3bac | S3cba deriving(Read,Show,Eq,Enum,Bounded,Ord)
@@ -250,3 +251,7 @@ prop_sort3WithPermutation (xs :: (Int,Int,Int)) =
             x1 <= x2 .&.
             xs .=. xs' *. g
 
+
+instance Binary S3 where
+    get = getEnumWord8
+    put = putEnumWord8

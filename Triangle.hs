@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TypeFamilies,BangPatterns,MultiParamTypeClasses, StandaloneDeriving, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, FlexibleContexts, TypeFamilies,BangPatterns,MultiParamTypeClasses, StandaloneDeriving, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Triangle(
     module Edge,
@@ -44,6 +44,7 @@ module Triangle(
     itriangleDualVertex,
     iVerticesOfTriangle,
     iTriangleByVertices,
+    itriangleByDualVertex,
 
     -- * Ordered and indexed
     OITriangle,
@@ -60,26 +61,30 @@ module Triangle(
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Data.Binary
+import Data.Binary.Derive
 import Data.List as List
+import Data.Maybe
+import Data.Proxy
 import Edge
 import Element
+import GHC.Generics(Generic)
 import HomogenousTuples
 import Language.Haskell.TH.Syntax as Syntax
 import OrderableFace
-import QuickCheckUtil
 import PrettyUtil
+import QuickCheckUtil
 import Quote
 import S3
-import Test.QuickCheck
-import Util
-import Test.QuickCheck.All
 import ShortShow
-import Data.Proxy
-import Data.Maybe
+import Test.QuickCheck
+import Test.QuickCheck.All
+import Util
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
 newtype Triangle = Triangle { triangleDualVertex :: Vertex }
+    deriving Binary
 
 triangleByDualVertex :: Vertex -> Triangle
 triangleByDualVertex = Triangle
@@ -88,6 +93,8 @@ instance Show Triangle where
     show (verticesOfTriangle -> (v0,v1,v2)) = show v0 ++ show v1 ++ show v2
 
 deriving instance Eq Triangle 
+
+-- | By 'triangleDualVertex' (= descending lexicographic by 'verticesOfTriangle')
 deriving instance Ord Triangle 
 
 instance Enum Triangle where
@@ -198,7 +205,11 @@ instance Quote Triangle where
 
 -- | A 'Triangle' with a tetrahedron index attached to it
 data ITriangle = ITriangle {-# UNPACK #-} !TIndex !Triangle
-    deriving (Eq,Ord)
+    deriving (Eq,Ord,Generic)
+
+instance Binary ITriangle where
+    put = derivePut
+    get = deriveGet
 
 instance HasTIndex ITriangle Triangle where
     viewI (ITriangle i x) = I i x
@@ -214,8 +225,13 @@ instance Pretty ITriangle where pretty = pretty . viewI
 instance ShortShow ITriangle where shortShow = shortShow . viewI
 
 -- | Triangle of an abstract tetrahedron, with ordered vertices
-data OTriangle = OTriangle !Triangle !S3 deriving(Eq,Ord)
+data OTriangle = OTriangle !Triangle !S3 
+    deriving(Eq,Ord,Generic)
+    
 
+instance Binary OTriangle where
+    put = derivePut
+    get = deriveGet
 
 class MakeOTriangle a where
     otriangle :: a -> OTriangle
@@ -240,7 +256,6 @@ trivialHasTIndexInstance [t|Pair OTriangle|]
 
 instance OrderableFace ITriangle OITriangle where
     type VertexSymGroup ITriangle = S3
-    type VertexTuple ITriangle = Triple IVertex
     unpackOrderedFace = defaultUnpackOrderedFaceI
     packOrderedFace = defaultPackOrderedFaceI
 
@@ -253,7 +268,6 @@ instance RightAction S3 OITriangle where (*.) = defaultRightActionForOrderedFace
 
 instance OrderableFace Triangle OTriangle where
     type VertexSymGroup Triangle = S3
-    type VertexTuple Triangle = Triple Vertex
     unpackOrderedFace (OTriangle x g) = (x,g)
     packOrderedFace = OTriangle
 
@@ -267,7 +281,8 @@ instance RightAction S3 OTriangle where
 
 
 -- | Ordered edges contained in a given triangle, in order
-instance Edges OTriangle (Triple OEdge) where
+instance Edges OTriangle where
+    type Eds OTriangle = Triple OEdge
     edges = oEdgesOfTriangle
     
 
@@ -285,12 +300,9 @@ oTriangleByVertices vs =
 trianglesContainingEdge :: Edge -> (Pair Triangle)
 trianglesContainingEdge e = fromList2 ( filter4 (e `isEdgeOfTriangle`) allTriangles' ) 
 
--- | Triangles containing a given edge
-instance Star Edge (TwoSkeleton AbsTet) (Pair Triangle) where
-    star = const . trianglesContainingEdge 
 
 gedgesOfTriangle
-  :: Vertices t (Triple v) => ((v, v) -> e) -> t -> Triple e
+  :: (Vertices t, Verts t ~ Triple v) => ((v, v) -> e) -> t -> Triple e
 gedgesOfTriangle f t = map3 f ((v0,v1),(v1,v2),(v2,v0)) 
         where
             (v0,v1,v2) = vertices t 
@@ -298,26 +310,29 @@ gedgesOfTriangle f t = map3 f ((v0,v1),(v1,v2),(v2,v0))
 
 -- | Edges contained in a given triangle
 edgesOfTriangle
-  :: (Vertices t (Triple v), MakeEdge (v, v)) => t -> Triple Edge
+  :: (Vertices t, Verts t ~ Triple v, MakeEdge (v, v)) => t -> Triple Edge
 edgesOfTriangle = gedgesOfTriangle edge
 
 -- | Ordered edges contained in a given triangle (result is a cycle)
-oEdgesOfTriangle :: Vertices t (Triple Vertex) => t -> Triple OEdge
+oEdgesOfTriangle :: (Vertices t, Verts t ~ Triple Vertex) => t -> Triple OEdge
 oEdgesOfTriangle = gedgesOfTriangle verticesToOEdge 
 
 
 -- | = 'edgesOfTriangle'
-instance Edges Triangle (Triple Edge) where
+instance Edges Triangle where
+    type Eds Triangle = Triple Edge
     edges = edgesOfTriangle 
 
 -- | = 'verticesOfTriangle'
-instance Vertices Triangle (Triple Vertex) where
+instance Vertices Triangle where
+    type Verts Triangle = Triple Vertex
     vertices = verticesOfTriangle
 
 -- | Vertices contained in a given ordered facet (in order) 
 --
 -- > vertices (OTriangle g x) = g .* vertices x 
-instance Vertices OTriangle (Triple Vertex) where
+instance Vertices OTriangle where
+    type Verts OTriangle = Triple Vertex
     vertices = defaultVerticesForOrderedFace
 
 instance Show OTriangle where
@@ -337,24 +352,31 @@ instance Bounded OTriangle where
 
 
 iVerticesOfTriangle
-  :: (Vertices a (Triple b), HasTIndex ia a, HasTIndex ib b) =>
+  :: (Vertices a, Verts a ~ Triple b, HasTIndex ia a, HasTIndex ib b) =>
      ia -> Triple ib
 iVerticesOfTriangle = traverseI map3 vertices 
 
 instance Finite OTriangle
 
 -- | = 'iVerticesOfTriangle'
-instance Vertices ITriangle (Triple IVertex) where 
+instance Vertices ITriangle where 
+    type Verts ITriangle = Triple IVertex
+
     vertices = iVerticesOfTriangle
 
 -- | = 'iVerticesOfTriangle'
-instance Vertices OITriangle (Triple IVertex) where 
+instance Vertices OITriangle where 
+    type Verts OITriangle = Triple IVertex
+  
     vertices = iVerticesOfTriangle
 
-instance Edges OITriangle (Triple OIEdge) where
+instance Edges OITriangle where
+    type Eds OITriangle = Triple OIEdge
+
     edges (viewI -> I i t) = map3 (i ./) (edges t)
 
-instance Edges ITriangle (Triple IEdge) where
+instance Edges ITriangle where
+    type Eds ITriangle = Triple IEdge
     edges (viewI -> I i t) = map3 (i ./) (edges t)
 
 
@@ -369,8 +391,6 @@ prop_trianglesContainingVertex v =
     (asList (trianglesContainingVertex v))  
     (filter (isVertexOfTriangle v) allTriangles)
 
-instance Star Vertex (TwoSkeleton AbsTet) (Triple Triangle) where
-    star = const . trianglesContainingVertex 
 
 -- | Gets the edge which is contained in the given triangle and does /not/ contain the given vertex. 
 --
@@ -393,7 +413,7 @@ instance Link IVertex ITriangle IEdge where
         assert (i==i') (i ./ link v t)
 
 vertexByOppositeEdge
-  :: (Show a, Vertices a (Triple Vertex)) =>
+  :: (Show a, Vertices a, Verts a ~ Triple Vertex) =>
      Edge -> a -> Vertex
 vertexByOppositeEdge e t =
     case filter3 (\v -> not (isVertexOfEdge v e)) (vertices t) of
@@ -409,18 +429,13 @@ instance Link IEdge ITriangle IVertex where
     link (viewI -> I i e) (viewI -> I i' t) = 
         assert (i==i') (i ./ link e t)
 
-instance Triangles TIndex (Quadruple ITriangle) where
+instance Triangles TIndex where
+    type Tris TIndex = Quadruple ITriangle
     triangles z = map4 (z ./) allTriangles'
 
--- | Triangles containing a given vertex
-instance Star IVertex (TwoSkeleton AbsTet) (Triple ITriangle) where
-    star v p = traverseI map3 (flip star p) v
 
--- | Triangles containing a given edge
-instance Star IEdge (TwoSkeleton AbsTet) (Pair ITriangle) where
-    star e p = traverseI map2 (flip star p) e
-
-instance OEdges OTriangle (Triple OEdge) where
+instance OEdges OTriangle where
+    type OEds OTriangle = Triple OEdge
     oedges (vertices -> (v0,v1,v2)) = (oedge (v0,v1), oedge (v1,v2), oedge(v2,v0)) 
 
 data VertexIndexInTriangle = VT0 | VT1 | VT2
@@ -438,7 +453,7 @@ triangleGetEdgeAt :: Triangle -> VertexIndexInTriangle -> Edge
 triangleGetEdgeAt t vi = edgeByOppositeVertexAndTriangle (triangleGetVertexAt t vi) t
 
 triangleGetVertexAt
-  :: Vertices a (t, t, t) => a -> VertexIndexInTriangle -> t
+  :: (Vertices a, Verts a ~ Triple t) => a -> VertexIndexInTriangle -> t
 triangleGetVertexAt (vertices -> (v0,v1,v2)) i = 
     case i of
          VT0 -> v0
@@ -446,7 +461,7 @@ triangleGetVertexAt (vertices -> (v0,v1,v2)) i =
          VT2 -> v2
 
 triangleGetIndexOf
-  :: (Eq a1, Vertices a (a1, a1, a1)) =>
+  :: (Eq a1, Vertices a, Verts a ~ Triple a1) =>
      a -> a1 -> Maybe VertexIndexInTriangle
 triangleGetIndexOf (vertices -> (v0,v1,v2)) v 
     | v == v0 = Just VT0
@@ -485,21 +500,6 @@ oitriangleDualVertex = mapI otriangleDualVertex
 itriangleByDualVertex :: IVertex -> ITriangle
 itriangleByDualVertex = mapI triangleByDualVertex
 
--- = 'triangleDualVertex'
-instance Link Triangle AbsTet Vertex where 
-    link t _ = triangleDualVertex t
-
--- = 'itriangleDualVertex'
-instance Link ITriangle AbsTet IVertex where 
-    link t _ = itriangleDualVertex t
-
--- = 'triangleByDualVertex'
-instance Link Vertex AbsTet Triangle where 
-    link v _ = triangleByDualVertex v
-
--- = 'itriangleByDualVertex'
-instance Link IVertex AbsTet ITriangle where 
-    link v _ = itriangleByDualVertex v
 
 instance Star Vertex (OneSkeleton Triangle) (Pair Edge) where
     star v (OneSkeleton t) = case link v t of

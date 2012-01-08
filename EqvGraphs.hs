@@ -5,7 +5,10 @@ module EqvGraphs
     vertexEqvGraph,veg,
     viewEdgeEqvGraph,
     viewVertexEqvGraph,
-    productionEqvGraphs) 
+    productionEqvGraphs,
+    -- * Reex
+    Seed,ExitCode(..)
+    ) 
 
     where
 
@@ -86,16 +89,17 @@ gNodeAttrs =
 
 gGraphAttrs :: [Attribute]
 gGraphAttrs =
-                        [ 
+    [ 
 --                                 RankDir FromLeft
 --                                , RankSep [2.4] 
 --                               , Overlap RemoveOverlaps
 --                               , Splines SplineEdges
-                                 Layout "neato"
+                Layout "neato"
 --                               , Pack (PackMargin 4)
-                               , d2t (FigPreamble $
-                                    ("\\footnotesize"))
-                         ] 
+            , d2t (FigPreamble $
+                ("\\footnotesize"))
+            , d2t (DocPreamble ("\\usepackage[a2paper]{geometry}"))
+        ] 
 
 equivalenceEdge
   :: (Ord a, FLN_Id a) => Gluing -> (a, a) -> DotEdge Int

@@ -16,7 +16,7 @@ import Data.Vect.Double.Base
 import Latexable
 import EqvGraphs
 import QuadCoordinates
-import DD
+import VerboseDD
 import Control.Applicative
 import qualified Data.Map as M
 import Tikz.Gen

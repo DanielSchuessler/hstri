@@ -2,10 +2,13 @@
 {-# OPTIONS -Wall #-}
 module QuadCoordinates where
 
+import AbstractNeighborhood
 import AbstractTetrahedron
+import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Exception
 import Control.Monad.State
+import Data.EdgeLabelledTree
 import Data.Foldable(Foldable)
 import Data.Function
 import Data.Map as M hiding(mapMaybe)
@@ -13,15 +16,15 @@ import Data.Maybe as May
 import HomogenousTuples
 import INormalDisc
 import PrettyUtil
+import QuickCheckUtil
 import StandardCoordinates
+import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import TriangulationCxtObject
 import ZeroDefaultMap
-import AbstractNeighborhood
 import qualified Data.Vector as V
-import QuickCheckUtil
-import Control.Applicative
+import qualified Data.Vector.Generic as VG
 
 newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
     deriving(AdditiveGroup,InnerSpace,Eq)
@@ -56,10 +59,22 @@ prop_standardToQuad_VertexLinkingSurface (tr :: Triangulation) =
 qc_QuadCoordinates :: IO Bool
 qc_QuadCoordinates = $(quickCheckAll)
 
+canonExtDbg
+  :: (Num r, Ord r, Pretty r) =>
+     Triangulation -> QuadCoordinates r -> StandardCoordinates r
+canonExtDbg tr qc =
+    case canonExt tr qc of
+         sc ->
 
-quadToStandard :: forall r. (Ord r, Num r) => 
+             case admissible tr sc of
+                Right () -> sc
+                Left str -> error ("canonExtDbg: result not admissible:\n"++show str++"\n"++
+                                    $(showExps ['qc,'sc]))
+
+
+canonExt :: forall r. (Pretty r, Ord r, Num r) => 
     Triangulation -> QuadCoordinates r -> StandardCoordinates r
-quadToStandard tr qc = 
+canonExt tr qc = 
         stc_fromMap (unionsWith 
                         (\ _ _ -> assert False undefined) 
                         (mapKeys iNormalDisc (quad_toMap qc)
@@ -74,7 +89,10 @@ quadToStandard tr qc =
         goVertex v =
             let vertexLinkCoeffs = 
                     case dfsVertexLink v of
-                        Node tri0 edges_ -> execState (mapM_ (goVertexLinkArc tri0) edges_) mempty
+                        Node tri0 edges_ -> 
+                            execState 
+                                (mapM_ (goVertexLinkArc tri0) edges_) 
+                                (singleton tri0 0)
             in
                 fmap 
                     (subtract (minimum (elems vertexLinkCoeffs)))
@@ -89,7 +107,9 @@ quadToStandard tr qc =
 
             modify (\sc ->
                     insertWith
-                        (\_ _ -> assert False undefined)
+                        (\_ _ -> 
+                            error ("canonExt: tri1 visited twice"
+                                    ++ $(showExps ['qc,'tri0,'arc0,'arc1,'tri1,'edges_])))
                         tri1
                         ( 
                             quad_coefficient qc (iNormalQuadByNormalArc arc0)
@@ -181,6 +201,11 @@ quad_toDenseList tr = fmap snd . quad_toDenseAssocs tr
 quad_fromDenseList
   :: Num r => Triangulation -> [r] -> QuadCoordinates r
 quad_fromDenseList tr = quad_fromAssocs . zip (tINormalQuads tr) 
+
+quad_fromVector
+  :: (Num r, VG.Vector v r) =>
+     Triangulation -> v r -> QuadCoordinates r
+quad_fromVector tr = quad_fromDenseList tr . VG.toList
 
 unrestrictedQC
   :: (Num r, Arbitrary r) => Triangulation -> Gen (QuadCoordinates r)

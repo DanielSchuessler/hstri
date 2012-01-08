@@ -15,6 +15,7 @@ import FaceIx
 import HomogenousTuples
 import TypeLevel.TF.List
 import Simplicial.AnySimplex
+import Simplicial.DeltaSet3
 import Simplicial.DeltaSet
 import Simplicial.GraphComplex
 --import Simplicial.Labels

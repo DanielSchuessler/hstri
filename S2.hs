@@ -11,6 +11,7 @@ import Test.QuickCheck
 import PrettyUtil
 import Group
 import Util
+import Data.Binary
 
 
 data S2 = NoFlip | Flip deriving(Show,Enum,Bounded,Eq,Ord)
@@ -49,4 +50,8 @@ sort2WithPermutation (x,y) =
     if (x<=y) 
        then ((x,y),NoFlip)
        else ((y,x),Flip)
+
+instance Binary S2 where
+    get = getEnumWord8
+    put = putEnumWord8
 

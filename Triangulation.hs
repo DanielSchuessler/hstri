@@ -81,6 +81,7 @@ import qualified Data.List as List
 import THUtil
 import Numbering2
 import {-# SOURCE #-} TriangulationCxtObject
+import qualified Data.Binary as Binary
 
 forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
 forAllNonEmptyIntTriangulations f = property (\t ->
@@ -552,3 +553,9 @@ type LabelledTriangulation = (String,Triangulation)
 labelledTriangulation :: String -> Triangulation -> LabelledTriangulation
 labelledTriangulation = (,) 
 
+instance Binary.Binary Triangulation where
+    get = mkTriangulation <$> Binary.get <*> Binary.get
+    put = 
+        (>>) 
+            <$> (Binary.put <$> tNumberOfTetrahedra_)
+            <*> (Binary.put <$> tGluingsIrredundant)

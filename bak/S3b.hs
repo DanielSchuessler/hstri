@@ -2,6 +2,7 @@
 module S3 where
 import Data.Monoid
 import Data.Maybe
+import Data.Binary
 
 
 -- | Symmetric group on 3 elements

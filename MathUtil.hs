@@ -50,6 +50,7 @@ import THUtil
 import qualified Data.Set as S
 import Control.Monad.ST.Safe
 import Data.Vector(Vector)
+import HomogenousTuples
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -464,4 +465,23 @@ pro_symSol = forAll arbMatrix' (\(PrettyMatrix mtx) ->
                                     map show (VG.toList s)++[";"])) $
 
                     mulMVwith (*^) mtx s .=. V.replicate (rows mtx) zeroV)
+
+
+
+-- | Returns a tetrahedration of a three-sided prism, and the newly created edges and (inner triangles)
+tetrahedrate3Prism
+  :: (t, t, t)
+     -> (t, t, t) -> ([(t, t, t, t)], [(t, t)], [(t, t, t)])
+tetrahedrate3Prism (a,b,c) (a',b',c') =
+    ( [ list4 a b c c', list4 a b b' c', list4 a a' b' c' ] 
+    , [(a,c'),(b,c'),(a,b')]
+    , [(a,b,c'),(a,b',c')])
+
+
+
+incircleRadius :: Floating a => a -> a -> a -> a
+incircleRadius a b c =
+    let s = (a+b+c) / 2
+    in sqrt ((s-a)*(s-b)*(s-c)/s)
+
 

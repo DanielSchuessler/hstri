@@ -2,7 +2,7 @@
 {-# LANGUAGE Rank2Types, UndecidableInstances, NoMonomorphismRestriction, RecordWildCards, CPP, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, PolymorphicComponents, DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
-module DisjointUnion(module Either1, DisjointUnionable(..), GDisjointUnionable, defaultDisjointUnion) where
+module DisjointUnion(module Either1, DisjointUnionable(..), GDisjointUnionable, defaultDisjointUnion, CoDisjointUnionable(..)) where
 
 import Control.Applicative
 import Control.Monad
@@ -27,11 +27,23 @@ defaultDisjointUnion a b = to (gDisjointUnion (from a) (from b))
 -- instance DisjointUnionable (a -> r) (a' -> r) (Either a a' -> r) where
 --     disjointUnion = either
 
-instance DisjointUnionable (a n -> r) (a' n -> r) (Either1 a a' n -> r) where
-    disjointUnion = either1
+class CoDisjointUnionable a b c | a b -> c, c -> a b where
+    coDjEither :: (a -> r) -> (b -> r) -> (c -> r)
 
-instance DisjointUnionable (AnySimplex a -> r) (AnySimplex a' -> r) (AnySimplex (Either1 a a') -> r) where
-    disjointUnion f f' (AnySimplex x) = either1 (f . AnySimplex) (f' . AnySimplex) x
+instance (CoDisjointUnionable a b c) => DisjointUnionable (a -> r) (b -> r) (c -> r) where
+    disjointUnion = coDjEither
+
+instance CoDisjointUnionable (a n) (a' n) (Either1 a a' n) where
+    coDjEither = either1
+
+instance CoDisjointUnionable 
+        (AnySimplex a)
+        (AnySimplex a')
+        (AnySimplex (Either1 a a')) where
+
+    coDjEither f f' (AnySimplex x) = either1 (f . AnySimplex) (f' . AnySimplex) x
+
+
 
 instance DisjointUnionable (DeltaSet a) (DeltaSet b) (DeltaSet (Either1 a b)) where
 

@@ -20,12 +20,16 @@ import Data.BitSet.Word8(BitSet(..))
 import Control.Exception
 import QuickCheckUtil
 import Data.Set as S
-import Control.Monad.State
 import Data.Functor
 import Data.Char
 import System.Process
 import System.Exit
 import Data.Time.Clock.POSIX
+import Data.Maybe
+import Data.Binary(getWord8)
+import Data.Binary(putWord8)
+import Data.Binary(Get)
+import Data.Binary(Put)
 
 
 
@@ -161,6 +165,9 @@ showBits = (\x -> fmap (\i -> if testBit x i then '1' else '0') [n-1,n-2..0])
 concatMapM ::  Monad m => (z -> m [a]) -> [z] -> m [a]
 concatMapM f = liftM concat . mapM f
 
+mapMaybeM :: Monad m => (a1 -> m (Maybe a)) -> [a1] -> m [a]
+mapMaybeM f = liftM catMaybes . mapM f
+
 
 instance (NFData n, NFData e) => NFData (Gr n e) where
     rnf g = rnf (labNodes g, labEdges g)
@@ -232,20 +239,6 @@ wrapException msg = mapException (\(SomeException e) ->
 
 
 
-data EdgeLabelledTree n e = Node n [(e,EdgeLabelledTree n e)]
-    deriving Show
-
-dfs :: Ord n => n -> (n -> [(e,n)]) -> EdgeLabelledTree n e
-dfs x0 outEdges = evalState (go x0) S.empty
-    where
-        go x = do
-            modify (S.insert x)
-            edgesToUnseen <- filterM isUnseen (outEdges x)
-            Node x <$> mapM goEdge edgesToUnseen
-
-        isUnseen (_,n) = gets (not . S.member n)
-        
-        goEdge (e,n) = (e,) <$> go n
         
         
 uncurry3 :: (t1 -> t2 -> t3 -> t) -> (t1, t2, t3) -> t
@@ -292,3 +285,9 @@ atLeastTwo a b c =
 
 tmpfn :: String -> IO FilePath
 tmpfn stem = (("/tmp/" ++ stem) ++) . show . fromEnum <$> getPOSIXTime
+
+getEnumWord8 :: Enum b => Get b
+getEnumWord8 = (toEnum . fromIntegral) <$> getWord8
+
+putEnumWord8 :: Enum a => a -> Put
+putEnumWord8 = putWord8 . fromIntegral . fromEnum 

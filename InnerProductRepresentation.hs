@@ -7,6 +7,7 @@ import qualified Data.Vector.Unboxed as VU
 import PrettyUtil
 import Control.Exception
 import Data.Function
+import MathUtil
 
 #define IPR_WITHVALUES
 
@@ -44,7 +45,7 @@ ipr_combine x y index =
         hy = V.head ipsy
 
         c = (\xi yi -> (hy*xi-hx*yi)    
-                             /(hx-hy))
+                             /(hy-hx))
     in
         assert (hx > 0 && hy < 0) $
         IPR 
@@ -59,12 +60,12 @@ ipr_combine x y index =
 #endif
 
 instance Pretty IPR where
-    pretty = ipr_pretty 6 
+    pretty = ipr_pretty ShowZeros 6 
     
     
     
-ipr_pretty :: Int -> IPR -> Doc
-ipr_pretty scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = ips } = 
+ipr_pretty :: ZeroPrinting -> Int -> IPR -> Doc
+ipr_pretty zp scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = ips } = 
             hencloseSep lparen rparen (text " , ")
                 [   pretty i
                 ,   VU.ifoldr f empty z
@@ -79,7 +80,7 @@ ipr_pretty scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = ips
                         <>  char (if b then '0' else '.') 
                         <>  r
 
-            g (showRational -> x) r =
+            g (showRational zp -> x) r =
                 text (pad scalarWidth x ++ " ") <> r
 
 ipr_maxScalarWidth :: IPR -> Int
@@ -91,7 +92,7 @@ ipr_maxScalarWidth ipr =
 #endif
 
     where
-        f = length . showRational
+        f = length . showRational ShowZeros
 
 
 instance Show IPR where
@@ -104,3 +105,15 @@ instance Show IPR where
 --         where
 --             f b r = showChar (if b then '0' else '.') . r
 -- 
+--
+
+ipr_makeIntegral :: IPR -> IPR
+ipr_makeIntegral ipr =
+
+    ipr 
+#ifdef IPR_WITHVALUES
+        { 
+            ipr_value = V.map toRational . makeVecIntegral . ipr_value $ ipr
+        }
+
+#endif

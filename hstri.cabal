@@ -26,14 +26,15 @@ Library
     Blender
     Blenderable
     Collections
-    Command
+    Interactive.Command
     ConcreteNormal
     ConcreteNormal.PreRenderable
-    DD
+    VerboseDD
     DisjointUnion
     DotUtil
     Edge
     EdgeCentered
+    Data.EdgeLabelledTree
     Either1
     Element
     Equivalence
@@ -72,6 +73,7 @@ Library
     ParseRga
     PolymakeInterface
     PreRenderable
+    PreRenderable.TriangleLabel
     PrettyUtil
     QuadCoordinates
     QuickCheckUtil
@@ -100,10 +102,11 @@ Library
     VectorUtil
     Vertex
     ZeroDefaultMap
+    EqvGraphs
 
 
 
-  Build-depends: dlist, 
+  Build-depends: zlib, utf8-string, Interpolation, binary, binary-derive, dlist, 
   
         GLFW-b,
         MissingH,
@@ -150,7 +153,8 @@ Library
         vector,
         vector-space,
         xml,
-        xml-monad
+        xml-monad,
+        criterion
 
   -- Buildable: False
 

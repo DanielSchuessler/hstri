@@ -14,7 +14,7 @@ import Data.Vect.Double
 import Graphics.Rendering.OpenGL.GLU.Errors
 import Graphics.Rendering.OpenGL(get)
 import Data.Tensor
-import Command
+import Interactive.Command
 import Data.BitSet
 import Control.Applicative
 

@@ -7,6 +7,7 @@ module THUtil(
     Printees(..),
     showExps,
     traceExps,
+    ppTestCase,
     assrt) where
 
 import Language.Haskell.TH
@@ -20,6 +21,7 @@ import Debug.Trace
 import PrettyUtil
 import Control.Applicative
 import Control.Arrow((&&&))
+import Test.QuickCheck
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
@@ -107,3 +109,5 @@ showExps printees =
 traceExps :: Printees a => [Char] -> a -> Q Exp
 traceExps msg printees = [| trace (msg ++ " " ++ $(showExps printees)) |]
 
+ppTestCase :: Printees a => a -> ExpQ
+ppTestCase printees = [| printTestCase $(showExps printees) |]

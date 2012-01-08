@@ -1,6 +1,6 @@
 {-# LANGUAGE PackageImports, TemplateHaskell #-}
 
-import Command
+import Interactive.Command
 import Control.Applicative
 import Control.Arrow
 import Control.Exception(assert)

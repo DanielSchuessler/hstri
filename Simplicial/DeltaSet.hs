@@ -20,6 +20,7 @@ import HomogenousTuples
 import Numbering
 import PrettyUtil
 import Simplicial.AnySimplex
+import Simplicial.DeltaSet3
 import Simplicial.StrictlyIncreasingMap
 import Test.QuickCheck
 import TupleTH
@@ -224,12 +225,8 @@ mkFaceFunctionWithNat :: (forall n. Nat n => n -> FaceIx -> a (S n) -> a n) -> F
 mkFaceFunctionWithNat f = f undefined
 
 
-type Vert a = a  N0
-type Arc a =  a  N1
-type Tri a =  a  N2
-type Tet a =  a  N3
 
-mkTuply2dFaceFunc :: (Arc a -> Pair (Vert a)) -> (Tri a -> Triple (Arc a)) -> FaceFunction a 
+mkTuply2dFaceFunc :: (a N1 -> Pair (a N0)) -> (a N2 -> Triple (a N1)) -> FaceFunction a 
 mkTuply2dFaceFunc f0 f1 = 
     mkFaceFunctionWithNat (\n i -> 
         caseNat2 n
@@ -266,68 +263,47 @@ mkTuply2dFaceFunc f0 f1 =
 --     dimension = dimension_
 --     faceGraph = faceGraph_
 
-faces10 :: DeltaSet a -> Arc a -> Pair (Vert a)
-faces10 a x = map2 (\i -> face a i x) (0,1)
+instance Vertices (DeltaSet a) where
+    type Verts (DeltaSet a) = [a N0]
+    vertices = simps'
 
-faces21 :: DeltaSet a -> Tri a -> Triple (Arc a)
-faces21 a x = map3 (\i -> face a i x) (0,1,2)
+instance Edges (DeltaSet a) where
+    type Eds (DeltaSet a) = [a N1]
+    edges = simps'
 
-faces32 :: DeltaSet a -> Tet a -> Quadruple (Tri a)
-faces32 a x = map4 (\i -> face a i x) (0,1,2,3)
+instance Triangles (DeltaSet a) where
+    type Tris (DeltaSet a) = [a N2]
+    triangles = simps'
+
+instance Tetrahedra (DeltaSet a) where
+    type Tets (DeltaSet a) = [a N3]
+    tetrahedra = simps'
+
+instance DeltaSet1 (DeltaSet a) where 
+    faces10 a x = map2 (\i -> face a i x) (0,1)
+
+instance DeltaSet2 (DeltaSet a) where 
+    faces21 a x = map3 (\i -> face a i x) (0,1,2)
+
+instance DeltaSet3 (DeltaSet a) where
+    faces32 a x = map4 (\i -> face a i x) (0,1,2,3)
 
 simps' :: Nat n => DeltaSet a -> [a n]
 simps' ds = simps ds undefined 
 
-instance Vertices (DeltaSet a) [Vert a] where
-    vertices = simps'
 
-instance Edges (DeltaSet a) [Arc a] where
-    edges = simps'
-
-instance Triangles (DeltaSet a) [Tri a] where
-    triangles = simps'
-
-s3 :: DeltaSet a -> [Tet a]
-s3 = simps'
-
-super01 :: DeltaSet a -> Vert a -> [Arc a]
+super01 :: DeltaSet a -> a N0 -> [a N1]
 super01 = supers
 
-super12 :: DeltaSet a -> Arc a -> [Tri a]
+super12 :: DeltaSet a -> a N1 -> [a N2]
 super12 = supers
 
-super23 :: DeltaSet a -> Tri a -> [Tet a]
+super23 :: DeltaSet a -> a N2 -> [a N3]
 super23 = supers
 
 
-faces20 :: DeltaSet a -> Tri a -> (Vert a, Vert a, Vert a)
-faces20 t tr = (v2,v1,v0)
-    where
-        (e12,e02,_) = faces21 t tr
-        (v2,v1) = faces10 t e12
-        (_,v0) = faces10 t e02
 
-faces20Ascending :: DeltaSet a -> Tri a -> (Vert a, Vert a, Vert a)
-faces20Ascending t = $(reverseTuple 3) . faces20 t 
 
-faces31
-  :: DeltaSet a
-     -> Tet a
-     -> (Arc a, Arc a, Arc a, Arc a, Arc a, Arc a)
-faces31 t tet = (e23,e13,e12,e03,e02,e01)
-    where
-        (tr123,tr023,tr013,_) = faces32 t tet
-        (e23,e13,e12) = faces21 t tr123
-        ( _ ,e03,e02) = faces21 t tr023
-        ( _ , _ ,e01) = faces21 t tr013
-
-faces30
-  :: DeltaSet a -> Tet a -> (Vert a, Vert a, Vert a, Vert a)
-faces30 t tet = (v3,v2,v1,v0)
-    where
-        (tr123,tr023,_,_) = faces32 t tet
-        (v3,v2,v1) = faces20 t tr123
-        ( _, _,v0) = faces20 t tr023
 
 
 -- s0_default t = Set.unions (fmap f (s3 t))
@@ -351,7 +327,7 @@ memoFun :: Ord k => (k -> a) -> [k] -> Map k a
 memoFun f xs = Map.fromList [(x,f x) | x <- xs] 
 
 memoSuper
-  :: forall a. (Ord (Vert a), Ord (Arc a), Ord (Tri a)) => DeltaSet a -> DeltaSet a
+  :: forall a. (Ord (a N0), Ord (a N1), Ord (a N2)) => DeltaSet a -> DeltaSet a
 memoSuper d = 
     let
             super01_ = (memoFun (super01 d) (vertices d) !)
@@ -497,7 +473,7 @@ checkFaceOrderConsistency ds = (sequence_ :: [m()] -> m()) $ do -- list monad
 
 
 
-oneSkeletonGraph :: DeltaSet a -> Gr (Vert a) (Arc a)
+oneSkeletonGraph :: DeltaSet a -> Gr (a N0) (a N1)
 oneSkeletonGraph ds = mkGraph 
     (do
         v <- vertices ds
@@ -508,8 +484,6 @@ oneSkeletonGraph ds = mkGraph
         return (nod,nod',e)) 
 
 
-class OneSkeletonable a where
-    oneSkeleton :: a -> a
 
 
 instance OrdN a => OneSkeletonable (DeltaSet a) where
