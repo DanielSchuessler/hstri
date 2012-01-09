@@ -19,26 +19,28 @@ Library
   Extensions: PatternGuards
   Exposed-modules:     
     
+
     AbstractNeighborhood
     AbstractTetrahedron
     AbstractTetrahedron2
+    AbsTet
     BarySD
     Blender
     Blenderable
     Collections
-    Interactive.Command
     ConcreteNormal
     ConcreteNormal.PreRenderable
-    VerboseDD
+    Data.EdgeLabelledTree
+    Data.AscTuples
     DisjointUnion
     DotUtil
     Edge
     EdgeCentered
-    Data.EdgeLabelledTree
     Either1
     Element
     Equivalence
     Equivalence.Class
+    EqvGraphs
     ExampleComplexes
     ExampleTriangulations
     FaceClasses
@@ -53,6 +55,7 @@ Library
     INormalDisc
     IndexedSimplices
     InnerProductRepresentation
+    Interactive.Command
     Interactive.Floor
     Interactive.ReadInput
     Interactive.Utils
@@ -83,6 +86,9 @@ Library
     ShortShow
     Simplicial.AnySimplex
     Simplicial.DeltaSet
+    Simplicial.DeltaSet1
+    Simplicial.DeltaSet2
+    Simplicial.DeltaSet3
     Simplicial.GraphComplex
     Simplicial.Layout
     Simplicial.SimplicialComplex
@@ -100,13 +106,12 @@ Library
     UPair
     Util
     VectorUtil
+    VerboseDD
     Vertex
     ZeroDefaultMap
-    EqvGraphs
 
 
-
-  Build-depends: zlib, utf8-string, Interpolation, binary, binary-derive, dlist, 
+  Build-depends: OneTuple, zlib, utf8-string, Interpolation, binary, binary-derive, dlist, 
   
         GLFW-b,
         MissingH,

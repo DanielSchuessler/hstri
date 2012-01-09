@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, FlexibleContexts, CPP, RecordWildCards, NoMonomorphismRestriction, FlexibleInstances, StandaloneDeriving, GADTs, ViewPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, TemplateHaskell, FlexibleContexts, CPP, RecordWildCards, NoMonomorphismRestriction, FlexibleInstances, StandaloneDeriving, GADTs, ViewPatterns, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 
 module ConcreteNormal.PreRenderable(
@@ -11,19 +11,20 @@ module ConcreteNormal.PreRenderable(
 
     ) where
 
+import ConcreteNormal
+import Data.Function
 import Data.Set as Set
 import Data.Vect.Double(interpolate)
+import DisjointUnion
 import HomogenousTuples
-import StandardCoordinates
+import Language.Haskell.TH
 import PreRenderable
 import PrettyUtil
-import Simplicial.AnySimplex
+import ShortShow
+import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
 import TriangulationCxtObject
-import ShortShow
-import ConcreteNormal
-import Data.Function
 
 type CornerCount = Int
 
@@ -48,10 +49,10 @@ corn pos n u0 u1 =
                    else Corn (n - pos - 1) n u1 u0
 
 normalSurfaceToPreRenderable
-  :: forall s v i. (Integral i, Ord v, Pretty i, ShortShow v, NormalSurface s i) =>
+  :: forall s v i. (Integral i, Show v, Ord v, Pretty i, ShortShow v, NormalSurface s i) =>
      SPQWithCoords v
      -> s
-     -> PreRenderable (OTuple (Corn v))
+     -> PreRenderable (SC2 (Corn v))
 normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =  
     let
         tr = spq_tr spq
@@ -98,16 +99,20 @@ normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =
     in
 
                 (mkPreRenderable
-                    (cornerCoords . unOT)
+                    cornerCoords
                     sc)
 
-                    { pr_visible = \asi -> elimAnySimplexWithNat asi (\n ->
-                            caseNat2 n
+                    { pr_visible = 
+                            foldAnySimplex2
                                 (const True)
                                 (\e -> not (Set.member e quadDiagonals))
-                                (const (const True))) 
+                                (const True) 
                     }
 
 
 instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
     gluingMap glu (Corn i n v1 v2) = (corn i n `on` gluingMap glu) v1 v2
+
+
+isRegardedAsSimplexByDisjointUnionDeriving (conT ''Corn `appT` varT (mkName "v"))
+

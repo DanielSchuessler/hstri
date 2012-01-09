@@ -17,17 +17,16 @@ import HomogenousTuples
 import MathUtil
 import PreRenderable
 import Prelude hiding(catch,mapM_,sequence_) 
-import Simplicial.DeltaSet
 import System.Environment
 import System.Process
 import ToPython
 import FaceClasses
 import System.Exit
-import Simplicial.AnySimplex
 import THUtil
 import PrettyUtil(Pretty)
+import Simplicial.DeltaSet2
 
-#define CONSTRAINTS(a) Pretty (Vert a), ShowN a, Pretty (Arc a), Pretty (Tri a)
+#define CONSTRAINTS(s) Pretty (Vert s), Pretty (Arc s), Pretty (Tri s), DeltaSet2 s, Pretty s
 
 
 sceneVar,worldVar,camVar,objVar,lightVar :: Python ()
@@ -70,13 +69,13 @@ objCommon grp faceName faceMat = do
                 grpLink grp objVar
                 objVar <.> "simplexlabel" .= str faceName
 
--- toBlender :: forall a. (BlenderLabel a, 
---                         VertexInfoClass (Vertex a),
---                         Show (Vertex a), 
---                         Show (Edge a), 
---                         Show (blenderTriangle a), 
---                         DeltaSet a) => 
---        Scene a
+-- toBlender :: forall a. (BlenderLabel s, 
+--                         VertexInfoClass (Vertex s),
+--                         Show (Vertex s), 
+--                         Show (Edge s), 
+--                         Show (blenderTriangle s), 
+--                         DeltaSet s) => 
+--        Scene s
 --     -> Python ()
 
 returnContextStmt :: Python ()
@@ -104,7 +103,7 @@ makeCylinderFunDef = PythonFunDef {
 
 }
 
-toBlender :: (CONSTRAINTS(a)) => Scene a -> Python ()
+toBlender :: (CONSTRAINTS(s)) => Scene s -> Python ()
 toBlender Scene{
         scene_worldProps,
         scene_blenderable = ba@Blenderable{..},
@@ -117,7 +116,7 @@ toBlender Scene{
             mapM_ pfd_def [makeSphereFunDef,makeCylinderFunDef]
 
 
-            -- Make a new scene
+            -- Make s new scene
             sceneVar .= methodCallExpr1 (dat "scenes") "new" (str "TheScene")
             -- Remove all other scenes
             ln  "for s in data.scenes:"
@@ -126,7 +125,7 @@ toBlender Scene{
                 indent $ do
                     ln  "data.scenes.remove(s)" 
 
-            -- Make a new world, assign it to the scene, set world properties
+            -- Make s new world, assign it to the scene, set world properties
             worldVar .= methodCallExpr1 (dat "worlds") "new" (str "TheWorld")
             mapM_ (setProp' worldVar) scene_worldProps
             setProp sceneVar "world" worldVar
@@ -160,9 +159,9 @@ toBlender Scene{
                 methodCallExpr1 bpy_props "StringProperty" (str "Simplex label")
 
 
-            mapM_ (handleV ba grp0) (vertices ba_ds)
-            mapM_ (handleE ba grp1) (edges ba_ds)
-            mapM_ (handleT ba grp2 grpTriLabels) (triangles ba_ds)
+            mapM_ (handleV ba grp0) (vertexList ba_ds)
+            mapM_ (handleE ba grp1) (edgeList ba_ds)
+            mapM_ (handleT ba grp2 grpTriLabels) (triangleList ba_ds)
 
             --ln "ops.view3d.viewnumpad(type='CAMERA')"
 
@@ -176,28 +175,28 @@ toBlender Scene{
 
 
 handleSimplex
-  :: Nat n =>
-     Python () -> Blenderable a -> BlenderGroup -> a n -> Python ()
-handleSimplex f ba grp si = when (ba_visible ba asi) $ do
+  :: (a -> AnySimplex2Of s) ->
+     Python () -> Blenderable s -> BlenderGroup -> a -> Python ()
+handleSimplex mkAsi f ba grp si = when (ba_visible ba asi) $ do
         f
         objCommon grp faceName faceMat
     
 
     where
-        asi = AnySimplex si
+        asi = mkAsi si
         FaceInfo{..} = ba_faceInfo ba asi
 
 
 
 type BlenderGroup = Python ()
 
-handleV ::  Blenderable a -> BlenderGroup -> Vert a -> Python ()
-handleV ba grp v = handleSimplex    
+handleV ::  Blenderable s -> BlenderGroup -> Vert s -> Python ()
+handleV ba grp v = handleSimplex vertToAnySimplex2 
                     (sphere (ba_coords ba v) (ba_vertexThickness ba v)) 
                     ba grp v
 
-handleE :: (CONSTRAINTS(a)) => Blenderable a -> BlenderGroup -> Arc a -> Python ()
-handleE ba grp e = handleSimplex 
+handleE :: (CONSTRAINTS(s)) => Blenderable s -> BlenderGroup -> Arc s -> Python ()
+handleE ba grp e = handleSimplex edToAnySimplex2
                     (either handleErr id
                         (cylinder (ba_coords ba v0) (ba_coords ba v1) (ba_edgeThickness ba e)))
                     ba grp e
@@ -208,8 +207,8 @@ handleE ba grp e = handleSimplex
         handleErr err = error (err++"\n"++"In handleE\n"++ $(showExps ['ba,'e]))
 
 
-handleT :: Pretty (Tri a) => Blenderable a -> BlenderGroup -> BlenderGroup -> Tri a -> Python ()
-handleT ba grp grpTriLabels t = when (ba_visible ba (AnySimplex t)) $ do
+handleT :: (CONSTRAINTS(s)) => Blenderable s -> BlenderGroup -> BlenderGroup -> Tri s -> Python ()
+handleT ba grp grpTriLabels t = when (ba_visible ba (triToAnySimplex2 t)) $ do
             blenderTriangle cv0 cv1 cv2 
             objVar <.> "show_transparent" .= True
             objCommon grp faceName faceMat
@@ -220,10 +219,10 @@ handleT ba grp grpTriLabels t = when (ba_visible ba (AnySimplex t)) $ do
         vs = faces20Ascending (ba_ds ba) t
         (cv0,cv1,cv2) = map3 (ba_coords ba) vs
 
-        FaceInfo{..} = ba_faceInfo ba (AnySimplex t)
+        FaceInfo{..} = ba_faceInfo ba (triToAnySimplex2 t)
 
         
-handleTriLabel :: (Pretty (Tri a)) => Blenderable a -> BlenderGroup -> Tri a -> Python ()
+handleTriLabel :: (CONSTRAINTS(s)) => Blenderable s -> BlenderGroup -> Tri s -> Python ()
 handleTriLabel ba grpTriLabels t =
             case ba_triangleLabel ba t of
                 Nothing -> return ()
@@ -292,7 +291,7 @@ handleTriLabel ba grpTriLabels t =
         vs = faces20Ascending (ba_ds ba) t
         cvs = map3 (ba_coords ba) vs
 
-        FaceInfo{..} = ba_faceInfo ba (AnySimplex t)
+        FaceInfo{..} = ba_faceInfo ba (triToAnySimplex2 t)
 
 
         
@@ -353,7 +352,7 @@ newGroup varName groupName = do
     return var
 
 
-testBlender :: (CONSTRAINTS(a)) => Scene a -> IO ExitCode
+testBlender :: (CONSTRAINTS(s)) => Scene s -> IO ExitCode
 testBlender s = do
     let fn = "/tmp/foo.py"
     writeFile fn (renderPython $ toBlender s)

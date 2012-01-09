@@ -139,8 +139,6 @@ data Triangulation = Triangulation {
 
 tNumberOfTetrahedra :: Num c => Triangulation -> c
 tNumberOfTetrahedra = fi . tNumberOfTetrahedra_
-        
-
 
 
 instance Pretty Triangulation where

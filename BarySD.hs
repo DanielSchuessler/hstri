@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-} 
+{-# LANGUAGE TypeFamilies, NoMonomorphismRestriction, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-} 
 module BarySD where
 
 import AbstractTetrahedron
@@ -11,7 +11,9 @@ data BaryVert = BaryVert0 Vertex
               | BaryVert2 Triangle
               | BaryVert3
 
-instance Vertices BaryTet (Quadruple BaryVert) where
+instance Vertices BaryTet where
+    type Verts BaryTet = (Quadruple BaryVert)
+
     vertices (BaryTet (v0,v1,v2)) = 
         (   BaryVert0 v0,
             BaryVert1 (edge (v0,v1)),

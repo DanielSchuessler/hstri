@@ -6,6 +6,7 @@ import Vertex
 import HomogenousTuples
 import Edge
 import Triangle
+import Data.Tuple.OneTuple
 
 instance HasTIndex TIndex AbsTet where
     viewI = flip I AbsTet 
@@ -14,9 +15,23 @@ instance HasTIndex TIndex AbsTet where
 data AbsTet = AbsTet
     deriving(Eq,Ord,Show)
 
+absTet = AbsTet
+
 instance Vertices AbsTet where
-    type Verts AbsTet = (Quadruple Vertex) 
+    type Verts AbsTet = Quadruple Vertex 
     vertices = const allVertices'
+
+instance Edges AbsTet where
+    type Eds AbsTet = Sextuple Edge 
+    edges = const allEdges'
+
+instance Triangles AbsTet where
+    type Tris AbsTet = Quadruple Triangle 
+    triangles = const allTriangles'
+
+instance Tetrahedra AbsTet where
+    type Tets AbsTet = OneTuple AbsTet
+    tetrahedra = OneTuple
 
 instance Link Vertex (ZeroSkeleton AbsTet) (Triple Vertex) where
     link v _ = fromList3 (filter4 (/= v) allVertices')
@@ -53,7 +68,7 @@ instance Link Triangle AbsTet Vertex where
 
 -- = 'itriangleDualVertex'
 instance Link ITriangle AbsTet IVertex where 
-    link t _ = itriangleDualVertex t
+    link t _ = iTriangleDualVertex t
 
 -- = 'triangleByDualVertex'
 instance Link Vertex AbsTet Triangle where 

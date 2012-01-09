@@ -37,11 +37,11 @@ module Triangle(
     OTriangle,
     MakeOTriangle(..),
     oTriangleByVertices,
-    otriangleDualVertex,
+    oTriangleDualVertex,
 
     -- * Indexed
     ITriangle,
-    itriangleDualVertex,
+    iTriangleDualVertex,
     iVerticesOfTriangle,
     iTriangleByVertices,
     iTriangleByDualVertex,
@@ -49,7 +49,7 @@ module Triangle(
     -- * Ordered and indexed
     OITriangle,
     oiTriangleByVertices,
-    oitriangleDualVertex,
+    oiTriangleDualVertex,
 
     -- * Testing
     qc_Triangle,
@@ -490,12 +490,12 @@ qc_Triangle :: IO Bool
 qc_Triangle = $quickCheckAll
 
 
-otriangleDualVertex :: OTriangle -> Vertex
-otriangleDualVertex = triangleDualVertex . forgetVertexOrder
-itriangleDualVertex :: ITriangle -> IVertex
-itriangleDualVertex = mapI triangleDualVertex
-oitriangleDualVertex :: I OTriangle -> IVertex
-oitriangleDualVertex = mapI otriangleDualVertex
+oTriangleDualVertex :: OTriangle -> Vertex
+oTriangleDualVertex = triangleDualVertex . forgetVertexOrder
+iTriangleDualVertex :: ITriangle -> IVertex
+iTriangleDualVertex = mapI triangleDualVertex
+oiTriangleDualVertex :: I OTriangle -> IVertex
+oiTriangleDualVertex = mapI oTriangleDualVertex
 
 iTriangleByDualVertex :: IVertex -> ITriangle
 iTriangleByDualVertex = mapI triangleByDualVertex

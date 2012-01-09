@@ -42,6 +42,7 @@ import Data.List(sort)
 import Data.Maybe
 import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
 import Data.Vect.Double.Base((&-))
+import DisjointUnion
 import Element
 import FaceClasses
 import GHC.Generics hiding(prec)
@@ -219,3 +220,8 @@ prop_otherVertices v =
 instance Binary Vertex where
     put = put . vertexToWord8
     get = vertexFromWord8 <$> get
+
+
+isRegardedAsSimplexByDisjointUnionDeriving [t|Vertex|]
+isRegardedAsSimplexByDisjointUnionDeriving [t|IVertex|]
+

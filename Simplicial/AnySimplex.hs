@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, ExistentialQuantification, TypeOperators, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, Rank2Types, ExistentialQuantification, TypeOperators, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 module Simplicial.AnySimplex(
     AnySimplex(..),anySimplex_dim,
@@ -11,7 +11,7 @@ module Simplicial.AnySimplex(
     ShowN(..),showN,showsPrecN,
     OrdN(..),compareN,
 
-    foldAnySimplex3,
+    foldAnySimplexCaseNat3,
 
 
     Vert,Arc,Tri,Tet
@@ -27,6 +27,7 @@ import Data.Proxy
 import PrettyUtil
 import Either1
 import Simplicial.DeltaSet3
+import DisjointUnion
 
 data AnySimplex a = forall n. Nat n => AnySimplex (a n)
 
@@ -109,15 +110,24 @@ instance (OrdN s1, OrdN s2) => OrdN (Either1 s1 s2) where
 
 
 -- | Does case analysis on the dimension of the simplex: 0,1,2 or greater
-foldAnySimplex3 :: 
+foldAnySimplexCaseNat3 :: 
         (a N0 -> r)
     ->  (a N1 -> r)
     ->  (a N2 -> r)
     ->  (forall n. Nat n => n -> a (S (S (S n))) -> r)
     ->  (AnySimplex a -> r)
-foldAnySimplex3 k0 k1 k2 k3 = foldAnySimplexWithNat
+foldAnySimplexCaseNat3 k0 k1 k2 k3 = foldAnySimplexWithNat
     (\n x -> caseNat3 n 
                 (k0 x) 
                 (k1 x)
                 (k2 x) 
                 (\n' -> k3 n' x))
+
+
+instance CoDisjointUnionable 
+        (AnySimplex a)
+        (AnySimplex a')
+        (AnySimplex (Either1 a a')) where
+
+    coDjEither f f' (AnySimplex x) = either1 (f . AnySimplex) (f' . AnySimplex) x
+

@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, ViewPatterns, TypeOperators, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, NoMonomorphismRestriction, ViewPatterns, TypeOperators, FlexibleContexts, TypeFamilies #-}
 {-# OPTIONS -Wall #-}
 module EdgeCentered(
     module Triangulation,
@@ -22,6 +22,7 @@ import Control.Monad
 import SimplicialPartialQuotient
 import PrettyUtil
 import ShortShow
+import DisjointUnion
 
 data EdgeNeighborhoodVertex =
     Bottom |
@@ -178,3 +179,5 @@ prop_edgeIsGlued m oiedge =
 
         
 --qc_EdgeCentered = $(quickCheckAll)
+
+isRegardedAsSimplexByDisjointUnionDeriving [t|EdgeNeighborhoodVertex|]

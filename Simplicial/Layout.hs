@@ -18,6 +18,7 @@ import Control.Arrow
 import HomogenousTuples
 import Control.Monad
 import Simplicial.AnySimplex
+import Simplicial.DeltaSet2
 
 data LayoutMode n where
     LayoutDebug :: LayoutMode (NodeType,String)
@@ -29,14 +30,14 @@ layout = layoutG LayoutNoDebug
 
 layoutDebug = layoutG LayoutDebug
 
-layoutG :: forall a nl. (ShowN a, Show (Vert a), Show (Tri a)) => 
-            LayoutMode nl -> DeltaSet a -> IO (Vert a -> Vec3)
+layoutG :: forall a nl. (ShowN a, Show (a N0), Show (a N2)) => 
+            LayoutMode nl -> DeltaSet a -> IO (a N0 -> Vec3)
 layoutG mode ds = do
     let 
         oneSkeleton_ :: Gr nl ()
         oneSkeleton_ = nmap labelNode . emap (const ()) $ oneSkeletonGraph ds
         
-        labelNode :: Vert a -> nl
+        labelNode :: a N0 -> nl
         labelNode v = case mode of
                          LayoutNoDebug -> ()
                          LayoutDebug -> (VertNode,show v) 

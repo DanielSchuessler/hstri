@@ -1,4 +1,4 @@
-{-# LANGUAGE QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 -- {-# OPTIONS -Wall #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
@@ -63,8 +63,9 @@ latexTriangleBrief
   :: (Show a1,
       Show a2,
       Show a3,
-      Vertices a (a1, a2, a3),
-      HasTIndex ia a) =>
+      Vertices a,
+      HasTIndex ia a,
+      Verts a ~ (a1, a2, a3)) =>
      ia -> String
 latexTriangleBrief (viewI -> I ti (vertices -> (v0,v1,v2))) = 
     show v0 <> show v1 <> show v2 <> "_" <> show ti
@@ -74,7 +75,11 @@ instance Latexable OITriangle where
 
 
 latexEdgeBrief
-  :: (Show a1, Show a2, Vertices a (a1, a2), HasTIndex ia a) =>
+  :: (Show a1,
+      Show a2,
+      Vertices a,
+      HasTIndex ia a,
+      Verts a ~ (a1, a2)) =>
      ia -> String
 latexEdgeBrief (viewI -> I ti (vertices -> (v0,v1))) = (show v0 <> show v1 <> "_" <> show ti)
 

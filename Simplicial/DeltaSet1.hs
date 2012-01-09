@@ -1,6 +1,6 @@
-{-# LANGUAGE FlexibleContexts, FunctionalDependencies, TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, FunctionalDependencies, TypeFamilies #-}
+{-# OPTIONS -Wall #-}
 module Simplicial.DeltaSet1(
-    module Simplicial.Simplex,
     module TypeLevel.TF.Nat.Small,
     module HomogenousTuples,
     module FaceClasses,
@@ -8,14 +8,17 @@ module Simplicial.DeltaSet1(
 
     DeltaSet1(..),
     AnySimplex1,
-    OneSkeletonable(..)
+    OneSkeletonable(..),
+    foldAnySimplex1,
+    vertToAnySimplex1,
+    edToAnySimplex1
     ) where
 
 import TypeLevel.TF.Nat.Small
-import Simplicial.Simplex
 import HomogenousTuples
 import FaceClasses
 import Element
+import Control.Arrow
 
 
 class (Vertices s, Edges s) => 
@@ -24,8 +27,18 @@ class (Vertices s, Edges s) =>
     faces10 :: s -> Arc s -> Pair (Vert s)
 
 
+vertToAnySimplex1 :: v -> AnySimplex1 v e
+vertToAnySimplex1 = AnySimplex1 . Left
+edToAnySimplex1 :: e -> AnySimplex1 v e
+edToAnySimplex1 = AnySimplex1 . Right
 
-type AnySimplex1 s = Either (Vert s) (Ed s)
+newtype AnySimplex1 v e = AnySimplex1 (Either v e)
+    deriving(Show)
+
+foldAnySimplex1 :: 
+    (v -> r) -> (e -> r) -> AnySimplex1 v e -> r
+foldAnySimplex1 kv ke (AnySimplex1 x) = (kv ||| ke) x
+
 
 class OneSkeletonable a where
     oneSkeleton :: a -> a

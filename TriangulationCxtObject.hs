@@ -110,12 +110,12 @@ import Prelude hiding(catch,lookup)
 import PrettyUtil
 import QuickCheckUtil
 import ShortShow
+import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Triangulation
 import Triangulation.CanonOrdered
 import UPair
-import THUtil
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -718,3 +718,4 @@ triArcGraph tr =
 
 prettyEdgeEquivalence :: Triangulation -> Doc
 prettyEdgeEquivalence = prettyEquivalence . edgeEquivalence
+

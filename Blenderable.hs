@@ -10,34 +10,32 @@ import Data.Vect.Double
 import DisjointUnion
 import HomogenousTuples
 import Prelude hiding(catch,mapM_,sequence_) 
-import Simplicial.DeltaSet
 import ToPython
 import PreRenderable
 import GHC.Generics
 import SimplicialPartialQuotient
 import Simplicial.SimplicialComplex
+import Simplicial.DeltaSet2
 import ConcreteNormal.PreRenderable
 import NormalEverything
-import Simplicial.AnySimplex
-import Control.Exception
 import PrettyUtil
 import ShortShow
 
-data Blenderable a = Blenderable { 
-    ba_ds :: DeltaSet a,
-    ba_coords :: Vert a -> Vec3,
-    ba_faceInfo :: AnySimplex a -> FaceInfo,
-    ba_vertexThickness :: Vert a -> Double,
-    ba_visible :: AnySimplex a -> Bool,
-    ba_edgeThickness :: Arc a -> Double,
-    ba_triangleLabel :: Tri a -> Maybe TriangleLabel, 
+data Blenderable s = Blenderable { 
+    ba_ds :: s,
+    ba_coords :: Vert s -> Vec3,
+    ba_faceInfo :: AnySimplex2Of s -> FaceInfo,
+    ba_vertexThickness :: Vert s -> Double,
+    ba_visible :: AnySimplex2Of s -> Bool,
+    ba_edgeThickness :: Arc s -> Double,
+    ba_triangleLabel :: Tri s -> Maybe TriangleLabel, 
     ba_materials :: [Material]
 }
     deriving (Generic)
 
 
 
-instance Coords (Blenderable a) where
+instance Coords (Blenderable s) where
     transformCoords f b = b { ba_coords = f . ba_coords b }
 
 data FaceInfo = FaceInfo {
@@ -45,8 +43,8 @@ data FaceInfo = FaceInfo {
         faceMat :: Material
 }
 
--- instance (BlenderLabel a, BlenderLabel b) => BlenderLabel (DisjointUnion a b) where
---     blenderLabel (DisjointUnion a b) n = blenderLabel a n ||| blenderLabel b n 
+-- instance (BlenderLabel s, BlenderLabel b) => BlenderLabel (DisjointUnion s b) where
+--     blenderLabel (DisjointUnion s b) n = blenderLabel s n ||| blenderLabel b n 
 
 type MatName = String
 
@@ -56,13 +54,12 @@ type EulerAnglesXYZ = Vec3
 eulerAnglesXYZ :: Double -> Double -> Double -> EulerAnglesXYZ
 eulerAnglesXYZ = Vec3
 
-data Scene a = Scene {
-    scene_blenderable :: Blenderable a,
+data Scene s = Scene {
+    scene_blenderable :: Blenderable s,
     scene_worldProps :: Props,
     scene_cams :: [Cam]
 }
 
-deriving instance (Pretty (Vert a), ShowN a) => Show (Scene a)
 
 
 data Cam = Cam {
@@ -76,7 +73,7 @@ data Cam = Cam {
 defaultFOV :: Double
 defaultFOV = 0.8575560591178853
 
-setCams :: [Cam] -> Scene a -> Scene a
+setCams :: [Cam] -> Scene s -> Scene s
 setCams scene_cams s = s { scene_cams }
                         
 data Material = Material {
@@ -114,7 +111,7 @@ transparency alpha spec_alpha fresnel =
                 "raytrace_transparency.depth" & (15::Int)
                 ]
 
--- newtype Pseudomanifold a = Pseudomanifold { unPseudomanifold :: a }
+-- newtype Pseudomanifold s = Pseudomanifold { unPseudomanifold :: s }
 --     deriving(Coordinates)
 
 
@@ -136,27 +133,27 @@ nsurfVertThickness = 0.03
 
 
 pseudomanifoldStyle
-  :: PreRenderable a -> Blenderable a
+  :: PreRenderable s -> Blenderable s
 pseudomanifoldStyle = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
 
 mkBlenderable
-  :: forall a. 
+  :: forall s. 
      Material
      -> Material
      -> Material
      -> Double
-     -> PreRenderable a
-     -> Blenderable a
+     -> PreRenderable s
+     -> Blenderable s
 mkBlenderable mat0 mat1 mat2 vertThick pr_ = Blenderable { 
     ba_ds = pr_ds pr_,
     ba_coords = pr_coords pr_,
     ba_triangleLabel = pr_triangleLabel pr_,
     ba_visible = pr_visible pr_,
 
-    ba_faceInfo = \asi -> elimAnySimplexWithNat asi (\n _ ->
+    ba_faceInfo = \asi ->
         FaceInfo 
             (pr_name pr_ asi) 
-            (caseNat3 n mat0 mat1 mat2 (assert False undefined))),
+            (foldAnySimplex2 (const mat0) (const mat1) (const mat2) asi),
 
     ba_vertexThickness = const vertThick,
     ba_edgeThickness = const (edgeThicknessFactor*vertThick),
@@ -164,7 +161,7 @@ mkBlenderable mat0 mat1 mat2 vertThick pr_ = Blenderable {
     ba_materials = [mat0,mat1,mat2]
 }
 --     where
---         sh :: forall n. Nat n => n -> a n -> String
+--         sh :: forall n. Nat n => n -> s n -> String
 --         sh _ = showN 
 
 
@@ -176,18 +173,18 @@ nsurfMat1 = Material "nsurfMat1" (diffuseColor (0, 0.2, 1):specular 100 0.8)
 nsurfMat2 ::  Material
 nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++transparency 0.55 0.7 1)
 
-normalSurfaceStyle :: PreRenderable a -> Blenderable a
+normalSurfaceStyle :: PreRenderable s -> Blenderable s
 normalSurfaceStyle = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
 
 
 -- | Points cam at positive y dir
-defaultScene :: ToBlenderable x a => x -> Scene a
-defaultScene a = Scene (toBlenderable a) defaultWorldProps [defaultCam]
+defaultScene :: ToBlenderable x s => x -> Scene s
+defaultScene s = Scene (toBlenderable s) defaultWorldProps [defaultCam]
 
 defaultCam :: Cam
 defaultCam = Cam (Vec3 0.66 (-2.3) 0.52) (eulerAnglesXYZ (pi/2) 0 0) defaultFOV
 
-(&) :: ToPython a => t -> a -> (t, Python ())
+(&) :: ToPython s => t -> s -> (t, Python ())
 x & y = (x, toPython y)
 
 defaultWorldProps :: Props
@@ -202,7 +199,20 @@ instance DisjointUnionable [Material] [Material] [Material] where
     disjointUnion ma ma' =
             (nubBy ((==) `on` ma_name) (ma++ma'))
 
-instance DisjointUnionable (Blenderable a) (Blenderable b) (Blenderable (Either1 a b)) where
+
+instance 
+    (   DisjointUnionable s1 s2 s
+    
+    ,   CoDisjointUnionable
+                        (Vert s1) (Vert s2) (Vert s)
+    ,   CoDisjointUnionable
+                        (Ed s1) (Ed s2) (Ed s)
+    ,   CoDisjointUnionable
+                        (Tri s1) (Tri s2) (Tri s)
+    ) =>
+    DisjointUnionable (Blenderable s1) (Blenderable s2) (Blenderable s) where
+
+
 
     disjointUnion = defaultDisjointUnion
 
@@ -211,61 +221,62 @@ instance DisjointUnionable (Blenderable a) (Blenderable b) (Blenderable (Either1
 
 
 
---normalSurface' a = normalSurface (addCoordFunc id (const Nothing) a)
+--normalSurface' s = normalSurface (addCoordFunc id (const Nothing) s)
 
 
-instance (Pretty (Vert a), ShowN a) => Pretty (Blenderable a) where
+instance (Pretty (Vert s), Vertices s, Pretty s) => Pretty (Blenderable s) where
     pretty Blenderable{..} = prettyRecord "Blenderable"
         [("ba_ds",pretty ba_ds),
          ("ba_coords",prettyFunction ba_coords (vertices ba_ds))
         ]
 
 
-instance (Pretty (Vert a), ShowN a) => Show (Blenderable a) where
+instance (Pretty (Vert s), Vertices s, Pretty s) => Show (Blenderable s) where
     showsPrec = prettyShowsPrec
 
-
+deriving instance (Pretty (Vert s), Vertices s, Pretty s) => Show (Scene s)
 
 -- * Conversion
 
-class ToBlenderable x a | x -> a where
-    toBlenderable :: x -> Blenderable a
+class ToBlenderable x s | x -> s where
+    toBlenderable :: x -> Blenderable s
 
-instance ToBlenderable (Blenderable a) a where
+instance ToBlenderable (Blenderable s) s where
     toBlenderable = id
 
 fromSpqwc
-  :: (Ord v, ShortShow v,Pretty v) =>
+  :: (Ord v, ShortShow v,Pretty v,Show v) =>
      SPQWithCoords v
-     -> Blenderable (OTuple v)
-fromSpqwc = pseudomanifoldStyle . toPreRenderable
+     -> Blenderable (SC2 v)
+fromSpqwc = pseudomanifoldStyle . pr_popDimension . toPreRenderable
 
 -- | = 'fromSpqwc'
-instance (Ord v, ShortShow v, Pretty v) => ToBlenderable (SPQWithCoords v) (OTuple v) where
+instance (Ord v, ShortShow v, Pretty v, Show v) => ToBlenderable (SPQWithCoords v) (SC2 v) where
     toBlenderable = fromSpqwc
 
 fromNormalSurface
-  :: (Integral i, Ord v, Pretty i, ShortShow v, NormalSurface s i) =>
-     SPQWithCoords v -> s -> Blenderable (OTuple (Corn v))
+  :: (Integral i, Ord v, Pretty i, ShortShow v, NormalSurface s i, Show v) =>
+     SPQWithCoords v -> s -> Blenderable (SC2 (Corn v))
 fromNormalSurface spqwc stc = normalSurfaceStyle (normalSurfaceToPreRenderable spqwc stc) 
 
 fromIntegerNormalSurface
-  :: (Ord v, ShortShow v, NormalSurface s Integer) =>
-     SPQWithCoords v -> s -> Blenderable (OTuple (Corn v))
+  :: (Ord v, ShortShow v, NormalSurface s Integer, Show v) =>
+     SPQWithCoords v -> s -> Blenderable (SC2 (Corn v))
 fromIntegerNormalSurface = fromNormalSurface
 
 
 fromSpqwcAndIntegerNormalSurface
-  :: (Ord v, ShortShow v, NormalSurface s Integer, Pretty v) =>
+  :: (Ord v, ShortShow v, NormalSurface s Integer, Pretty v, Show v) =>
      SPQWithCoords v
-     -> s -> Blenderable (Either1 (OTuple v) (OTuple (Corn v)))
+     -> s -> Blenderable (DJ (SC2 v) (SC2 (Corn v)))
 fromSpqwcAndIntegerNormalSurface spqwc s = 
-    fromSpqwc spqwc `disjointUnion`
+    fromSpqwc spqwc 
+    `disjointUnion`
     fromIntegerNormalSurface spqwc s 
 
 
 -- | = @uncurry 'fromSpqwcAndIntegerNormalSurface'@
-instance (Ord v, ShortShow v, NormalSurface s Integer, Pretty v) => 
-    ToBlenderable (SPQWithCoords v, s) (Either1 (OTuple v) (OTuple (Corn v))) where
+instance (Ord v, ShortShow v, NormalSurface s Integer, Pretty v, Show v) => 
+    ToBlenderable (SPQWithCoords v, s) (DJ (SC2 v) (SC2 (Corn v))) where
 
     toBlenderable = uncurry fromSpqwcAndIntegerNormalSurface

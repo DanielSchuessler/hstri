@@ -4,8 +4,16 @@ module Simplicial.DeltaSet2(
     module Simplicial.DeltaSet1,
     DeltaSet2(..),
     AnySimplex2,
+    AnySimplex2Of,
     faces20,
     faces20Ascending,
+    foldAnySimplex2,
+    vertToAnySimplex2,
+    edToAnySimplex2,
+    triToAnySimplex2,
+    foldAnySimplex2',
+    anySimplex1To2,
+
     -- * Testing
     polyprop_faces21
     ) where
@@ -13,13 +21,38 @@ module Simplicial.DeltaSet2(
 import Simplicial.DeltaSet1
 import QuickCheckUtil
 import Test.QuickCheck
+import Control.Arrow
 
 class (DeltaSet1 s, Triangles s) => 
     DeltaSet2 s where
 
     faces21 :: s -> Tri s -> Triple (Arc s)
 
-type AnySimplex2 s = Either (AnySimplex1 s) (Tri s) 
+newtype AnySimplex2 v e t = AnySimplex2 (Either (AnySimplex1 v e) t) 
+    deriving(Show)
+
+type AnySimplex2Of s = AnySimplex2 (Vert s) (Ed s) (Tri s)
+
+
+foldAnySimplex2'
+  :: (AnySimplex1 v e -> r) -> (t -> r) -> AnySimplex2 v e t -> r
+foldAnySimplex2' kve kt (AnySimplex2 x) = (kve ||| kt) x 
+
+foldAnySimplex2 :: 
+    (v -> r) -> (e -> r) -> (t -> r) -> AnySimplex2 v e t -> r
+foldAnySimplex2 kv ke kt (AnySimplex2 x) = (foldAnySimplex1 kv ke ||| kt) x 
+
+anySimplex1To2 :: AnySimplex1 v e -> AnySimplex2 v e t
+anySimplex1To2 = AnySimplex2 . Left
+
+vertToAnySimplex2 :: v -> AnySimplex2 v e t
+vertToAnySimplex2 = anySimplex1To2 . vertToAnySimplex1
+
+edToAnySimplex2 :: e -> AnySimplex2 v e t
+edToAnySimplex2 = anySimplex1To2 . edToAnySimplex1
+
+triToAnySimplex2 :: t -> AnySimplex2 v e t
+triToAnySimplex2 = AnySimplex2 . Right
 
 polyprop_faces21
   :: (Eq (Element (Verts s)),

@@ -4,11 +4,9 @@ module PreRenderable.TriangleLabel where
 import S3
 import PrettyUtil
 import THUtil
-import Simplicial.AnySimplex
-import Simplicial.SimplicialComplex
 import qualified Data.Map as M
-import Control.Exception
 import HomogenousTuples
+import Data.AscTuples
 
 
 data TriangleLabel = TriangleLabel {
@@ -61,21 +59,21 @@ sTriangleLabelAssoc txt l r t =
 
     SimplicialTriangleLabelAssoc txt l r t defaultTriangleLabelUpDisplacement 1 0
 
-triangleLabelsForSimplicial :: Ord v => 
-    [SimplicialTriangleLabelAssoc v] -> (OTuple v N2) -> Maybe TriangleLabel
+triangleLabelsForSimplicial :: (Show v, Ord v) => 
+    [SimplicialTriangleLabelAssoc v] -> Asc3 v -> Maybe TriangleLabel
 
 triangleLabelsForSimplicial assocs = flip M.lookup (M.fromList (fmap stla2tla assocs))
 
 
-stla2tla :: (Ord v) =>
-    SimplicialTriangleLabelAssoc v -> (OTuple v N2, TriangleLabel)
+stla2tla :: (Ord v, Show v) =>
+    SimplicialTriangleLabelAssoc v -> (Asc3 v, TriangleLabel)
 stla2tla a =
             let
                 lrt = map3 ($ a) (stla_left,stla_right,stla_top)
-                (sorted,g) = sort3WithPermutation lrt 
+                (sorted,g) = sort3WithPermutation' lrt 
             in
                 (
-                    assert (isOrdered3 sorted) $ OT sorted
+                    sorted
                 ,   TriangleLabel {
                         tl_transform = g,
                         

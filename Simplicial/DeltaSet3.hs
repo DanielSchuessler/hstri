@@ -4,18 +4,24 @@ module Simplicial.DeltaSet3(
     DeltaSet3(..),
     faces31,
     faces30,
-    AnySimplex3
+    AnySimplex3,
+    foldAnySimplex3
     )
     where
 
 import Simplicial.DeltaSet2
+import Control.Arrow
 
 class (DeltaSet2 s, Tetrahedra s) =>
     DeltaSet3 s where
 
     faces32 :: s -> Tet s -> Quadruple (Tri s)
 
-type AnySimplex3 s = Either (AnySimplex2 s) (Tet s) 
+newtype AnySimplex3 v e t tet = AnySimplex3 (Either (AnySimplex2 v e t) tet)
+
+foldAnySimplex3 :: 
+    (v -> r) -> (e -> r) -> (t -> r) -> (tet -> r) -> AnySimplex3 v e t tet -> r
+foldAnySimplex3 kv ke kt ktet (AnySimplex3 x) = (foldAnySimplex2 kv ke kt ||| ktet) x
 
 
 faces31

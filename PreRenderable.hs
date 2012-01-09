@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, UndecidableInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
+{-# LANGUAGE TypeFamilies, FlexibleContexts, UndecidableInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
 {-# OPTIONS -Wall #-}
 module PreRenderable(
     module S3,
@@ -11,6 +11,8 @@ module PreRenderable(
     SimplicialTriangleLabelAssoc(..),
     sTriangleLabelAssoc,
     triangleLabelsForSimplicial,
+    pr_mapDs,
+    pr_popDimension
 
     ) where
 
@@ -24,7 +26,6 @@ import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
 import Vertex
 import PreRenderable.TriangleLabel
-import Control.Arrow
 
 
 
@@ -34,9 +35,9 @@ class Coords t where
 data PreRenderable s = PreRenderable {
     pr_ds :: s,
     pr_coords :: Vert s -> Vec3,
-    pr_visible :: AnySimplex2 s -> Bool, 
+    pr_visible :: AnySimplex2Of s -> Bool, 
     pr_triangleLabel :: Tri s -> Maybe TriangleLabel,
-    pr_name :: AnySimplex2 s -> String
+    pr_name :: AnySimplex2Of s -> String
 }
     deriving(Generic)
 
@@ -49,16 +50,9 @@ instance
     ,   CoDisjointUnionable
                         (Vert s1) (Vert s2) (Vert s)
     ,   CoDisjointUnionable
-                        (Tri s1) (Tri s2) (Tri s)
+                        (Ed s1) (Ed s2) (Ed s)
     ,   CoDisjointUnionable
-                        (Either
-                           (Either (Vert s1) (Ed s1))
-                           (Tri s1))
-                        (Either
-                           (Either (Vert s2) (Ed s2))
-                           (Tri s2))
-                        (Either
-                           (Either (Vert s) (Ed s)) (Tri s))
+                        (Tri s1) (Tri s2) (Tri s)
     ) =>
     DisjointUnionable (PreRenderable s1) (PreRenderable s2) (PreRenderable s) where
 
@@ -72,7 +66,7 @@ mkPreRenderable
      (Vert s -> Vec3) -> s -> PreRenderable s
 mkPreRenderable pr_coords_ pr_ds_ = 
     PreRenderable pr_ds_ pr_coords_ (const True) (const Nothing) 
-        ((shortShow|||shortShow)|||shortShow)
+        (foldAnySimplex2 shortShow shortShow shortShow) 
 
 instance OneSkeletonable s => OneSkeletonable (PreRenderable s) where
     oneSkeleton _pr = _pr { pr_ds = oneSkeleton (pr_ds _pr) }
@@ -81,7 +75,16 @@ instance OneSkeletonable s => OneSkeletonable (PreRenderable s) where
 --type PreRenderableSimplicialComplex v = PreRenderable (OTuple v)
 
 --tet3d :: PreRenderableSimplicialComplex Vertex
-tet3d :: PreRenderable (SimplicialComplex Vertex)
-tet3d = mkPreRenderable (vertexDefaultCoords . unOT) abstractTet 
+tet3d :: PreRenderable (SC3 Vertex)
+tet3d = mkPreRenderable vertexDefaultCoords abstractTet 
 
 
+pr_mapDs
+  :: (Vert t ~ Vert s,
+      Ed t ~ Ed s,
+      Tri t ~ Tri s) =>
+     (t -> s) -> PreRenderable t -> PreRenderable s
+pr_mapDs f (PreRenderable a b c d e) = PreRenderable (f a) b c d e
+
+pr_popDimension :: PreRenderable (SC3 v) -> PreRenderable (SC2 v)
+pr_popDimension = pr_mapDs sccons_skeleton

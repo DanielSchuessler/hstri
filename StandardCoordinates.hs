@@ -16,9 +16,6 @@ module StandardCoordinates(
     stc_coefficientIsZero,
     stc_set,
     normalArcCounts,
-    admissible,
-    satisfiesMatchingEquations,
-    satisfiesQuadrilateralConstraints,
 
     -- * Matching equations
     MatchingEquationReason(..),
@@ -322,37 +319,6 @@ instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
 
                                           
 
-admissible
-  :: (Num r, Ord r) => Triangulation -> StandardCoordinates r -> Either String ()
-admissible tr stc@(SC m) = do
-    Fold.mapM_ (\r -> unless (r >= 0) (Left ("Negative coefficient"))) m
-    satisfiesMatchingEquations tr stc
-    satisfiesQuadrilateralConstraints (tTetrahedra_ tr) stc 
-
-satisfiesMatchingEquations
-  :: Num r =>
-     Triangulation -> StandardCoordinates r -> Either [Char] ()
-satisfiesMatchingEquations tr stc =
-        mapM_ p (matchingEquationReasons tr)
-    where
-        p me = unless (r==0)
-                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
-            where
-                r = matchingEquationReasonToVector me <.> stc
-
-satisfiesQuadrilateralConstraints
-  :: (Num r, Ord r) =>
-     [TIndex] -> StandardCoordinates r -> Either String ()
-satisfiesQuadrilateralConstraints tets stc = 
-        mapM_ p tets
-    where
-        p tet = 
-            unless ($(sumTuple 3) (map3 f (normalQuads tet)) <= (1::Int))
-                   (Left ("Quadrilateral constraints violated at tet "++show tet))
-
-        f quad = if stc_coefficient stc (iNormalDisc quad) == 0 
-                    then 0
-                    else 1
 
 
 

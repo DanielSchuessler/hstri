@@ -10,6 +10,7 @@ module AbstractTetrahedron(
     module Vertex,
     module Edge,
     module Triangle,
+    module AbsTet,
     module AbstractTetrahedron2,
     module OrderableFace,
     module Data.Word,
@@ -25,6 +26,7 @@ module AbstractTetrahedron(
     where
 
 import AbstractTetrahedron2
+import AbsTet
 import Control.Exception
 import Control.Monad.RWS
 import HomogenousTuples

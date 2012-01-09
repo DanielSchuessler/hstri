@@ -6,10 +6,12 @@ import Data.Set(Set)
 import HomogenousTuples
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
+import Data.Tuple.OneTuple
 
 type family Element xs
 
-
+type instance Element (OneTuple a) = a
+type instance Element (a,a) = a
 type instance Element (a,a) = a
 type instance Element (a,a,a) = a
 type instance Element (a,a,a,a) = a
@@ -34,6 +36,9 @@ instance AsList (V.Vector a) where
 
 instance (VU.Unbox a) => AsList (VU.Vector a) where
     asList = VU.toList
+
+instance AsList (OneTuple a) where 
+    asList = return . only
 
 -- Make AsList instances for tuples
 $(let 

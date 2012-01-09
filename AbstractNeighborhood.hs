@@ -66,7 +66,7 @@ abstractEdgeNeighborhood dir te =
                                             ent_top = v0
                                         ,   ent_bot = v1
                                         ,   ent_left = v2 
-                                        ,   ent_right = otriangleDualVertex _S'
+                                        ,   ent_right = oTriangleDualVertex _S'
 
                                         }
                             

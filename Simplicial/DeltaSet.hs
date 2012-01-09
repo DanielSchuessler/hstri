@@ -26,6 +26,8 @@ import Test.QuickCheck
 import TupleTH
 import Util
 import qualified Data.Vector as V
+import DisjointUnion
+import GraphUtil
 
 -- data RightShift f
 -- type instance RightShift f  n = f  (S n)
@@ -523,4 +525,48 @@ prop_ds_fmap_consistent_with_face ds =
         in
             forAll (genFaceIx n) (\i ->
                 ds_fmap ds (cofaceMap n i) anys == anySimplex_face ds i anys))
+
+instance DisjointUnionable (DeltaSet a) (DeltaSet b) (DeltaSet (Either1 a b)) where
+
+    disjointUnion a b = DeltaSet face' simps'_ supers' dimension' faceGraph' nodeMap'
+        (sumNumbering (simpsIndexing a) (simpsIndexing b) Left1 Right1)
+                            
+     where
+
+        dimension' =
+                    case (dimension a, dimension b) of
+                        (hda@(HomogenousDim da), (HomogenousDim db)) | da == db -> hda
+                        (da, db) -> InhomogenousDim (max (dimMax da) (dimMax db))
+
+
+        face' :: FaceFunction (Either1 a b)
+        face' i = 
+                    face a i `bimap1` face b i
+
+        simps'_ :: SimpsFunction (Either1 a b)
+        simps'_ n = 
+                    (Left1 <$> simps a n) ++ (Right1 <$> simps b n)
+
+        
+        supers' :: SuperFunction (Either1 a b)
+        supers' = 
+                    (fmap Left1  . supers a) `either1` 
+                    (fmap Right1 . supers b)
+
+        faceGraph' :: FaceGraph (Either1 a b)
+        (faceGraph',nodeEmbedding) = 
+            disjointUnionGraphs 
+                        (\(AnySimplex x) -> AnySimplex (Left1 x))
+                        id 
+                        (\(AnySimplex x) -> AnySimplex (Right1 x))
+                        id 
+                        (faceGraph a) 
+                        (faceGraph b)
+
+
+        nodeMap' (AnySimplex x) =
+            case x of
+                 Left1 x' -> nodeMap a (AnySimplex x') 
+                 Right1 x' -> nodeEmbedding (nodeMap b (AnySimplex x'))
+
 

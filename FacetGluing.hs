@@ -1,22 +1,20 @@
 {-# LANGUAGE StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS -Wall #-}
 module FacetGluing where
 
 import AbstractTetrahedron
-import IndexedSimplices
 import Control.Applicative
 import HomogenousTuples
 import Data.Maybe
 import INormalDisc
 import Control.Exception
-import Control.Monad
 import QuickCheckUtil
 import Test.QuickCheck
 import THUtil
 import Test.QuickCheck.All
 import PrettyUtil
 import Either1
-import Simplicial.SimplicialComplex
 import PreRenderable.TriangleLabel
 
 type Gluing = (ITriangle,OITriangle)
@@ -45,6 +43,7 @@ flipGluing (x1, unpackOrderedFace -> (x2,g)) = (x2, packOrderedFace x1 (inv g))
 class GluingMappable a where
     gluingMap :: Gluing -> a -> a
 
+gluingUnmap :: GluingMappable a => Gluing -> a -> a
 gluingUnmap g a = gluingMap (flipGluing g) a
 
 instance GluingMappable IVertex where
@@ -159,13 +158,14 @@ instance Pretty NormalizedGluing where
 ngToGluing :: NormalizedGluing -> (ITriangle, OITriangle)
 ngToGluing ng = (ngDom ng, ngCod ng)
 
+ngMap :: GluingMappable a => NormalizedGluing -> a -> a
 ngMap = gluingMap . ngToGluing 
 
 instance (GluingMappable (a n), GluingMappable (b n)) => GluingMappable (Either1 a b n) where
     gluingMap = bimap1 <$> gluingMap <*> gluingMap
 
 
-deriving instance (GluingMappable (OTuple' v n)) => GluingMappable (OTuple v n)
+--deriving instance (GluingMappable (OTuple' v n)) => GluingMappable (OTuple v n)
 
 instance (GluingMappable v) => GluingMappable (SimplicialTriangleLabelAssoc v) where
     gluingMap gl stla =

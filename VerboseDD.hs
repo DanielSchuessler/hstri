@@ -221,3 +221,12 @@ ddSolutions = V.map ipr_value . snd
 
 ddSolutions' :: DDResult -> Vector (Vector Integer)
 ddSolutions' = V.map makeVecIntegral . ddSolutions
+
+
+prop_dd tr =
+    let
+        sols = ddSolutions' tr
+    in
+        all (
+
+
