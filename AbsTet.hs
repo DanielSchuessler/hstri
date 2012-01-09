@@ -61,5 +61,5 @@ instance Link Vertex AbsTet Triangle where
 
 -- = 'itriangleByDualVertex'
 instance Link IVertex AbsTet ITriangle where 
-    link v _ = itriangleByDualVertex v
+    link v _ = iTriangleByDualVertex v
 

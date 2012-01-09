@@ -44,7 +44,7 @@ module Triangle(
     itriangleDualVertex,
     iVerticesOfTriangle,
     iTriangleByVertices,
-    itriangleByDualVertex,
+    iTriangleByDualVertex,
 
     -- * Ordered and indexed
     OITriangle,
@@ -497,8 +497,8 @@ itriangleDualVertex = mapI triangleDualVertex
 oitriangleDualVertex :: I OTriangle -> IVertex
 oitriangleDualVertex = mapI otriangleDualVertex
 
-itriangleByDualVertex :: IVertex -> ITriangle
-itriangleByDualVertex = mapI triangleByDualVertex
+iTriangleByDualVertex :: IVertex -> ITriangle
+iTriangleByDualVertex = mapI triangleByDualVertex
 
 
 instance Star Vertex (OneSkeleton Triangle) (Pair Edge) where
