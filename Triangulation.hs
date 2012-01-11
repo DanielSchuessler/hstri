@@ -37,8 +37,7 @@ module Triangulation(
     oEdgeEqv,vertexEqv,
     iEdgeEqv,
     -- * Construction 
-    mkTriangulation,mkTriangulationSafe,mkTriangulationG,triang,randomTriangulation,randT,
-    randomClosed,
+    mkTriangulation,mkTriangulationSafe,mkTriangulationG,triang,
     -- * Transformation
     addGluings,
     -- * Canonical representatives for things that are glued
@@ -50,8 +49,6 @@ module Triangulation(
 
 
 
-    -- * Testing
-    qc_Triangulation,prop_tGluingsIrredundant
     
     ) where
 
@@ -61,7 +58,6 @@ import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Exception
 import Control.Monad.Reader
-import Control.Monad.State
 import Data.Function
 import Data.Maybe
 import Equivalence
@@ -70,26 +66,12 @@ import HomogenousTuples
 import INormalDisc
 import NormalDisc
 import Prelude hiding(catch,lookup)
-import PrettyUtil
-import QuickCheckUtil
 import Quote
-import System.Random
-import Test.QuickCheck
-import Test.QuickCheck.All
-import Test.QuickCheck.Gen
 import qualified Data.List as List
-import THUtil
 import Numbering2
-import {-# SOURCE #-} TriangulationCxtObject
 import qualified Data.Binary as Binary
 
-forAllNonEmptyIntTriangulations :: Testable prop => (Triangulation -> prop) -> Property
-forAllNonEmptyIntTriangulations f = property (\t ->
-    not (Prelude.null (tTetrahedra_ t)) ==>
-        (f t)  )
 
-genI ::  Arbitrary a => Triangulation -> Gen (I a)
-genI t = liftM2 I (genTet t) arbitrary
 
 tGluingsIrredundant :: Triangulation -> [Gluing]
 tGluingsIrredundant tr = 
@@ -103,11 +85,6 @@ tGluingsIrredundant tr =
         filter (not . isRedundant) gluings
 
 
-prop_tGluingsIrredundant :: Triangulation -> Bool
-prop_tGluingsIrredundant tr = 
-    tGlueMap_ tr == tGlueMap_ (mkTriangulation
-                        (tNumberOfTetrahedra tr) 
-                        (tGluingsIrredundant tr)) 
 
 tTetrahedra_ :: Triangulation -> [TIndex]
 tTetrahedra_ tr = if n==0 then [] else [0..tindex (n - 1)]
@@ -141,19 +118,6 @@ tNumberOfTetrahedra :: Num c => Triangulation -> c
 tNumberOfTetrahedra = fi . tNumberOfTetrahedra_
 
 
-instance Pretty Triangulation where
-    pretty tr@Triangulation{..} =
-        prettyRecord "Triangulation" fields
-
-          where
-            fields = [ ("Quote", text (quote tr))
-                     , ("Number of tetrahedra", pretty tNumberOfTetrahedra_)
-                     , ("Triangle gluings", pretty tOriginalGluings)
---                     , ("Edges", pretty edgeEqv)
-                     , ("Canonically ordered edges", 
-                            prettyEdgeEquivalence tr)
-                     , ("Vertices", pretty vertexEqv)
-                     ]
 
 
 mkTriangulation :: Word -> [Gluing] -> Triangulation
@@ -228,89 +192,21 @@ triang gluings = mkTriangulation n gluings
           | otherwise = maximum (concatMap (\(t,o) -> 
                                     [ fi $ getTIndex t, fi $ getTIndex o ]) gluings) + 1
 
-instance Show Triangulation where
-    showsPrec = prettyShowsPrec 
-
-
-
-instance Arbitrary Triangulation where
-    arbitrary = {-# SCC "arbitrary/Triangulation" #-} 
-
-        sized (\n -> do
-            nTets <- choose (1::Int,max 1 (n`div`5))
-            nGluings <- choose (0,2*nTets)
-            randT nTets nGluings
-            )
-
-
-
-    shrink t = 
---            concatMap removeTet (tTetrahedra_ t) ++ 
-            fmap removeGluing (tOriginalGluings t)
-        where
-            removeGluing g = 
-                mkTriangulation (tNumberOfTetrahedra t) (List.delete g (tOriginalGluings t))
-
-generateUntilRight :: Show a => Gen (Either a b) -> Gen b
-generateUntilRight g = fromRight <$> (g `suchThat` isRight)
-
-randT :: Int -> Int -> Gen Triangulation
-randT nTets nGluings = 
-        $(assrt [| nTets > 0 |] 'nTets) $
-        $(assrt [| nGluings >= 0 |] 'nGluings) $
-        $(assrt [| nGluings <= 2*nTets |] ['nGluings,'nTets]) $
-            
-            generateUntilRight go
-    where
-        go = do
-            let 
-                tets = (tindex . fromIntegral) <$> [0..nTets-1]
-
-                loop :: [Gluing] -> Int -> StateT (Set ITriangle) Gen [Gluing] 
-                loop acc 0 = return acc
-                loop acc j = do
-                    t1 <- takeTriangle
-                    t2 <- takeTriangle
-                    g <- lift arbitrary
-                    loop ((t1,packOrderedFace t2 g):acc) (j-1)
-
-                takeTriangle = do
-                    trianglesLeft <- get
-                    ix <- lift (choose (0, setSize trianglesLeft-1))
-                    let res = elemOfSetAt ix trianglesLeft
-                    put (deleteAt ix trianglesLeft)
-                    return res
-
-
-            pairs <- evalStateT (loop [] nGluings) (setFromList ((./) <$> tets <*> allTriangles))
-            
-            return $ mkTriangulationSafe (fi nTets) pairs
 
 
 isBoundaryITriangle ::  Triangulation -> ITriangle -> Bool
 isBoundaryITriangle t x = not (x `memberOfMap` tGlueMap_ t)
 
 
-randomClosed :: Int -> IO Triangulation
-randomClosed n = randomTriangulation n (2*n)
-
-randomTriangulation :: Int -> Int -> IO Triangulation
-randomTriangulation nTets nGluings = do
-    g <- newStdGen 
-    return $ unGen (randT nTets nGluings) g 0 --(error "randomTriangulation: undefined") 
 
 triangTetCount :: Triangulation -> Int
 triangTetCount = length `liftM` tTetrahedra_
 
 
-qc_Triangulation ::  IO Bool
-qc_Triangulation = $quickCheckAll
 
 
 
 
-genTet ::  Triangulation -> Gen TIndex
-genTet = elements . tTetrahedra_ 
 
 
 -- | Allows an arbitrary tetrahedron index set
@@ -404,15 +300,6 @@ getOIEdgeGluingSense t oedge1 oedge2 =
         else Nothing
 
 
-prop_getOIEdgeGluingSense_same :: Triangulation -> Property
-prop_getOIEdgeGluingSense_same tr = forAllElements (tOIEdges tr)
-    (\e -> getOIEdgeGluingSense tr e e == Just NoFlip )
-    
-prop_getOIEdgeGluingSense_sym :: Triangulation -> Property
-prop_getOIEdgeGluingSense_sym tr = 
-    join forAllElements2 (tOIEdges tr) (\(e1, e2) -> f e1 e2 == f e2 e1)
-  where
-        f = getOIEdgeGluingSense tr
 
 class TriangulationDSnakeItem a where
     canonicalize :: Triangulation -> a -> a
@@ -474,10 +361,6 @@ instance TriangulationDSnakeItem INormalQuad where
 instance TriangulationDSnakeItem INormalDisc where
     canonicalize _ = id
 
-prop_forgetVertexOrder_natural_for_canonicalization :: Triangulation -> Property
-prop_forgetVertexOrder_natural_for_canonicalization t =
-    forAllElements (tOIEdges t)
-        (\e -> canonicalize t (forgetVertexOrder e) == forgetVertexOrder (canonicalize t e)) 
 
 
 addGluings :: Triangulation -> [Gluing] -> Either String Triangulation
@@ -515,8 +398,6 @@ disorderEquivalenceClass
      cls -> EqvClassImpl elt
 disorderEquivalenceClass = ecMap forgetVertexOrder
 
-prop_iEdgeEqv :: Triangulation -> Property
-prop_iEdgeEqv tr = polyprop_Equivalence' (iEdgeEqv tr) (tIEdges tr) 
 
 -- | Returns the normal triangles adjacent to the given one, and the arcs witnessing the adjacencies (the first arc of each pair is the arc of the input triangle) 
 adjacentNormalTris

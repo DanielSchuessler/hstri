@@ -11,11 +11,15 @@ module StandardCoordinates(
     stc_fromAssocs,
     ToStandardCoordinates(..),
     vertexLinkingSurface,
+    vertexLinkEulerC,
     -- * Properties
     stc_coefficient,
     stc_coefficientIsZero,
     stc_set,
     normalArcCounts,
+    admissible,
+    satisfiesMatchingEquations,
+    satisfiesQuadrilateralConstraints,
 
     -- * Matching equations
     MatchingEquationReason(..),
@@ -63,7 +67,6 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Triangulation
 import TriangulationCxtObject
-import TupleTH
 import ZeroDefaultMap
 import qualified Data.Foldable as Fold
 import qualified Data.List as L
@@ -151,6 +154,7 @@ stc_coefficient (SC sc) = zdm_get sc . iNormalDisc
 
 instance Num i => NormalSurface (StandardCoordinates i) i where
     discCount = stc_coefficient
+    nsToAssocs = stc_toAssocs
 
 stc_coefficientIsZero
   :: (Num r, MakeINormalDisc a) =>
@@ -319,6 +323,37 @@ instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
 
                                           
 
+admissible
+  :: (Num r, Ord r) => Triangulation -> StandardCoordinates r -> Either String ()
+admissible tr stc@(SC m) = do
+    Fold.mapM_ (\r -> unless (r >= 0) (Left ("Negative coefficient"))) m
+    satisfiesQuadrilateralConstraints (tTetrahedra_ tr) stc 
+    satisfiesMatchingEquations tr stc
+
+satisfiesMatchingEquations
+  :: Num r =>
+     Triangulation -> StandardCoordinates r -> Either [Char] ()
+satisfiesMatchingEquations tr stc =
+        mapM_ p (matchingEquationReasons tr)
+    where
+        p me = unless (r==0)
+                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
+            where
+                r = matchingEquationReasonToVector me <.> stc
+
+satisfiesQuadrilateralConstraints
+  :: (Num r, Ord r) =>
+     [TIndex] -> StandardCoordinates r -> Either String ()
+satisfiesQuadrilateralConstraints tets stc = 
+        mapM_ p tets
+    where
+        p tet = 
+            unless (sum3 (map3 f (normalQuads tet)) <= (1::Int))
+                   (Left ("Quadrilateral constraints violated at tet "++show tet))
+
+        f quad = if stc_coefficient stc (iNormalDisc quad) == 0 
+                    then 0
+                    else 1
 
 
 
@@ -336,7 +371,12 @@ instance ToStandardCoordinates a => ToStandardCoordinates [a] where
 vertexLinkingSurface :: TVertex -> StandardCoordinates Integer
 vertexLinkingSurface = standardCoordinates . vertexLinkingSurfaceTris
 
+vertexLinkEulerC :: TVertex -> Rational
+vertexLinkEulerC v = eulerCRatio (getTriangulation v) . vertexLinkingSurface $ v 
+
 stc_set
   :: (Num r, MakeINormalDisc a) =>
      a -> r -> StandardCoordinates r -> StandardCoordinates r
 stc_set d r (SC m) = SC (zdm_set (iNormalDisc d) r m)
+
+

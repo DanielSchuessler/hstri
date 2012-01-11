@@ -348,10 +348,10 @@ makeVecIntegral ro =
     in
         VG.map (f . (fromIntegral l*)) ro
 
-instance Integral i => AdditiveGroup (Ratio i) where
-    zeroV = 0
-    (^+^) = (+)
-    negateV = negate
+-- instance Integral i => AdditiveGroup (Ratio i) where
+--     zeroV = 0
+--     (^+^) = (+)
+--     negateV = negate
 
 
 symbolicSolution

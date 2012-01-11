@@ -48,4 +48,7 @@ spqwc = makeEdgeNeighborhood tr oiedge glab
                   (show . getTIndex . ngCod) ng
                  
 
+tr_e = mkTriangulation 2 [(0 ./ tABD, 1 ./ oCDB), (1 ./ tABD, 0 ./ oACB), (0 ./ tBCD, 1 ./ oDCA)]
+
+quad_e = quad_singleton (0./Q_ab) 1
 

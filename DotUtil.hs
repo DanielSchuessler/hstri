@@ -47,6 +47,7 @@ import System.Exit
 import System.SimpleArgs
 import THUtil
 import Triangulation.CanonOrdered
+import Triangulation.Random
 import TriangulationCxtObject
 import qualified Data.Map as M
 import qualified Data.Text.Lazy as Text
@@ -200,6 +201,9 @@ bendMultiedges edges_ =
                                     multiplyLen 1 lenFactor (edgeAttributes e) }
 
             where 
+              extraAttrs :: Attributes
+              lenFactor :: Double
+
               (extraAttrs,lenFactor) =
                 case edgeCount M.! endpoints e of
                      [_] -> ([],1)--0.82)

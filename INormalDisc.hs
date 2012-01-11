@@ -56,8 +56,21 @@ instance MakeINormalArc (ITriangle,IVertex) where
 instance MakeINormalArc (OITriangle,IVertex) where
     iNormalArc (t,v) = iNormalArc (forgetVertexOrder t,v)
 
+
 instance NormalCorners INormalArc (Pair INormalCorner) where
     normalCorners = traverseI map2 normalCorners
+
+instance NormalCorners TIndex (Sextuple INormalCorner) where
+    normalCorners ti = map6 (ti ./) allNormalCorners'
+
+instance NormalCorners ITriangle (Triple INormalCorner) where
+    normalCorners = traverseI map3 normalCorners
+
+instance NormalCorners INormalTri (Triple INormalCorner) where
+    normalCorners = traverseI map3 normalCorners
+    
+instance NormalCorners INormalQuad (Quadruple INormalCorner) where
+    normalCorners = traverseI map4 normalCorners
 
 instance MakeINormalTri IVertex where
     iNormalTri = mapI normalTri
@@ -69,11 +82,6 @@ instance MakeINormalDisc INormalQuad where
     iNormalDisc = mapI normalDisc
 
 
-instance NormalCorners TIndex (Sextuple INormalCorner) where
-    normalCorners ti = map6 (ti ./) allNormalCorners'
-
-instance NormalCorners ITriangle (Triple INormalCorner) where
-    normalCorners = traverseI map3 normalCorners
 
 instance NormalArcs TIndex [INormalArc] where
     normalArcs ti = map (ti ./) allNormalArcs

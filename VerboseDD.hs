@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module VerboseDD 
     (module InnerProductRepresentation,
@@ -7,7 +7,11 @@ module VerboseDD
      PairFateKind(..),
      ddSolutions,
      ddSolutions',
-     ppDDRes)
+     ppDDRes,
+     
+        -- * Testing
+        qc_VerboseDD
+     )
 
 
     where
@@ -27,6 +31,9 @@ import VectorUtil
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import MathUtil
+import StandardCoordinates
+import Test.QuickCheck.All
+import Test.QuickCheck
 
 data PairFate = 
     PairFate {
@@ -95,8 +102,10 @@ dd tr =
             loop mempty 1 _V0
 
         loop acc i _Vp 
-            | i == g = return (reverse acc,_Vp) 
+            | i == g+1 = return (reverse acc,_Vp) 
             | otherwise =
+
+--                 $(traceExps "dd/loop" [ [|i|],[|V.length _Vp|] ]) $
 
             let
                 (_Sneg,_Snn ) = V.partition ((<0)  . ipr_head) _Vp
@@ -222,11 +231,34 @@ ddSolutions = V.map ipr_value . snd
 ddSolutions' :: DDResult -> Vector (Vector Integer)
 ddSolutions' = V.map makeVecIntegral . ddSolutions
 
+ddSolutionsQC
+  :: Triangulation
+     -> DDResult -> Vector (QuadCoordinates Integer)
+ddSolutionsQC tr = V.map (quad_fromVector tr) . ddSolutions' 
 
+ddSolutionsSC
+  :: Triangulation
+     -> DDResult -> Vector (StandardCoordinates Integer)
+ddSolutionsSC tr = V.map (canonExt tr) . ddSolutionsQC tr
+
+               
+prop_dd :: Triangulation -> Bool
 prop_dd tr =
     let
-        sols = ddSolutions' tr
+        sols = ddSolutionsQC tr (dd tr)
     in
-        all (
+        either error (const True) 
+            (V.mapM_ (quad_admissible tr) sols)
 
+prop_dd' :: Triangulation -> Property
+prop_dd' tr =
+    tNumberOfTetrahedra_ tr <= 10 ==>
+                                                               
+    let
+        sols = ddSolutionsQC tr (dd tr)
+    in V.all (either error (const True) . admissible tr . canonExtDbg tr) sols
+
+
+qc_VerboseDD :: IO Bool
+qc_VerboseDD = $quickCheckAll
 

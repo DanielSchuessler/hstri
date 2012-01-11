@@ -2,7 +2,7 @@
 -- see
 -- http://www.haskell.org/cabal/release/cabal-latest/doc/users-guide/authors.html#pkg-descr.
 Name:                hstri
-Version:             0.1
+Version:             0.2
 -- Synopsis:            
 -- Description:         
 License:             GPL-3
@@ -27,6 +27,7 @@ Library
     BarySD
     Blender
     Blenderable
+    ClosedOrCensus6
     Collections
     ConcreteNormal
     ConcreteNormal.PreRenderable
@@ -34,7 +35,7 @@ Library
     Data.AscTuples
     DisjointUnion
     DotUtil
-    Edge
+    Tetrahedron.Edge
     EdgeCentered
     Either1
     Element
@@ -99,15 +100,17 @@ Library
     TIndex
     ToPython
     TriArcGraph
-    Triangle
+    Tetrahedron.Triangle
     Triangulation
+    Triangulation.Tests
+    Triangulation.Random
     Triangulation.CanonOrdered
     TriangulationCxtObject
     UPair
     Util
     VectorUtil
     VerboseDD
-    Vertex
+    Tetrahedron.Vertex
     ZeroDefaultMap
 
 
@@ -151,12 +154,12 @@ Library
         time,
         transformers,
         transformers-compose,
-        tuple-th,
+        tuple-th >= 0.2.3,
         type-level-tf2,
         vect,
         vect-opengl,
         vector,
-        vector-space,
+        vector-space >= 0.8.0,
         xml,
         xml-monad,
         criterion

@@ -2,10 +2,10 @@
 -- | The tetrahedron
 module AbsTet where
 import TIndex
-import Vertex
+import Tetrahedron.Vertex
 import HomogenousTuples
-import Edge
-import Triangle
+import Tetrahedron.Edge
+import Tetrahedron.Triangle
 import Data.Tuple.OneTuple
 
 instance HasTIndex TIndex AbsTet where

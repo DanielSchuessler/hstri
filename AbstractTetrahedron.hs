@@ -1,5 +1,4 @@
-{-# LANGUAGE CPP, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns, BangPatterns #-}
--- {-# OPTIONS -ddump-splices #-}
+{-# LANGUAGE NoMonomorphismRestriction, FlexibleInstances, TemplateHaskell, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
 {-# OPTIONS -Wall #-}
 module AbstractTetrahedron(
     module S2,
@@ -7,9 +6,9 @@ module AbstractTetrahedron(
     module Util,
     module TIndex,
     module Data.Monoid,
-    module Vertex,
-    module Edge,
-    module Triangle,
+    module Tetrahedron.Vertex,
+    module Tetrahedron.Edge,
+    module Tetrahedron.Triangle,
     module AbsTet,
     module AbstractTetrahedron2,
     module OrderableFace,
@@ -36,9 +35,9 @@ import S3
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Util
-import Vertex
-import Edge
-import Triangle
+import Tetrahedron.Vertex
+import Tetrahedron.Edge
+import Tetrahedron.Triangle
 import TIndex
 import OrderableFace
 import Data.Monoid(Monoid(..),mconcat)

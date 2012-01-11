@@ -20,6 +20,7 @@ module TriangulationCxtObject(
     -- ** Construction
     MakeTVertex(..),
     NormalArcPreimage(..),
+    tVerticesOfIEdge,
     -- ** Properties
     equivalentIVertices,
     vertexLinkingSurfaceTris,
@@ -45,6 +46,7 @@ module TriangulationCxtObject(
     -- * Triangles
     TTriangle,
     triangleEquivalence,
+    iTriangleEqv,
     -- ** Construction
     MakeTTriangle(..),
     boundaryTriangles,
@@ -52,6 +54,7 @@ module TriangulationCxtObject(
     -- ** Properties
     isBoundaryTriangle,
     preimageListOfTriangle,
+    eqvTriangles,
 
 
     -- * Normal corners
@@ -70,6 +73,7 @@ module TriangulationCxtObject(
     tNormalArcsAroundVertex,
     toInnNA,
     innNAs,
+    innNAFromPreimage,
     -- ** Properties
     normalArcPreimage,
     isBoundaryNormalArc,
@@ -84,10 +88,12 @@ module TriangulationCxtObject(
 
     -- * Misc
     triArcGraph,
+
+    -- * For testing
+    isSubface_ET,isSubface_VE,isSubface_TTet
     
-    -- * Testing
-    qc_TriangulationCxtObject 
     ) where
+
 
 import AbstractTetrahedron
 import Collections
@@ -108,14 +114,11 @@ import NormalDisc
 import Numbering2
 import Prelude hiding(catch,lookup)
 import PrettyUtil
-import QuickCheckUtil
 import ShortShow
 import THUtil
-import Test.QuickCheck
-import Test.QuickCheck.All
 import Triangulation
 import Triangulation.CanonOrdered
-import UPair
+import Quote
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -169,8 +172,6 @@ type instance Element TVertex = IVertex
 vertexEquivalence :: Triangulation -> EnumEqvImpl TVertex
 vertexEquivalence tr = enumEqvImpl (pMap tr) (vertices tr)
 
-prop_vertexEquivalence :: Triangulation -> Property
-prop_vertexEquivalence tr = polyprop_Equivalence' (vertexEquivalence tr) (tIVertices tr)
 
 instance AsList TVertex where
     asList = preimageListOfVertex
@@ -209,8 +210,6 @@ instance IsEquivalenceClass TEdge where
 edgeEquivalence :: Triangulation -> EnumEqvImpl TEdge
 edgeEquivalence tr = enumEqvImpl (pMap tr . forgetVertexOrder . unCanonOrdered) (edges tr)
 
-prop_edgeEquivalence :: Triangulation -> Property
-prop_edgeEquivalence tr = polyprop_Equivalence' (edgeEquivalence tr) (tCOIEdges tr)
     
 
 type instance Element TTriangle = COITriangle
@@ -245,9 +244,6 @@ triangleEquivalence tr =
     enumEqvImpl 
         (pMap tr . forgetVertexOrder . unCanonOrdered)
         (triangles tr)
-                                      
-prop_triangleEquivalence :: Triangulation -> Property
-prop_triangleEquivalence tr = polyprop_Equivalence' (triangleEquivalence tr) (tCOITriangles tr)
 
 iTriangleEqv :: Triangulation -> EnumEqvImpl (EqvClassImpl ITriangle)
 iTriangleEqv tr = 
@@ -258,9 +254,6 @@ iTriangleEqv tr =
             (\t -> ecMap f (pMap tr t))
             (fmap (ecMap f) (triangles tr)) 
         
-
-prop_iTriangleEqv :: Triangulation -> Property
-prop_iTriangleEqv tr = polyprop_Equivalence' (iTriangleEqv tr) (tITriangles tr)
 
 
 class MakeTVertex a where tvertex :: a -> TVertex
@@ -366,12 +359,6 @@ instance  Pretty TNormalQuad where
 instance  Pretty TNormalDisc where
     pretty = pretty . unT
 
-
-prop_VerticesOfEdge_welldefined :: Triangulation -> Property
-prop_VerticesOfEdge_welldefined tr = 
-    polyprop_respects (iEdgeEqv tr) trivialEquivalence 
-       (elements (tIEdges tr))
-       (uncurry uPair . tVerticesOfIEdge tr) 
                 
                 
 
@@ -432,30 +419,6 @@ instance IsSubface TTriangle TIndex where
 
 
 
-prop_IsSubface_TTet_welldefined :: Triangulation -> Property
-prop_IsSubface_TTet_welldefined t = 
-    forAllElements2 (unT <$> triangles t) (tTetrahedra_ t)
-        (mkWellDefinednessProp2 (eqvTriangles t) ((:[]))
-            (isSubface_TTet t))  
-
-prop_IsSubface_VE_welldefined :: Triangulation -> Property
-prop_IsSubface_VE_welldefined t = 
-    forAllElements (vertices t) $ \v ->
-    polyprop_respects (iEdgeEqv t) trivialEquivalence (elements $ tIEdges t)
-        (isSubface_VE v)
-
-
-
-prop_IsSubface_ET_welldefined :: Triangulation -> Property
-prop_IsSubface_ET_welldefined t = 
-    forAllElements (edges t) $ \e ->
-        polyprop_respects 
-            (iTriangleEqv t) 
-            trivialEquivalence 
-            (elements $ tITriangles t)
-            (isSubface_ET e)
-
-
 
 
 
@@ -490,21 +453,9 @@ instance Triangles (Triangulation, TIndex)  where
     triangles (t,i) = map4 (pMap t) (triangles i)
 
 
-prop_TIndexToTTriangles_surjective ::  Triangulation -> Property
-prop_TIndexToTTriangles_surjective t = setEq (triangles t) (concatMap (triangleList . (t,)) (tTetrahedra_ t)) 
-
-prop_TTrianglesToTEdges_surjective ::  Triangulation -> Property
-prop_TTrianglesToTEdges_surjective t = setEq (edges t) (concatMap edgeList (triangles t)) 
-
-
-prop_TEdgesToTVertices_surjective ::  Triangulation -> Property
-prop_TEdgesToTVertices_surjective t = setEq (vertices t) (concatMap vertexList (edges t)) 
 
 lookupGluingOfTTriangle :: TTriangle -> Maybe OITriangle
 lookupGluingOfTTriangle (UnsafeMakeT t rep) = lookup rep (tGlueMap_ t)
-
-qc_TriangulationCxtObject ::  IO Bool
-qc_TriangulationCxtObject = $quickCheckAll
 
 instance NormalArcs (T INormalTri) (Triple TNormalArc) where
     normalArcs (UnsafeMakeT t x) = map3 (pMap t) (normalArcs x) 
@@ -522,14 +473,6 @@ instance NormalArcs TTriangle (Triple TNormalArc) where
     normalArcs (UnsafeMakeT t x) = map3 (UnsafeMakeT t) (normalArcs x)
 
 
-prop_normalArcsOfTriangulationAreCanonical :: Triangulation -> Property
-prop_normalArcsOfTriangulationAreCanonical tr =
-    forAll (elements (normalArcs tr))
-        (\(UnsafeMakeT _ arc) -> arc == canonicalize tr arc)
-
-prop_normalArcsOfTriangulationAreDistinct :: Triangulation -> Bool
-prop_normalArcsOfTriangulationAreDistinct tr =
-    not (hasDuplicates (normalArcs tr))
 
 
 instance NormalCorners TNormalArc (Pair TNormalCorner) where
@@ -609,11 +552,6 @@ innerNormalArcs = filter (not . isBoundaryNormalArc) . normalArcs
 boundaryNormalArcs :: Triangulation -> [TNormalArc]
 boundaryNormalArcs = filter isBoundaryNormalArc . normalArcs
 
-prop_normalArcs_triangles :: Triangulation -> Property
-prop_normalArcs_triangles tr =
-    length (innerNormalArcs tr) .=. 3 * length (innerTriangles tr) 
-    .&.
-    length (boundaryNormalArcs tr) .=. 3 * length (boundaryTriangles tr) 
 
 
 
@@ -627,20 +565,6 @@ dfsVertexLink v = dfs nt0 (adjacentNormalTris (getTriangulation v))
         nt0 = iNormalTri (unT v)
         
 
-prop_dfsVertexLink :: Triangulation -> Property
-prop_dfsVertexLink tr = forAllElements (vertices tr)
-    (\v -> case dfsVertexLink v of
-                elt -> $(ppTestCase 'elt) 
-                
-                        ((noDupes . eltNodes) elt
-                         .&.
-                         setEq (eltNodes elt) (vertexLinkingSurfaceTris v)
-                         .&.
-                         isSubset 
-                            (map (uncurry innNAFromPreimage) . eltEdges $ elt) 
-                            (innNAsAroundVertex $ v)
-                        
-                        ))
 
 itrianglesContainingEdge :: TEdge -> [ITriangle]
 itrianglesContainingEdge =
@@ -660,12 +584,6 @@ tNormalArcsAroundVertex v =
     nub' . fmap p . iNormalArcsAroundTVertex $ v
   where
     p = pMap (getTriangulation v)
-
--- prop_tNormalArcsAroundVertex tr =
---     forAllElements (vertices tr) $ \v ->
---         setEq
---             (tNormalArcsAroundVertex v)
---             (filter 
 
 normalTrisContainingInnNA :: InnNA -> Pair INormalTri
 normalTrisContainingInnNA (InnNA ina1 ina2) = 
@@ -718,4 +636,20 @@ triArcGraph tr =
 
 prettyEdgeEquivalence :: Triangulation -> Doc
 prettyEdgeEquivalence = prettyEquivalence . edgeEquivalence
+
+instance Pretty Triangulation where
+    pretty tr =
+        prettyRecord "Triangulation" fields
+
+          where
+            fields = [ ("Quote", text (quote tr))
+                     , ("Number of tetrahedra", pretty (tNumberOfTetrahedra_ tr))
+                     , ("Triangle gluings", pretty (tOriginalGluings tr))
+                     , ("Canonically ordered edges", 
+                            prettyEdgeEquivalence tr)
+                     , ("Vertices", pretty (vertexEqv tr))
+                     ]
+
+instance Show Triangulation where
+    showsPrec = prettyShowsPrec 
 

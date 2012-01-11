@@ -1,6 +1,6 @@
 
 import Prelude
-import Edge
+import Tetrahedron.Edge
 import {-# SOURCE #-} qualified Vertex
 
 

@@ -145,6 +145,8 @@ indexInTriple x (x1,x2,x3) | x == x1 = 0
 intersect2_2 :: Eq a => (a, a) -> (a, a) -> [a]
 intersect2_2 xs ys = filter2 (`elem2` ys) xs 
     
+sum3 :: Num a => Triple a -> a
+sum3 = $(sumTuple 3)
 
 sum4 :: Num a => Quadruple a -> a
 sum4 = $(sumTuple 4)

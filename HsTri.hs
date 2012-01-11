@@ -23,7 +23,9 @@ module HsTri(
     module THUtil,
     module VerboseDD,
     module EqvGraphs,
-    module QuadCoordinates
+    module QuadCoordinates,
+    module Triangulation.Random,
+    module TriArcGraph
 
     ) where
 
@@ -34,6 +36,7 @@ import ConcreteNormal.PreRenderable
 import Data.Vect.Double.Base(Vec3)
 import DisjointUnion
 import Either1
+import EqvGraphs
 import ExampleTriangulations
 import FaceLattice
 import HomogenousTuples
@@ -44,10 +47,11 @@ import NormalDisc
 import NormalSurface
 import PreRenderable
 import PrettyUtil
+import QuadCoordinates
 import Simplicial.DeltaSet
 import StandardCoordinates
 import THUtil
 import TriangulationCxtObject
+import Triangulation.Random
 import VerboseDD
-import EqvGraphs
-import QuadCoordinates
+import TriArcGraph

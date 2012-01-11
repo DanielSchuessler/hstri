@@ -5,8 +5,7 @@ module Triangulation.CanonOrdered(
     module Triangulation,
     CanonOrdered(..),COIEdge,COITriangle,
     CanonicallyOrderable(..),isCanonicallyOrdered,tCOIEdges,tCOITriangles,
-    -- * Testing
-    qc_CanonOrdered
+    polyprop_CanonicallyOrderable
 ) where
 
 
@@ -23,7 +22,7 @@ import FacetGluing
 import QuickCheckUtil
 import Data.Proxy
 import Triangulation
-import Test.QuickCheck.All
+import Triangulation.Random()
 
 
 
@@ -94,11 +93,3 @@ polyprop_CanonicallyOrderable (_ :: Proxy ot) tr =
 --     forAllElements 
 
 
-prop_CanonicallyOrderable_Triangle :: Triangulation -> Property
-prop_CanonicallyOrderable_Triangle = polyprop_CanonicallyOrderable (undefined :: Proxy OITriangle)
-
-prop_CanonicallyOrderable_Edge :: Triangulation -> Property
-prop_CanonicallyOrderable_Edge = polyprop_CanonicallyOrderable (undefined :: Proxy OIEdge)
-
-qc_CanonOrdered :: IO Bool
-qc_CanonOrdered = $quickCheckAll

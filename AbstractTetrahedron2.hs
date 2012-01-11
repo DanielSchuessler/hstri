@@ -2,7 +2,7 @@
 module AbstractTetrahedron2 where
 
 import S3
-import Triangle
+import Tetrahedron.Triangle
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Data.List((\\))

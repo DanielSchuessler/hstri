@@ -24,7 +24,7 @@ import ShortShow
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
-import Vertex
+import Tetrahedron.Vertex
 import PreRenderable.TriangleLabel
 
 

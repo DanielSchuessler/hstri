@@ -25,6 +25,7 @@ import TriangulationCxtObject
 import ZeroDefaultMap
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
+import qualified Data.Foldable as Fold
 
 newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
     deriving(AdditiveGroup,InnerSpace,Eq)
@@ -56,8 +57,6 @@ prop_standardToQuad_VertexLinkingSurface (tr :: Triangulation) =
     forAll (elements (vertices tr)) 
         (\v -> standardToQuad (vertexLinkingSurface v) == zeroV)
 
-qc_QuadCoordinates :: IO Bool
-qc_QuadCoordinates = $(quickCheckAll)
 
 canonExtDbg
   :: (Num r, Ord r, Pretty r) =>
@@ -68,7 +67,7 @@ canonExtDbg tr qc =
 
              case admissible tr sc of
                 Right () -> sc
-                Left str -> error ("canonExtDbg: result not admissible:\n"++show str++"\n"++
+                Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
                                     $(showExps ['qc,'sc]))
 
 
@@ -207,13 +206,13 @@ quad_fromVector
      Triangulation -> v r -> QuadCoordinates r
 quad_fromVector tr = quad_fromDenseList tr . VG.toList
 
-unrestrictedQC
+unrestrictedQCGen
   :: (Num r, Arbitrary r) => Triangulation -> Gen (QuadCoordinates r)
-unrestrictedQC tr = QC <$> zdm_gen (tINormalQuads tr) 
+unrestrictedQCGen tr = QC <$> zdm_gen (tINormalQuads tr) 
 
 prop_toFromDenseList :: Triangulation -> Property
 prop_toFromDenseList tr =
-        forAll (unrestrictedQC tr) 
+        forAll (unrestrictedQCGen tr) 
             (\(qc :: QuadCoordinates Int) -> 
                 quad_fromDenseList tr (quad_toDenseList tr qc) .=. qc)
 
@@ -246,3 +245,45 @@ qMatchingEquationsMatrixRat = qMatchingEquationsMatrix
 quad_toNonzeroAssocs
   :: Num b => QuadCoordinates b -> [(INormalQuad, b)]
 quad_toNonzeroAssocs = zdm_toNonzeroAssocs . quad_toZDM
+
+quad_admissible
+  :: (Num r, Ord r, Pretty r) => Triangulation -> QuadCoordinates r -> Either String ()
+quad_admissible tr qc@(QC m) = do
+    Fold.mapM_ (\r -> unless (r >= 0) (Left ("Negative coefficient"))) m
+    quad_satisfiesQuadrilateralConstraints (tTetrahedra_ tr) qc 
+    satisfiesQMatchingEquations tr qc
+
+satisfiesQMatchingEquations
+  :: (Pretty r, Num r) =>
+     Triangulation -> QuadCoordinates r -> Either [Char] ()
+satisfiesQMatchingEquations tr qc =
+        mapM_ p (qMatchingEquations tr)
+    where
+        p me = unless (r==0)
+                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
+            where
+                r = me <.> qc
+
+prop_satisfiesQMatchingEquationsControl
+  :: Triangulation -> Property
+prop_satisfiesQMatchingEquationsControl tr =
+    expectFailure (forAll (unrestrictedQCGen tr
+        :: Gen (QuadCoordinates Integer)) (isRight . satisfiesQMatchingEquations tr))
+
+quad_satisfiesQuadrilateralConstraints
+  :: (Num r, Ord r) =>
+     [TIndex] -> QuadCoordinates r -> Either String ()
+quad_satisfiesQuadrilateralConstraints tets qc = 
+        mapM_ p tets
+    where
+        p tet = 
+            unless (sum3 (map3 f (normalQuads tet)) <= (1::Int))
+                   (Left ("Quadrilateral constraints violated at tet "++show tet))
+
+        f quad = if quad_coefficient qc quad == 0 
+                    then 0
+                    else 1
+
+
+qc_QuadCoordinates :: IO Bool
+qc_QuadCoordinates = $(quickCheckAll)

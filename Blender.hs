@@ -271,7 +271,7 @@ handleTriLabel ba grpTriLabels t =
                                 
                                 * tl_scale tl
 
-                        m = -- $(traceExps "tri" ['t,'text,'textCenterBase,'thescale]) $ 
+                        m = --   $(traceExps "tri" ['t,'text,'textCenterBase,'thescale]) $ 
 
                             scalingUniformProj4 thescale 
                             .*.
