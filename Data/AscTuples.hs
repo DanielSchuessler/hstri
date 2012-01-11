@@ -9,7 +9,7 @@ import Element
 import HomogenousTuples
 import Language.Haskell.TH
 import PrettyUtil
-import S3
+import Math.Groups.S3
 import ShortShow
 import TupleTH
 import Util

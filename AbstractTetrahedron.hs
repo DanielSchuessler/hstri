@@ -1,8 +1,8 @@
 {-# LANGUAGE NoMonomorphismRestriction, FlexibleInstances, TemplateHaskell, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
 {-# OPTIONS -Wall #-}
 module AbstractTetrahedron(
-    module S2,
-    module S3,
+    module Math.Groups.S2,
+    module Math.Groups.S3,
     module Util,
     module TIndex,
     module Data.Monoid,
@@ -30,8 +30,8 @@ import Control.Exception
 import Control.Monad.RWS
 import HomogenousTuples
 import Prelude hiding(catch,lookup)
-import S2
-import S3
+import Math.Groups.S2
+import Math.Groups.S3
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Util

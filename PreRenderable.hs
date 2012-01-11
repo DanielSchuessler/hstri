@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, FlexibleContexts, UndecidableInstances, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
 {-# OPTIONS -Wall #-}
 module PreRenderable(
-    module S3,
+    module Math.Groups.S3,
     TriangleLabel(..),
     defaultTriangleLabelUpDisplacement,
     PreRenderable(..),
@@ -19,7 +19,7 @@ module PreRenderable(
 import Data.Vect.Double.Base
 import DisjointUnion
 import GHC.Generics
-import S3
+import Math.Groups.S3
 import ShortShow
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet2

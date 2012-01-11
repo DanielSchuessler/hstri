@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS -Wall #-}
 module PreRenderable.TriangleLabel where
-import S3
+import Math.Groups.S3
 import PrettyUtil
 import THUtil
 import qualified Data.Map as M

@@ -1,5 +1,5 @@
 {-# LANGUAGE Rank2Types, NoMonomorphismRestriction, BangPatterns #-}
-module S3 where
+module Math.Groups.S3 where
 import Data.Monoid
 import Data.Maybe
 

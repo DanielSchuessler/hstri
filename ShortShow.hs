@@ -4,8 +4,8 @@ module ShortShow where
 import TypeLevel.TF.List
 import Element
 import Data.List
-import S2
-import S3
+import Math.Groups.S2
+import Math.Groups.S3
 import Data.Word
 
 

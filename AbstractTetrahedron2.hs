@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module AbstractTetrahedron2 where
 
-import S3
+import Math.Groups.S3
 import Tetrahedron.Triangle
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax

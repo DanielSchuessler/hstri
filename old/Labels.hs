@@ -12,7 +12,7 @@ import DisjointUnion
 import Element
 import Simplicial.GraphComplex
 import HomogenousTuples
-import S3
+import Math.Groups.S3
 import Simplicial.AnySimplex
 import Simplicial.DeltaSet
 import TypeLevel.TF.Fun
