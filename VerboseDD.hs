@@ -24,16 +24,17 @@ import Data.List as L
 import Data.Ord
 import Data.Vector(Vector)
 import InnerProductRepresentation
+import MathUtil
 import PrettyUtil
 import QuadCoordinates
+import StandardCoordinates
+import Test.QuickCheck
+import Test.QuickCheck.All
 import TriangulationCxtObject
+import Util
 import VectorUtil
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
-import MathUtil
-import StandardCoordinates
-import Test.QuickCheck.All
-import Test.QuickCheck
 
 data PairFate = 
     PairFate {

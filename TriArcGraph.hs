@@ -1,24 +1,26 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances, TupleSections, FunctionalDependencies, MultiParamTypeClasses, ImplicitParams, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, TypeSynonymInstances, ScopedTypeVariables, FlexibleContexts, GeneralizedNewtypeDeriving, StandaloneDeriving, ExistentialQuantification #-}
-module TriArcGraph(test,ta_toDot,triArcGraphDot,triArcGraphDotNoQuad,taq) where
+{-# LANGUAGE OverloadedStrings, ViewPatterns #-}
+module TriArcGraph(test,ta_toDot,triArcGraphDot,triArcGraphDotNoQuad,taq,ta) where
 
 
+import Control.Monad
 import Data.AdditiveGroup
 import Data.Char
 import Data.Graph.Inductive
+import Data.Maybe
 import Data.Vector(Vector)
 import DotUtil
 import Latexable
 import MathUtil
 import Prelude hiding(writeFile)
+import PrettyUtil
 import QuadCoordinates
 import Triangulation.CanonOrdered
+import Triangulation.Class
 import TriangulationCxtObject
 import ZeroDefaultMap
-import qualified Data.Vector as V
 import qualified Data.Text.Lazy as Text
-import PrettyUtil
-import Data.Maybe
-import Control.Monad
+import qualified Data.Vector as V
+import System.Exit
 
 
 
@@ -114,16 +116,22 @@ markings = "decoration={markings,mark=between positions 0 and 1 step 0.1 with {\
 
 
 triArcGraphDot
-  :: (AdditiveGroup a, Eq a, Latexable a, Num a) =>
-     Triangulation -> Maybe (QuadCoordinates a) -> DotGraph Node
-triArcGraphDot tr mbQuadVector = ta_toDot (triArcGraph tr) mbQuadVector
+  :: (Num a, AdditiveGroup a, ToTriangulation t, Latexable a) =>
+     t -> Maybe (QuadCoordinates a) -> DotGraph Node
+triArcGraphDot (toTriangulation -> tr) mbQuadVector = ta_toDot (triArcGraph tr) mbQuadVector
 
-triArcGraphDotNoQuad :: Triangulation -> DotGraph Node
+triArcGraphDotNoQuad :: ToTriangulation t => t -> DotGraph Node
 triArcGraphDotNoQuad tr = triArcGraphDot tr (Nothing :: Maybe (QuadCoordinates Integer))
 
 
 ta_symSol tr me = triArcGraphDot tr (Just . quad_fromVector tr . snd $ symbolicSolution me quadVar)
 
+ta :: ToTriangulation t => t -> IO ExitCode
+ta tr = viewDot (triArcGraphDotNoQuad tr)
+
+taq
+  :: (Num a, AdditiveGroup a, ToTriangulation t, Latexable a) =>
+     t -> QuadCoordinates a -> IO ExitCode
 taq tr quad = viewDot (triArcGraphDot tr (Just quad)) 
 
 test tr = 

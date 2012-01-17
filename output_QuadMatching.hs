@@ -1,17 +1,5 @@
 {-# LANGUAGE TupleSections, ExtendedDefaultRules #-}
-import ExampleTriangulations
-import NormalEverything
-import Element
-import Blenderable
-import Blender
-import DisjointUnion
-import ConcreteNormal.PreRenderable
-import Simplicial.DeltaSet
-import Simplicial.AnySimplex
-import TriangulationCxtObject
-import HomogenousTuples
-import Data.Function
-import PrettyUtil
+import HsTri
 
 n = 4
 
@@ -38,14 +26,20 @@ irrelevants =
      :
      [ vertexLinkingSurface (pMap tr (i ./ vC)) | i <- is]) 
 
+orderProblem = canonExt tr (quad_fromNormalSurface  [0./Q_ac, 1./Q_ad, 2./Q_ad, 3./Q_ac]) 
+
+
+-- orderProblemCam =
+--  (Vector((-2.74153470993042, -3.1508467197418213, 0.28193315863609314)), Euler((1.5094698667526245, -9.01907424122328e-06, -0.7160851359367371), 'XYZ'))
+
+-- orderProblemCam2 =
+    -- (Vector((-4.257680416107178, -0.0048864055424928665, 0.33231738209724426)), Euler((1.4978764057159424, -1.8658225826584385e-06, -1.6015570163726807), 'XYZ'))
 
 main = (testBlender . setCams [octahedronCam1])
         (defaultScene
             (
-                (fromSpqwc spqwc)
-                `disjointUnion`
-                fromNormalSurface spqwc 
-                    (irrQuads ^+^ linkBot ^+^ linkTop)
+                fromSpqwcAndIntegerNormalSurface spqwc
+                    orderProblem
             )
         )
     

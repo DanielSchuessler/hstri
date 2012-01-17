@@ -3,7 +3,6 @@
 module AbstractTetrahedron(
     module Math.Groups.S2,
     module Math.Groups.S3,
-    module Util,
     module TIndex,
     module Data.Monoid,
     module Tetrahedron.Vertex,
@@ -34,7 +33,6 @@ import Math.Groups.S2
 import Math.Groups.S3
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Util
 import Tetrahedron.Vertex
 import Tetrahedron.Edge
 import Tetrahedron.Triangle

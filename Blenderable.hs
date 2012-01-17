@@ -1,4 +1,4 @@
-{-# LANGUAGE FunctionalDependencies, StandaloneDeriving, FlexibleContexts, FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns, RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell, FunctionalDependencies, StandaloneDeriving, FlexibleContexts, FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns, RecordWildCards #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module Blenderable where
@@ -20,26 +20,29 @@ import ConcreteNormal.PreRenderable
 import NormalEverything
 import PrettyUtil
 import ShortShow
+import Util
+import THUtil
 
 data Blenderable s = Blenderable { 
-    ba_ds :: s,
-    ba_coords :: Vert s -> Vec3,
-    ba_faceInfo :: AnySimplex2Of s -> FaceInfo,
+    ba_pr :: PreRenderable s,
+    ba_faceInfo :: AnySimplex2Of s -> BaFaceInfo,
     ba_vertexThickness :: Vert s -> Double,
-    ba_visible :: AnySimplex2Of s -> Bool,
     ba_edgeThickness :: Arc s -> Double,
-    ba_triangleLabel :: Tri s -> Maybe TriangleLabel, 
     ba_materials :: [Material]
 }
     deriving (Generic)
 
 
+ba_triangleInfo
+  :: Blenderable s
+     -> Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleEmbedding)
+ba_triangleInfo = pr_triangleInfo . ba_pr
+
 
 instance Coords (Blenderable s) where
-    transformCoords f b = b { ba_coords = f . ba_coords b }
+    transformCoords f b = b { ba_pr = transformCoords f (ba_pr b) }
 
-data FaceInfo = FaceInfo {
-        faceName :: String,
+data BaFaceInfo = BaFaceInfo {
         faceMat :: Material
 }
 
@@ -145,15 +148,12 @@ mkBlenderable
      -> PreRenderable s
      -> Blenderable s
 mkBlenderable mat0 mat1 mat2 vertThick pr_ = Blenderable { 
-    ba_ds = pr_ds pr_,
-    ba_coords = pr_coords pr_,
-    ba_triangleLabel = pr_triangleLabel pr_,
-    ba_visible = pr_visible pr_,
+    ba_pr = pr_,
 
     ba_faceInfo = \asi ->
-        FaceInfo 
-            (pr_name pr_ asi) 
-            (foldAnySimplex2 (const mat0) (const mat1) (const mat2) asi),
+        BaFaceInfo {
+            faceMat = foldAnySimplex2 (const mat0) (const mat1) (const mat2) asi
+        },
 
     ba_vertexThickness = const vertThick,
     ba_edgeThickness = const (edgeThicknessFactor*vertThick),
@@ -223,18 +223,22 @@ instance
 
 --normalSurface' s = normalSurface (addCoordFunc id (const Nothing) s)
 
+instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
+            , Vertices s, Edges s, Triangles s) => 
+                    Pretty (Blenderable s) where
 
-instance (Pretty (Vert s), Vertices s, Pretty s) => Pretty (Blenderable s) where
     pretty Blenderable{..} = prettyRecord "Blenderable"
-        [("ba_ds",pretty ba_ds),
-         ("ba_coords",prettyFunction ba_coords (vertices ba_ds))
+        [("ba_pr",pretty ba_pr)
+--         ("ba_coords",prettyFunction ba_coords (vertices ba_ds))
         ]
 
+instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
+            , Vertices s, Edges s, Triangles s) => 
+                    Show (Blenderable s) where
 
-instance (Pretty (Vert s), Vertices s, Pretty s) => Show (Blenderable s) where
     showsPrec = prettyShowsPrec
 
-deriving instance (Pretty (Vert s), Vertices s, Pretty s) => Show (Scene s)
+deriving instance (Show (Blenderable s)) => Show (Scene s)
 
 -- * Conversion
 
@@ -280,3 +284,45 @@ instance (Ord v, ShortShow v, NormalSurface s Integer, Pretty v, Show v) =>
     ToBlenderable (SPQWithCoords v, s) (DJ (SC2 v) (SC2 (Corn v))) where
 
     toBlenderable = uncurry fromSpqwcAndIntegerNormalSurface
+
+ba_triangleLabel :: Blenderable s -> Tri s -> Maybe TriangleLabel
+ba_triangleLabel = fmap fst . ba_triangleInfo 
+
+ba_triangleEmbedding :: DeltaSet2 s => Blenderable s -> Tri s -> TriangleEmbedding
+ba_triangleEmbedding = pr_triangleEmbedding . ba_pr
+
+ba_edgeEmbedding
+  :: (Pretty (Element (Eds s)),
+      Pretty (Element (Tris s)),
+      DeltaSet2 s) =>
+     Blenderable s
+     -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
+     -> Ed s
+     -> EdgeEmbedding
+ba_edgeEmbedding = pr_edgeEmbedding . ba_pr
+
+ba_coords
+  :: (Pretty (Element (Eds s)),
+      Pretty (Element (Tris s)),
+      DeltaSet2 s) =>
+     Blenderable s
+     -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
+     -> EdgesContainingVertex_Cache (Vert s) (Ed s)
+     -> Vert s
+     -> Vec3
+ba_coords = pr_coords . ba_pr
+
+ba_faceName :: Blenderable s -> AnySimplex2Of s -> FaceName
+ba_faceName = pr_faceName . ba_pr
+
+ba_visibility :: Blenderable s -> AnySimplex2Of s -> Visibility
+ba_visibility = pr_visibility . ba_pr
+
+ba_faceMat :: Blenderable s -> AnySimplex2Of s -> Material
+ba_faceMat = fmap faceMat . ba_faceInfo
+
+readCam :: String -> Cam
+readCam s = 
+    case parseFloatLiterals s of
+         [a,b,c,d,e,f,g] -> Cam (Vec3 a b c) (Vec3 d e f) g 
+         r -> error ("readCam: no parse "++ $(showExps ['s,'r]))

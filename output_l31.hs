@@ -36,7 +36,12 @@ qmes = putStr (latexifyQMatchingEquations tr)
 main = (testBlender . setCams [twoTetCam])
         (defaultScene $
             (
-                (fromSpqwc spqwc)
+                (fromSpqwcAndIntegerNormalSurface 
+                    spqwc
+                    (canonExtDbg tr (quad_fromNormalSurface [0./Q_ab,1./Q_ab]))
+                    )
+
+
 --             `disjointUnion`
    --             fromNormalSurface spqwc (standardCoordinates [0./Q_ac,1./Q_ac,2./Q_ad,3./Q_ad])
             )
@@ -53,8 +58,8 @@ writeFileOrPreview = const previewTikz
 
 vl_A0 way =  
     let 
-        v = pMap tr_l31 (iNormalTriGetVertex $ head triOrder)
-        triOrder = flip (./) <$> [ntA,ntC,ntB] <*> [0,1] 
+        v = pMap tr_l31 (head triOrder)
+        triOrder = flip (./) <$> [vA,vC,vB] <*> [0,1] 
 
         nodePerm = (M.!) . M.fromList . zip triOrder $
             [S3cba,mempty
@@ -63,10 +68,10 @@ vl_A0 way =
             ]
                     
 
-        tikz = tikzVertexLink 
+        tikz = tikzStructureGraphForVertexLink 
                 v 
+                (ptcToIVertex_fromS3s nodePerm)
                 (regularPolygonLocs triOrder) 
-                nodePerm 
                 ("x=3cm,y=3cm,scale=0.8,scale="++show scaleTweak)
                 noExtraEdgeStyles
                 way
@@ -76,18 +81,18 @@ vl_A0 way =
 vl_D0 way =
 
     let 
-        v = pMap tr_l31 (iNormalTriGetVertex $ head triOrder)
-        triOrder = flip (./) <$> [ntD] <*> [1,0] 
+        v = pMap tr_l31 (head triOrder)
+        triOrder = flip (./) <$> [vD] <*> [1,0] 
 
         nodePerm = (M.!) . M.fromList . zip triOrder $
             [S3acb,mempty
             ]
                     
 
-        tikz = tikzVertexLink 
+        tikz = tikzStructureGraphForVertexLink 
                 v 
+                (ptcToIVertex_fromS3s nodePerm)
                 (regularPolygonLocs triOrder) 
-                nodePerm 
                 ("x=3cm,y=3cm,shift={(0.5,2)},scale=0.4,scale="++show scaleTweak)
                 (\x -> if x == 0 ./ tABD then "looseness=2" else "") 
                 way
@@ -105,8 +110,7 @@ suf = "_100010"
 scaleTweak = 0.8
 
 graphs = do
-    let way = QuadGiven 
-                    (quad_fromAssocs [(0./Q_ab,1),(1./Q_ac,1)]) 
-                    --(qVertexSols !! 0)
+    let way = -- QuadGiven (quad_fromAssocs [(0./Q_ab,1),(1./Q_ac,1)]) --(qVertexSols !! 0)
+                NoQuad
     vl_A0 way 
     vl_D0 way

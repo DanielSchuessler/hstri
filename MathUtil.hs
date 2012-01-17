@@ -485,3 +485,30 @@ incircleRadius a b c =
     in sqrt ((s-a)*(s-b)*(s-c)/s)
 
 
+type UnitInterval = Double
+type Standard2Simplex = Vec2
+
+
+
+-- | Triangulation of the triangle with corners @(0,0),(0,steps),(steps,0)@, using isosceles triangles with scele length 1
+triangulateTriangle
+  :: (Enum t, Num t) => t -> ([(t, t)], [((t, t), (t, t), (t, t))])
+triangulateTriangle steps = (verts,ts)
+    where
+        m = steps-1
+
+        verts = [(u,v) | u <- [0..m], v <- [0..m-u]]
+
+        ts = 
+                       [ ((u,v)
+                         ,(u+1,v)
+                         ,(u,v+1))
+                         
+                            | u <- [0..m-1], v <- [ 0..m-1-u ] ]  
+                        ++
+                       [ ((u,v)                             
+                         ,(u,v+1)                           
+                         ,(u-1,v+1))                          
+                                                                
+                            | u <- [1..m-1], v <- [ 0..m-1-u ] ]
+

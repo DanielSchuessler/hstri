@@ -1,6 +1,7 @@
 {-# LANGUAGE NoMonomorphismRestriction, FlexibleInstances, TypeSynonymInstances, TemplateHaskell #-}
 module THUtil(
     module Debug.Trace,
+    Pretty,
     liftByShow,
     mkConstantDecls,
     showVars,

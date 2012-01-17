@@ -11,18 +11,19 @@ module Triangulation.Random
 
     where
 
-import Triangulation
-import Test.QuickCheck
 import ClosedOrCensus6
-import Control.Applicative
-import qualified Data.List as L
-import THUtil
-import Control.Monad.State
-import qualified Data.Set as S
-import Data.Set(Set)
 import Collections(elemOfSetAt,deleteAt)
+import Control.Applicative
+import Control.Monad.State
+import Data.Set(Set)
 import System.Random
+import THUtil
+import Test.QuickCheck
 import Test.QuickCheck.Gen
+import Triangulation
+import Util
+import qualified Data.List as L
+import qualified Data.Set as S
     
 
 arbitraryTriangulation :: Gen Triangulation

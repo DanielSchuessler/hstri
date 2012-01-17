@@ -2,19 +2,19 @@
 {-# OPTIONS -Wall #-}
 module ParseRga(readRgaFile,readRgaZip,RequiredAttributeNotPresentException(..)) where
 
-import Control.Monad
-import Data.Maybe
-import HomogenousTuples
---import Text.XML.Light hiding(parseXMLDoc,strContent)
-import Triangulation
-import Text.XML.HXT.Core
-import Control.Exception
-import Data.Typeable
-import Data.List.Split
-import Data.ByteString.Lazy(readFile)
-import Prelude hiding(readFile)
 import Codec.Compression.GZip(decompress)
+import Control.Exception
+import Control.Monad
+import Data.ByteString.Lazy(readFile)
 import Data.ByteString.Lazy.UTF8(toString)
+import Data.List.Split
+import Data.Maybe
+import Data.Typeable
+import HomogenousTuples
+import Prelude hiding(readFile)
+import Text.XML.HXT.Core as HXT
+import Triangulation
+import Util(fi)
 
 
 readRgaZip :: FilePath -> IO [LabelledTriangulation]
@@ -56,7 +56,7 @@ parseTetrahedraTag = proc x -> do
 getRequiredAttrValue :: ArrowXml a => String -> a XmlTree String
 getRequiredAttrValue a =
     getAttrValue0 a 
-    `orElse`
+    `HXT.orElse`
     constA (throw (RequiredAttributeNotPresentException a))
 
 translateGluings :: Word -> [[Int]] -> Triangulation

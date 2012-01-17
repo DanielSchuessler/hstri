@@ -4,16 +4,20 @@ module Tetrahedron.Edge (
     module Tetrahedron.Vertex,
 
     -- * Plain
-    Edge, eAB,eAC,eAD,eBC,eBD,eCD,
+    Edge, 
+    -- ** Constants
+    eAB,eAC,eAD,eBC,eBD,eCD,
     allEdges,allEdges',
-    MakeEdge(..),
-    oppositeEdge,
-    oppositeIEdge,
+    -- ** Properties
     edgeToBitSet,
-    bitSetToEdge,
     isVertexOfEdge,
     intersectEdges,
     otherVertex,
+    -- ** Construction
+    MakeEdge(..),
+    edgeByVertices,
+    oppositeEdge,
+    bitSetToEdge,
 
     -- * Oriented
     OEdge,
@@ -24,6 +28,7 @@ module Tetrahedron.Edge (
     -- * Indexed
     IEdge,
     iEdgeByVertices,
+    oppositeIEdge,
 
     -- * Oriented and indexed
     OIEdge,
@@ -99,18 +104,21 @@ class MakeEdge a where
 allEdges ::  [Edge]
 allEdges = asList allEdges'
 
-allEdges' ::  (Edge, Edge, Edge, Edge, Edge, Edge)
+allEdges' ::  (Sextuple Edge)
 allEdges' = ( eAB , eAC , eAD , eBC , eBD , eCD  ) 
 
 isVertexOfEdge :: Vertex -> Edge -> Bool
 isVertexOfEdge v (Edge x) = BitSet.member v x
 
-edgeVertices :: Edge -> (Vertex, Vertex)
+edgeVertices :: Edge -> (Pair Vertex)
 edgeVertices e = fromList2 ( filter4 (`isVertexOfEdge` e) allVertices' ) 
 
+edgeByVertices :: (Pair Vertex) -> Edge
+edgeByVertices (v0,v1) = assert (v0 /= v1) $ Edge (BitSet.insert v0 $ BitSet.singleton v1)
+
 -- | The argument vertices must be distinct.
-instance MakeEdge (Vertex,Vertex) where
-    edge (v0,v1) = assert (v0 /= v1) $ Edge (BitSet.insert v0 $ BitSet.singleton v1)
+instance MakeEdge (Pair Vertex) where
+    edge = edgeByVertices
 
 
 -- | The BitSet must have exactly two elements
@@ -139,7 +147,7 @@ edgePrettyColor = cyan
 
 instance Pretty Edge where pretty = edgePrettyColor . text . show
 
-oppositeEdge ::  Edge -> Edge
+oppositeEdge :: Edge -> Edge
 oppositeEdge (Edge e) = Edge (BitSet.complement e)
 
 oppositeIEdge :: IEdge -> IEdge
@@ -197,7 +205,7 @@ prop_EnumOEdge = forAll (elements [0..11]) (\n -> fromEnum (toEnum n :: OEdge) .
 
 
 -- | Make an oriented edge of an abstract tetrahedron from two of its vertices (which must be distinct)
-verticesToOEdge ::  (Vertex, Vertex) -> OEdge
+verticesToOEdge ::  (Pair Vertex) -> OEdge
 verticesToOEdge (map2 vertexToWord8 -> (v0, v1)) = OEdge (nibblesToWord8 (v0,v1))
 
 instance Bounded OEdge where
@@ -335,21 +343,24 @@ instance ShortShow Edge where shortShow = show
 instance ShortShow OEdge where shortShow = show
 
 withTIndexEqual
-  :: (HasTIndex ia a, HasTIndex ia1 a1, HasTIndex ia2 a2) =>
-     (a -> a1 -> a2) -> ia -> ia1 -> ia2
+  :: (HasTIndex ia a, HasTIndex ib b , HasTIndex ic c) =>
+     (( a,  b) ->  c) -> (ia,ib) -> ic
 withTIndexEqual f 
-    (viewI -> I i0 v0) 
-    (viewI -> I i1 v1) 
-    =
-        assert (i0==i1)
+    (
+        (viewI -> I i0 v0) 
+    ,   (viewI -> I i1 v1) 
+    )
 
-        i0 ./ f v0 v1
+    =
+        assert (i0==i1) $
+
+        i0 ./ f (v0, v1)
 
 iEdgeByVertices
-  :: IVertex -> IVertex -> IEdge
-iEdgeByVertices = withTIndexEqual (curry edge)
+  :: Pair IVertex -> IEdge
+iEdgeByVertices = withTIndexEqual edgeByVertices
 
 oiEdgeByVertices
-  :: IVertex -> IVertex -> OIEdge
-oiEdgeByVertices = withTIndexEqual (curry oedge)
+  :: Pair IVertex -> OIEdge
+oiEdgeByVertices = withTIndexEqual verticesToOEdge
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module Blender(
     module Blenderable,
     module MathUtil,
@@ -8,34 +8,41 @@ module Blender(
     toBlender) where
 
 import Blenderable
+import Control.Applicative
 import Control.Exception
-import Control.Monad(when)
-import Data.Foldable
+import Control.Monad
 import Data.Function
+import Data.MemoTrie
 import Data.Vect.Double hiding((*.),(.*.))
+import FaceClasses
 import HomogenousTuples
 import MathUtil
+import Numbering2
 import PreRenderable
 import Prelude hiding(catch,mapM_,sequence_) 
-import System.Environment
-import System.Process
-import ToPython
-import FaceClasses
-import System.Exit
-import THUtil
 import PrettyUtil(Pretty)
 import Simplicial.DeltaSet2
+import System.Environment
+import System.Exit
+import System.Process
+import THUtil
+import ToPython
+import Util
+import qualified Data.Vector as V
 
-#define CONSTRAINTS(s) Pretty (Vert s), Pretty (Arc s), Pretty (Tri s), DeltaSet2 s, Pretty s
+#define CONSTRAINTS(s) Pretty (Vert s), Pretty (Ed s), Pretty (Tri s), DeltaSet2 s, Pretty s, Ord (Ed s), Ord (Vert s)
 
 
-sceneVar,worldVar,camVar,objVar,lightVar :: Python ()
+sceneVar,worldVar,camVar,objVar,lightVar,curveVar,splineVar,meshTextureFaceLayerVar :: Python ()
 
 sceneVar = py "scene"
 worldVar = py "world"
 camVar = py "cam"
 objVar = py "obj"
 lightVar = py "light"
+curveVar = py "curve"
+splineVar = py "spline"
+meshTextureFaceLayerVar = py "meshTextureFaceLayer"
 
 
 
@@ -103,6 +110,7 @@ makeCylinderFunDef = PythonFunDef {
 
 }
 
+
 toBlender :: (CONSTRAINTS(s)) => Scene s -> Python ()
 toBlender Scene{
         scene_worldProps,
@@ -159,9 +167,13 @@ toBlender Scene{
                 methodCallExpr1 bpy_props "StringProperty" (str "Simplex label")
 
 
-            mapM_ (handleV ba grp0) (vertexList ba_ds)
-            mapM_ (handleE ba grp1) (edgeList ba_ds)
-            mapM_ (handleT ba grp2 grpTriLabels) (triangleList ba_ds)
+            let ba_ds = pr_ds ba_pr 
+                tcec = mkTCEC ba_ds
+                ecvc = mkECVC ba_ds
+
+            mapM_ (handleV ba tcec ecvc grp0) (vertexList ba_ds)
+            mapM_ (handleE ba tcec grp1) (edgeList ba_ds)
+            mapM_ (handleT ba tcec ecvc grp2 grpTriLabels) (triangleList ba_ds)
 
             --ln "ops.view3d.viewnumpad(type='CAMERA')"
 
@@ -177,53 +189,116 @@ toBlender Scene{
 handleSimplex
   :: (a -> AnySimplex2Of s) ->
      Python () -> Blenderable s -> BlenderGroup -> a -> Python ()
-handleSimplex mkAsi f ba grp si = when (ba_visible ba asi) $ do
-        f
-        objCommon grp faceName faceMat
-    
+handleSimplex mkAsi f ba grp si = case ba_visibility ba asi of
 
-    where
-        asi = mkAsi si
-        FaceInfo{..} = ba_faceInfo ba asi
+    Invisible -> return ()
+    Visible -> do
+            f
+            objCommon grp (unFaceName (ba_faceName ba asi)) (ba_faceMat ba asi)
+        
+
+  where
+      asi = mkAsi si
+      
 
 
 
 type BlenderGroup = Python ()
 
-handleV ::  Blenderable s -> BlenderGroup -> Vert s -> Python ()
-handleV ba grp v = handleSimplex vertToAnySimplex2 
-                    (sphere (ba_coords ba v) (ba_vertexThickness ba v)) 
+handleV :: (CONSTRAINTS(s)) =>  
+        Blenderable s 
+    -> TrianglesContainingEdge_Cache (Ed s) (Tri s) 
+    -> EdgesContainingVertex_Cache (Vert s) (Ed s) 
+    -> BlenderGroup 
+    -> Vert s 
+    -> Python ()
+handleV ba tcec ecvc grp v = handleSimplex vertToAnySimplex2 
+                    (sphere (ba_coords ba tcec ecvc v) (ba_vertexThickness ba v)) 
                     ba grp v
 
-handleE :: (CONSTRAINTS(s)) => Blenderable s -> BlenderGroup -> Arc s -> Python ()
-handleE ba grp e = handleSimplex edToAnySimplex2
-                    (either handleErr id
-                        (cylinder (ba_coords ba v0) (ba_coords ba v1) (ba_edgeThickness ba e)))
-                    ba grp e
-    
+handleE :: (CONSTRAINTS(s)) => 
+       Blenderable s 
+    -> TrianglesContainingEdge_Cache (Ed s) (Tri s) 
+    -> BlenderGroup 
+    -> Ed s 
+    -> Python ()
+handleE ba tcec grp e = 
+    handleSimplex 
+        edToAnySimplex2
+        (either handleErr id $ mkObjDataAndObj)
+        ba 
+        grp 
+        e
 
     where
-        (v1,v0) = faces10 (ba_ds ba) e
         handleErr err = error (err++"\n"++"In handleE\n"++ $(showExps ['ba,'e]))
+        thickness = ba_edgeThickness ba e
+
+        mkObjDataAndObj = 
+            case ba_edgeEmbedding ba tcec e of 
+
+                 FlatEdge cv0 cv1 -> cylinder cv0 cv1 thickness
+
+                 -- curved triangle
+                 GeneralEdge (GEE res emb) -> 
+                    blenderCurvedEdge res thickness emb
+                        
 
 
-handleT :: (CONSTRAINTS(s)) => Blenderable s -> BlenderGroup -> BlenderGroup -> Tri s -> Python ()
-handleT ba grp grpTriLabels t = when (ba_visible ba (triToAnySimplex2 t)) $ do
-            blenderTriangle cv0 cv1 cv2 
+
+-- triangleTransform
+--   :: DeltaSet2 s => Blenderable s -> Tri s -> Vec3 -> Vec3
+-- triangleTransform ba t =
+--                             (&+ cv0)
+--                             . flip rmul (Mat3 x' y' z') 
+--                     where
+--                         x' = cv1 &- cv0 
+--                         y' = cv2 &- cv0
+--                         z' = norm x' *& normalize (crossprod x' y')
+-- 
+--                         (cv0,cv1,cv2) = triangleVertexCoordinatesAscending ba t
+-- 
+-- 
+-- 
+-- triangleVertexCoordinatesAscending
+--   :: DeltaSet2 s => Blenderable s -> Tri s -> Triple Vec3
+-- triangleVertexCoordinatesAscending ba t =
+--                          map3 (ba_coords ba) (faces20Ascending (ba_ds ba) t) 
+
+
+handleT :: (CONSTRAINTS(s)) => 
+    Blenderable s 
+    -> TrianglesContainingEdge_Cache (Ed s) (Tri s) 
+    -> EdgesContainingVertex_Cache (Vert s) (Ed s) 
+    -> BlenderGroup 
+    -> BlenderGroup 
+    -> Tri s 
+    -> Python ()
+handleT ba tcec ecvc grp grpTriLabels t = case ba_visibility ba asi of
+        Invisible -> return ()
+        Visible -> do
+            case ba_triangleEmbedding ba t of
+                 FlatTriangle cv0 cv1 cv2 -> blenderTriangle cv0 cv1 cv2 
+                 GeneralTriangle (GTE res f) -> blenderTriangularSurface res f
+                        
+
             objVar <.> "show_transparent" .= True
-            objCommon grp faceName faceMat
+            objCommon grp (unFaceName (ba_faceName ba asi)) (ba_faceMat ba asi)
 
-            handleTriLabel ba grpTriLabels t
+            handleTriLabel ba tcec ecvc grpTriLabels t
 
     where
-        vs = faces20Ascending (ba_ds ba) t
-        (cv0,cv1,cv2) = map3 (ba_coords ba) vs
-
-        FaceInfo{..} = ba_faceInfo ba (triToAnySimplex2 t)
+        asi = triToAnySimplex2 t
 
         
-handleTriLabel :: (CONSTRAINTS(s)) => Blenderable s -> BlenderGroup -> Tri s -> Python ()
-handleTriLabel ba grpTriLabels t =
+handleTriLabel :: (CONSTRAINTS(s)) => 
+
+        Blenderable s 
+    ->  TrianglesContainingEdge_Cache (Ed s) (Tri s) 
+    ->  EdgesContainingVertex_Cache (Vert s) (Ed s) 
+    ->  BlenderGroup -> Tri s -> Python ()
+
+handleTriLabel ba tcec ecvc grpTriLabels t =
             case ba_triangleLabel ba t of
                 Nothing -> return ()
 
@@ -284,14 +359,17 @@ handleTriLabel ba grpTriLabels t =
                     in do
                         newTextObj text
                         objVar <.> matrix_basis .= m
-                        objCommon grpTriLabels (text ++ " on "++show perm++" "++faceName) triLabelMat 
+                        objCommon 
+                            grpTriLabels 
+                            (text ++ " on "++show perm++" "++unFaceName (ba_faceName ba asi))
+                            triLabelMat 
 
 
     where
-        vs = faces20Ascending (ba_ds ba) t
-        cvs = map3 (ba_coords ba) vs
+        vs = faces20Ascending (pr_ds (ba_pr ba)) t
+        cvs = map3 (ba_coords ba tcec ecvc) vs
 
-        FaceInfo{..} = ba_faceInfo ba (triToAnySimplex2 t)
+        asi = triToAnySimplex2 t
 
 
         
@@ -335,7 +413,7 @@ matrix_basis = "matrix_basis"
 
 blenderTriangle ::  Vec3 -> Vec3 -> Vec3 -> Python ()
 blenderTriangle p0 p1 p2 =
-    mesh [p0,p1,p2] [(0,1,2)]
+    mesh (Mesh [p0,p1,p2] [(0,1,2)] False [])
 
 
 safeOrthogonal :: Mat3 -> Proj4
@@ -367,20 +445,48 @@ meshVar = py "me"
 emptyList ::  [()]
 emptyList = [] :: [()]
 
-mesh :: [Vec3] -> [(Int,Int,Int)] -> Python ()
-mesh verts faceList = 
-            do 
-            meshVar .= (methodCallExpr1 (dat "meshes") "new" (str "M"))
+data Mesh = Mesh {
+        meshVertices :: [MeshVertex],
+        meshFaces :: [Triple MeshVertexIndex],
+        meshSmooth :: Bool,
+        uv_textures :: [MeshTextureFaceLayer]
+    }
 
-            methodCall meshVar "from_pydata" (verts,emptyList,faceList)
+type UV = Vec2
+
+newtype MeshTextureFaceLayer = MeshTextureFaceLayer [Triple UV] 
+
+type MeshVertexIndex = Int
+type MeshVertex = Vec3
+
+mesh :: Mesh -> Python ()
+mesh m =
+    do 
+        meshVar .= (methodCallExpr1 (dat "meshes") "new" (str "M"))
+
+        methodCall meshVar "from_pydata" (meshVertices m,emptyList,meshFaces m)
+
+        when (meshSmooth m)
+            (foreach "f" (meshVar <.> "faces") (\f ->
+                f <.> "use_smooth" .= True))
+
+        forM_ (uv_textures m)
+            (\(MeshTextureFaceLayer uvs) -> do
+                meshTextureFaceLayerVar .= methodCallExpr (meshVar <.> "uv_textures") "new" ()
+                methodCall
+                    (meshTextureFaceLayerVar <.> "data") 
+                    "foreach_set"
+                    ( str "uv"
+                    , concatMap ((++[-1,-1]) . concatMap asList . asList) uvs ))
+
 
 
 --             "print('vertices:')",
 --             "for x in me.vertices:",
 --             "   pprint(x.co)",
 
-            methodCall meshVar "update" ()
-            newObj "SomeMesh" meshVar 
+        methodCall meshVar "update" ()
+        newObj "SomeMesh" meshVar 
 
 txtVar ::  Python ()
 txtVar = py "txt"
@@ -396,6 +502,48 @@ newTextObj txt = do
     txtVar <.> "align" .= str "CENTER"
     newObj "T" txtVar
 
+data BlenderCurve = BlenderCurve {
+    bevel_depth :: Double,
+    -- | 0 to 32
+    bevel_resolution :: Int,
+    curve_spline :: BlenderSpline
+}
+
+data BlenderSpline = Nurbs {
+    spline_points :: V.Vector SplinePoint,
+    use_endpoint_u :: Bool,
+    order_u :: Int
+}
+
+type SplinePoint = Vec3
+
+extendVec34 :: Vec3 -> Vec4
+extendVec34 = extendWith 1
+
+newCurveObj :: BlenderCurve -> Python ()
+newCurveObj BlenderCurve{..} = do
+    curveVar .= methodCallExpr (dat "curves") "new" (str "Cu", str "CURVE")
+    curveVar <.> "dimensions" .= str "3D" 
+    curveVar <.> "bevel_depth" .= bevel_depth
+    curveVar <.> "bevel_resolution" .= bevel_resolution
+    curveVar <.> "use_fill_front" .= False
+    curveVar <.> "use_fill_back" .= False
+    --    curveVar <.> "fill_mode" .= str "half"
+
+    case curve_spline of
+         Nurbs{..} -> do
+            splineVar .= methodCallExpr1 (curveVar <.> "splines") "new" (str "NURBS")
+            methodCall (splineVar <.> "points") "add" 
+                (SingleArg (V.length spline_points-1))
+                -- -1 because the new spline already has one point
+            methodCall (splineVar <.> "points") "foreach_set" (str "co",
+                concatMap (asList . extendVec34) (V.toList spline_points))
+            splineVar <.> "order_u" .= order_u
+            splineVar <.> "use_endpoint_u" .= use_endpoint_u
+            splineVar <.> "use_smooth" .= True
+    
+    newObj "Cu" curveVar
+    
 
 -- | Returns the object in the 'objVar' \"register\" :-)
 newObj ::  ToPython t => String -> t -> Python ()
@@ -439,4 +587,75 @@ materialToBlender m@Material{..} = do
 --                     (0,0.2,1)
 --         
 --                     | i <- dims ]
+
+
+blenderCurvedEdge :: Int -> Double -> (UnitInterval -> Vec3) -> Either String (Python ())
+blenderCurvedEdge (steps :: Int) thickness f =
+    let
+        m = steps - 1
+
+        ys = V.generate steps (\i -> f (fi i / fi m))
+
+    in return $ do
+        
+        newCurveObj (BlenderCurve {
+            bevel_depth = thickness,
+            bevel_resolution = 10,
+            curve_spline = Nurbs {
+                use_endpoint_u = True,
+                order_u = 3,
+                spline_points = ys
+            }
+         })
+
+
+
+        --sequence_ <$> zipWithM (\x y -> cylinder x y thickness) ys (tail ys)
+            
+
+blenderTriangularSurface :: Int 
+    -> (Vec2 -> Vec3) 
+        -- ^
+        --
+        -- Input is in the convex hull of 
+        -- @{ Vec2 0 0, Vec2 1 0, Vec2 0 1 }@
+    
+    -> Python ()
+blenderTriangularSurface = memo prepare
+    where
+        prepare steps = 
+            let
+                m = steps - 1
+                nu = nuFromList vertices_intUV 
+                toi = toInt nu
+
+                (vertices_intUV,tris_intUV) = 
+                    triangulateTriangle steps
+                
+                
+                        
+                tris = map (map3 toi) tris_intUV
+
+                normalizeIntUV (u,v) = Vec2 (fi u / fi_m) (fi v / fi_m)
+
+                vertices_normalizedUV = map normalizeIntUV vertices_intUV
+                tris_normalizedUV = map (map3 normalizeIntUV) tris_intUV
+
+                fi_m = fi m
+            in
+                \f -> mesh
+                        (Mesh {
+                            meshVertices = map f vertices_normalizedUV,
+
+                            meshFaces = tris,
+                            meshSmooth = True,
+                            uv_textures = 
+                                [ MeshTextureFaceLayer tris_normalizedUV ] 
+
+                            }
+                            
+                            )
+                
+
+
 

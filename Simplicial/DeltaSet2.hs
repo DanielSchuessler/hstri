@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE NoMonomorphismRestriction, TupleSections, FlexibleContexts, TypeFamilies, FunctionalDependencies #-}
 {-# OPTIONS -Wall #-}
 module Simplicial.DeltaSet2(
     module Simplicial.DeltaSet1,
@@ -13,6 +13,10 @@ module Simplicial.DeltaSet2(
     triToAnySimplex2,
     foldAnySimplex2',
     anySimplex1To2,
+    anySimplex2s,
+    TrianglesContainingEdge_Cache,
+    lookupTrianglesContainingEdge,
+    mkTCEC,
 
     -- * Testing
     polyprop_faces21
@@ -22,6 +26,9 @@ import Simplicial.DeltaSet1
 import QuickCheckUtil
 import Test.QuickCheck
 import Control.Arrow
+import qualified Data.Map as M
+import Control.Applicative
+import PrettyUtil
 
 class (DeltaSet1 s, Triangles s) => 
     DeltaSet2 s where
@@ -30,6 +37,9 @@ class (DeltaSet1 s, Triangles s) =>
 
 newtype AnySimplex2 v e t = AnySimplex2 (Either (AnySimplex1 v e) t) 
     deriving(Show)
+
+instance (Pretty v, Pretty e, Pretty t) => Pretty (AnySimplex2 v e t) where
+    prettyPrec prec = foldAnySimplex2' (prettyPrec prec) (prettyPrec prec)
 
 type AnySimplex2Of s = AnySimplex2 (Vert s) (Ed s) (Tri s)
 
@@ -95,4 +105,32 @@ faces20Ascending
   :: DeltaSet2 s =>
      s -> Tri s -> (Vert s, Vert s, Vert s)
 faces20Ascending t = reverse3 . faces20 t 
+
+
+
+newtype TrianglesContainingEdge_Cache ed tri = 
+    TCEC { lookupTrianglesContainingEdge :: ed -> [(tri,Int)] } 
+
+
+
+mkTCEC
+  :: (Ord (Ed s), DeltaSet2 s) => s -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
+mkTCEC s = TCEC (m M.!)
+    where
+        m = M.fromListWith (++)
+                    . concatMap (\t -> 
+                        asList 
+                            (zipTuple3 
+                                (faces21 s t) 
+                                (map3 ((:[]) . (t,)) (0,1,2))))
+                    $ triangleList s
+                
+
+anySimplex2s
+  :: (Vertices s, Triangles s, Edges s) =>
+     s -> [AnySimplex2 (Vert s) (Ed s) (Tri s)]
+anySimplex2s = 
+    (++)
+    <$> (map anySimplex1To2 . anySimplex1s) 
+    <*> (map triToAnySimplex2 . triangleList)
 

@@ -56,7 +56,6 @@ import HomogenousTuples
 import INormalDisc
 import IndexedSimplices
 import MathUtil
-import MathUtil()
 import NormalSurface
 import PolymakeInterface
 import Prelude hiding(lookup)
@@ -67,6 +66,7 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Triangulation
 import TriangulationCxtObject
+import Util
 import ZeroDefaultMap
 import qualified Data.Foldable as Fold
 import qualified Data.List as L

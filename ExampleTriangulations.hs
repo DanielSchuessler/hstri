@@ -2,12 +2,13 @@
 {-# OPTIONS -Wall #-}
 module ExampleTriangulations where
 
-import TriangulationCxtObject
-import EdgeCentered
 import Blenderable
-import Data.Vect.Double
 import Control.Exception
+import Data.Vect.Double
+import EdgeCentered
 import THUtil
+import TriangulationCxtObject
+import Util
 
 tr_aroundEdge :: Word -> Triangulation
 tr_aroundEdge n =

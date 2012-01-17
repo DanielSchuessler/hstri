@@ -5,9 +5,9 @@ module SimplicialPartialQuotient where
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Data.AscTuples
 import Data.Map as M
 import Data.Maybe
-import Data.Vect.Double((*&),(&+),(&-),Vec3)
 import HomogenousTuples
 import INormalDisc
 import NormalDisc
@@ -18,8 +18,8 @@ import Simplicial.SimplicialComplex
 import Test.QuickCheck
 import Triangulation
 import TriangulationCxtObject
+import Util
 import qualified Data.List as L
-import Data.AscTuples
 
 -- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
@@ -169,15 +169,10 @@ toPreRenderable
   :: (Ord v, ShortShow v, Pretty v, Show v) =>
      SPQWithCoords v -> PreRenderable (SC3 v)
 toPreRenderable (SPQWithCoords spq coords gluingLabeller) = 
-    let pr0 =
-            mkPreRenderable 
+            mkPreRenderableWithTriangleLabels 
+                (makeTriangleLabelling spq gluingLabeller)
                 coords
                 (toSimplicialComplex spq)
-    in pr0
-        {
-            pr_triangleLabel = makeTriangleLabelling spq gluingLabeller
-        }
-
 
     
 spq_Equivalence_helper

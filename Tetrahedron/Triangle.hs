@@ -13,6 +13,9 @@ module Tetrahedron.Triangle(
     ascVerticesToTriangle,
     trianglesContainingVertex,
     trianglesContainingEdge,
+    verticesToTriangle,
+    triangleByVertices,
+    joinVertexAndEdge,
 
     -- ** Properties
     verticesOfTriangle,
@@ -35,21 +38,37 @@ module Tetrahedron.Triangle(
 
     -- * Ordered
     OTriangle,
+    -- ** Properties
+    oTriangleDualVertex,
+    -- ** Construction
     MakeOTriangle(..),
     oTriangleByVertices,
-    oTriangleDualVertex,
+    verticesToOTriangle,
+    allOTriangles,
 
     -- * Indexed
     ITriangle,
+    -- ** Properties
     iTriangleDualVertex,
     iVerticesOfTriangle,
+    -- ** Construction
+    MakeITriangle(..),
     iTriangleByVertices,
+    iVerticesToITriangle,
+    iVerticesToTriangle,
+    verticesToITriangle,
     iTriangleByDualVertex,
+    joinIVertexAndEdge,
 
     -- * Ordered and indexed
     OITriangle,
-    oiTriangleByVertices,
+    -- ** Properties
     oiTriangleDualVertex,
+    -- ** Construction
+    MakeOITriangle(..),
+    oiTriangleByVertices,
+    verticesToOITriangle,
+    iVerticesToOITriangle,
 
     -- * Testing
     qc_Triangle,
@@ -66,33 +85,31 @@ import Data.Binary.Derive
 import Data.List as List
 import Data.Maybe
 import Data.Proxy
-import Tetrahedron.Edge
 import Element
 import GHC.Generics(Generic)
 import HomogenousTuples
 import Language.Haskell.TH.Syntax as Syntax
+import Math.Groups.S3
 import OrderableFace
 import PrettyUtil
 import QuickCheckUtil
 import Quote
-import Math.Groups.S3
 import ShortShow
 import Test.QuickCheck
 import Test.QuickCheck.All
+import Tetrahedron.Edge
 import Util
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
 newtype Triangle = Triangle { triangleDualVertex :: Vertex }
-    deriving Binary
+    deriving (Eq,Binary)
 
 triangleByDualVertex :: Vertex -> Triangle
 triangleByDualVertex = Triangle
 
 instance Show Triangle where
     show (verticesOfTriangle -> (v0,v1,v2)) = show v0 ++ show v1 ++ show v2
-
-deriving instance Eq Triangle 
 
 -- | By 'triangleDualVertex' (= descending lexicographic by 'verticesOfTriangle')
 deriving instance Ord Triangle 
@@ -106,12 +123,14 @@ instance Bounded Triangle where
     maxBound = tBCD
 
 
+-- | Memoize a triangle-consuming function
 triangleMemo :: (Triangle -> c) -> Triangle -> c
 triangleMemo f = vertexMemo (f . Triangle) . triangleDualVertex
 
 -- | Vertices contained in a given triangle, ascending
 verticesOfTriangle :: Triangle -> (Triple Vertex)
 verticesOfTriangle = otherVertices . triangleDualVertex
+
 
 prop_verticesOfTriangle :: Triangle -> Property
 prop_verticesOfTriangle t =
@@ -150,9 +169,17 @@ ascVerticesToTriangle vs = triangleByDualVertex . unviewVertex $
              (A,B,C) -> D
              _ -> error ("ascVerticesToTriangle "++show vs)
 
--- | The Vertices must be distinct (but needn't be ordered)
-instance MakeTriangle (Vertex,Vertex,Vertex) where
-    triangle = ascVerticesToTriangle . sort3
+-- | The vertices must be distinct (but needn't be ordered)
+verticesToTriangle :: (Triple Vertex) -> Triangle
+verticesToTriangle = ascVerticesToTriangle . sort3
+
+-- | = 'verticesToTriangle'
+triangleByVertices :: (Triple Vertex) -> Triangle
+triangleByVertices = verticesToTriangle
+
+-- | = 'verticesToTriangle'
+instance MakeTriangle (Triple Vertex) where
+    triangle = verticesToTriangle
 
 prop_MakeTriangle_VVV ::  Vertex -> Property
 prop_MakeTriangle_VVV v0 = 
@@ -524,3 +551,62 @@ instance Dual Triangle Vertex where
 -- | = 'triangleDualVertex'
 instance Dual Vertex Triangle where
     dual = triangleByDualVertex
+
+allOTriangles :: [OTriangle]
+allOTriangles = [minBound..maxBound]
+
+joinVertexAndEdge
+  :: (Vertices edge, Verts edge ~ (Pair Vertex)) =>
+     Vertex -> edge -> Triangle
+joinVertexAndEdge v0 (vertices -> (v1,v2)) = verticesToTriangle (v0,v1,v2) 
+
+joinIVertexAndEdge
+  :: (Vertices edge, Verts edge ~ (Pair IVertex)) =>
+     IVertex -> edge -> ITriangle
+joinIVertexAndEdge v0 (vertices -> (v1,v2)) = iVerticesToITriangle (v0,v1,v2) 
+
+-- | = 'iTriangleByVertices'
+iVerticesToITriangle :: Triple IVertex -> ITriangle
+iVerticesToITriangle = iTriangleByVertices
+
+-- | = 'iTriangleByVertices'
+iVerticesToTriangle :: Triple IVertex -> ITriangle
+iVerticesToTriangle = iTriangleByVertices
+
+-- | = 'iTriangleByVertices'
+verticesToITriangle :: Triple IVertex -> ITriangle
+verticesToITriangle = iTriangleByVertices
+
+-- | = 'oTriangleByVertices'
+verticesToOTriangle :: Triple Vertex -> OTriangle
+verticesToOTriangle = oTriangleByVertices
+
+-- | = 'oiTriangleByVertices'
+verticesToOITriangle :: Triple IVertex -> OITriangle
+verticesToOITriangle = oiTriangleByVertices
+
+-- | = 'oiTriangleByVertices'
+iVerticesToOITriangle :: Triple IVertex -> OITriangle
+iVerticesToOITriangle = oiTriangleByVertices
+
+class MakeITriangle a where
+    iTriangle :: a -> ITriangle
+
+-- | = 'iTriangleByVertices'
+instance MakeITriangle (Triple IVertex) where
+    iTriangle = iTriangleByVertices
+
+-- | = 'forgetVertexOrder'
+instance MakeITriangle (OITriangle) where
+    iTriangle = forgetVertexOrder
+
+class MakeOITriangle a where
+    oiTriangle :: a -> OITriangle
+
+-- | = 'oiTriangleByVertices'
+instance MakeOITriangle (Triple IVertex) where
+    oiTriangle = oiTriangleByVertices
+
+-- | @uncurry 'packOrderedFace'@
+instance MakeOITriangle (ITriangle,S3) where
+    oiTriangle = uncurry packOrderedFace

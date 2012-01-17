@@ -30,6 +30,9 @@ import Data.Binary(getWord8)
 import Data.Binary(putWord8)
 import Data.Binary(Get)
 import Data.Binary(Put)
+import Data.List.Split
+import Control.Applicative
+import Safe
 
 
 
@@ -291,3 +294,20 @@ getEnumWord8 = (toEnum . fromIntegral) <$> getWord8
 
 putEnumWord8 :: Enum a => a -> Put
 putEnumWord8 = putWord8 . fromIntegral . fromEnum 
+
+
+findJust :: (a1 -> Maybe a) -> [a1] -> Maybe a
+findJust f = foldr (\x r -> case f x of
+                        Nothing -> r
+                        j@(Just _) -> j)
+                    Nothing
+
+orElse :: Maybe c -> c -> c
+orElse = flip fromMaybe
+infixr 4 `orElse`
+
+
+parseFloatLiterals :: String -> [Double]
+parseFloatLiterals =
+    mapMaybe readMay .
+    wordsBy (not <$> ((||) <$> isDigit <*> (`elem` "-+.Ee")))

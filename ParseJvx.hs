@@ -11,6 +11,7 @@ import HomogenousTuples
 import Text.XML.Monad
 import Triangulation
 import TupleTH
+import Util
 import qualified Data.ByteString as BS
 
 readJvxFile

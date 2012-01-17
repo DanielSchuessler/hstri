@@ -27,18 +27,19 @@ module NormalArc(
 
     where
 
-import NormalCorner
 import AbstractTetrahedron
-import HomogenousTuples
 import Control.Exception
+import Data.Maybe
 import Element
+import HomogenousTuples
+import Language.Haskell.TH.Syntax
+import NormalCorner
+import PrettyUtil
+import QuickCheckUtil
+import Quote
 import Test.QuickCheck
 import Test.QuickCheck.All
-import PrettyUtil
-import Quote
-import QuickCheckUtil
-import Language.Haskell.TH.Syntax
-import Data.Maybe
+import Util
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
     deriving (Eq,Ord)

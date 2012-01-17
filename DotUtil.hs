@@ -49,6 +49,7 @@ import THUtil
 import Triangulation.CanonOrdered
 import Triangulation.Random
 import TriangulationCxtObject
+import Util
 import qualified Data.Map as M
 import qualified Data.Text.Lazy as Text
 
@@ -98,6 +99,7 @@ viewDot dotGraph0 = do
             "tikz"]
         (\mode -> do
                 rawSystemS "dot2tex" (dot2texBasicFlags++["-f",mode,"-o",texfile,dotfile])
+                rawSystemS "source-highlight" ["-i",texfile,"-fesc"]
                 rawSystemS "ln" ["-sf",texfile,"/tmp/it.tex"]
                 runPdfLatex texfile
                 rawSystemS "ln" ["-sf",pdffile,"/tmp/it.pdf"]

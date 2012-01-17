@@ -163,3 +163,13 @@ deleteAt4 = $(deleteAtTuple 4)
 
 reverse3 :: (t2, t1, t) -> (t, t1, t2)
 reverse3 = $(reverseTuple 3)
+
+reverse2 :: (t1, t) -> (t, t1)
+reverse2 = $(reverseTuple 2)
+
+zipTuple2 :: (a, a1) -> (b, b1) -> ((a, b), (a1, b1))
+zipTuple2 = $(zipTuple 2)
+
+zipTuple3
+  :: (a, a1, a2) -> (b, b1, b2) -> ((a, b), (a1, b1), (a2, b2))
+zipTuple3 = $(zipTuple 3)

@@ -1,31 +1,36 @@
 {-# OPTIONS -Wall #-}
 -- | Reexport module
 module HsTri(
+
     module Blender,
     module Blenderable,
+    module ClosedOrCensus6,
+    module ConcreteNormal.PreRenderable,
+    module Data.Vect.Double.Base,
+    module DisjointUnion,
+    module DotUtil,
+    module Either1,
+    module EqvGraphs,
     module ExampleTriangulations,
     module FaceLattice,
+    module HomogenousTuples,
     module INormalDisc,
     module Latexable,
     module NormalConstants,
     module NormalDisc,
     module NormalSurface,
-    module StandardCoordinates,
-    module TriangulationCxtObject,
-    module Either1,
     module PreRenderable,
-    module ConcreteNormal.PreRenderable,
-    module HomogenousTuples,
-    module DisjointUnion,
     module PrettyUtil,
-    module Simplicial.DeltaSet,
-    module Data.Vect.Double.Base,
-    module THUtil,
-    module VerboseDD,
-    module EqvGraphs,
     module QuadCoordinates,
+    module Simplicial.DeltaSet,
+    module StandardCoordinates,
+    module THUtil,
+    module TriArcGraph,
     module Triangulation.Random,
-    module TriArcGraph
+    module Triangulation.Class,
+    module TriangulationCxtObject,
+    module VerboseDD,
+    module Tikz.Gen
 
     ) where
 
@@ -53,5 +58,9 @@ import StandardCoordinates
 import THUtil
 import TriangulationCxtObject
 import Triangulation.Random
+import Triangulation.Class
 import VerboseDD
 import TriArcGraph
+import DotUtil(viewDot)
+import ClosedOrCensus6
+import Tikz.Gen

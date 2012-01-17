@@ -5,19 +5,20 @@
 module Simplicial.SimplicialComplex where
 
 
+--import Simplicial.Labels
 import AbstractTetrahedron
+import Control.Arrow
 import Control.Exception
 import Control.Monad
+import Data.AscTuples
 import Data.List
 import Data.Set as Set hiding(map)
-import HomogenousTuples
-import Simplicial.DeltaSet3
---import Simplicial.Labels
-import TupleTH
-import PrettyUtil
-import Data.AscTuples
 import DisjointUnion
-import Control.Arrow
+import HomogenousTuples
+import PrettyUtil
+import Simplicial.DeltaSet3
+import TupleTH
+import Util
 
 
 -- type Plus4 n = S (S (S (S n)))

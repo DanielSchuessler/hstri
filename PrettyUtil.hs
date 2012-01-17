@@ -85,7 +85,7 @@ docAssocs xs =  spacedEncloseSep lbrace rbrace comma
                         | (k,v) <- xs ]
 
 prettyString ::  Pretty a => a -> String
-prettyString = ($"") . displayS . renderPretty 0.5 116 . pretty
+prettyString = ($"") . displayS . renderPretty 0.6 116 . pretty
 
 pr ::  Pretty a => a -> IO ()
 pr = putStrLn . prettyString
@@ -280,6 +280,9 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
 
 instance Pretty Double where pretty = prettyRealFloat
 instance Pretty Float where pretty = prettyRealFloat
+
+instance Pretty Vec2 where
+    pretty (Vec2 x y) = parens (hsep (toList2 $ map2 pretty (x,y)))
 
 instance Pretty Vec3 where
     pretty (Vec3 x y z) = parens (hsep (toList3 $ map3 pretty (x,y,z)))

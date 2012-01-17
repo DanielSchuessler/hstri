@@ -7,6 +7,7 @@ import HomogenousTuples
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import Data.Tuple.OneTuple
+import Data.Vect.Double.Base
 
 type family Element xs
 
@@ -65,3 +66,11 @@ $(let
 asListOfLists
   :: (AsList (Element a), AsList a) => a -> [[Element (Element a)]]
 asListOfLists = map asList . asList
+
+type instance Element Vec2 = Double
+type instance Element Vec3 = Double
+type instance Element Vec4 = Double
+
+instance AsList Vec2 where asList (Vec2 a b) = [a,b]
+instance AsList Vec3 where asList (Vec3 a b c) = [a,b,c]
+instance AsList Vec4 where asList (Vec4 a b c d) = [a,b,c,d]

@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, RecordWildCards, FlexibleInstances, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, TemplateHaskell, GeneralizedNewtypeDeriving, TypeFamilies, NoMonomorphismRestriction #-}
+{-# LANGUAGE TupleSections, ViewPatterns, RecordWildCards, FlexibleInstances, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, TemplateHaskell, GeneralizedNewtypeDeriving, TypeFamilies, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module QuadCoordinates where
 
@@ -22,10 +22,11 @@ import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import TriangulationCxtObject
+import Util
 import ZeroDefaultMap
+import qualified Data.Foldable as Fold
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
-import qualified Data.Foldable as Fold
 
 newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
     deriving(AdditiveGroup,InnerSpace,Eq)
@@ -287,3 +288,9 @@ quad_satisfiesQuadrilateralConstraints tets qc =
 
 qc_QuadCoordinates :: IO Bool
 qc_QuadCoordinates = $(quickCheckAll)
+
+quad_fromNormalSurface
+  :: (Num r, NormalSurface s r) => s -> QuadCoordinates r
+quad_fromNormalSurface = quad_fromAssocs . mapMaybe f . nsToAssocs 
+    where
+        f (d,r) = eitherIND (const Nothing) (Just . (,r)) d

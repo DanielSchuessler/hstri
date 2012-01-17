@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, NoMonomorphismRestriction #-}
 module Numbering2 where
 
 import Data.Map as M
@@ -102,17 +102,18 @@ nuFromSet m =
                     (lookupIndex a m)) 
         (size m)
 
-nuFromVector :: V.Vector Int -> Numbering Int
+nuFromVector :: forall a. (Show a, Ord a) => V.Vector a -> Numbering a
 nuFromVector v =
     let
+        m :: M.Map a Int 
         m = V.ifoldl' (\r i a -> M.insert a i r) M.empty v
     in
         Numbering
-            (v V.!)
             (\a -> fromMaybe
                         (error ("nuFromVector: Element not in Numbering: "++show a))
                         (M.lookup a m)) 
+            (v V.!)
             (V.length v)
 
-nuFromList :: [Int] -> Numbering Int
+nuFromList :: (Ord a, Show a) => [a] -> Numbering a
 nuFromList = nuFromVector . V.fromList 

@@ -125,16 +125,22 @@ instance MakeINormalCorner IEdge where
 instance MakeINormalCorner OIEdge where
     iNormalCorner = mapI normalCorner
 
+-- | Get the vertex enclosed (in the 'iNormalArcGetTriangle') by representatives of this normal arc type
 iNormalArcGetVertex :: INormalArc -> IVertex
 iNormalArcGetVertex = mapI normalArcGetVertex 
 
+-- | Get the index of the 'iNormalArcGetVertex' in the 'iNormalArcGetTriangle'
 iNormalArcGetVertexIndex
   :: I NormalArc -> VertexIndexInTriangle
 iNormalArcGetVertexIndex = normalArcGetVertexIndex . unI
 
+-- | Get the triangle containing representatives of this normal arc type
 iNormalArcGetTriangle :: INormalArc -> ITriangle
 iNormalArcGetTriangle = mapI normalArcGetTriangle 
 
+-- | = 'iNormalArcGetTriangle'
+instance MakeITriangle INormalArc where
+    iTriangle = iNormalArcGetTriangle
 
 iNormalArcByTriangleAndVertex
   :: ITriangle -> IVertex -> INormalArc
@@ -152,6 +158,7 @@ iNormalArcByTriangleAndVertexIndex (viewI -> I ti t) vi =
     ti ./ normalArcByTriangleAndVertexIndex t vi
 
     
+-- | Case analysis on whether a given 'INormalDisc' is a tri or a quad
 eitherIND
   :: (INormalTri -> r) -> (INormalQuad -> r) -> INormalDisc -> r
 eitherIND kt kq (viewI -> I i x) = eitherND (kt . (i ./)) (kq . (i ./)) x

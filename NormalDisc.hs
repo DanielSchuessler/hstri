@@ -54,24 +54,24 @@ module NormalDisc(
     ) where
 
 import AbstractTetrahedron
-import Data.Functor
+import Control.Applicative
+import Control.Arrow((&&&))
+import Control.Monad
 import Data.List(sort)
+import Data.Maybe
 import Element
 import HomogenousTuples
+import Language.Haskell.TH.Syntax
+import NormalArc
 import Prelude hiding(catch,lookup)
+import PrettyUtil
+import QuickCheckUtil
+import Quote
+import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import TupleTH
-import NormalArc
-import Control.Monad
-import Data.Maybe
-import PrettyUtil
-import Language.Haskell.TH.Syntax
-import THUtil
-import Quote
-import QuickCheckUtil
-import Control.Arrow((&&&))
-import Control.Applicative
+import Util
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary)

@@ -21,6 +21,7 @@ import HomogenousTuples
 import StandardCoordinates
 import PrettyUtil
 import TriangulationCxtObject
+import Util
 
 -- | Quads are numbered away from their 'firstDisjointEdge'
 firstDisjointEdge :: NormalQuad -> Edge

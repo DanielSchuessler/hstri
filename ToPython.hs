@@ -6,6 +6,7 @@ import Data.List
 import Control.Monad.Writer.Lazy
 import Text.Printf.TH
 import Data.Functor
+import qualified Data.Vector as V
 
 
 newtype Python a = Python { unPython :: Writer String a }
@@ -175,3 +176,17 @@ pfd_call pfd = funCallExpr (pfd_name pfd)
 pfd_def pfd = do 
             ln ("def "++pfd_name pfd++"("++intercalate "," (pfd_argList pfd) ++"):")
             indent $ pfd_defBody pfd
+
+instance ToPython a => ToPython (V.Vector a) where
+    toPython = toPython . V.toList 
+
+
+foreach
+  :: [Char] -> Python () -> (Python () -> Python ()) -> Python ()
+foreach varname xs b = do
+    py ("for " ++ varname ++ " in ")
+    xs
+    py ":\n"
+    indent $ b (py varname)
+
+

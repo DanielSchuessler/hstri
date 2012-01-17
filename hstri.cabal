@@ -19,11 +19,10 @@ Library
   Extensions: PatternGuards
   Exposed-modules:     
     
-
+    AbsTet
     AbstractNeighborhood
     AbstractTetrahedron
     AbstractTetrahedron2
-    AbsTet
     BarySD
     Blender
     Blenderable
@@ -31,11 +30,10 @@ Library
     Collections
     ConcreteNormal
     ConcreteNormal.PreRenderable
-    Data.EdgeLabelledTree
     Data.AscTuples
+    Data.EdgeLabelledTree
     DisjointUnion
     DotUtil
-    Tetrahedron.Edge
     EdgeCentered
     Either1
     Element
@@ -61,6 +59,8 @@ Library
     Interactive.ReadInput
     Interactive.Utils
     Latexable
+    Math.Groups.S2
+    Math.Groups.S3
     MathUtil
     NormalArc
     NormalConstants
@@ -82,8 +82,6 @@ Library
     QuadCoordinates
     QuickCheckUtil
     Quote
-    S2
-    S3
     ShortShow
     Simplicial.AnySimplex
     Simplicial.DeltaSet
@@ -98,71 +96,83 @@ Library
     StandardCoordinates
     THUtil
     TIndex
+    Tetrahedron.Edge
+    Tetrahedron.Triangle
+    Tetrahedron.Vertex
+    Tikz.Base
+    Tikz.Gen
+    Tikz.Preview
     ToPython
     TriArcGraph
-    Tetrahedron.Triangle
     Triangulation
-    Triangulation.Tests
-    Triangulation.Random
     Triangulation.CanonOrdered
+    Triangulation.Class
+    Triangulation.Random
+    Triangulation.Tests
     TriangulationCxtObject
     UPair
     Util
     VectorUtil
     VerboseDD
-    Tetrahedron.Vertex
     ZeroDefaultMap
 
 
-  Build-depends: OneTuple, zlib, utf8-string, Interpolation, binary, binary-derive, dlist, 
+  Build-depends: MemoTrie, 
   
-        GLFW-b,
-        MissingH,
-        OpenGL,
-        Printf-TH,
-        QuickCheck,
-        Tensor,
-        ansi-wl-pprint,
-        base >= 4 && < 5,
-        bit-set,
-        bitset,
-        bytestring,
-        colour,
-        containers,
-        deepseq,
-        directory,
-        elerea,
-        equivalence,
-        fgl,
-        filepath,
-        ghc-prim,
-        graphviz,
-        hashable,
-        hmatrix,
-        hxt,
-        mtl,
-        parallel,
-        parsec,
-        process,
-        random,
-        semigroups,
-        simpleargs,
-        split,
-        tagged,
-        template-haskell,
-        text,
-        time,
-        transformers,
-        transformers-compose,
-        tuple-th >= 0.2.3,
-        type-level-tf2,
-        vect,
-        vect-opengl,
-        vector,
-        vector-space >= 0.8.0,
-        xml,
-        xml-monad,
-        criterion
+         GLFW-b
+        ,Interpolation
+        ,MissingH
+        ,OneTuple
+        ,OpenGL
+        ,Printf-TH
+        ,QuickCheck
+        ,Tensor
+        ,ansi-wl-pprint
+        ,base >= 4 && < 5
+        ,binary
+        ,binary-derive
+        ,bit-set
+        ,bitset
+        ,bytestring
+        ,colour
+        ,containers
+        ,criterion
+        ,deepseq
+        ,directory
+        ,dlist
+        ,elerea
+        ,equivalence
+        ,fgl
+        ,filepath
+        ,ghc-prim
+        ,graphviz
+        ,hashable
+        ,hxt
+        ,mtl
+        ,parallel
+        ,parsec
+        ,process
+        ,random
+        ,semigroups
+        ,simpleargs
+        ,safe
+        ,split
+        ,tagged
+        ,template-haskell
+        ,text
+        ,time
+        ,transformers
+        ,transformers-compose
+        ,tuple-th >= 0.2.3
+        ,type-level-tf2
+        ,utf8-string
+        ,vect
+        ,vect-opengl
+        ,vector
+        ,vector-space >= 0.8.0
+        ,xml
+        ,xml-monad
+        ,zlib
 
   -- Buildable: False
 

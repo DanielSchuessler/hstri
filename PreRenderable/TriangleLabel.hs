@@ -87,4 +87,5 @@ stla2tla a =
 
     
 
-
+instance Pretty TriangleLabel where
+    prettyPrec = prettyPrecFromShow

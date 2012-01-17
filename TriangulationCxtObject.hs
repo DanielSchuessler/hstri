@@ -114,11 +114,12 @@ import NormalDisc
 import Numbering2
 import Prelude hiding(catch,lookup)
 import PrettyUtil
+import Quote
 import ShortShow
 import THUtil
 import Triangulation
 import Triangulation.CanonOrdered
-import Quote
+import Util
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 

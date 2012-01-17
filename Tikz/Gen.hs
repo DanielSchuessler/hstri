@@ -1,35 +1,50 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TupleSections, FlexibleContexts, ViewPatterns, QuasiQuotes, ScopedTypeVariables, NoMonomorphismRestriction #-}
-module Tikz.Gen where
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TupleSections, FlexibleContexts, ViewPatterns, QuasiQuotes, ScopedTypeVariables, NoMonomorphismRestriction #-}
+{-# LANGUAGE ImplicitParams #-}
+module Tikz.Gen(
+    tikzStructureGraph,
+    tikzStructureGraphForVertexLink,
+    PaperTriangleCorner(..),
+    allPaperTriangleCorners,
+    allPaperTriangleCorners',
+    TikzLoc(..),
+    TikzLength,
+    TikzStyle,
+    regularPolygonLocs,
+    ptcToIVertex_fromS3s,
+    noExtraEdgeStyles,
+    Way(..)
 
-import TriangulationCxtObject
-import Data.String.Interpolation
-import qualified Data.Map as M
-import Latexable
-import HomogenousTuples
-import Tikz.Preview
+
+
+    ) where
+
 import Control.Applicative
-import NormalConstants
-import Data.Maybe
-import Control.Monad
 import Control.Exception
+import Control.Monad
 import Data.List(find)
-import QuadCoordinates
 import Data.List(intercalate)
+import Data.Maybe
+import Data.String.Interpolation
+import HomogenousTuples
+import Latexable
+import NormalConstants
+import QuadCoordinates
+import Tikz.Preview
+import TriangulationCxtObject
+import qualified Data.Map as M
+import Util
+import qualified Data.Set as S
+import Tikz.Base
+
+
+
 
 noExtraEdgeStyles :: ITriangle -> TikzStyle
 noExtraEdgeStyles = const ""
 
-data TikzLoc = Polar { tl_degrees :: Int, tl_radius :: TikzLength }
-
-renderTikzLoc (Polar a r) = [str| ($:a$:$:r$) |]
-
-type TikzLength = Int
-
-
-type TikzNodeName = String
 
 regularPolygonLocs
-  :: (Ord (Element xs), AsList xs) => xs -> Element xs -> TikzLoc
+  :: (AsList xs, Element xs ~ IVertex) => xs -> IVertex -> TikzLoc
 regularPolygonLocs v =
     let
         eqvs = asList v
@@ -42,125 +57,197 @@ regularPolygonLocs v =
 
         m = M.fromList _assocs 
     in
-        (m M.!)
+        \(x :: IVertex) -> 
+            fromMaybe (error ("regularPolygonLocs: invalid vertex: "++show x)) (M.lookup x m)
 
 
-newtype TikzRegularPolygonSideIx = TRPSI Int
-    deriving(Eq,Num,Ord,Real,Enum,Integral)
-
-instance Show TikzRegularPolygonSideIx where show (TRPSI i) = show i
 
 
-type TikzStyle = String
 
-ensureComma "" = ""
-ensureComma s@(',':_) = s
-ensureComma s = ", "++s
 
-nodeVertexOrder
-  :: (INormalTri -> S3) -> INormalTri -> Triple IVertex
-nodeVertexOrder nodePerm tri =
-                (traverseI map3 otherVertices . iNormalTriGetVertex $ tri)
-                                *.
-                (nodePerm tri :: S3)
+ptcToIVertex_fromS3s
+  :: (IVertex -> S3) -> IVertex -> PaperTriangleCorner -> IVertex
+ptcToIVertex_fromS3s nodePerm ivertex = ptcToIVertex_fromS3 (nodePerm ivertex) ivertex
 
-sideVertices
-  :: (INormalTri -> S3)
-     -> INormalTri -> TikzRegularPolygonSideIx -> (IVertex, IVertex)
-sideVertices nodePerm ntri (tikzRegularPolygonSideIx :: TikzRegularPolygonSideIx) = 
-    case nodeVertexOrder nodePerm ntri of
-            (v1,v2,v3) -> 
-                case tikzRegularPolygonSideIx of
-                    1 -> (v1,v2)
-                    2 -> (v2,v3)
-                    3 -> (v3,v1)
+ptcToIVertex_fromS3
+  :: S3 -> IVertex -> PaperTriangleCorner -> IVertex
+ptcToIVertex_fromS3 g ivertex ptc =
+    case otherIVerticesInSameTet ivertex *. g of
+         (v0,v1,v2) -> case ptc of
+                            PTC_N -> v0
+                            PTC_SW -> v1
+                            PTC_SE -> v2
 
-getTikzRegularPolygonSideIndex
-  :: (INormalTri -> S3)
-     -> INormalTri
-     -> (IVertex, IVertex)
-     -> (TikzRegularPolygonSideIx, S2)
-getTikzRegularPolygonSideIndex nodePerm ntri us = 
+
+
+nodeAssocs ivertex = map3 (\s -> (s, ?ptcToIVertex ivertex s)) allPaperTriangleCorners'  
+
+portToOIEdge (StructureGraphPort ivertex side) = 
+    oiEdgeByVertices (map2 (?ptcToIVertex ivertex) (pts_cornersCCW side))
+
+iEdgeToPaperTriangleSide ivertex = oiEdgeToPaperTriangleSide ivertex . toOrderedFace 
+
+oiEdgeToPaperTriangleSide ivertex ed = 
                 fromMaybe (assert False undefined) 
                     . listToMaybe 
                     . mapMaybe f 
-                    $ [1,2,3]
+                    $ allPaperTriangleSides
             where
-                f tikzRegularPolygonSideIx =
+                f side =
 
-                    (tikzRegularPolygonSideIx,) <$>
+                    (side,) <$>
 
-                    case sideVertices nodePerm ntri tikzRegularPolygonSideIx of
+                    case portToOIEdge 
+                            (StructureGraphPort ivertex side) of
 
-                         ws | ws == us -> Just NoFlip
-                            | ws == (us *. Flip) -> Just Flip
+                         ws | ws == ed -> Just NoFlip
+                            | ws == (ed *. Flip) -> Just Flip
                             | otherwise -> Nothing
 
 data Way = NoQuad
          | QuadGiven (QuadCoordinates Integer) 
 
-tikzVertexLink 
-    (v::TVertex) 
-    (loc :: INormalTri -> TikzLoc)
-    (nodePerm :: INormalTri -> S3) 
+tikzStructureGraph
+  :: Triangulation
+     -> (IVertex -> PaperTriangleCorner -> IVertex)
+     -> (IVertex -> TikzLoc)
+     -> TikzStyle
+     -> (ITriangle -> TikzStyle)
+     -> Way
+     -> Tikz
+tikzStructureGraph tr ptcToIVertex = 
+    let ?ptcToIVertex = ptcToIVertex
+    in tikzStructureGraphForVertices tr (tIVertices tr)
+
+tikzStructureGraphForVertexLink
+  :: TVertex
+     -> (IVertex -> PaperTriangleCorner -> IVertex)
+     -> (IVertex -> TikzLoc)
+     -> TikzStyle
+     -> (ITriangle -> TikzStyle)
+     -> Way
+     -> Tikz
+tikzStructureGraphForVertexLink v ptcToIVertex = 
+    let ?ptcToIVertex = ptcToIVertex
+    in tikzStructureGraphForVertices (getTriangulation v) (preimageListOfVertex v)
+
+data StructureGraphPort = 
+    StructureGraphPort {
+        portNode :: IVertex,
+        portSide :: PaperTriangleSide
+    }
+
+data StructureGraphEdge = SGE {
+    sge_from,sge_to :: StructureGraphPort,
+    sge_kind :: StructureGraphEdgeKind,
+    sge_orientationBehaviour :: S2
+}
+data StructureGraphEdgeKind = GluingEdge 
+                            | EdgeEqualityEdge
+
+
+portTriangle p = joinIVertexAndEdge (portNode p) (portToOIEdge p)
+
+structureGraphEdges tr verts = 
+            concatMap (gluingEdges tr) verts 
+            ++
+            (concatMap (edgeEqualityEdges verts) . nub' . map getTIndex) verts
+
+gluingEdges tr ivertex = do
+            side <- allPaperTriangleSides
+            let port = StructureGraphPort ivertex side
+
+            let ed = portToOIEdge port
+            let tri = joinIVertexAndEdge ivertex ed   
+                        -- portTriangle port 
+
+            otri <- maybeToList (lookupGluingOfITriangle tr tri)
+            guard (tri<forgetVertexOrder otri)
+
+            let glu = (tri,otri)
+            let ivertex2 = gluingMap glu ivertex
+                ed2 = gluingMap glu ed
+
+                (side2,orientation) = 
+                    oiEdgeToPaperTriangleSide ivertex2 ed2
+
+                port2 = StructureGraphPort ivertex2 side2
+
+            [SGE port port2 GluingEdge orientation] 
+
+
+edgeEqualityEdges
+  :: (?ptcToIVertex::IVertex -> PaperTriangleCorner -> IVertex) =>
+     [IVertex] -> TIndex -> [StructureGraphEdge]
+edgeEqualityEdges (S.fromList -> verts) = go 
+  where
+    go tet = do
+        ed <- edgeList tet
+        let (v0,v1) = vertices . oppositeIEdge $ ed
+            (side0,o0) = iEdgeToPaperTriangleSide v0 ed
+            (side1,o1) = iEdgeToPaperTriangleSide v1 ed
+
+        guard (S.member v0 verts)
+        guard (S.member v1 verts)
+
+        [SGE 
+            (StructureGraphPort v0 side0)
+            (StructureGraphPort v1 side1)
+            EdgeEqualityEdge
+            (o0 .*. o1)]
+
+--sideAngle = (`mod` 360) . (+30) . (*120)
+
+
+tikzStructureGraphForVertices 
+    (tr :: Triangulation)
+    (verts::[IVertex]) 
+    (loc :: IVertex -> TikzLoc)
     (outerScopeStyle :: TikzStyle)
     (extraEdgeStyles :: ITriangle -> TikzStyle) 
     way
         =
 
     let
-        tris = vertexLinkingSurfaceTris v
-        tr = getTriangulation v
-
-
-
-
-
-        
-                    
-        sideAngle = (`mod` 360) . (+30) . (*120)
 
         edgeDraws :: [Tikz]
         edgeDraws = do
-            ntri <- tris
-            let ntri_dual = iNormalTriGetVertex ntri
-            tikzRegularPolygonSideIx <- [1,2,3]
-            let (u,u') = sideVertices nodePerm ntri tikzRegularPolygonSideIx 
-            let tri = iTriangleByVertices (ntri_dual, u, u') 
+            SGE port1 port2 kind orientation <- structureGraphEdges tr verts 
 
-            otri <- maybeToList (lookupGluingOfITriangle tr tri)
-            guard (tri<forgetVertexOrder otri)
-            let glu = (tri,otri)
-            let ntri2 = iNormalTri (gluingMap glu ntri_dual) 
-                u2 = gluingMap glu u
-                u'2 = gluingMap glu u'
+            let
+                ivertex1 = portNode port1
+                ivertex2 = portNode port2
 
-                (tikzRegularPolygonSideIx2,orientation) = 
-                    getTikzRegularPolygonSideIndex nodePerm ntri2 (u2, u'2)
+                ed1 = portToOIEdge port1 
+                ed2 = portToOIEdge port2 
 
-                outAngle = sideAngle tikzRegularPolygonSideIx 
-                inAngle = sideAngle tikzRegularPolygonSideIx2 
+                outAngle = sideAngle (portSide port1) 
+                inAngle = sideAngle (portSide port2) 
 
-                extraEdgeStyle = ensureComma $    extraEdgeStyles tri 
-                                               ++ extraEdgeStyles (forgetVertexOrder otri)
+                extraEdgeStyle = ensureComma $    extraEdgeStyles (portTriangle port1) 
+                                               ++ extraEdgeStyles (portTriangle port2)
 
                 maybeFlipWarning = if orientation == NoFlip 
                                 then Just "draw=red,thick" 
                                 else Nothing
 
                 toOpts = [str|out=$:outAngle$, in=$:inAngle$$extraEdgeStyle$|]
-                _style = intercalate "," (catMaybes [maybeFlipWarning,dir]) 
+
+                drawStyle = intercalate "," (catMaybes [kindStyle,maybeFlipWarning,dir]) 
+
+                kindStyle = case kind of
+                                 GluingEdge -> Nothing
+                                 EdgeEqualityEdge -> Just "draw=green" 
 
                 (dir,lblNode) = 
-                    case way of
-                         NoQuad -> (Nothing,"")
-                         QuadGiven qc -> 
+                    case (way,kind) of
+                         (QuadGiven qc, GluingEdge) -> 
                             let
                                 (c1,c2) = 
                                     map2 (      quad_coefficient qc 
                                             .   iNormalQuadByDisjointEdge 
-                                            .   uncurry iEdgeByVertices)
-                                        ((u,u'),(u2,u'2))
+                                            .   forgetVertexOrder)
+                                        (ed1,ed2)
 
                             in
                                 case compare c1 c2 of
@@ -171,10 +258,12 @@ tikzVertexLink
                                             GT -> (Just "<-"
                                                   , [str|node[] {$$$ toLatex (c1-c2) $$$} |]
                                                   )
+
+                         _ -> (Nothing,"")
                                 
 
             return [str| 
-                    \draw [$_style$] ($nodeName ntri$) to[$toOpts$] $lblNode$($nodeName ntri2$);
+                    \draw [$drawStyle$] ($nodeName ivertex1$) to[$toOpts$] $lblNode$($nodeName ivertex2$);
                     |]
 
 
@@ -188,8 +277,8 @@ tikzVertexLink
                         every node/.style={
                                 draw, regular polygon, regular polygon sides=3, inner sep=$innerSep$
                         }]
-                \small#tri in tris: 
-                $goTri tri$#
+                \small#ivertex in verts: 
+                $goVert ivertex$#
             \end{scope}|]
 
             where
@@ -198,9 +287,9 @@ tikzVertexLink
                     | NoQuad <- way = "0.45em"
                     | QuadGiven{} <- way = "0.1em"
 
-                goTri tri = [str|\node ($ nodeName tri $) at $ renderTikzLoc (loc tri) $ {$lbl$};|]
+                goVert ivertex = [str|\node ($ nodeName ivertex $) at $ renderTikzLoc (loc ivertex) $ {$lbl$};|]
                     where
-                        trilbl = [str|$$$ toLatex tri $$$|]
+                        trilbl = [str|$$$ toLatex ivertex $$$|]
                         lbl = case way of
                                    NoQuad -> trilbl 
                                    QuadGiven{} -> trilbl
@@ -213,21 +302,21 @@ tikzVertexLink
                                     every node/.style={
                                         inner sep=0.05em
                                     }]
-                                    \scriptsize#tri in tris:
-                                $nodecorners tri$#
+                                    \scriptsize#ivertex in verts:
+                                $nodecorners ivertex$#
                                 \end{scope}|]
             | QuadGiven{} <- way = ""
 
                 where
-                    nodecorners tri = 
+                    nodecorners ivertex = 
                         let
-                            vs = asList $ nodeVertexOrder nodePerm tri
-                            nn = nodeName tri
+                            assocs = asList $ nodeAssocs ivertex
+                            nn = nodeName ivertex
                         in
                             [str|
-                                # (i,v) in zip [1..] vs: 
+                                # (c,v) in assocs:
                                     \path ($nn$.center) to node[pos=0.56] {$$$ toLatex v $$$} 
-                                          ($nn$.corner $:i$);#|]
+                                          ($nn$.$ptc_toTikz c$);#|]
 
         pre = case way of
                    NoQuad -> ""
@@ -254,5 +343,5 @@ tikzVertexLink
 
             \end{tikzpicture}|]
 
-nodeName :: INormalTri -> TikzNodeName
-nodeName (iNormalTriGetVertex -> (viewI -> (I i x))) = show x ++ show i
+nodeName :: IVertex -> TikzNodeName
+nodeName (viewI -> (I i x)) = show x ++ show i

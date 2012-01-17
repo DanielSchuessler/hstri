@@ -25,6 +25,7 @@ import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
 import TriangulationCxtObject
+import Util
 
 type CornerCount = Int
 
@@ -95,19 +96,24 @@ normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =
         cornerCoords (Corn pos n v0 v1) = 
                 interpolate (fi (1+pos) / fi (1+n)) (coords v0) (coords v1)
 
+
+        isVisible = 
+                            foldAnySimplex2
+                                (const Visible)
+                                (\e -> if Set.member e quadDiagonals
+                                         then Invisible
+                                         else Visible)
+                                (const Visible)
+
         
     in
+
+            pr_setVisibility isVisible
 
                 (mkPreRenderable
                     cornerCoords
                     sc)
 
-                    { pr_visible = 
-                            foldAnySimplex2
-                                (const True)
-                                (\e -> not (Set.member e quadDiagonals))
-                                (const True) 
-                    }
 
 
 instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where

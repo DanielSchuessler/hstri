@@ -1,15 +1,7 @@
-import MathUtil
-import Test.QuickCheck
-import System.Random
-import TriArcGraph
+import HsTri
 import ClosedOrCensus6
-import DotUtil
-import TriangulationCxtObject
-import EqvGraphs
-import VerboseDD
-import PrettyUtil
-import Control.Monad
 import qualified Data.Vector as V
+import TriArcGraph
 
 
 go i = do

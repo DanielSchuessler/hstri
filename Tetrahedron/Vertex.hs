@@ -17,6 +17,7 @@ module Tetrahedron.Vertex
     vertexDefaultCoords,
     vertexMemo,
     otherVertices,
+    otherIVerticesInSameTet,
 
     Link(..),
     Star(..),
@@ -194,6 +195,7 @@ qc_Vertex = $quickCheckAll
 
 instance ShortShow Vertex where shortShow = show
 
+-- | Memoize a vertex-consuming function
 vertexMemo :: (Vertex -> r) -> Vertex -> r
 vertexMemo f = 
     let
@@ -225,3 +227,5 @@ instance Binary Vertex where
 isRegardedAsSimplexByDisjointUnionDeriving [t|Vertex|]
 isRegardedAsSimplexByDisjointUnionDeriving [t|IVertex|]
 
+otherIVerticesInSameTet :: IVertex -> Triple IVertex
+otherIVerticesInSameTet = traverseI map3 otherVertices
