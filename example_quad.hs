@@ -1,6 +1,6 @@
 import Blender
 import TriangulationCxtObject
-import NormalDisc
+import Tetrahedron.NormalDisc
 import INormalDisc
 import StandardCoordinates
 import Triangulation

@@ -16,13 +16,12 @@ module HsTri(
     module HomogenousTuples,
     module INormalDisc,
     module Latexable,
-    module NormalConstants,
-    module NormalDisc,
+    module Tetrahedron.NormalConstants,
+    module Tetrahedron.NormalDisc,
     module NormalSurface,
     module PreRenderable,
     module PrettyUtil,
     module QuadCoordinates,
-    module Simplicial.DeltaSet,
     module StandardCoordinates,
     module THUtil,
     module TriArcGraph,
@@ -47,13 +46,12 @@ import FaceLattice
 import HomogenousTuples
 import INormalDisc
 import Latexable
-import NormalConstants
-import NormalDisc
+import Tetrahedron.NormalConstants
+import Tetrahedron.NormalDisc
 import NormalSurface
 import PreRenderable
 import PrettyUtil
 import QuadCoordinates
-import Simplicial.DeltaSet
 import StandardCoordinates
 import THUtil
 import TriangulationCxtObject

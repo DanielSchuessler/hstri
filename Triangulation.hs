@@ -1,10 +1,10 @@
-{-# LANGUAGE PatternGuards, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
+{-# LANGUAGE TupleSections, PatternGuards, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module Triangulation(
     module AbstractTetrahedron,
     module Equivalence,
-    module FacetGluing,
+    module Triangulation.FacetGluing,
     Triangulation,
     
     -- * Properties 
@@ -18,6 +18,7 @@ module Triangulation(
     tOIEdgeEquivalents,
     tOIEdgeDegree,
     tGluingsIrredundant,
+    tNormalizedGluings,
     tINormalCorners,
     tINormalTris,
     tINormalArcs,
@@ -33,6 +34,9 @@ module Triangulation(
     isCanonicallyOrderedClass,
     tINormalDiscNu,
     tINormalArcNu,
+    lookupGluingAsGluing,
+    tetGetGluings,
+    dfsFacePairingGraph,
     -- ** Equivalences
     oEdgeEqv,vertexEqv,
     iEdgeEqv,
@@ -61,16 +65,17 @@ import Control.Monad.Reader
 import Data.Function
 import Data.Maybe
 import Equivalence
-import FacetGluing
+import Triangulation.FacetGluing
 import HomogenousTuples
 import INormalDisc
-import NormalDisc
+import Tetrahedron.NormalDisc
 import Prelude hiding(catch,lookup)
 import Quote
 import qualified Data.List as List
-import Numbering2
+import Data.Numbering
 import qualified Data.Binary as Binary
 import Util
+import Data.EdgeLabelledTree
 
 
 
@@ -86,6 +91,8 @@ tGluingsIrredundant tr =
         filter (not . isRedundant) gluings
 
 
+tNormalizedGluings :: Triangulation -> [NormalizedGluing]
+tNormalizedGluings = fmap normalizeGluing . tGluingsIrredundant
 
 tTetrahedra_ :: Triangulation -> [TIndex]
 tTetrahedra_ tr = if n==0 then [] else [0..tindex (n - 1)]
@@ -102,9 +109,11 @@ data Triangulation = Triangulation {
 
     -- | INVARIANT: 
     --
-    -- @lookup (ITriangle x y) tGlueMap_ = Just (OITriangle x' y' g')@ 
+    -- @lookup (x ./ y) tGlueMap_ = Just (x' ./ y')@ 
+    --
     -- implies 
-    -- @lookup (ITriangle x' y') tGlueMap_ = Just (OITriangle x y (inv g'))@
+    --
+    -- @lookup (x' ./ 'forgetVertexOrder' y') tGlueMap_ = Just (x ./ 'packOrderedFace' x ('inv' g'))@
     --
     -- (for all @f0@, @f1@, @g@)
     tGlueMap_ :: Map ITriangle OITriangle,
@@ -439,3 +448,17 @@ instance Binary.Binary Triangulation where
         (>>) 
             <$> (Binary.put <$> tNumberOfTetrahedra_)
             <*> (Binary.put <$> tGluingsIrredundant)
+
+
+lookupGluingAsGluing :: Triangulation -> ITriangle -> Maybe Gluing
+lookupGluingAsGluing tr t = fmap (t,) . lookupGluingOfITriangle tr $ t
+
+tetGetGluings :: Triangulation -> TIndex -> [Gluing]
+tetGetGluings tr (i :: TIndex) =
+    mapMaybe (lookupGluingAsGluing tr) (triangleList i)
+
+dfsFacePairingGraph
+  :: Triangulation -> TIndex -> EdgeLabelledTree TIndex Gluing
+dfsFacePairingGraph tr = flip dfs (map (id &&& (getTIndex . glCod)) . tetGetGluings tr)
+
+

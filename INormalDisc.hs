@@ -3,7 +3,7 @@
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module INormalDisc where
 
-import NormalDisc
+import Tetrahedron.NormalDisc
 import HomogenousTuples
 import ONormal
 import Control.Exception

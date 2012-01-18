@@ -47,7 +47,8 @@ nub' ::  Ord a => [a] -> [a]
 nub' = S.toList . S.fromList
 
 
-
+isLeft :: Either a b -> Bool
+isLeft = either (const True) (const False)
 
 isRight ::  Either t t1 -> Bool
 isRight (Right _) = True

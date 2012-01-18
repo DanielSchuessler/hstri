@@ -3,27 +3,31 @@
 module Math.Groups.S2 where
 
 import Collections
+import Data.Binary
 import Data.Hashable
 import Data.Monoid
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
-import Test.QuickCheck
+import Math.Group
 import PrettyUtil
-import Group
+import Test.QuickCheck
 import Util
-import Data.Binary
+import Data.Semigroup
 
 
 data S2 = NoFlip | Flip deriving(Show,Enum,Bounded,Eq,Ord)
 
+instance Semigroup S2 where
+    NoFlip <> x = x
+    Flip <> NoFlip = Flip
+    Flip <> Flip = NoFlip
+
 instance Monoid S2 where
     mempty = NoFlip
-    NoFlip `mappend` x = x
-    x `mappend` NoFlip = x
-    _ `mappend` _ = NoFlip
+    mappend = (<>)
 
 instance Group S2 where
-    inv _ = Flip
+    inv = id
 
 instance RightAction S2 (a,a) where
     (x,y) *. NoFlip = (x,y)
@@ -32,7 +36,10 @@ instance RightAction S2 (a,a) where
 instance Pretty S2 where
     pretty = yellow . text . show
 
-instance Arbitrary S2 where arbitrary = elements [NoFlip,Flip]
+instance Arbitrary S2 where 
+    arbitrary = elements [NoFlip,Flip]
+    shrink = monoidDefaultShrink
+
 instance CoArbitrary S2 where coarbitrary = variant . fromEnum
 
 
@@ -54,4 +61,9 @@ sort2WithPermutation (x,y) =
 instance Binary S2 where
     get = getEnumWord8
     put = putEnumWord8
+
+class Signum a where
+    sgn :: a -> S2
+
+instance Signum S2 where sgn = id
 

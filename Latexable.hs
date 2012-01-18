@@ -11,7 +11,7 @@ module Latexable(
     ,quad_latex
     
     -- * Program invocation
-    ,runPdfLatex,runOkularAsync
+    ,runPdfLatex,runPdfLatexSilent,runOkularAsync
     ) where
 
 import Control.Applicative
@@ -34,6 +34,10 @@ import TriangulationCxtObject
 import ZeroDefaultMap
 import Util
 import Data.String.Interpolation
+import System.Process
+import qualified Data.ByteString.Lazy as B
+import System.IO as IO
+import Control.Concurrent
 
 type Latex = String
 
@@ -303,11 +307,23 @@ instance (Latexable k, Latexable r, Num r, Ord r) => Latexable (ZeroDefaultMap k
 instance Latexable Variable where toLatex = variableName
 
 
-runPdfLatex :: FilePath -> IO ()
-runPdfLatex texfile =
-                 rawSystemS "pdflatex" ["-interaction","nonstopmode","-file-line-error" 
+pdfLatexOptions texfile = ["-interaction","nonstopmode","-file-line-error" 
                                         ,"-halt-on-error"
-                                        ,"-output-directory","/tmp",texfile]
+                                        ,"-output-directory","/tmp",texfile] 
+
+runPdfLatex :: FilePath -> IO ()
+runPdfLatex texfile = rawSystemS "pdflatex" (pdfLatexOptions texfile) 
+
+runPdfLatexSilent texfile = do 
+    (Nothing,Just so,Nothing,ph) <- 
+        createProcess   
+            (proc "pdflatex" (pdfLatexOptions texfile))
+                { std_out = CreatePipe }
+
+    forkIO (B.writeFile "/tmp/pdflatex-drivel" =<< B.hGetContents so)
+
+    waitForProcess ph
+
 
 
 quad_latex

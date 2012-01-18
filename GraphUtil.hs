@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 module GraphUtil where
 
 import Data.Graph.Inductive hiding(augmentGraph)
@@ -9,11 +9,17 @@ import Data.GraphViz.Printing(printIt)
 import Data.GraphViz.Commands.IO
 import Control.Monad
 import Data.Text.Lazy.IO
-import Numbering2
+import Data.Numbering
+import qualified Data.Graph.Inductive.PatriciaTree as Pat
+import PrettyUtil
+import Data.Maybe
 
 idGr :: Gr a b -> Gr a b
 idGr = id
 
+idPatGr :: Pat.Gr a b -> Pat.Gr a b
+idPatGr = id 
+         
 mkGraphWithNu
   :: Graph gr => Numbering a -> [a] -> [(a, a, b)] -> gr a b
 mkGraphWithNu nu ns es =
@@ -23,6 +29,11 @@ mkGraphWithNu nu ns es =
 
   where
     ti = toInt nu
+
+
+-- | Like 'mkGraphWithNu', but uses all 'nuElements' of the numbering
+mkGraphWithNu' :: Graph gr => Numbering a -> [(a, a, b)] -> gr a b
+mkGraphWithNu' nu = mkGraphWithNu nu (nuElements nu)
 
 
 
@@ -68,13 +79,13 @@ dotAttributesWithCmd :: (Graph gr, PPDotRepr dg Node) =>
     -> gr nl (EdgeID el)
     -> dg Node 
     -> IO (gr (AttributeNode nl) (AttributeEdge el))
-dotAttributesWithCmd command gr dot
+dotAttributesWithCmd command gr _dot
   =  do
-        dg <- graphvizWithHandle command dot DotOutput hGetDot
+        dg <- graphvizWithHandle command _dot DotOutput hGetDot
         Data.Text.Lazy.IO.putStrLn $ printIt dg
         return ((augmentGraph gr . parseDG) dg)
   where
-    parseDG = asTypeOf dot
+    parseDG = asTypeOf _dot
 
 
 -- copied from the graphviz package
@@ -86,9 +97,31 @@ graphToGraphWithCmd :: (Ord cl, Graph gr) =>
     -> GraphvizParams Node nl el cl l 
     -> gr nl el
     -> IO (gr (AttributeNode nl) (AttributeEdge el))
-graphToGraphWithCmd command params gr = dotAttributesWithCmd command gr' dot
+graphToGraphWithCmd command params gr = dotAttributesWithCmd command gr' _dot
   where
-    dot = graphToDot params' gr'
+    _dot = graphToDot params' gr'
     params' = params { fmtEdge = setEdgeIDAttribute $ fmtEdge params }
     gr' = addEdgeIDs gr
+
+prettyGraph :: (Graph gr, Pretty a, Pretty t) => gr a t -> Doc
+prettyGraph gr = 
+    align (
+        vsep (
+            map pretty (do
+                (n,n',e) <- labEdges gr
+                [ (lab'' gr n, lab'' gr n', e) ] 
+
+            )
+             ))
+
+
+lab'' :: Graph gr => gr a b -> Node -> a
+lab'' gr n = fromMaybe (error "lab''") (lab gr n)
+
+instance (Pretty n, Pretty e) => Pretty (Gr n e) where
+    pretty = prettyGraph
+
+instance (Pretty n, Pretty e) => Pretty (Pat.Gr n e) where
+    pretty = prettyGraph
+
 

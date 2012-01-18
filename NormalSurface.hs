@@ -6,7 +6,7 @@ import INormalDisc
 import Control.Applicative
 import HomogenousTuples
 import Triangulation
-import NormalCorner
+import Tetrahedron.NormalCorner
 import TriangulationCxtObject
 import Control.Arrow
 import Data.Ratio

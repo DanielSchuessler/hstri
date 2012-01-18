@@ -4,7 +4,7 @@ module ONormal where
 
 import Collections
 import Element
-import NormalDisc
+import Tetrahedron.NormalDisc
 import HomogenousTuples
 import PrettyUtil
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, TupleSections, NoMonomorphismRestriction, TypeFamilies, FlexibleInstances, ViewPatterns #-} 
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
-module FacetGluing where
+module Triangulation.FacetGluing where
 
 import AbstractTetrahedron
 import Control.Applicative
@@ -16,8 +16,12 @@ import Test.QuickCheck.All
 import PrettyUtil
 import Either1
 import PreRenderable.TriangleLabel
+import Control.Arrow
 
 type Gluing = (ITriangle,OITriangle)
+
+gluing :: ITriangle -> OITriangle -> Gluing
+gluing = (,)
 
 -- class GluingSpec a where
 --     type TetIndex a
@@ -53,6 +57,7 @@ instance GluingMappable IVertex where
             (triangleGetVertexAt ot)  
             (triangleGetIndexOf t v)
 
+-- | The input 'Vertex is interpreted as being in the same tetrahedron as the domain triangle of the gluing. The output 'Vertex' should be interpreted as being in the same tetrahedron as the codomain triangle of the gluing.
 instance GluingMappable Vertex where
 
     gluingMap (t,ot) v = 
@@ -60,13 +65,21 @@ instance GluingMappable Vertex where
             (triangleGetVertexAt (forgetTIndex ot))  
             (triangleGetIndexOf (forgetTIndex t) v)
 
+-- | See comment for the @GluingMappable Vertex@ instance
+instance GluingMappable OEdge where
+    gluingMap gl (vertices -> (v0,v1)) = oedge (gluingMap gl v0, gluingMap gl v1) 
+
+-- | See comment for the @GluingMappable Vertex@ instance
+instance GluingMappable Edge where
+    gluingMap gl = forgetVertexOrder . gluingMap gl . toOrderedFace
 
 instance GluingMappable OIEdge where
-    gluingMap gl@(t,ot) (viewI -> I i (vertices -> (v0,v1))) = 
+    gluingMap gl@(t,ot) (viewI -> I i oe) =
 
-        assert (i==getTIndex t) $
-        
-        getTIndex ot ./ oedge (gluingMap gl v0, gluingMap gl v1) 
+        assert (i==getTIndex t) $ 
+
+        getTIndex ot ./ gluingMap gl oe 
+
 
 instance GluingMappable IEdge where
     gluingMap gl = forgetVertexOrder . gluingMap gl . toOrderedFace
@@ -86,10 +99,10 @@ instance GluingMappable OITriangle where
             (otri *. g)
 
 prop_gluingMapVertex :: Gluing -> Property
-prop_gluingMapVertex gluing@(t,ot) =
-    ot .=. oiTriangleByVertices us
+prop_gluingMapVertex gl =
+    glCod gl .=. oiTriangleByVertices us
   where
-    us = map3 (gluingMap gluing) (vertices t)
+    us = map3 (gluingMap gl) (vertices (glDom gl))
 
 
 prop_gluingMapOITriangle :: OITriangle -> OITriangle -> Property
@@ -132,8 +145,13 @@ isGluingNormalized (tri,otri) =
          LT -> True
          GT -> False
 
+-- | This function also returns whether the given gluing was already normalized.
+normalizeGluing' :: Gluing -> (Bool, NormalizedGluing)
+normalizeGluing' gl = second (uncurry UnsafeNormalizedGluing)
+    (if isGluingNormalized gl then (True,gl) else (False,flipGluing gl))
+
 normalizeGluing :: Gluing -> NormalizedGluing
-normalizeGluing gl = uncurry UnsafeNormalizedGluing (if isGluingNormalized gl then gl else flipGluing gl)
+normalizeGluing = snd . normalizeGluing'
 
 gluingGen :: Gen Gluing
 gluingGen = arbitrary `suchThat` \gl -> fst gl /= forgetVertexOrder (snd gl)
@@ -175,3 +193,11 @@ instance (GluingMappable v) => GluingMappable (SimplicialTriangleLabelAssoc v) w
             stla_top = f (stla_top stla)
         }
         where f = gluingMap gl
+
+
+
+glDom :: Gluing -> ITriangle
+glDom = fst
+
+glCod :: Gluing -> OITriangle
+glCod = snd

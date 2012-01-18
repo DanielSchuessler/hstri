@@ -94,3 +94,4 @@ enumNumbering min_ max_ =
             (M.fromList (map (id &&& toInt_) (V.toList v))) 
             v
 
+

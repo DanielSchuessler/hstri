@@ -26,12 +26,15 @@ Library
     BarySD
     Blender
     Blenderable
+    ClosedNorCensus8
     ClosedOrCensus6
     Collections
     ConcreteNormal
     ConcreteNormal.PreRenderable
     Data.AscTuples
     Data.EdgeLabelledTree
+    Data.Numbering
+    Data.Tuple.Index
     DisjointUnion
     DotUtil
     EdgeCentered
@@ -40,15 +43,12 @@ Library
     Equivalence
     Equivalence.Class
     EqvGraphs
-    ExampleComplexes
     ExampleTriangulations
     FaceClasses
     FaceIx
     FaceLattice
-    FacetGluing
     Graph
     GraphUtil
-    Group
     HomogenousTuples
     HsTri
     INormalDisc
@@ -59,20 +59,16 @@ Library
     Interactive.ReadInput
     Interactive.Utils
     Latexable
+    Math.Group
     Math.Groups.S2
     Math.Groups.S3
     MathUtil
-    NormalArc
-    NormalConstants
-    NormalCorner
-    NormalDisc
     NormalEverything
     NormalSurface
     Normalizable
-    Numbering
-    Numbering2
     ONormal
     OrderableFace
+    Orientation
     ParseJvx
     ParseRga
     PolymakeInterface
@@ -83,34 +79,35 @@ Library
     QuickCheckUtil
     Quote
     ShortShow
-    Simplicial.AnySimplex
-    Simplicial.DeltaSet
     Simplicial.DeltaSet1
     Simplicial.DeltaSet2
     Simplicial.DeltaSet3
-    Simplicial.GraphComplex
-    Simplicial.Layout
     Simplicial.SimplicialComplex
-    Simplicial.StrictlyIncreasingMap
     SimplicialPartialQuotient
     StandardCoordinates
     THUtil
     TIndex
     Tetrahedron.Edge
+    Tetrahedron.NormalArc
+    Tetrahedron.NormalConstants
+    Tetrahedron.NormalCorner
+    Tetrahedron.NormalDisc
     Tetrahedron.Triangle
     Tetrahedron.Vertex
     Tikz.Base
     Tikz.Gen
     Tikz.Preview
+    Tikz.StructureGraph
+    Tikz.StructureGraphLayout
     ToPython
     TriArcGraph
     Triangulation
     Triangulation.CanonOrdered
     Triangulation.Class
+    Triangulation.FacetGluing
     Triangulation.Random
     Triangulation.Tests
     TriangulationCxtObject
-    UPair
     Util
     VectorUtil
     VerboseDD

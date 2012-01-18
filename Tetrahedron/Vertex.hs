@@ -18,6 +18,7 @@ module Tetrahedron.Vertex
     vertexMemo,
     otherVertices,
     otherIVerticesInSameTet,
+    vertexNu,
 
     Link(..),
     Star(..),
@@ -26,8 +27,6 @@ module Tetrahedron.Vertex
     VertexView,
     viewVertex,unviewVertex,
 
-    -- * Testing
-    qc_Vertex,
 
 
     )
@@ -39,7 +38,6 @@ import Control.Applicative
 import Data.Binary
 import Data.Binary.Derive
 import Data.BitSet.Word8
-import Data.List(sort)
 import Data.Maybe
 import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
 import Data.Vect.Double.Base((&-))
@@ -50,15 +48,14 @@ import GHC.Generics hiding(prec)
 import HomogenousTuples
 import Language.Haskell.TH.Syntax as Syntax
 import PrettyUtil
-import QuickCheckUtil
 import Quote
 import ShortShow
 import THUtil
 import THUtil() -- Lift Word8
 import TIndex
 import Test.QuickCheck
-import Test.QuickCheck.All
 import Util
+import Data.Numbering
 
 data Vertex = A | B | C | D
     deriving(Eq,Ord,Enum,Bounded)
@@ -93,11 +90,6 @@ vertexToWord8 v = case v of
 unviewVertex :: VertexView -> Vertex
 unviewVertex = id
 
-prop_viewUnviewVertex :: Vertex -> Property
-prop_viewUnviewVertex v = v .=. unviewVertex (viewVertex v) 
-
-prop_toFromWord8 :: Vertex -> Property
-prop_toFromWord8 v = v .=. vertexFromWord8 (vertexToWord8 v) 
 
 instance BitSetable Vertex
 
@@ -188,8 +180,6 @@ vertexDefaultCoords = (\x -> f x &- center_) . viewVertex
         center_ = Vec3 0.5 0.5 0.5
 
 
-qc_Vertex :: IO Bool
-qc_Vertex = $quickCheckAll
 
 
 
@@ -215,9 +205,6 @@ vertexMemo f =
 otherVertices :: Vertex -> (Triple Vertex)
 otherVertices = fromJust . flip deleteTuple4 allVertices'
 
-prop_otherVertices :: Vertex -> Bool
-prop_otherVertices v = 
-    asList (otherVertices v) == sort (filter (/= v) allVertices) 
 
 instance Binary Vertex where
     put = put . vertexToWord8
@@ -229,3 +216,7 @@ isRegardedAsSimplexByDisjointUnionDeriving [t|IVertex|]
 
 otherIVerticesInSameTet :: IVertex -> Triple IVertex
 otherIVerticesInSameTet = traverseI map3 otherVertices
+
+vertexNu :: Numbering Vertex
+vertexNu = finiteTypeNu
+                    

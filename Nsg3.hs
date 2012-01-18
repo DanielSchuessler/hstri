@@ -10,7 +10,7 @@ import DotUtil
 import GraphUtil
 import HomogenousTuples
 import Latexable
-import Numbering2
+import Data.Numbering
 import Prelude hiding(writeFile)
 import QuadCoordinates
 import System.Exit

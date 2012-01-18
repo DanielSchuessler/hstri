@@ -9,7 +9,7 @@ import PreRenderable
 import ExampleTriangulations
 import Control.Monad
 import StandardCoordinates
-import NormalDisc
+import Tetrahedron.NormalDisc
 import DisjointUnion
 
 

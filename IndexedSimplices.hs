@@ -2,7 +2,7 @@
 {-# OPTIONS -Wall #-}
 module IndexedSimplices(
     module Data.Word,
-    module NormalDisc,
+    module Tetrahedron.NormalDisc,
     module ONormal,
     module AbstractTetrahedron
 
@@ -12,7 +12,7 @@ module IndexedSimplices(
 
 import AbstractTetrahedron
 import Data.Word
-import NormalDisc
+import Tetrahedron.NormalDisc
 import ONormal
 
 

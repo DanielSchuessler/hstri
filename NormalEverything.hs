@@ -1,13 +1,13 @@
 module NormalEverything(
-    module NormalDisc,
+    module Tetrahedron.NormalDisc,
     module INormalDisc,
-    module NormalConstants,
+    module Tetrahedron.NormalConstants,
     module StandardCoordinates
     ) 
 
     where
 
-import NormalDisc
+import Tetrahedron.NormalDisc
 import INormalDisc
-import NormalConstants
+import Tetrahedron.NormalConstants
 import StandardCoordinates

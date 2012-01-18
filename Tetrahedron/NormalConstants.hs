@@ -1,8 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module NormalConstants where
+module Tetrahedron.NormalConstants where
 
 import THUtil
-import NormalDisc
+import Tetrahedron.NormalDisc
 import Language.Haskell.TH.Syntax
 
 mkConstantDecls allNormalCorners lift

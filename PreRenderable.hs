@@ -43,7 +43,6 @@ import DisjointUnion
 import GHC.Generics
 import Math.Groups.S3
 import ShortShow
-import Simplicial.AnySimplex
 import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
 import Tetrahedron.Vertex

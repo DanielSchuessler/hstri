@@ -17,7 +17,7 @@ import Data.Vect.Double hiding((*.),(.*.))
 import FaceClasses
 import HomogenousTuples
 import MathUtil
-import Numbering2
+import Data.Numbering
 import PreRenderable
 import Prelude hiding(catch,mapM_,sequence_) 
 import PrettyUtil(Pretty)

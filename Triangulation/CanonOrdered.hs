@@ -18,7 +18,7 @@ import Equivalence
 import Prelude hiding(catch,lookup)
 import Test.QuickCheck
 import PrettyUtil
-import FacetGluing
+import Triangulation.FacetGluing
 import QuickCheckUtil
 import Data.Proxy
 import Triangulation

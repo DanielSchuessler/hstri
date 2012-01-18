@@ -4,7 +4,7 @@
 module TriangulationCxtObject(
     module Element,
     module Triangulation,
-    module NormalDisc,
+    module Tetrahedron.NormalDisc,
     module INormalDisc,
 
 
@@ -110,8 +110,8 @@ import Element
 import Equivalence
 import HomogenousTuples
 import INormalDisc
-import NormalDisc
-import Numbering2
+import Tetrahedron.NormalDisc
+import Data.Numbering
 import Prelude hiding(catch,lookup)
 import PrettyUtil
 import Quote

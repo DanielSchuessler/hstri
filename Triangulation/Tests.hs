@@ -14,7 +14,7 @@ import Test.QuickCheck.All
 import QuickCheckUtil
 import Data.Proxy
 import Data.EdgeLabelledTree
-import UPair
+import HomogenousTuples
 
 
 
@@ -72,7 +72,7 @@ prop_VerticesOfEdge_welldefined :: Triangulation -> Property
 prop_VerticesOfEdge_welldefined tr = 
     polyprop_respects (iEdgeEqv tr) trivialEquivalence 
        (elements (tIEdges tr))
-       (uncurry uPair . tVerticesOfIEdge tr) 
+       (sort2 . tVerticesOfIEdge tr) 
 
 
 prop_IsSubface_TTet_welldefined :: Triangulation -> Property

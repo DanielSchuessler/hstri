@@ -4,6 +4,8 @@ module HomogenousTuples where
 
 import TupleTH
 import Data.List
+import Prelude hiding((<=))
+import qualified Prelude as P
 
 type Pair a = (a,a)
 type Triple a = (a,a,a)
@@ -30,7 +32,7 @@ isOrdered4 :: Ord a => (Quadruple a) -> Bool
 isOrdered4 (v0,v1,v2,v3) = isOrdered3 (v0,v1,v2) && v2 < v3
 
 isNondecreasing2 :: Ord a => (a, a) -> Bool
-isNondecreasing2 (v0,v1) = v0 <= v1
+isNondecreasing2 (v0,v1) = v0 P.<= v1
 
 list4 :: a -> b -> c -> d -> (a, b, c, d)
 list4 = (,,,) 
@@ -91,27 +93,36 @@ fromList4 ::  [t2] -> (t2, t2, t2, t2)
 fromList4 = $(tupleFromList 4)
 
 sort2 :: Ord t1 => (t1, t1) -> (t1, t1)
-sort2 xs@(x0,x1) = if x0<=x1 then xs else (x1,x0)
+sort2 = sort2By compare
+
+sort2By :: (t -> t -> Ordering) -> (t, t) -> (t, t)
+sort2By f xs@(x0,x1) = if f x0 x1 /= GT then xs else (x1,x0)
 
 sort3 :: Ord t => (t, t, t) -> (t, t, t)
-sort3 xs@(x0,x1,x2) =
-    if x0<=x1
-       then 
-        if x1<=x2
-           then xs
-           else -- x2 < x1 
-            if x0<=x2
-               then (x0,x2,x1)
-               else -- x2 < x0 
-                (x2,x0,x1)
-       else -- x1 < x0
-        if x0<=x2
-           then (x1,x0,x2)
-           else -- x2 < x0
+sort3 = sort3By compare
+
+sort3By :: (t -> t -> Ordering) -> (t, t, t) -> (t, t, t)
+sort3By f xs@(x0,x1,x2) =
+    let
+        x <= y = f x y /= GT
+    in
+        if x0<=x1
+        then 
             if x1<=x2
-               then (x1,x2,x0)
-               else -- x2 < x1
-                (x2,x1,x0)
+            then xs
+            else -- x2 < x1 
+                if x0<=x2
+                then (x0,x2,x1)
+                else -- x2 < x0 
+                    (x2,x0,x1)
+        else -- x1 < x0
+            if x0<=x2
+            then (x1,x0,x2)
+            else -- x2 < x0
+                if x1<=x2
+                then (x1,x2,x0)
+                else -- x2 < x1
+                    (x2,x1,x0)
 
 prop_sort3 :: (Int,Int,Int) -> Bool
 prop_sort3 is = sort3 is == sort3' is
@@ -173,3 +184,14 @@ zipTuple2 = $(zipTuple 2)
 zipTuple3
   :: (a, a1, a2) -> (b, b1, b2) -> ((a, b), (a1, b1), (a2, b2))
 zipTuple3 = $(zipTuple 3)
+
+subtuples3_2 :: (t, t1, t2) -> ((t, t1), (t, t2), (t1, t2))
+subtuples3_2 = $(subtuples 3 2)
+
+foldlTuple4 :: (r -> t -> r) -> r -> (t, t, t, t) -> r
+foldlTuple4 = $(foldlTuple 4) 
+
+
+foldlMTuple4
+  :: Monad m => (r -> b -> m r) -> m r -> (b, b, b, b) -> m r
+foldlMTuple4 c = foldlTuple4 (\r x -> r >>= flip c x)

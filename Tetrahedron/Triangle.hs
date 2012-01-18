@@ -59,6 +59,7 @@ module Tetrahedron.Triangle(
     verticesToITriangle,
     iTriangleByDualVertex,
     joinIVertexAndEdge,
+    joinIVertexAndIEdge,
 
     -- * Ordered and indexed
     OITriangle,
@@ -70,8 +71,10 @@ module Tetrahedron.Triangle(
     verticesToOITriangle,
     iVerticesToOITriangle,
 
-    -- * Testing
-    qc_Triangle,
+    -- * Misc
+    triangleNu,
+    oTriangleNu,
+
 
 
     ) where
@@ -84,7 +87,6 @@ import Data.Binary
 import Data.Binary.Derive
 import Data.List as List
 import Data.Maybe
-import Data.Proxy
 import Element
 import GHC.Generics(Generic)
 import HomogenousTuples
@@ -92,13 +94,12 @@ import Language.Haskell.TH.Syntax as Syntax
 import Math.Groups.S3
 import OrderableFace
 import PrettyUtil
-import QuickCheckUtil
 import Quote
 import ShortShow
 import Test.QuickCheck
-import Test.QuickCheck.All
 import Tetrahedron.Edge
 import Util
+import Data.Numbering
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
@@ -132,11 +133,6 @@ verticesOfTriangle :: Triangle -> (Triple Vertex)
 verticesOfTriangle = otherVertices . triangleDualVertex
 
 
-prop_verticesOfTriangle :: Triangle -> Property
-prop_verticesOfTriangle t =
-    asList (verticesOfTriangle t)  
-    .=.
-    sort (filter (`isVertexOfTriangle` t) allVertices)
               
 
 tABC, tABD, tACD, tBCD :: Triangle
@@ -181,15 +177,6 @@ triangleByVertices = verticesToTriangle
 instance MakeTriangle (Triple Vertex) where
     triangle = verticesToTriangle
 
-prop_MakeTriangle_VVV ::  Vertex -> Property
-prop_MakeTriangle_VVV v0 = 
-    forAll (elements vs') $ 
-        \v1 -> forAll (elements (vs' \\ [v1])) $ 
-            \v2 -> 
-                let v012 = (v0,v1,v2) in asList v012 `setEq` (asList . verticesOfTriangle) (triangle v012)
-    where
-        vs' = allVertices \\ [v0]
-
 
 
 
@@ -204,13 +191,6 @@ instance MakeTriangle (Pair Edge) where
             _ -> error ("triangle "++show (e1,e2))
 
 
-prop_MakeTriangle_EE ::  Edge -> Edge -> Property
-prop_MakeTriangle_EE e1 e2 = (e1 /= e2 && e1 /= oppositeEdge e2) ==> 
-                                let
-                                   t = triangle (e1,e2)
-                                in
-                                    (e1 `isEdgeOfTriangle` t) .&. (e2 `isEdgeOfTriangle` t)
-                                    
 
 
 isVertexOfTriangle :: Vertex -> Triangle -> Bool
@@ -286,9 +266,6 @@ instance OrderableFace ITriangle OITriangle where
     unpackOrderedFace = defaultUnpackOrderedFaceI
     packOrderedFace = defaultPackOrderedFaceI
 
-prop_OrderableFace_ITriangle :: Property
-prop_OrderableFace_ITriangle = polyprop_OrderableFace (undefined :: Proxy ITriangle)
-
 
 
 instance RightAction S3 OITriangle where (*.) = defaultRightActionForOrderedFace
@@ -297,9 +274,6 @@ instance OrderableFace Triangle OTriangle where
     type VertexSymGroup Triangle = S3
     unpackOrderedFace (OTriangle x g) = (x,g)
     packOrderedFace = OTriangle
-
-prop_OrderableFace_Triangle :: Property
-prop_OrderableFace_Triangle = polyprop_OrderableFace (undefined :: Proxy Triangle)
 
 
 instance RightAction S3 OTriangle where
@@ -412,11 +386,6 @@ trianglesContainingVertex
   :: Vertex -> Triple Triangle
 trianglesContainingVertex = map3 triangleByDualVertex . otherVertices
 
-prop_trianglesContainingVertex :: Vertex -> Property
-prop_trianglesContainingVertex v =
-   setEq 
-    (asList (trianglesContainingVertex v))  
-    (filter (isVertexOfTriangle v) allTriangles)
 
 
 -- | Gets the edge which is contained in the given triangle and does /not/ contain the given vertex. 
@@ -435,6 +404,7 @@ edgeByOppositeVertexAndTriangle v t =
 instance Link Vertex Triangle Edge where
     link = edgeByOppositeVertexAndTriangle
 
+-- | 'getTIndex's must be equal
 instance Link IVertex ITriangle IEdge where
     link (viewI -> I i v) (viewI -> I i' t) = 
         assert (i==i') (i ./ link v t)
@@ -452,9 +422,9 @@ vertexByOppositeEdge e t =
 instance Link Edge Triangle Vertex where
     link = vertexByOppositeEdge
 
+-- | 'getTIndex's must be equal
 instance Link IEdge ITriangle IVertex where
-    link (viewI -> I i e) (viewI -> I i' t) = 
-        assert (i==i') (i ./ link e t)
+    link = withTIndexEqualC link
 
 instance Triangles TIndex where
     type Tris TIndex = Quadruple ITriangle
@@ -497,6 +467,7 @@ triangleGetIndexOf (vertices -> (v0,v1,v2)) v
     | otherwise = Nothing
 
 
+-- | 'getTIndex's must be equal
 oiTriangleByVertices
   :: Triple IVertex -> OITriangle
 oiTriangleByVertices (map3 viewI -> (I i0 v0, I i1 v1, I i2 v2)) =
@@ -513,8 +484,6 @@ instance Quote OTriangle where
 
 
 
-qc_Triangle :: IO Bool
-qc_Triangle = $quickCheckAll
 
 
 oTriangleDualVertex :: OTriangle -> Vertex
@@ -532,6 +501,7 @@ instance Star Vertex (OneSkeleton Triangle) (Pair Edge) where
     star v (OneSkeleton t) = case link v t of
                                   (vertices -> (v0,v1)) -> (edge (v,v0), edge (v,v1))
 
+-- | 'getTIndex's must be equal
 instance Star IVertex (OneSkeleton ITriangle) (Pair IEdge) where
     star (viewI -> I i v) (OneSkeleton (viewI -> I i' t)) = 
         assert (i==i')
@@ -540,6 +510,7 @@ instance Star IVertex (OneSkeleton ITriangle) (Pair IEdge) where
 instance ShortShow Triangle where shortShow = show 
 
 
+-- | 'getTIndex's must be equal
 iTriangleByVertices :: Triple IVertex -> ITriangle
 iTriangleByVertices = forgetVertexOrder . oiTriangleByVertices
 
@@ -560,10 +531,19 @@ joinVertexAndEdge
      Vertex -> edge -> Triangle
 joinVertexAndEdge v0 (vertices -> (v1,v2)) = verticesToTriangle (v0,v1,v2) 
 
+
 joinIVertexAndEdge
-  :: (Vertices edge, Verts edge ~ (Pair IVertex)) =>
+  :: (Vertices edge, Verts edge ~ (Pair Vertex)) =>
      IVertex -> edge -> ITriangle
-joinIVertexAndEdge v0 (vertices -> (v1,v2)) = iVerticesToITriangle (v0,v1,v2) 
+joinIVertexAndEdge = traverseI (.) joinVertexAndEdge
+
+
+
+-- | 'getTIndex's must be equal
+joinIVertexAndIEdge
+  :: (Vertices edge, HasTIndex iedge edge, Verts edge ~ (Pair Vertex)) =>
+     IVertex -> iedge -> ITriangle
+joinIVertexAndIEdge = withTIndexEqualC joinVertexAndEdge
 
 -- | = 'iTriangleByVertices'
 iVerticesToITriangle :: Triple IVertex -> ITriangle
@@ -610,3 +590,12 @@ instance MakeOITriangle (Triple IVertex) where
 -- | @uncurry 'packOrderedFace'@
 instance MakeOITriangle (ITriangle,S3) where
     oiTriangle = uncurry packOrderedFace
+
+
+
+triangleNu :: Numbering Triangle
+triangleNu = finiteTypeNu
+
+oTriangleNu :: Numbering OTriangle
+oTriangleNu = finiteTypeNu
+

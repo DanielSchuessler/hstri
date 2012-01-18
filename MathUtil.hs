@@ -51,6 +51,8 @@ import qualified Data.Set as S
 import Control.Monad.ST.Safe
 import Data.Vector(Vector)
 import HomogenousTuples
+import Control.Arrow((&&&))
+import qualified Data.List as L
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -511,4 +513,20 @@ triangulateTriangle steps = (verts,ts)
                          ,(u-1,v+1))                          
                                                                 
                             | u <- [1..m-1], v <- [ 0..m-1-u ] ]
+
+
+bary2 :: Vect.Vector v => (v, v) -> v
+bary2 (x, y) = (x &+ y) &/ 2
+
+bary3 :: Vect.Vector v => (v, v, v) -> v
+bary3 (x, y, z) = (x &+ y &+ z) &/ 3
+
+
+hillClimb :: Ord b => (a -> [a]) -> (a -> b) -> a -> a
+hillClimb successors badness initial = go (initial,badness initial)
+    where
+        go (x,curBadness) =
+           case L.find ((<curBadness) . snd) .  map (id &&& badness) . successors $ x of
+                Nothing -> x
+                Just suc -> go suc
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE ViewPatterns, TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances  #-}
 {-# OPTIONS -Wall #-}
-module NormalArc(
-        module NormalCorner,
+module Tetrahedron.NormalArc(
+        module Tetrahedron.NormalCorner,
 
         NormalArc, 
         -- * Construction
@@ -33,7 +33,7 @@ import Data.Maybe
 import Element
 import HomogenousTuples
 import Language.Haskell.TH.Syntax
-import NormalCorner
+import Tetrahedron.NormalCorner
 import PrettyUtil
 import QuickCheckUtil
 import Quote

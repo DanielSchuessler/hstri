@@ -2,9 +2,9 @@
 {-# LANGUAGE Rank2Types #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
-module NormalDisc(
+module Tetrahedron.NormalDisc(
         module AbstractTetrahedron,
-        module NormalArc,
+        module Tetrahedron.NormalArc,
 
         -- * Normal discs
         NormalDisc,eitherND,
@@ -62,7 +62,7 @@ import Data.Maybe
 import Element
 import HomogenousTuples
 import Language.Haskell.TH.Syntax
-import NormalArc
+import Tetrahedron.NormalArc
 import Prelude hiding(catch,lookup)
 import PrettyUtil
 import QuickCheckUtil

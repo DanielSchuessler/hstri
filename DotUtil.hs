@@ -10,6 +10,7 @@ module DotUtil(
     bendMultiedges, bendMultiedges',
     testDot,
     viewDot,
+    viewDot',
     productionGraph,
     FLN_Id(..),
     mkNode,
@@ -18,6 +19,8 @@ module DotUtil(
     mathLabel,
     Seed(..),
     seed,
+    getPosAttrSafe,
+    getPosAttr,
     -- * Backslash issues
     backslashPlaceholder,
     printIt',
@@ -63,7 +66,7 @@ testDot mkdotGraph_ = do
 
 dot2texBasicFlags :: [String]
 dot2texBasicFlags = [
---    "-ftikz", 
+    "-ftikz", 
     "--tikzedgelabels", 
     "--autosize", 
     "-traw",
@@ -77,7 +80,13 @@ dot2texBasicFlags = [
     ]
 
 viewDot :: PrintDot a => a -> IO ExitCode
-viewDot dotGraph0 = do
+viewDot = viewDotCore True 
+
+viewDot' :: PrintDot a => a -> IO ExitCode
+viewDot' = viewDotCore False
+
+viewDotCore :: PrintDot a => Bool -> a -> IO ExitCode
+viewDotCore useDot2tex dotGraph0 = do
 --     putStrLn "\n\n=== DOTGRAPH ===\n"
 --     print dotGraph0 
 --     putStrLn "\n\n=== DOT CODE ===\n"
@@ -94,16 +103,17 @@ viewDot dotGraph0 = do
     writeFile dotfile (printIt' dotGraph0)
     rawSystemS "ln" ["-sf",dotfile,"/tmp/it.dot"]
 
-    forM_ [
-            -- "pgf",
-            "tikz"]
-        (\mode -> do
-                rawSystemS "dot2tex" (dot2texBasicFlags++["-f",mode,"-o",texfile,dotfile])
-                rawSystemS "source-highlight" ["-i",texfile,"-fesc"]
-                rawSystemS "ln" ["-sf",texfile,"/tmp/it.tex"]
-                runPdfLatex texfile
-                rawSystemS "ln" ["-sf",pdffile,"/tmp/it.pdf"]
-                runOkularAsync pdffile)
+    case useDot2tex of
+         True -> do 
+            rawSystemS "dot2tex" (dot2texBasicFlags++["-o",texfile,dotfile])
+            rawSystemS "source-highlight" ["-i",texfile,"-fesc"]
+            rawSystemS "ln" ["-sf",texfile,"/tmp/it.tex"]
+            runPdfLatex texfile
+         False -> do
+             rawSystemS "dot" ["-Tpdf","-o",pdffile,dotfile]
+
+    rawSystemS "ln" ["-sf",pdffile,"/tmp/it.pdf"]
+    runOkularAsync pdffile
 
     return ExitSuccess
 
@@ -310,3 +320,11 @@ seed (Seed s) = Start (StartStyleSeed RandomStyle s)
 
 style :: Text -> Attribute
 style = UnknownAttribute "style" . replace "\\" backslashPlaceholder
+
+getPosAttrSafe :: Attributes -> Maybe Pos
+getPosAttrSafe = findJust (\a -> case a of
+                                  Pos x -> Just x
+                                  _ -> Nothing)
+
+getPosAttr :: Attributes -> Pos
+getPosAttr = fromMaybe (assert False undefined) . getPosAttrSafe

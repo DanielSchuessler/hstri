@@ -1,11 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, NoMonomorphismRestriction #-}
-module Numbering2 where
+module Data.Numbering where
 
 import Data.Map as M
 import THUtil
 import PrettyUtil
 import Data.Maybe
 import qualified Data.Vector as V
+import Util
 
 data Numbering a = Numbering {
     toInt :: a -> Int,
@@ -117,3 +118,7 @@ nuFromVector v =
 
 nuFromList :: (Ord a, Show a) => [a] -> Numbering a
 nuFromList = nuFromVector . V.fromList 
+
+finiteTypeNu :: (Finite a) => Numbering a
+finiteTypeNu = enumNu minBound maxBound
+

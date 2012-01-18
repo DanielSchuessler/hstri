@@ -5,6 +5,7 @@
 module PrettyUtil(
     -- * Reexports
     module Text.PrettyPrint.ANSI.Leijen,
+    (<>),
     appPrec,appPrec1,
     -- * Main
     spacedEncloseSep,
@@ -50,14 +51,19 @@ import GHC.Show
 import HomogenousTuples
 import Numeric
 import Test.QuickCheck(Arbitrary)
-import Text.PrettyPrint.ANSI.Leijen hiding((<$>),Pretty(..))
+import Text.PrettyPrint.ANSI.Leijen hiding((<$>),Pretty(..),(<>))
+import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
 import TupleTH
 import TypeLevel.TF.List(List,lToList)
 import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
+import Data.Semigroup
 
 --import GHC.Generics hiding(prec)
+
+instance Semigroup Doc where 
+    (<>) = (Leijen.<>)
 
 spacedEncloseSep ::  Doc -> Doc -> Doc -> [Doc] -> Doc
 spacedEncloseSep l r separator = encloseSep (l <> space) (space <> r) (separator <> space)
@@ -350,3 +356,4 @@ htupled = hencloseSep lbrace rbrace (text ", ")
 prettyPrecFromShow :: Show a => Int -> a -> Doc
 prettyPrecFromShow = (fmap . fmap) (string . ($"")) showsPrec
 
+instance Pretty Word8 where pretty = text . show

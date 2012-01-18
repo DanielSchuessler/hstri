@@ -8,7 +8,7 @@ import Math.Groups.S2
 import Math.Groups.S3
 import Data.Word
 
-
+-- | This class is for stringifying things (for humans) in contexts where characters are at a premium, e.g. Blender object names
 class ShortShow a where
     shortShowsPrec :: Int -> a -> ShowS 
     shortShow :: a -> String

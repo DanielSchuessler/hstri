@@ -13,11 +13,13 @@ module Tetrahedron.Edge (
     isVertexOfEdge,
     intersectEdges,
     otherVertex,
+    edgeVertices,
     -- ** Construction
     MakeEdge(..),
     edgeByVertices,
     oppositeEdge,
     bitSetToEdge,
+
 
     -- * Oriented
     OEdge,
@@ -35,8 +37,9 @@ module Tetrahedron.Edge (
     allOIEdges,
     oiEdgeByVertices,
 
-    -- * Testing
-    qc_Edge
+    -- * Misc
+    edgeNu,oEdgeNu,
+
     )
     where
 
@@ -49,23 +52,21 @@ import Data.BitSet.Word8 as BitSet
 import Data.Function
 import Data.List as List
 import Data.Maybe
-import Data.Proxy
 import Element
 import GHC.Generics(Generic)
 import HomogenousTuples
 import Language.Haskell.TH.Syntax
 import OrderableFace
 import PrettyUtil
-import QuickCheckUtil
 import Quote
 import Math.Groups.S2
 import ShortShow
 import THUtil() -- Lift BitSet
 import Test.QuickCheck
-import Test.QuickCheck.All
 import TupleTH
 import Util
 import Tetrahedron.Vertex
+import Data.Numbering
 
 
 deriving instance Binary (BitSet Vertex)
@@ -80,8 +81,6 @@ instance Enum Edge where
     fromEnum e@(Edge x) = fromMaybe (error ("Invalid edge: "++show x)) (findIndex (==e) allEdges)
 
 
-prop_EnumEdge :: Property
-prop_EnumEdge = forAll (elements [0..5]) (\n -> fromEnum (toEnum n :: Edge) .=. n)
 
 instance Show Edge where
     show (edgeVertices -> (v0,v1)) = show v0 ++ show v1
@@ -153,15 +152,6 @@ oppositeEdge (Edge e) = Edge (BitSet.complement e)
 oppositeIEdge :: IEdge -> IEdge
 oppositeIEdge = mapI oppositeEdge
 
-prop_OppositeEdge_Order2 ::  Edge -> Property
-prop_OppositeEdge_Order2 e = let e' = oppositeEdge e in (e' /= e) .&. (oppositeEdge e' == e)
-
-
-
-prop_OppositeEdge_disjoint ::  Edge -> Property
-prop_OppositeEdge_disjoint e = List.intersect (edgeVertexList e) (edgeVertexList (oppositeEdge e)) .=. [] 
-    where
-        edgeVertexList = asList . edgeVertices
 
 instance Arbitrary Edge where arbitrary = elements allEdges
 instance Finite Edge
@@ -200,8 +190,6 @@ instance Enum OEdge where
     toEnum n = packOrderedFace e g where EnumPair e g = toEnum n
 
 
-prop_EnumOEdge :: Property
-prop_EnumOEdge = forAll (elements [0..11]) (\n -> fromEnum (toEnum n :: OEdge) .=. n)
 
 
 -- | Make an oriented edge of an abstract tetrahedron from two of its vertices (which must be distinct)
@@ -225,8 +213,6 @@ instance (OrderableFace IEdge OIEdge) where
     unpackOrderedFace = defaultUnpackOrderedFaceI
     packOrderedFace = defaultPackOrderedFaceI
 
-prop_OrderableFace_IEdge :: Property
-prop_OrderableFace_IEdge = polyprop_OrderableFace (undefined :: Proxy IEdge)
 
 instance RightAction S2 OIEdge where (*.) = defaultRightActionForOrderedFace
 
@@ -251,8 +237,6 @@ instance OrderableFace Edge OEdge where
 
     packOrderedFace e g = verticesToOEdge (vertices e *. g) 
 
-prop_OrderableFace_Edge :: Property
-prop_OrderableFace_Edge = polyprop_OrderableFace (undefined :: Proxy Edge)
 
 instance RightAction S2 OEdge where
     (*.) = defaultRightActionForOrderedFace
@@ -322,8 +306,6 @@ instance Link IVertex IEdge IVertex where
 instance Link IVertex OIEdge IVertex where
     link = flip otherVertex
 
-qc_Edge :: IO Bool
-qc_Edge = $(quickCheckAll)
 
 edgeToBitSet :: Edge -> BitSet Vertex
 edgeToBitSet (Edge bs) = bs
@@ -342,19 +324,6 @@ instance Lift Edge where
 instance ShortShow Edge where shortShow = show
 instance ShortShow OEdge where shortShow = show
 
-withTIndexEqual
-  :: (HasTIndex ia a, HasTIndex ib b , HasTIndex ic c) =>
-     (( a,  b) ->  c) -> (ia,ib) -> ic
-withTIndexEqual f 
-    (
-        (viewI -> I i0 v0) 
-    ,   (viewI -> I i1 v1) 
-    )
-
-    =
-        assert (i0==i1) $
-
-        i0 ./ f (v0, v1)
 
 iEdgeByVertices
   :: Pair IVertex -> IEdge
@@ -364,3 +333,8 @@ oiEdgeByVertices
   :: Pair IVertex -> OIEdge
 oiEdgeByVertices = withTIndexEqual verticesToOEdge
 
+edgeNu :: Numbering Edge
+edgeNu = finiteTypeNu
+
+oEdgeNu :: Numbering OEdge
+oEdgeNu = finiteTypeNu

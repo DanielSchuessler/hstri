@@ -1,15 +1,27 @@
 {-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS -Wall #-}
 module Tikz.Base where
 import Data.String.Interpolation
 import HomogenousTuples
 import Element
 
+type Tikz = String
 
 data TikzLoc = Polar { tl_degrees :: Int, tl_radius :: TikzLength }
+             | Cartesian (TikzLength, TikzLength)
 
-renderTikzLoc (Polar a r) = [str| ($:a$:$:r$) |]
+renderTikzLoc :: TikzLoc -> Tikz
+renderTikzLoc (Polar a r) = [str| ($:a$:$r$) |]
+renderTikzLoc (Cartesian (x, y)) = [str| ($x$,$y$) |]
 
-type TikzLength = Int
+type TikzLength = String
+
+scopeUnitLength :: Double -> String
+scopeUnitLength = show
+
+ptLength :: Double -> [Char]
+ptLength x = show x ++ "pt"
+
 
 
 type TikzNodeName = String
@@ -20,14 +32,20 @@ type TikzStyle = String
 data PaperTriangleSide = PTS_NW | PTS_S | PTS_NE 
     deriving Show
 
+allPaperTriangleSides :: [PaperTriangleSide]
 allPaperTriangleSides = asList allPaperTriangleSides'
+allPaperTriangleSides'
+  :: (PaperTriangleSide, PaperTriangleSide, PaperTriangleSide)
 allPaperTriangleSides' = (PTS_NW,PTS_S,PTS_NE)
 
+pts_toTikz :: PaperTriangleSide -> Tikz
 pts_toTikz x = "side " ++ show (case x of
-                                    PTS_NW -> 1
+                                    PTS_NW -> 1::Int
                                     PTS_S  -> 2
                                     PTS_NE -> 3)
 
+pts_cornersCCW
+  :: PaperTriangleSide -> (PaperTriangleCorner, PaperTriangleCorner)
 pts_cornersCCW x = case x of
                         PTS_NW -> (PTC_N,PTC_SW)
                         PTS_S -> (PTC_SW,PTC_SE)
@@ -42,11 +60,14 @@ allPaperTriangleCorners = asList allPaperTriangleCorners'
 allPaperTriangleCorners' :: (Triple PaperTriangleCorner)
 allPaperTriangleCorners' = (PTC_N,PTC_SW,PTC_SE)
 
+ptc_toTikz :: PaperTriangleCorner -> Tikz
 ptc_toTikz x = "corner " ++ show (case x of
-                                    PTC_N  -> 1
+                                    PTC_N  -> 1::Int
                                     PTC_SW -> 2
                                     PTC_SE -> 3)
 
+-- | Prepends a comma unless the argument is empty or starts with a comma already
+ensureComma :: [Char] -> [Char]
 ensureComma "" = ""
 ensureComma s@(',':_) = s
 ensureComma s = ", "++s

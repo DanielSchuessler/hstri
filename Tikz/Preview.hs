@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleContexts, ViewPatterns, QuasiQuotes, ScopedTypeVariables, NoMonomorphismRestriction #-}
 
-module Tikz.Preview(Tikz,previewTikz,previewTikzFile) where
+module Tikz.Preview(Tikz,previewTikz,previewTikzFile,wrapTikzAsDoc) where
 
 import Data.String.Interpolation
 import qualified Data.Map as M
 import Latexable
 import HomogenousTuples
 import Util
+import Tikz.Base
 
-type Tikz = String
 
 previewTikz :: Tikz -> IO ()
 previewTikz tikz = do
@@ -18,7 +18,7 @@ previewTikz tikz = do
     let texfile = fbase++".tex"
         pdffile = fbase++".pdf"
 
-    writeFile texfile (wrap tikz)
+    writeFile texfile (wrapTikzAsDoc tikz)
     rawSystemS "ln" ["-sf",texfile,"/tmp/it.tex"]
     previewTikzFile texfile pdffile
 
@@ -29,10 +29,9 @@ previewTikzFile texfile pdffile = do
 
     runOkularAsync pdffile
 
-
-wrap :: Tikz -> Tikz
-wrap tikz = [str|
-\documentclass[a4paper,ngerman]{article}
+wrapTikzAsDoc :: Tikz -> Tikz
+wrapTikzAsDoc tikz = [str|
+\documentclass[ngerman]{article}
 
 \usepackage{amsmath}
 \usepackage{amsthm}
@@ -43,6 +42,7 @@ wrap tikz = [str|
 \usepackage{graphicx}
 \usepackage{wrapfig}
 \usepackage{tikz}
+\usepackage[a2paper]{geometry}
 
 \usetikzlibrary{decorations,arrows,shapes,calc}
 

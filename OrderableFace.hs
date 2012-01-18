@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, MultiParamTypeClasses, TypeFamilies, FunctionalDependencies #-}
 {-# OPTIONS -Wall #-}
 module OrderableFace(
-    module Group,
+    module Math.Group,
     module FaceClasses,    
     OrderableFace(..),
     defaultRightActionForOrderedFace,
@@ -16,7 +16,7 @@ module OrderableFace(
     
     ) where
 
-import Group
+import Math.Group
 import FaceClasses
 import Data.Monoid
 import QuickCheckUtil

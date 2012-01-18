@@ -1,6 +1,6 @@
 {-# LANGUAGE ViewPatterns, TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall #-}
-module NormalCorner(
+module Tetrahedron.NormalCorner(
          -- * Normal corners
         NormalCorner, allNormalCorners, allNormalCorners', normalCornerGetContainingEdge, 
         MakeNormalCorner(..),

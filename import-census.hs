@@ -7,43 +7,53 @@ import Data.String.Interpolation
 import Triangulation
 import Data.Binary
 
-main =
-    go "/usr/share/regina-normal/examples/closed-or-census.rga" "ClosedOrCensus6" "closedOrCensus6"
-         ((<= 6). tNumberOfTetrahedra_ . snd)
+maxTets n = ((<= n). tNumberOfTetrahedra_ . snd)
+
+main = do
+    --go "/usr/share/regina-normal/examples/closed-or-census.rga" "ClosedOrCensus6" "closedOrCensus6" (maxTets 6) 
+    go "/usr/share/regina-normal/examples/closed-nor-census.rga" "ClosedNorCensus8" "closedNorCensus8" (maxTets 8)
 
 go rga modname lowername predi = do
+    let fn = "/tmp/"++modname++".hs"
+    putStrLn fn
 
-    putStrLn [str|
-module $modname$ where
-import Triangulation
-import Data.Binary
-import qualified Data.ByteString.Lazy.Char8
-
-|]
     trs0 <- readRgaZip rga
 
     let trs = filter predi trs0 
     let nam i = "tr_"++show i
 
-    units <- zipWithM (\i (l,tr) ->
-            putStrLn [str|
--- | $l$
-$nam i$ :: LabelledTriangulation
-$nam i$ = ($quote l$, decode $quotePrec 11 (encode tr)$)
+    let
+     src =
+            [str|
+                    module $modname$ where
+                    import Triangulation
+                    import Data.Binary
+                    import qualified Data.ByteString.Lazy.Char8
 
-|])
+            |]
+            ++
+            concat (zipWith (\i (l,tr) ->
+                [str|
+                    -- | $l$
+                    $nam i$ :: LabelledTriangulation
+                    $nam i$ = ($quote l$, decode $quotePrec 11 (encode tr)$)
+
+                |])
 
                    [0..]
-                   trs
+                   trs)
 
-    putStrLn [str|
-$lowername$ :: [LabelledTriangulation]
-$lowername$ =
-  [ # i in [0..length units-1]:$nam i$|
-  , #
-  ]
+            ++
 
--- vim: nowrap
-|]
+            [str|
+                $lowername$ :: [LabelledTriangulation]
+                $lowername$ =
+                    [ # i in [0..length trs-1]:$nam i$|
+                    , #
+                    ]
+
+                -- vim: nowrap
+            |]
 
 
+    writeFile fn src

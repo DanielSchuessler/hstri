@@ -42,7 +42,7 @@ conjoinMap2 xs ys p = conjoinMap (xs `cart` ys) p
 
 (.=.) ::  (Show a, Eq a) => a -> a -> Property
 x .=. y = 
-    printTestCase (unlines ["(.=.):","=== FIRST ELEMENT ===",show x,"=== SECOND ELEMENT ===",show y])
+    printTestCase (unlines ["Checking equality","=== LHS of equation ===",show x,"=== RHS of equation ===",show y])
     (x==y)
 
 infix 4 .=.

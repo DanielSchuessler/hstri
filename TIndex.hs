@@ -13,6 +13,7 @@ import ShortShow
 import Data.Binary
 import Data.Binary.Derive
 import GHC.Generics(Generic)
+import Control.Exception
 
 
 
@@ -124,3 +125,26 @@ unI (viewI -> I _ x) = x
 newtype TwoSkeleton a = TwoSkeleton { unTwoSkeleton :: a }
 newtype OneSkeleton a = OneSkeleton { unOneSkeleton :: a }
 newtype ZeroSkeleton a = ZeroSkeleton { unZeroSkeleton :: a } 
+
+
+withTIndexEqual
+  :: (HasTIndex ia a, HasTIndex ib b , HasTIndex ic c) =>
+     (( a,  b) ->  c) -> (ia,ib) -> ic
+withTIndexEqual f 
+    (
+        (viewI -> I i0 v0) 
+    ,   (viewI -> I i1 v1) 
+    )
+
+    =
+        assert (i0==i1) $
+
+        i0 ./ f (v0, v1)
+
+withTIndexEqualC
+  :: (HasTIndex ia a, HasTIndex ib b , HasTIndex ic c) =>
+     ( a ->  b ->  c) -> ia -> ib -> ic
+withTIndexEqualC = curry . withTIndexEqual . uncurry
+
+inIOf :: (HasTIndex ia a, HasTIndex ib b) => b -> ia -> ib
+inIOf b ia = getTIndex ia ./ b

@@ -1,26 +1,31 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeFamilies #-}
 {-# OPTIONS -Wall #-}
-module Math.Groups.S3(module Group, S3(..),allS3,sort3WithPermutation,
+module Math.Groups.S3(module Math.Group, module Math.Groups.S2, S3(..),allS3,sort3WithPermutation,
+    transpositions,
+    s3ToFun,
+    s3FromFunMay,
+    s3sgn,
 
     -- * Testing
     qc_S3
     ) where
 
-import Control.Monad
 import Data.Binary
 import Data.Hashable
 import Data.Maybe
 import Data.Monoid
-import Data.Proxy
-import Group
 import Language.Haskell.TH.Syntax
 import PrettyUtil
-import QuickCheckUtil
 import Quote
 import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Util
+import Math.Groups.S2
+import HomogenousTuples
+import Math.Group
+import Data.Tuple.Index
+import Data.Semigroup
 
 -- | Symmetric group / permutation group on 3 elements
 data S3 = S3abc | S3bca | S3cab | S3acb | S3bac | S3cba deriving(Read,Show,Eq,Enum,Bounded,Ord)
@@ -38,7 +43,10 @@ data S3 = S3abc | S3bca | S3cab | S3acb | S3bac | S3cba deriving(Read,Show,Eq,En
 allS3 :: [S3]
 allS3 = [minBound .. maxBound]
 
-instance Arbitrary S3 where arbitrary = elements allS3 
+instance Arbitrary S3 where 
+    arbitrary = elements allS3 
+    shrink = monoidDefaultShrink
+
 instance CoArbitrary S3 where coarbitrary = variant . fromEnum
 
 instance Pretty S3 where pretty = yellow . text . drop 2 . show 
@@ -59,55 +67,40 @@ s3the = fromMaybe err . s3find
     where
         err = error "s3the: no element satisfies the predicate"
 
-data ABC = A | B | C deriving(Eq,Show)
-
-instance Arbitrary ABC where arbitrary = elements [A,B,C]
-instance CoArbitrary ABC where coarbitrary = coarbitraryShow
-instance Show (ABC -> ABC) where showsPrec prec f = showParen (prec > 10) (showString "tupleToFun " . shows (tupleFromFun f))                                
-
-tupleToFun :: (t, t, t) -> ABC -> t
-tupleToFun (a,_,_) A = a
-tupleToFun (_,b,_) B = b
-tupleToFun (_,_,c) C = c
-
-tupleFromFun :: (ABC -> t) -> (t, t, t)
-tupleFromFun f = (f A, f B, f C)
-
-prop_tupleFromToFun :: (Int, Int, Int) -> Property
-prop_tupleFromToFun (x :: (Int,Int,Int)) = x .=. tupleFromFun (tupleToFun x) 
 
 
-toFun ::  S3 -> ABC -> ABC
-toFun g = case g of
-                       S3abc -> mkFun A B C
-                       S3bca -> mkFun B C A
-                       S3cab -> mkFun C A B
-                       S3acb -> mkFun A C B
-                       S3bac -> mkFun B A C
-                       S3cba -> mkFun C B A
+
+s3ToFun ::  S3 -> Index3 -> Index3
+s3ToFun g = case g of
+                       S3abc -> mkFun I3_0 I3_1 I3_2
+                       S3bca -> mkFun I3_1 I3_2 I3_0
+                       S3cab -> mkFun I3_2 I3_0 I3_1
+                       S3acb -> mkFun I3_0 I3_2 I3_1
+                       S3bac -> mkFun I3_1 I3_0 I3_2
+                       S3cba -> mkFun I3_2 I3_1 I3_0
     where
-        mkFun imA _ _ A = imA
-        mkFun _ imB _ B = imB
+        mkFun imA _ _ I3_0 = imA
+        mkFun _ imB _ I3_1 = imB
         mkFun _ _ imC _ = imC
 
-fromFunMay ::  (ABC -> ABC) -> Maybe S3
-fromFunMay f = case tupleFromFun f of
-                 (A,B,C) -> Just S3abc
-                 (A,C,B) -> Just S3acb
-                 (B,A,C) -> Just S3bac
-                 (B,C,A) -> Just S3bca
-                 (C,A,B) -> Just S3cab
-                 (C,B,A) -> Just S3cba
+s3FromFunMay ::  (Index3 -> Index3) -> Maybe S3
+s3FromFunMay f = case tupleFromFun f of
+                 (I3_0,I3_1,I3_2) -> Just S3abc
+                 (I3_0,I3_2,I3_1) -> Just S3acb
+                 (I3_1,I3_0,I3_2) -> Just S3bac
+                 (I3_1,I3_2,I3_0) -> Just S3bca
+                 (I3_2,I3_0,I3_1) -> Just S3cab
+                 (I3_2,I3_1,I3_0) -> Just S3cba
                  _ -> Nothing
 
-fromBijFun :: (ABC -> ABC) -> S3
-fromBijFun f = case (f A, f B) of
-                 (A,B) -> S3abc
-                 (A,C) -> S3acb
-                 (B,A) -> S3bac
-                 (B,C) -> S3bca
-                 (C,A) -> S3cab
-                 (C,B) -> S3cba
+fromBijFun :: (Index3 -> Index3) -> S3
+fromBijFun f = case (f I3_0, f I3_1) of
+                 (I3_0,I3_1) -> S3abc
+                 (I3_0,I3_2) -> S3acb
+                 (I3_1,I3_0) -> S3bac
+                 (I3_1,I3_2) -> S3bca
+                 (I3_2,I3_0) -> S3cab
+                 (I3_2,I3_1) -> S3cba
                  _ -> error "fromBijFun: not bijective"
                 
 
@@ -156,49 +149,19 @@ s3mult' S3acb S3cba = S3bca
 s3mult' S3bac S3cba = S3cab
 s3mult' S3cba S3cba = S3abc
 
-
-prop_toFun_homomorphism :: S3 -> S3 -> ABC -> Property
-prop_toFun_homomorphism g2 g1 x = 
-    toFun g2 (toFun g1 x) .=. toFun (g2 .*. g1) x
-
-prop_fromFun_homomorphism
-  :: (ABC -> ABC) -> (ABC -> ABC) -> Property
-prop_fromFun_homomorphism f2 f1 =
-    fromFunMay (f2 . f1) .=. liftM2 (.*.) (fromFunMay f2) (fromFunMay f1)
+instance Semigroup S3 where
+    (<>) = s3mult'
 
 instance Monoid S3 where
-    mappend = s3mult'
+    mappend = (<>)
     mempty = S3abc
-
-prop_idl :: S3 -> Bool
-prop_idl = polyprop_idl
-
-prop_idr :: S3 -> Bool
-prop_idr = polyprop_idr
-
-prop_assoc :: S3 -> S3 -> S3 -> Bool
-prop_assoc = polyprop_assoc
-
 
 instance Group S3 where
     inv g = s3the (\g' -> g' .*. g == S3abc)
 
-prop_invl :: S3 -> Bool
-prop_invl = polyprop_invl 
-
-prop_invr :: S3 -> Bool
-prop_invr = polyprop_invr 
-
-
 instance RightAction S3 (a,a,a) where
-    xs *. g = tupleFromFun . (. toFun g) . tupleToFun $ xs 
+    xs *. g = tupleFromFun . (. s3ToFun g) . tupleToFun $ xs 
 
-
-prop_act_id :: (Int,Int,Int) -> Bool
-prop_act_id = polyprop_ract_id (undefined :: Proxy S3)
-
-prop_permute_mult :: S3 -> S3 -> (Int,Int,Int) -> Bool
-prop_permute_mult = polyprop_ract_mult
 
 
 -- | Tests
@@ -242,16 +205,19 @@ sort3WithPermutation xs@(x0,x1,x2) =
                 ((x2,x1,x0),S3cba)
 
 
-prop_sort3WithPermutation :: (Int, Int, Int) -> Property
-prop_sort3WithPermutation (xs :: (Int,Int,Int)) = 
-    case sort3WithPermutation xs of
-         (xs'@(x0,x1,x2),g) -> 
-         
-            x0 <= x1 .&. 
-            x1 <= x2 .&.
-            xs .=. xs' *. g
-
 
 instance Binary S3 where
     get = getEnumWord8
     put = putEnumWord8
+
+transpositions :: (S3, S3, S3)
+transpositions = (S3bac, S3cba, S3acb)
+
+-- | Signum
+s3sgn :: S3 -> S2
+s3sgn g = if g `elem3` transpositions
+             then Flip
+             else NoFlip
+
+instance Signum S3 where sgn = s3sgn
+

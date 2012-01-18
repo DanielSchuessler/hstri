@@ -10,7 +10,7 @@ import Data.Map as M
 import Data.Maybe
 import HomogenousTuples
 import INormalDisc
-import NormalDisc
+import Tetrahedron.NormalDisc
 import PreRenderable
 import PrettyUtil
 import ShortShow
