@@ -35,8 +35,14 @@ defaultDisjointUnion a b =
 -- instance DisjointUnionable (a -> r) (a' -> r) (Either a a' -> r) where
 --     disjointUnion = either
 
+class CoDisjointUnionable a b c | a b -> c where
+    coDjEither :: (a -> r) -> (b -> r) -> (c -> r)
 
+instance (CoDisjointUnionable a b c) => DisjointUnionable (a -> r) (b -> r) (c -> r) where
+    disjointUnion = coDjEither
 
+-- instance CoDisjointUnionable (a n) (a' n) (Either1 a a' n) where
+--     coDjEither = either1
 
 
 
@@ -91,62 +97,28 @@ instance (GDisjointUnionable f1 f2 f finj1 finj2 fei, GDisjointUnionable g1 g2 g
 --     deriving(Show)
 
 
-class CoDisjointUnionable a b c | a b -> c where
-    deither :: (a -> r) -> (b -> r) -> (c -> r)
-    dleft :: a -> c
-    dright :: b -> c
-
---    coDjEither :: (a -> r) -> (b -> r) -> DisjointUnion (c -> r) (a -> c) (b -> c)
-
-newtype EitherFunction a b c = EitherFunction { runEitherFunction :: (a -> r) -> (b -> r) -> (c -> r) } 
-
-instance (CoDisjointUnionable a b c) => 
-    DisjointUnionable (a -> r) (b -> r) (c -> r) 
-        ((c -> r) -> (a -> r)) 
-        ((c -> r) -> (b -> r)) 
-        (EitherFunction a b c) where
-
-    disjointUnionWithInjs ka kb = 
-        DisjointUnion (deither ka kb) (. dleft) (. dright)
-
--- instance CoDisjointUnionable (a n) (a' n) (Either1 a a' n) where
---     coDjEither = either1
-
-distrCoDjEither
-  :: ( CoDisjointUnionable v1 v2 v
-     , CoDisjointUnionable e1 e2 e
-     , SumType v1 e1 ve1
-     , SumType v2 e2 ve2
-     , SumType v  e  ve
-     ) =>
-        (ve1 -> r)
-     -> (ve2 -> r)
-     -> DisjointUnion (ve -> r) (ve1 -> ve) (ve2 -> ve)
-distrCoDjEither k1 k2 = 
-            let
-                    x1 = coDjEither (k1 . left') (k2 . left')
-                    x2 = coDjEither (k1 . right') (k2 . right')
-
-            in
-
-            DisjointUnion 
-                (djObject x1 |||| djObject x2)
-                (djInjection1 x1 ++++ djInjection1 x2) 
-                (djInjection2 x1 ++++ djInjection2 x2) 
 
 instance (CoDisjointUnionable v1 v2 v, CoDisjointUnionable e1 e2 e) =>
     CoDisjointUnionable (AnySimplex1 v1 e1) (AnySimplex1 v2 e2) (AnySimplex1 v e)
 
     where
-        coDjEither = distrCoDjEither
+
+        coDjEither k1 k2 = 
+            foldAnySimplex1
+                (coDjEither (k1 . vertToAnySimplex1) (k2 . vertToAnySimplex1))
+                (coDjEither (k1 . edToAnySimplex1) (k2 . edToAnySimplex1))
+
 
 instance (CoDisjointUnionable v1 v2 v, CoDisjointUnionable e1 e2 e,
             CoDisjointUnionable t1 t2 t) =>
     CoDisjointUnionable (AnySimplex2 v1 e1 t1) (AnySimplex2 v2 e2 t2) (AnySimplex2 v e t)
 
     where
-        coDjEither = distrCoDjEither
 
+        coDjEither k1 k2 = 
+            foldAnySimplex2'
+                (coDjEither (k1 . anySimplex1To2) (k2 . anySimplex1To2))
+                (coDjEither (k1 . triToAnySimplex2) (k2 . triToAnySimplex2))
 
 
 
@@ -159,10 +131,7 @@ isRegardedAsSimplexByDisjointUnionDeriving t =
         [instanceD 
             (cxt [])
             (conT ''CoDisjointUnionable `appT` a `appT` t `appT` [t|Either $(a) $(t)|]) 
-
-            [valD (varP 'coDjEither) 
-                (normalB 
-                    [| DisjointUnion either Left Right |]) []]
+            [valD (varP 'coDjEither) (normalB (varE 'either)) []]
             ]
 
 
