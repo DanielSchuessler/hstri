@@ -13,6 +13,7 @@ import Triangulation
 import TupleTH
 import Util
 import qualified Data.ByteString as BS
+import Data.SumType
 
 readJvxFile
   :: FilePath -> IO (Either XmlError Triangulation)

@@ -5,7 +5,7 @@ module ConcreteNormal.PreRenderable(
     module SimplicialPartialQuotient,
     module PreRenderable,
     module Simplicial.SimplicialComplex,
-    Corn,corn,
+    Corn,corn,cornVerts,
     normalSurfaceToPreRenderable,
     CornerPosition,CornerCount,
 
@@ -26,6 +26,7 @@ import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
 import TriangulationCxtObject
 import Util
+import Language.Haskell.TH.Syntax
 
 type CornerCount = Int
 
@@ -33,6 +34,9 @@ type CornerCount = Int
 data Corn v = Corn CornerPosition CornerCount v v
                     -- INVARIANT: Third field <= fourth field
     deriving(Eq,Ord,Show)
+
+cornVerts :: Corn t -> (t, t)
+cornVerts (Corn _ _ u v) = (u,v)
 
 instance ShortShow v => ShortShow (Corn v) where
     shortShow (Corn cp _ v0 v1) = shortShow (v0,v1) ++ show cp
@@ -122,3 +126,6 @@ instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
 
 isRegardedAsSimplexByDisjointUnionDeriving (conT ''Corn `appT` varT (mkName "v"))
 
+instance Lift v => Lift (Corn v) where 
+    lift (Corn a b c d) =
+        [| corn a b c d |]

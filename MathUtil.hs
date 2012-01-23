@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS -Wall -fno-warn-unused-imports -fno-warn-orphans #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 
 module MathUtil where
 
@@ -71,8 +71,6 @@ stereograph' t (Vec4 y0 y1 y2 y3) =
 c2_to_r4 :: Complex Double -> Complex Double -> Vec4
 c2_to_r4 ((:+) !a !b) ((:+) !c !d) = Vec4 a b c d 
 
-instance Arbitrary Vec4 where
-    arbitrary = gen4 arbitrary
 
 gen4 :: Monad m => m Double -> m Vec4
 gen4 g = liftM4 Vec4 g g g g
@@ -118,7 +116,6 @@ cScalarMul r (a :+ b) = r*a :+ r*b
 withOrigin :: AbelianGroup b => b -> (b -> b) -> b -> b
 withOrigin o f = (&+ o) . f . (&- o)
 
-deriving instance Ord Vec3
 
 
 -- | 'vec3Z' * @pointZTo z'@ = @z'@ 

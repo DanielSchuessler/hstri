@@ -24,6 +24,7 @@ import Triangulation
 import Util
 import qualified Data.List as L
 import qualified Data.Set as S
+import Data.SumType
     
 
 arbitraryTriangulation :: Gen Triangulation

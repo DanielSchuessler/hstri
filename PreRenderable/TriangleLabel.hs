@@ -7,6 +7,7 @@ import THUtil
 import qualified Data.Map as M
 import HomogenousTuples
 import Data.AscTuples
+import Language.Haskell.TH.Lift
 
 
 data TriangleLabel = TriangleLabel {
@@ -89,3 +90,5 @@ stla2tla a =
 
 instance Pretty TriangleLabel where
     prettyPrec = prettyPrecFromShow
+
+deriveLiftMany [''TriangleLabel]

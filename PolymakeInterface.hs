@@ -12,6 +12,7 @@ import System.Process
 import System.Random
 import Text.Parsec as P
 import qualified System.FilePath as File
+import OrphanInstances()
 
 type Parser a = ParsecT String () Identity a
 

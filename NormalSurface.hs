@@ -10,24 +10,40 @@ import Tetrahedron.NormalCorner
 import TriangulationCxtObject
 import Control.Arrow
 import Data.Ratio
+import QuadCoordinates.Class
+import Data.Maybe
+import Util
 
 
 -- | 
--- Minimal definition: ('discCount' || ('triCount' && 'quadCount')) && 'nsToAssocs'
+-- Minimal definition: ('discCount' || 'triCount') && 'nsToAssocs'
 --
 -- Law: If more than the minimum is implemented, the impls must be equivalent to the default implementations
-class NormalSurface s i | s -> i where
+class QuadCoords s i => NormalSurface s i | s -> i where
     discCount :: s -> INormalDisc -> i 
-
     triCount :: s -> INormalTri -> i 
-    quadCount :: s -> INormalQuad -> i 
-
-    discCount = eitherIND <$> triCount <*> quadCount
-    triCount = (. iNormalDisc) <$> discCount
-    quadCount = (. iNormalDisc) <$> discCount
 
     -- | May (but need not) omit zero coefficients. May contain repeated discs.
     nsToAssocs :: s -> [(INormalDisc,i)]
+
+    -- | May (but need not) omit zero coefficients. May contain repeated tris.
+    triAssocs :: s -> [(INormalTri,i)]
+
+    discCount = eitherIND <$> triCount <*> quadCount
+    triCount = (. iNormalDisc) <$> discCount
+
+    triAssocs = mapMaybe (traverseFst (eitherIND Just (const Nothing))) . nsToAssocs
+    nsToAssocs = (++) <$> (map (first iNormalDisc) . triAssocs) 
+                      <*> (map (first iNormalDisc) . quadAssocs) 
+
+
+-- | Superclass default; requires implementation of 'discCount'
+defaultQuadCount :: NormalSurface s c => s -> INormalQuad -> c
+defaultQuadCount = (. iNormalQuadToINormalDisc) <$> discCount
+
+-- | Superclass default; requires implementation of 'nsToAssocs'
+defaultQuadAssocs :: NormalSurface a t1 => a -> [(INormalQuad, t1)]
+defaultQuadAssocs = mapMaybe (traverseFst (eitherIND (const Nothing) Just)) . nsToAssocs
 
 -- The number of normal triangles in the first arg containing a normal arc of the given type.
 -- Note that this is only well-defined in the disjoint union of tetrahedra, not in the quotient space!
@@ -61,15 +77,16 @@ ns_toDenseAssocs tr ns = fmap (id &&& discCount ns) (tINormalDiscs tr)
 ns_toDenseList :: NormalSurface s i => Triangulation -> s -> [i]
 ns_toDenseList tr = fmap snd . ns_toDenseAssocs tr 
 
-instance Num n => NormalSurface INormalDisc n where
+
+instance NormalSurface INormalDisc Integer where
     discCount d d' = if d==d' then 1 else 0
     nsToAssocs d = [(d,1)] 
 
-instance Num n => NormalSurface INormalTri n where
+instance NormalSurface INormalTri Integer where
     discCount = discCount . iNormalDisc 
     nsToAssocs = nsToAssocs . iNormalDisc
 
-instance Num n => NormalSurface INormalQuad n where
+instance NormalSurface INormalQuad Integer where
     discCount = discCount . iNormalDisc 
     nsToAssocs = nsToAssocs . iNormalDisc
 
@@ -77,20 +94,12 @@ instance (Num n, NormalSurface s n) => NormalSurface [s] n where
     discCount xs d = sum (flip discCount d <$> xs) 
     nsToAssocs = concatMap nsToAssocs 
 
-data FormalProduct a b = a :* b
-    deriving Show
-
-infixl 7 :*
 
 instance (Num n, NormalSurface s n) => NormalSurface (FormalProduct n s) n where
     discCount (n :* s) = (n *) <$> discCount s
 
     nsToAssocs (n :* s) = second (n *) <$> nsToAssocs s
 
-data FormalSum a b = a :+ b
-    deriving Show
-
-infixl 6 :+
 
 instance (Num n, NormalSurface s n, NormalSurface s' n) => NormalSurface (FormalSum s s') n where
     discCount (s :+ s') = (+) <$> discCount s <*> discCount s'

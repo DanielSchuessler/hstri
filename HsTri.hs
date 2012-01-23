@@ -29,7 +29,9 @@ module HsTri(
     module Triangulation.Class,
     module TriangulationCxtObject,
     module VerboseDD,
-    module Tikz.Gen
+    module Tikz.Gen,
+    module Simplicial.SimplicialComplex,
+    module Data.AscTuples
 
     ) where
 
@@ -62,3 +64,5 @@ import TriArcGraph
 import DotUtil(viewDot)
 import ClosedOrCensus6
 import Tikz.Gen
+import Simplicial.SimplicialComplex
+import Data.AscTuples

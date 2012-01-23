@@ -303,3 +303,9 @@ instance (Ord v, Pretty v) => Pretty (SPQWithCoords v) where
 
 spqwc_tr :: SPQWithCoords v -> Triangulation
 spqwc_tr = spq_tr . spqwc_spq
+
+spqwc_map :: SPQWithCoords v -> IVertex -> v
+spqwc_map = spq_map . spqwc_spq
+
+spqwc_coords' :: SPQWithCoords v -> IVertex -> Vec3
+spqwc_coords' spqwc = spqwc_coords spqwc . spqwc_map spqwc

@@ -69,6 +69,8 @@ Library
     ONormal
     OrderableFace
     Orientation
+    OrphanInstances
+    OrphanInstances.Lift
     ParseJvx
     ParseRga
     PolymakeInterface
@@ -83,6 +85,7 @@ Library
     Simplicial.DeltaSet2
     Simplicial.DeltaSet3
     Simplicial.SimplicialComplex
+    Simplicial.SimplicialComplex.Class
     SimplicialPartialQuotient
     StandardCoordinates
     THUtil
@@ -112,11 +115,13 @@ Library
     VectorUtil
     VerboseDD
     ZeroDefaultMap
+    Data.SumType
 
 
-  Build-depends: MemoTrie, 
-  
-         GLFW-b
+  Build-depends: yices-painless, syb, th-lift, 
+         MemoTrie 
+        ,TypeCompose
+        ,GLFW-b
         ,Interpolation
         ,MissingH
         ,OneTuple

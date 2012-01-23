@@ -67,6 +67,7 @@ import TupleTH
 import Util
 import Tetrahedron.Vertex
 import Data.Numbering
+import OrphanInstances()
 
 
 deriving instance Binary (BitSet Vertex)
@@ -319,7 +320,7 @@ instance Edges TIndex where
     edges z = map6 (z ./) allEdges'
 
 instance Lift Edge where
-    lift (Edge e) = [| Edge e |]
+    lift (Edge e) = [| bitSetToEdge e |]
 
 instance ShortShow Edge where shortShow = show
 instance ShortShow OEdge where shortShow = show
@@ -338,3 +339,7 @@ edgeNu = finiteTypeNu
 
 oEdgeNu :: Numbering OEdge
 oEdgeNu = finiteTypeNu
+
+instance Lift IEdge where
+    lift (viewI -> I x y) = [| x ./ y |] 
+

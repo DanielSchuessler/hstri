@@ -1,13 +1,12 @@
 {-# LANGUAGE MultiParamTypeClasses, NoMonomorphismRestriction, ScopedTypeVariables #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall #-}
 module Math.Group where
+
 import Data.Monoid
 import Data.Proxy
-import qualified Data.Vect.Double as V
 import QuickCheckUtil
 import Test.QuickCheck
 import Data.Semigroup
-import qualified Data.Vect.Double as Vect
 
 (.*.) ::  Semigroup a => a -> a -> a
 (.*.) = (<>)
@@ -91,20 +90,6 @@ polyprop_ract_mult :: (Eq a, Show a, Semigroup g, RightAction g a) =>g -> g -> a
 polyprop_ract_mult g1 g2 x = x *. (g1 .*. g2) .=. x *. g1 *. g2
 
 
--- | Matrix multiplication
-instance Monoid V.Mat3 where 
-    mappend = (V..*.)
-    mempty = V.idmtx
-
--- | Matrix multiplication
-instance Monoid V.Mat4 where 
-    mappend = (V..*.)
-    mempty = V.idmtx
-
--- | Matrix multiplication
-instance Monoid V.Proj4 where 
-    mappend = (V..*.)
-    mempty = V.idmtx
 
 
 isMonoidHomo :: (Eq a1,Show a,Show a1,Monoid a,Monoid a1,Arbitrary a,Semigroup a,Semigroup a1) =>(a -> a1) -> Property
@@ -138,11 +123,3 @@ monoidDefaultShrink
     g | g == mempty = []
       | otherwise = [mempty]
 
-instance Semigroup Vect.Mat2 where (<>) = (Vect..*.)
-instance Semigroup Vect.Mat3 where (<>) = (Vect..*.)
-instance Semigroup Vect.Mat4 where (<>) = (Vect..*.)
-instance Semigroup Vect.Proj3 where (<>) = (Vect..*.)
-instance Semigroup Vect.Proj4 where (<>) = (Vect..*.)
-instance Semigroup Vect.Ortho2 where (<>) = (Vect..*.)
-instance Semigroup Vect.Ortho3 where (<>) = (Vect..*.)
-instance Semigroup Vect.Ortho4 where (<>) = (Vect..*.)

@@ -14,18 +14,17 @@ import Data.Binary
 import Data.Hashable
 import Data.Maybe
 import Data.Monoid
+import Data.Tuple.Index
+import HomogenousTuples
 import Language.Haskell.TH.Syntax
+import Math.Group
+import Math.Groups.S2
 import PrettyUtil
 import Quote
 import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Util
-import Math.Groups.S2
-import HomogenousTuples
-import Math.Group
-import Data.Tuple.Index
-import Data.Semigroup
 
 -- | Symmetric group / permutation group on 3 elements
 data S3 = S3abc | S3bca | S3cab | S3acb | S3bac | S3cba deriving(Read,Show,Eq,Enum,Bounded,Ord)

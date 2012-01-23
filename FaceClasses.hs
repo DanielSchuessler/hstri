@@ -61,3 +61,5 @@ type Tet a = Element (Tets a)
 
 tetrahedronList :: Tetrahedra a => a -> [Tet a]
 tetrahedronList = asList . tetrahedra
+
+

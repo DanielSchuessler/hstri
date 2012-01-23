@@ -1,16 +1,11 @@
 {-# LANGUAGE TupleSections, TypeSynonymInstances, BangPatterns, DeriveFoldable, DeriveTraversable, DeriveFunctor, ViewPatterns, TypeFamilies, NoMonomorphismRestriction, MultiParamTypeClasses, ScopedTypeVariables, TemplateHaskell, FunctionalDependencies, FlexibleContexts, FlexibleInstances, CPP #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall #-}
 
 module Util where
 import Collections
-import Control.DeepSeq
 import Control.Monad
 import Data.Bits
-import Data.Colour.SRGB as SRGB(RGB(..),toSRGB,Colour) 
 import Data.Function
-import Data.Graph.Inductive.Graph(labEdges)
-import Data.Graph.Inductive.Graph(labNodes)
-import Data.Graph.Inductive.PatriciaTree(Gr)
 import Data.Int
 import Data.List as List
 import Data.Word
@@ -33,10 +28,7 @@ import Data.Binary(Put)
 import Data.List.Split
 import Control.Applicative
 import Safe
-
-
-
-
+import Data.SumType
 
 
 fi :: (Integral a, Num b) => a -> b
@@ -47,17 +39,6 @@ nub' ::  Ord a => [a] -> [a]
 nub' = S.toList . S.fromList
 
 
-isLeft :: Either a b -> Bool
-isLeft = either (const True) (const False)
-
-isRight ::  Either t t1 -> Bool
-isRight (Right _) = True
-isRight _ = False
-
-fromRight ::  Show a => Either a c -> c
-fromRight = either (error . f) id
-    where
-        f x = "fromRight (Left "++showsPrec 11 x ""++")" 
 
 
 
@@ -69,23 +50,28 @@ fromRight = either (error . f) id
 class (Enum a, Bounded a) => Finite a where
 
 -- | Like 'Either', but I use a new type to avoid orphan instances
-data EnumEither a b = EnumLeft a | EnumRight a
+data EnumEither a b = EnumLeft a | EnumRight b
     deriving(Eq,Show)
 
 data EnumPair a b = EnumPair a b
      deriving(Eq,Ord,Show)   
 
-toEither ::  EnumEither b t -> Either b b
-toEither (EnumLeft a) = Left a
-toEither (EnumRight a) = Right a
-
-toEnumEither ::  Either a a -> EnumEither a b
+toEnumEither ::  Either a b -> EnumEither a b
 toEnumEither (Left a) = EnumLeft a
 toEnumEither (Right a) = EnumRight a
 
 
-either' ::  (b -> c) -> (b -> c) -> EnumEither b t -> c
-either' l r = either l r . toEither
+type instance L (EnumEither a b) = a
+type instance R (EnumEither a b) = b
+
+instance SuperSumTy (EnumEither a b) where
+    left' = EnumLeft
+    right' = EnumRight
+
+instance SubSumTy (EnumEither a b) where
+    either' l r x = case x of
+                         EnumLeft x' -> l x'
+                         EnumRight x' -> r x'
 
 
 -- | Like 'toEnum', but shifted to return the smallest element at zero.
@@ -172,13 +158,6 @@ concatMapM f = liftM concat . mapM f
 mapMaybeM :: Monad m => (a1 -> m (Maybe a)) -> [a1] -> m [a]
 mapMaybeM f = liftM catMaybes . mapM f
 
-
-instance (NFData n, NFData e) => NFData (Gr n e) where
-    rnf g = rnf (labNodes g, labEdges g)
-
-instance (NFData (Colour Double)) where
-    rnf c = case toSRGB c of 
-                 SRGB.RGB r g b -> rnf (r,g,b)
 
 
 
@@ -312,3 +291,16 @@ parseFloatLiterals :: String -> [Double]
 parseFloatLiterals =
     mapMaybe readMay .
     wordsBy (not <$> ((||) <$> isDigit <*> (`elem` "-+.Ee")))
+
+
+traverseFst :: Functor f => (t -> f a) -> (t, t1) -> f (a, t1)
+traverseFst f (x,y) = (,y) <$> f x
+
+sequenceFst :: Functor f => (f a, t1) -> f (a, t1)
+sequenceFst = traverseFst id
+
+traverseSnd :: Functor f => (t -> f a) -> (t1, t) -> f (t1, a)
+traverseSnd f (x,y) = (x,) <$> f y
+
+sequenceSnd :: Functor f => (t, f a) -> f (t, a)
+sequenceSnd = traverseSnd id

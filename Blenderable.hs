@@ -22,6 +22,8 @@ import PrettyUtil
 import ShortShow
 import Util
 import THUtil
+import Data.AscTuples
+import Language.Haskell.TH.Lift
 
 data Blenderable s = Blenderable { 
     ba_pr :: PreRenderable s,
@@ -114,16 +116,41 @@ transparency alpha spec_alpha fresnel =
                 "raytrace_transparency.depth" & (15::Int)
                 ]
 
--- newtype Pseudomanifold s = Pseudomanifold { unPseudomanifold :: s }
---     deriving(Coordinates)
+
+data Style = Style {
+    mat0, mat1, mat2 :: Material,
+    vertexThickness :: Double
+}
+
+mkBlenderable
+  :: forall s. 
+        Style
+     -> PreRenderable s
+     -> Blenderable s
+mkBlenderable Style{..} pr_ = Blenderable { 
+    ba_pr = pr_,
+
+    ba_faceInfo = \asi ->
+        BaFaceInfo {
+            faceMat = foldAnySimplex2 (const mat0) (const mat1) (const mat2) asi
+        },
+
+    ba_vertexThickness = const vertexThickness,
+    ba_edgeThickness = const (edgeThicknessFactor*vertexThickness),
+
+    ba_materials = [mat0,mat1,mat2]
+}
 
 
-pmMat0 :: Material
-pmMat0 = Material "pmMat0" (let r=0.3 in diffuseColor (r, r, r):[])
-pmMat1 :: Material
-pmMat1 = Material "pmMat1" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8)
-pmMat2 :: Material
-pmMat2 = Material "pmMat2" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8++transparency 0.25 0.3 1)
+
+
+
+pseudomanifoldStyle :: Style
+pseudomanifoldStyle = Style 
+    (Material "pmMat0" (let r=0.3 in diffuseColor (r, r, r):[]))
+    (Material "pmMat1" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8))
+    (Material "pmMat2" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8++transparency 0.25 0.3 1))
+    pmVertThickness  
 
 
 pmVertThickness ::  Double
@@ -135,47 +162,36 @@ nsurfVertThickness = 0.03
 
 
 
-pseudomanifoldStyle
-  :: PreRenderable s -> Blenderable s
-pseudomanifoldStyle = mkBlenderable pmMat0 pmMat1 pmMat2 pmVertThickness  
 
-mkBlenderable
-  :: forall s. 
-     Material
-     -> Material
-     -> Material
-     -> Double
-     -> PreRenderable s
-     -> Blenderable s
-mkBlenderable mat0 mat1 mat2 vertThick pr_ = Blenderable { 
-    ba_pr = pr_,
 
-    ba_faceInfo = \asi ->
-        BaFaceInfo {
-            faceMat = foldAnySimplex2 (const mat0) (const mat1) (const mat2) asi
-        },
 
-    ba_vertexThickness = const vertThick,
-    ba_edgeThickness = const (edgeThicknessFactor*vertThick),
-
-    ba_materials = [mat0,mat1,mat2]
-}
 --     where
 --         sh :: forall n. Nat n => n -> s n -> String
 --         sh _ = showN 
 
 
 
-nsurfMat0 ::  Material
-nsurfMat0 = Material "nsurfMat0" (diffuseColor (0, 0.4, 1):[])
-nsurfMat1 ::  Material
-nsurfMat1 = Material "nsurfMat1" (diffuseColor (0, 0.2, 1):specular 100 0.8)
-nsurfMat2 ::  Material
-nsurfMat2 = Material "nsurfMat2" (diffuseColor (0, 0, 1):specular 100 0.8++transparency 0.55 0.7 1)
 
-normalSurfaceStyle :: PreRenderable s -> Blenderable s
-normalSurfaceStyle = mkBlenderable nsurfMat0 nsurfMat1 nsurfMat2 nsurfVertThickness
+mkNormalSurfaceStyle
+  :: [Char]
+     -> Triple Double -> Triple Double -> Triple Double -> Style
+mkNormalSurfaceStyle suf col0 col1 col2 = Style 
+    (Material ("nsurfMat0"++suf) (diffuseColor col0 :[]))
+    (Material ("nsurfMat1"++suf) (diffuseColor col1:specular 100 0.8))
+    (Material ("nsurfMat2"++suf) (diffuseColor col2:specular 100 0.8++transparency 0.55 0.7 1))
+    nsurfVertThickness
 
+normalSurfaceStyle :: Style
+normalSurfaceStyle = mkNormalSurfaceStyle ""
+ (0, 0.4, 1)
+ (0, 0.2, 1)
+ (0, 0, 1)
+
+normalSurfaceStyleB :: Style
+normalSurfaceStyleB = mkNormalSurfaceStyle "B"
+ (0, 1,0)
+ (0, 0.8,0)
+ (0, 0.6,0)
 
 -- | Points cam at positive y dir
 defaultScene :: ToBlenderable x s => x -> Scene s
@@ -195,13 +211,16 @@ defaultWorldProps = ["use_sky_blend" & False,
 
 
 
-instance DisjointUnionable [Material] [Material] [Material] where
-    disjointUnion ma ma' =
+instance DisjointUnionable [Material] [Material] [Material] () () () where
+    disjointUnionWithInjs ma ma' =
+
+        DisjointUnion 
             (nubBy ((==) `on` ma_name) (ma++ma'))
+            () () ()
 
 
 instance 
-    (   DisjointUnionable s1 s2 s
+    (   DisjointUnionable s1 s2 s inj1 inj2 ei
     
     ,   CoDisjointUnionable
                         (Vert s1) (Vert s2) (Vert s)
@@ -210,11 +229,14 @@ instance
     ,   CoDisjointUnionable
                         (Tri s1) (Tri s2) (Tri s)
     ) =>
-    DisjointUnionable (Blenderable s1) (Blenderable s2) (Blenderable s) where
+    DisjointUnionable (Blenderable s1) (Blenderable s2) (Blenderable s) 
+        inj1 inj2 ei
+    
+        where
 
 
 
-    disjointUnion = defaultDisjointUnion
+    disjointUnionWithInjs = fmap djZapUnits . defaultDisjointUnion
 
 
 
@@ -252,7 +274,7 @@ fromSpqwc
   :: (Ord v, ShortShow v,Pretty v,Show v) =>
      SPQWithCoords v
      -> Blenderable (SC2 v)
-fromSpqwc = pseudomanifoldStyle . pr_popDimension . toPreRenderable
+fromSpqwc = mkBlenderable pseudomanifoldStyle . pr_popDimension . toPreRenderable
 
 -- | = 'fromSpqwc'
 instance (Ord v, ShortShow v, Pretty v, Show v) => ToBlenderable (SPQWithCoords v) (SC2 v) where
@@ -261,7 +283,7 @@ instance (Ord v, ShortShow v, Pretty v, Show v) => ToBlenderable (SPQWithCoords 
 fromNormalSurface
   :: (Integral i, Ord v, Pretty i, ShortShow v, NormalSurface s i, Show v) =>
      SPQWithCoords v -> s -> Blenderable (SC2 (Corn v))
-fromNormalSurface spqwc stc = normalSurfaceStyle (normalSurfaceToPreRenderable spqwc stc) 
+fromNormalSurface spqwc stc = mkBlenderable normalSurfaceStyle (normalSurfaceToPreRenderable spqwc stc) 
 
 fromIntegerNormalSurface
   :: (Ord v, ShortShow v, NormalSurface s Integer, Show v) =>
@@ -270,9 +292,18 @@ fromIntegerNormalSurface = fromNormalSurface
 
 
 fromSpqwcAndIntegerNormalSurface
-  :: (Ord v, ShortShow v, NormalSurface s Integer, Pretty v, Show v) =>
+  :: (Ord v,
+      Show v,
+      Pretty v,
+      ShortShow v,
+      NormalSurface s Integer) =>
      SPQWithCoords v
-     -> s -> Blenderable (DJ (SC2 v) (SC2 (Corn v)))
+     -> s
+     -> Blenderable
+          (DJSCons
+             (Asc3 v)
+             (Asc3 (Corn v))
+             (DJSCons (Asc2 v) (Asc2 (Corn v)) (DJSCons v (Corn v) SCMinus1)))
 fromSpqwcAndIntegerNormalSurface spqwc s = 
     fromSpqwc spqwc 
     `disjointUnion`
@@ -280,10 +311,10 @@ fromSpqwcAndIntegerNormalSurface spqwc s =
 
 
 -- | = @uncurry 'fromSpqwcAndIntegerNormalSurface'@
-instance (Ord v, ShortShow v, NormalSurface s Integer, Pretty v, Show v) => 
-    ToBlenderable (SPQWithCoords v, s) (DJ (SC2 v) (SC2 (Corn v))) where
-
-    toBlenderable = uncurry fromSpqwcAndIntegerNormalSurface
+-- instance (Ord v, ShortShow v, NormalSurface s Integer, Pretty v, Show v) => 
+--     ToBlenderable (SPQWithCoords v, s) (DJ (SC2 v) (SC2 (Corn v))) where
+-- 
+--     toBlenderable = uncurry fromSpqwcAndIntegerNormalSurface
 
 ba_triangleLabel :: Blenderable s -> Tri s -> Maybe TriangleLabel
 ba_triangleLabel = fmap fst . ba_triangleInfo 
@@ -326,3 +357,23 @@ readCam s =
     case parseFloatLiterals s of
          [a,b,c,d,e,f,g] -> Cam (Vec3 a b c) (Vec3 d e f) g 
          r -> error ("readCam: no parse "++ $(showExps ['s,'r]))
+
+
+deriveLiftMany [''Material,''BaFaceInfo]
+
+instance (DeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
+            , Lift (Vert s), Lift (Ed s), Lift (Tri s)) => 
+
+            Lift (Blenderable s) where
+
+     lift Blenderable{..} = 
+        [| Blenderable {
+                ba_pr = ba_pr,
+                ba_faceInfo = $(liftFunction (anySimplex2s ds) ba_faceInfo),
+                ba_vertexThickness = $(liftFunction (vertexList ds) ba_vertexThickness),
+                ba_edgeThickness = $(liftFunction (edgeList ds) ba_edgeThickness),
+                ba_materials = ba_materials
+        } |]
+
+
+        where ds = pr_ds ba_pr

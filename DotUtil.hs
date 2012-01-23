@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, StandaloneDeriving, GeneralizedNewtypeDeriving, NoMonomorphismRestriction, TypeSynonymInstances, FlexibleInstances #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall #-}
 module DotUtil(
     -- * Reex
     module Data.GraphViz,
@@ -275,14 +275,6 @@ productionGraph name graph = do
         putStrLn (fn "tex")
 
 
-instance Pretty Attribute where
-    prettyPrec = prettyPrecFromShow
-
-instance Pretty n => Pretty (DotEdge n) where
-    prettyPrec prec (DotEdge a b c) = 
-        prettyPrecApp prec
-            (text "DotEdge")
-            [anyPretty a, anyPretty b, anyPretty c]
 
 
 d2t' :: D2tAttribute -> Attribute

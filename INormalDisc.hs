@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables, ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module INormalDisc where
@@ -76,10 +76,10 @@ instance MakeINormalTri IVertex where
     iNormalTri = mapI normalTri
 
 instance MakeINormalDisc INormalTri where
-    iNormalDisc = mapI normalDisc
+    iNormalDisc = iNormalTriToINormalDisc
 
 instance MakeINormalDisc INormalQuad where
-    iNormalDisc = mapI normalDisc
+    iNormalDisc = iNormalQuadToINormalDisc
 
 
 
@@ -209,3 +209,9 @@ adjacentINormalCorners
   :: NormalCorner -> INormalDisc -> Pair INormalCorner
 adjacentINormalCorners = traverseI map2 <$> adjacentNormalCorners
 
+
+iNormalQuadToINormalDisc :: INormalQuad -> INormalDisc
+iNormalQuadToINormalDisc (x :: INormalQuad) = mapI normalDisc x
+
+iNormalTriToINormalDisc :: INormalTri -> INormalDisc
+iNormalTriToINormalDisc (x :: INormalTri) = mapI normalDisc x 

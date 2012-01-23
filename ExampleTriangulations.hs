@@ -8,6 +8,7 @@ import Data.Vect.Double
 import EdgeCentered
 import THUtil
 import TriangulationCxtObject
+import Data.SumType
 import Util
 
 tr_aroundEdge :: Word -> Triangulation
@@ -49,8 +50,14 @@ octahedronCam1 =
 tr_oneTet :: Triangulation
 tr_oneTet = mkTriangulation 1 []
 
+tr_twoTets :: Triangulation
+tr_twoTets = mkTriangulation 2 [gluing (0./tABC) (1./oABC)]
+
 spqwc_oneTet :: SPQWithCoords Vertex
 spqwc_oneTet = geometrifySingleTetTriang tr_oneTet show
+
+spqwc_twoTets :: SPQWithCoords TVertex
+spqwc_twoTets = geometrifyTwoTetTriang tr_twoTets (0./tABC) show
 
 spqwc_l31 :: SPQWithCoords TVertex
 spqwc_l31 = geometrifyTwoTetTriang tr_l31 (0./tABC)

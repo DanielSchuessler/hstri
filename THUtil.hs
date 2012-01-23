@@ -1,4 +1,5 @@
-{-# LANGUAGE NoMonomorphismRestriction, FlexibleInstances, TypeSynonymInstances, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, TypeSynonymInstances, TemplateHaskell #-}
+{-# OPTIONS -Wall #-}
 module THUtil(
     module Debug.Trace,
     Pretty,
@@ -9,30 +10,30 @@ module THUtil(
     showExps,
     traceExps,
     ppTestCase,
-    assrt) where
+    assrt,
+    stringQuote,
+    printQuote,
+    liftFunction
+    ) where
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
-import Data.Word
-import Data.BitSet.Word8
 import Util
 import Quote
 import Data.List
 import Debug.Trace
 import PrettyUtil
-import Control.Applicative
 import Control.Arrow((&&&))
 import Test.QuickCheck
+import qualified Data.Map as M
+import OrphanInstances.Lift()
+import Element
+import Data.Generics
+import Data.Maybe
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
 
-
-instance Lift Word8 where
-    lift w = sigE (litE (IntegerL (toInteger w))) [t| Word8 |]
-
-instance Lift (BitSet a) where
-    lift (BitSet w) = [| BitSet $(lift w) |]
 
 -- | Suitable for types with only nullable constructors and derived Show instance
 liftByShow ::  Show a => a -> ExpQ
@@ -112,3 +113,42 @@ traceExps msg printees = [| trace (msg ++ " " ++ $(showExps printees)) |]
 
 ppTestCase :: Printees a => a -> ExpQ
 ppTestCase printees = [| printTestCase $(showExps printees) |]
+
+unqual :: Name -> Name
+unqual = mkName . nameBase 
+
+stringQuote :: Lift t => Bool -> t -> Q Exp
+stringQuote qual qx = do
+        x <- lift qx
+        lift 
+            . pprint 
+            . (if qual then id else everywhere (mkT unqual))
+            . everywhere tExp 
+            $ x
+
+ where
+        tExp = mkT (\t -> fromMaybe t $ charListToStringLit t)
+
+
+printQuote :: Lift a => a -> ExpQ
+printQuote = appE [|putStrLn|] . stringQuote False
+
+-- | 'lift' a function with finite domain
+liftFunction
+  :: (Ord (Element dom), Lift (Element dom), Lift y, AsList dom) =>
+     dom -> (Element dom -> y) -> Q Exp
+liftFunction dom f = [| (M.!) $(lift . M.fromList . map (id &&& f) . asList $ dom) |] 
+    
+
+charListToStringLit :: Exp -> Maybe Exp
+charListToStringLit e = do
+    ListE xs <- Just e
+    cs <- mapM (\x -> do
+                    LitE (CharL c) <- Just x
+                    Just c)
+               xs
+
+    Just (LitE (StringL cs)) 
+
+
+

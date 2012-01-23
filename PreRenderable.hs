@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
+{-# LANGUAGE ViewPatterns, RecordWildCards, TemplateHaskell, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
@@ -38,23 +38,25 @@ module PreRenderable(
 
     ) where
 
+import Control.Arrow
+import Control.Exception(assert)
+import Control.Monad
+import Data.String
 import Data.Vect.Double.Base hiding((*.),(.*),(.*.))
 import DisjointUnion
 import GHC.Generics
+import Language.Haskell.TH.Lift
 import Math.Groups.S3
+import MathUtil
+import OrphanInstances.Lift()
+import PreRenderable.TriangleLabel
+import PrettyUtil(Pretty(..),prettyRecord,prettyFunction,prettyPrecFromShow)
 import ShortShow
 import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
-import Tetrahedron.Vertex
-import PreRenderable.TriangleLabel
-import Control.Arrow
-import Data.String
-import MathUtil
 import THUtil
+import Tetrahedron.Vertex
 import Util
-import Control.Monad
-import Control.Exception(assert)
-import PrettyUtil(Pretty(..),prettyRecord,prettyFunction,prettyPrecFromShow)
 
 class Coords t where
     transformCoords :: (Vec3 -> Vec3) -> t -> t
@@ -79,6 +81,8 @@ data PreRenderable s = PreRenderable {
 }
     deriving(Generic)
 
+
+
 pr_mbGeneralTriangleEmbedding
   :: PreRenderable s -> Tri s -> Maybe GeneralTriangleEmbedding
 pr_mbGeneralTriangleEmbedding = fmap snd . pr_triangleInfo
@@ -87,7 +91,7 @@ instance Coords (PreRenderable a) where
     transformCoords f _pr = _pr { pr_coords0 = f . pr_coords0 _pr }
 
 instance 
-    (   DisjointUnionable s1 s2 s
+    (   DisjointUnionable s1 s2 s inj1 inj2 ei
     
     ,   CoDisjointUnionable
                         (Vert s1) (Vert s2) (Vert s)
@@ -96,9 +100,9 @@ instance
     ,   CoDisjointUnionable
                         (Tri s1) (Tri s2) (Tri s)
     ) =>
-    DisjointUnionable (PreRenderable s1) (PreRenderable s2) (PreRenderable s) where
+    DisjointUnionable (PreRenderable s1) (PreRenderable s2) (PreRenderable s) inj1 inj2 ei where
 
-    disjointUnion = defaultDisjointUnion
+    disjointUnionWithInjs = fmap djZapUnits . defaultDisjointUnion
 
 
 
@@ -266,3 +270,37 @@ instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
 
 pr_visibility :: PreRenderable s -> AnySimplex2Of s -> Visibility
 pr_visibility = fmap fst . pr_faceInfo
+
+
+
+-- instance Lift TriangleEmbedding where
+--     lift (FlatTriangle a b c) = [| FlatTriangle a b c |]
+-- 
+-- instance Lift EdgeEmbedding where
+--     lift (FlatEdge a b) = [| FlatEdge a b |]
+
+-- | error instance
+instance Lift GeneralTriangleEmbedding where
+    lift _ = [| error "'lift' not supported for GeneralTriangleEmbedding" |]
+
+-- | error instance
+instance Lift GeneralEdgeEmbedding where
+    lift _ = [| error "'lift' not supported for GeneralEdgeEmbedding" |]
+
+instance Lift FaceName where
+    lift (unFaceName -> x) = [| mkFaceName x |] 
+
+deriveLiftMany [''Visibility,''TriangleEmbedding,''EdgeEmbedding]
+
+instance (DeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
+            , Lift (Vert s), Lift (Ed s), Lift (Tri s)) => 
+
+    Lift (PreRenderable s) where
+
+    lift PreRenderable{..} = 
+        [| PreRenderable {
+                pr_ds = pr_ds,
+                pr_coords0 = $(liftFunction (vertexList pr_ds) pr_coords0),
+                pr_faceInfo = $(liftFunction (anySimplex2s pr_ds) pr_faceInfo),
+                pr_triangleInfo = $(liftFunction (triangleList pr_ds) pr_triangleInfo)
+        } |]

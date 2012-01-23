@@ -14,6 +14,7 @@ import qualified Data.List as L
 import Data.String
 import Data.Function
 import PrettyUtil
+import Data.Traversable(Traversable)
 
 isZero :: Num a => a -> Bool
 isZero = (==0)
@@ -21,19 +22,21 @@ isZero = (==0)
 zero :: Num a => a
 zero = 0
 
-newtype ZeroDefaultMap k r = ZDM { zdm_toMap :: Map k r }
-    deriving(Foldable)
+-- | Represents a function @k -> r@ with all but finitely many values being zero.
+newtype ZeroDefaultMap k r = ZDM { illdefinedZdmToMap :: Map k r }
+    deriving(Foldable,Functor,Traversable)
 
 instance (Eq r, Num r, Ord k) => Eq (ZeroDefaultMap k r) where
-    (==) = (==) `on` (zdm_toMap . zdm_normalize)
+    (==) = (==) `on` (illdefinedZdmToMap . zdm_normalize)
     
 instance (Ord r, Num r, Ord k) => Ord (ZeroDefaultMap k r) where
-    compare = compare `on` (zdm_toMap . zdm_normalize)
+    compare = compare `on` (illdefinedZdmToMap . zdm_normalize)
 
 zdm_under
   :: (Map t t1 -> Map k r)
      -> ZeroDefaultMap t t1 -> ZeroDefaultMap k r
 zdm_under f (ZDM m) = ZDM (f m)
+
 zdm_under2
   :: (Map t t1 -> Map t2 t3 -> Map k r)
      -> ZeroDefaultMap t t1
@@ -41,6 +44,9 @@ zdm_under2
      -> ZeroDefaultMap k r
 zdm_under2 f (ZDM m) (ZDM m') = ZDM (f m m')
 
+-- | Removes all zero-valued entries from the underlying 'Map'.
+--
+-- Property: @zdm_normalize m == m@
 zdm_normalize
   :: (Num r, Ord k) => ZeroDefaultMap k r -> ZeroDefaultMap k r
 zdm_normalize = zdm_under (M.filter (not . isZero))
@@ -52,20 +58,25 @@ mapNonZeroing = zdm_under . M.map
 zdm_get :: (Num r, Ord k) => ZeroDefaultMap k r -> k -> r
 zdm_get (ZDM m) k = fromMaybe zero (M.lookup k m) 
 
--- | Absent keys are taken to have coefficient zero
+zdm_zero :: Ord k => ZeroDefaultMap k r
+zdm_zero = ZDM mempty
+
+-- | The given function must have zero as a neutral element, or else this won't be independent of the representation
+zdm_addWith :: Ord k => (r -> r -> r)
+     -> ZeroDefaultMap k r -> ZeroDefaultMap k r -> ZeroDefaultMap k r
+zdm_addWith f = zdm_under2 (unionWith f)
+
 instance (Ord k, Num r) => AdditiveGroup (ZeroDefaultMap k r) where
-    zeroV = ZDM mempty
-    ZDM xs ^+^ ZDM ys = ZDM (unionWith (+) xs ys)
+    zeroV = zdm_zero
+    (^+^) = zdm_addWith (+)
 
     negateV = mapNonZeroing negate
 
--- | Absent keys are taken to have coefficient zero
 instance (Ord k, Num r) => VectorSpace (ZeroDefaultMap k r) where
     type Scalar (ZeroDefaultMap k r) = r
     0 *^ _ = zeroV
     r *^ x = mapNonZeroing (r*) x 
 
--- | Absent keys are taken to have coefficient zero
 instance (Ord k, Num r) => InnerSpace (ZeroDefaultMap k r) where
     ZDM x <.> ZDM y = Fold.foldl' (+) 0 (intersectionWith (*) x y)
 
@@ -81,7 +92,7 @@ zdm_fromAssocs
 zdm_fromAssocs = sumV . fmap (uncurry zdm_singleton)
 
 zdm_toAssocs :: ZeroDefaultMap k a -> [(k, a)]
-zdm_toAssocs = M.assocs . zdm_toMap
+zdm_toAssocs = M.assocs . illdefinedZdmToMap
 
 zdm_map
   :: (Num r', Ord k) =>
@@ -180,6 +191,7 @@ variable = Variable
 
 instance Show Variable where show = variableName
 
+-- | '*', 'abs', 'signum', and @'fromInteger' i@ for @i /= 0@ are not supported!
 instance (Ord r, Show k, Ord k, Num r) => Num (ZeroDefaultMap k r) where
 
     fromInteger 0 = zeroV

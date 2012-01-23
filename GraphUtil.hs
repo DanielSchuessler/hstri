@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall #-}
 module GraphUtil where
 
 import Data.Graph.Inductive hiding(augmentGraph)
@@ -117,11 +117,4 @@ prettyGraph gr =
 
 lab'' :: Graph gr => gr a b -> Node -> a
 lab'' gr n = fromMaybe (error "lab''") (lab gr n)
-
-instance (Pretty n, Pretty e) => Pretty (Gr n e) where
-    pretty = prettyGraph
-
-instance (Pretty n, Pretty e) => Pretty (Pat.Gr n e) where
-    pretty = prettyGraph
-
 

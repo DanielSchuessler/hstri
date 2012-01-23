@@ -1,11 +1,11 @@
 {-# LANGUAGE TypeFamilies, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall #-}
 module PrettyUtil(
     -- * Reexports
     module Text.PrettyPrint.ANSI.Leijen,
-    (<>),
+    Semigroup.Semigroup,(Semigroup.<>),
     appPrec,appPrec1,
     -- * Main
     spacedEncloseSep,
@@ -58,12 +58,12 @@ import TypeLevel.TF.List(List,lToList)
 import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
-import Data.Semigroup
+import qualified Data.Semigroup as Semigroup
 
 --import GHC.Generics hiding(prec)
 
-instance Semigroup Doc where 
-    (<>) = (Leijen.<>)
+(<>) ::  Doc -> Doc -> Doc
+(<>) = (Leijen.<>)
 
 spacedEncloseSep ::  Doc -> Doc -> Doc -> [Doc] -> Doc
 spacedEncloseSep l r separator = encloseSep (l <> space) (space <> r) (separator <> space)

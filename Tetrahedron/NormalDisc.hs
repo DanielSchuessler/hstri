@@ -59,6 +59,7 @@ import Control.Arrow((&&&))
 import Control.Monad
 import Data.List(sort)
 import Data.Maybe
+import Data.SumType
 import Element
 import HomogenousTuples
 import Language.Haskell.TH.Syntax
@@ -74,7 +75,7 @@ import TupleTH
 import Util
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
-    deriving(Eq,Ord,Arbitrary)
+    deriving(Eq,Ord,Arbitrary,SubSumTy,SuperSumTy)
 
 eitherND
   :: (NormalTri -> r) -> (NormalQuad -> r) -> NormalDisc -> r

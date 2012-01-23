@@ -203,7 +203,7 @@ isEdgeOfTriangle e t = isVertexOfEdge (triangleDualVertex t) (oppositeEdge e)
 instance Arbitrary Triangle where arbitrary = elements allTriangles
 
 instance Lift Triangle where
-    lift (Triangle t) = [| Triangle $(Syntax.lift t) |]
+    lift (Triangle t) = [| triangleByDualVertex $(Syntax.lift t) |]
 
 instance Finite Triangle
 
@@ -252,7 +252,7 @@ instance MakeOTriangle (Triangle,S3) where
 
 
 instance Lift OTriangle where
-    lift (OTriangle g x) = [| OTriangle $(Syntax.lift g) $(Syntax.lift x) |]
+    lift (OTriangle g x) = [| packOrderedFace $(Syntax.lift g) $(Syntax.lift x) |]
 
 -- | An 'OTriangle' with a tetrahedron index attached to it
 type OITriangle = I OTriangle
@@ -599,3 +599,5 @@ triangleNu = finiteTypeNu
 oTriangleNu :: Numbering OTriangle
 oTriangleNu = finiteTypeNu
 
+instance Lift ITriangle where
+    lift (viewI -> I x y) = [| x ./ y |] 

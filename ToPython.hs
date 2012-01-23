@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, DefaultSignatures, FlexibleInstances, FlexibleContexts, OverlappingInstances, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns, TemplateHaskell, TemplateHaskell, NoMonomorphismRestriction, DefaultSignatures, FlexibleInstances, FlexibleContexts, OverlappingInstances, GeneralizedNewtypeDeriving #-}
 module ToPython where
 import Data.Vect.Double.Base
 import TupleTH
@@ -7,6 +7,7 @@ import Control.Monad.Writer.Lazy
 import Text.Printf.TH
 import Data.Functor
 import qualified Data.Vector as V
+import Language.Haskell.TH.Syntax
 
 
 newtype Python a = Python { unPython :: Writer String a }
@@ -190,3 +191,5 @@ foreach varname xs b = do
     indent $ b (py varname)
 
 
+instance Lift (Python ()) where
+    lift (Python (execWriter -> x)) = [| py x |]

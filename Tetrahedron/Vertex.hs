@@ -39,6 +39,7 @@ import Data.Binary
 import Data.Binary.Derive
 import Data.BitSet.Word8
 import Data.Maybe
+import Data.Numbering
 import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
 import Data.Vect.Double.Base((&-))
 import DisjointUnion
@@ -51,11 +52,9 @@ import PrettyUtil
 import Quote
 import ShortShow
 import THUtil
-import THUtil() -- Lift Word8
 import TIndex
 import Test.QuickCheck
 import Util
-import Data.Numbering
 
 data Vertex = A | B | C | D
     deriving(Eq,Ord,Enum,Bounded)

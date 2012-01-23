@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, TupleSections, ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall #-}
 module StandardCoordinates(
     module Data.VectorSpace,
     module NormalSurface,
@@ -66,11 +66,11 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 import Triangulation
 import TriangulationCxtObject
-import Util
 import ZeroDefaultMap
 import qualified Data.Foldable as Fold
 import qualified Data.List as L
 import qualified Data.Map as M
+import Data.SumType
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
@@ -78,7 +78,7 @@ newtype StandardCoordinates r = SC { stc_toZDM :: ZeroDefaultMap INormalDisc r }
     deriving(AdditiveGroup,InnerSpace)
 
 stc_toMap :: StandardCoordinates r -> Map INormalDisc r
-stc_toMap = zdm_toMap . stc_toZDM
+stc_toMap = illdefinedZdmToMap . stc_toZDM
 
 stc_fromMap :: Num r => Map INormalDisc r -> StandardCoordinates r
 stc_fromMap = SC . zdm_fromMap

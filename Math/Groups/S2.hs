@@ -12,7 +12,6 @@ import Math.Group
 import PrettyUtil
 import Test.QuickCheck
 import Util
-import Data.Semigroup
 
 
 data S2 = NoFlip | Flip deriving(Show,Enum,Bounded,Eq,Ord)

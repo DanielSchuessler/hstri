@@ -14,9 +14,18 @@ import Util
 import PrettyUtil
 import Control.Monad.State
 import Data.EdgeLabelledTree
+import Test.QuickCheck
+import Control.Exception as E
+import Yices.Painless.Base as Yices
+import Control.Applicative
+import System.IO.Unsafe
+import Control.DeepSeq
 
 data SimplexOrientation a = AscOr | FlipAscOr
     deriving(Show,Eq,Ord)
+
+instance Arbitrary (SimplexOrientation a) where arbitrary = elements[AscOr,FlipAscOr]
+instance NFData (SimplexOrientation a)                                                
 
 instance Pretty (SimplexOrientation a) where prettyPrec = prettyPrecFromShow 
 
@@ -79,13 +88,68 @@ tOrGetTriangleOr tOr tri = inducedOrient32 (tOrGetTetOr tOr (getTIndex tri)) (un
 
 type PackedMaybeSimplexOrientation = Word8
 
+gluingIsAscOrPreserving :: Gluing -> Bool
+gluingIsAscOrPreserving gl =
+                inducedOrient32 AscOr (unI (glDom gl))
+                ==
+                inducedOrient32o AscOr (unI (glCod gl))
+
+orientTriangulation'
+  :: Triangulation -> Either () TriangulationOrientation
+orientTriangulation' tr = unsafePerformIO go 
+  where
+    tetVarName = ("T"++) . show . toInteger
+
+    go = do
+        cxt <- mkContext
+        let tets = tTetrahedra_ tr
+        decls <- mapM (mkBoolDecl cxt . tetVarName) tets 
+        forM_ (tGluingsIrredundant tr) (\gl -> do
+            var0 <- mkBool cxt . tetVarName . glDomTet $ gl
+            var1 <- mkBool cxt . tetVarName . glCodTet $ gl
+            Yices.assert cxt
+                =<< (if gluingIsAscOrPreserving gl
+                       then mkEq cxt var0 =<< mkNot cxt var1
+                       else mkEq cxt var0 var1))
+
+
+
+
+        --setVerbosity 5
+        --ctxDump cxt
+        res <- check cxt            
+        case res of
+             Unsatisfiable -> do
+                 return (Left ())
+--                 unsatCore <- map show <$> getUnsatCore cxt
+--                 evaluate (rnf unsatCore)
+--                 return (Left unsatCore)
+
+             Satisfiable -> do
+                 Just m <- getModel cxt
+                 values <- V.forM (V.fromList decls)
+                        (\decl ->
+                            maybe AscOr (\b -> if b then AscOr else FlipAscOr)
+                                <$> getValueBool m decl)
+
+                        :: IO TriangulationOrientation
+
+                 evaluate (rnf (V.toList values))
+                 return (Right values)
+                     
+             Undefined -> error "yices returned Undefined" 
+                
+                        
+                
+
+
 orientTriangulation
   :: Triangulation
      -> Either
           NonOrientabilityEvidence          
           TriangulationOrientation
 orientTriangulation tr = do
-        check
+        _check
         return (finish sol)
 
 
@@ -126,14 +190,14 @@ orientTriangulation tr = do
 
 
         requiredTetOr gl o_dom = 
-            let
-                o1 = inducedOrient32 (toSor o_dom) (unI (glDom gl))
-            in
-                if inducedOrient32o AscOr (unI (glCod gl)) /= o1
-                    then asc
-                    else flipAsc
+            if gluingIsAscOrPreserving gl
+               then flipSo' o_dom
+               else o_dom
+
+        flipSo' o = if o == asc then flipAsc else E.assert (o==flipAsc) asc 
+            
                 
-        check =
+        _check =
             forM_ (tGluingsIrredundant tr)
                 (\gl -> 
                     let
@@ -155,7 +219,6 @@ orientTriangulation tr = do
                 | otherwise = 
                         error ("orientTriangulation/toSor: "++
                                 $(showExps 'x))
-
 
 
 

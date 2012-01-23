@@ -1,4 +1,5 @@
-{-# LANGUAGE NoMonomorphismRestriction, TupleSections, FlexibleContexts, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, TupleSections, FlexibleContexts, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
 module Simplicial.DeltaSet2(
     module Simplicial.DeltaSet1,
@@ -12,6 +13,7 @@ module Simplicial.DeltaSet2(
     edToAnySimplex2,
     triToAnySimplex2,
     foldAnySimplex2',
+    biMapAnySimplex2,
     anySimplex1To2,
     anySimplex2s,
     TrianglesContainingEdge_Cache,
@@ -29,6 +31,7 @@ import Control.Arrow
 import qualified Data.Map as M
 import Control.Applicative
 import PrettyUtil
+import Language.Haskell.TH.Lift
 
 class (DeltaSet1 s, Triangles s) => 
     DeltaSet2 s where
@@ -36,7 +39,11 @@ class (DeltaSet1 s, Triangles s) =>
     faces21 :: s -> Tri s -> Triple (Arc s)
 
 newtype AnySimplex2 v e t = AnySimplex2 (Either (AnySimplex1 v e) t) 
-    deriving(Show)
+    deriving(Show,SubSumTy,SuperSumTy,Eq,Ord)
+
+type instance L (AnySimplex2 v e t) = AnySimplex1 v e 
+type instance R (AnySimplex2 v e t) = t
+
 
 instance (Pretty v, Pretty e, Pretty t) => Pretty (AnySimplex2 v e t) where
     prettyPrec prec = foldAnySimplex2' (prettyPrec prec) (prettyPrec prec)
@@ -46,14 +53,14 @@ type AnySimplex2Of s = AnySimplex2 (Vert s) (Ed s) (Tri s)
 
 foldAnySimplex2'
   :: (AnySimplex1 v e -> r) -> (t -> r) -> AnySimplex2 v e t -> r
-foldAnySimplex2' kve kt (AnySimplex2 x) = (kve ||| kt) x 
+foldAnySimplex2' = (||||)
 
 foldAnySimplex2 :: 
     (v -> r) -> (e -> r) -> (t -> r) -> AnySimplex2 v e t -> r
 foldAnySimplex2 kv ke kt (AnySimplex2 x) = (foldAnySimplex1 kv ke ||| kt) x 
 
 anySimplex1To2 :: AnySimplex1 v e -> AnySimplex2 v e t
-anySimplex1To2 = AnySimplex2 . Left
+anySimplex1To2 = left'
 
 vertToAnySimplex2 :: v -> AnySimplex2 v e t
 vertToAnySimplex2 = anySimplex1To2 . vertToAnySimplex1
@@ -62,7 +69,7 @@ edToAnySimplex2 :: e -> AnySimplex2 v e t
 edToAnySimplex2 = anySimplex1To2 . edToAnySimplex1
 
 triToAnySimplex2 :: t -> AnySimplex2 v e t
-triToAnySimplex2 = AnySimplex2 . Right
+triToAnySimplex2 = right'
 
 polyprop_faces21
   :: (Eq (Element (Verts s)),
@@ -134,3 +141,18 @@ anySimplex2s =
     <$> (map anySimplex1To2 . anySimplex1s) 
     <*> (map triToAnySimplex2 . triangleList)
 
+
+
+biMapAnySimplex2
+  :: (AnySimplex1 v e -> AnySimplex1 v' e')
+     -> (t -> t') -> AnySimplex2 v e t -> AnySimplex2 v' e' t'
+biMapAnySimplex2 = (++++)
+
+
+instance (Lift v, Lift e, Lift t) => Lift (AnySimplex2 v e t) where
+
+    lift = either' 
+            (either' 
+                (\x -> [| vertToAnySimplex2 x |])
+                (\x -> [| edToAnySimplex2 x |]))
+            (\x -> [| triToAnySimplex2 x |])

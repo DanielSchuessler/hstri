@@ -2,12 +2,14 @@
 {-# OPTIONS -Wall #-}
 module InnerProductRepresentation where
 
-import qualified Data.Vector as V
-import qualified Data.Vector.Unboxed as VU
-import PrettyUtil
 import Control.Exception
 import Data.Function
+import Data.Semigroup
 import MathUtil
+import OrphanInstances()
+import PrettyUtil
+import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as VU
 
 #define IPR_WITHVALUES
 

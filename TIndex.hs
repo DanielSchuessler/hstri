@@ -14,7 +14,8 @@ import Data.Binary
 import Data.Binary.Derive
 import GHC.Generics(Generic)
 import Control.Exception
-
+import OrphanInstances()
+import Language.Haskell.TH.Lift
 
 
 
@@ -148,3 +149,5 @@ withTIndexEqualC = curry . withTIndexEqual . uncurry
 
 inIOf :: (HasTIndex ia a, HasTIndex ib b) => b -> ia -> ib
 inIOf b ia = getTIndex ia ./ b
+
+deriveLiftMany [''TIndex,''I]

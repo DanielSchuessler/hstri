@@ -61,7 +61,6 @@ import Collections
 import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Exception
-import Control.Monad.Reader
 import Data.Function
 import Data.Maybe
 import Equivalence
@@ -76,6 +75,9 @@ import Data.Numbering
 import qualified Data.Binary as Binary
 import Util
 import Data.EdgeLabelledTree
+import Data.SumType
+import Language.Haskell.TH.Lift
+import Control.Monad
 
 
 
@@ -246,6 +248,8 @@ instance Quote Triangulation where
                                                     ++ " "
                                                     ++ quotePrec 11 (tOriginalGluings t))
 
+instance Lift Triangulation where
+    lift t = [| mkTriangulation $(lift $ tNumberOfTetrahedra_ t) $(lift $ tOriginalGluings t) |]
 
 
 

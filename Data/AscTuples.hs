@@ -15,6 +15,8 @@ import TupleTH
 import Util
 import qualified Data.Foldable as Fold
 import DisjointUnion
+import FaceClasses
+import Language.Haskell.TH.Lift
 
 #define DEBUG
 
@@ -135,3 +137,17 @@ isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc2 `appT` varT (mkName "v")
 isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc3 `appT` varT (mkName "v"))
 isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc4 `appT` varT (mkName "v"))
 
+instance Vertices (Asc2 v) where
+    type Verts (Asc2 v) = Asc2 v
+    vertices = id
+
+instance Vertices (Asc3 v) where
+    type Verts (Asc3 v) = Asc3 v
+    vertices = id
+
+instance Vertices (Asc4 v) where
+    type Verts (Asc4 v) = Asc4 v
+    vertices = id
+
+
+deriveLiftMany [''Asc2,''Asc3,''Asc4]

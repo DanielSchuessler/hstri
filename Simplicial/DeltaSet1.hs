@@ -1,15 +1,19 @@
-{-# LANGUAGE NoMonomorphismRestriction, TupleSections, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, FunctionalDependencies, TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, TupleSections, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, FunctionalDependencies, TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
+-- {-# OPTIONS -ddump-deriv #-}
 module Simplicial.DeltaSet1(
     module TypeLevel.TF.Nat.Small,
     module HomogenousTuples,
     module FaceClasses,
     module Element,
+    module Data.SumType,
 
     DeltaSet1(..),
     AnySimplex1,
     OneSkeletonable(..),
     foldAnySimplex1,
+    biMapAnySimplex1,
     vertToAnySimplex1,
     edToAnySimplex1,
     anySimplex1s,
@@ -23,10 +27,11 @@ import TypeLevel.TF.Nat.Small
 import HomogenousTuples
 import FaceClasses
 import Element
-import Control.Arrow
 import qualified Data.Map as M
 import Control.Applicative
 import PrettyUtil
+import Data.SumType
+import Language.Haskell.TH.Lift
 
 
 class (Vertices s, Edges s) => 
@@ -36,19 +41,22 @@ class (Vertices s, Edges s) =>
 
 
 vertToAnySimplex1 :: v -> AnySimplex1 v e
-vertToAnySimplex1 = AnySimplex1 . Left
+vertToAnySimplex1 = left'
 edToAnySimplex1 :: e -> AnySimplex1 v e
-edToAnySimplex1 = AnySimplex1 . Right
+edToAnySimplex1 = right'
+
+type instance L (AnySimplex1 v e) = v
+type instance R (AnySimplex1 v e) = e
 
 newtype AnySimplex1 v e = AnySimplex1 (Either v e)
-    deriving(Show)
+    deriving(Show,SubSumTy,SuperSumTy,Eq,Ord)
 
 instance (Pretty v, Pretty e) => Pretty (AnySimplex1 v e) where
     prettyPrec prec = foldAnySimplex1 (prettyPrec prec) (prettyPrec prec)
 
 foldAnySimplex1 :: 
     (v -> r) -> (e -> r) -> AnySimplex1 v e -> r
-foldAnySimplex1 kv ke (AnySimplex1 x) = (kv ||| ke) x
+foldAnySimplex1 = either'
 
 
 class OneSkeletonable a where
@@ -82,3 +90,10 @@ anySimplex1s =
     (++)
     <$> (map vertToAnySimplex1 . vertexList) 
     <*> (map edToAnySimplex1 . edgeList)
+
+
+biMapAnySimplex1
+  :: (v -> v') -> (e -> e') -> AnySimplex1 v e -> AnySimplex1 v' e'
+biMapAnySimplex1 = (++++)
+
+deriveLiftMany [''AnySimplex1]

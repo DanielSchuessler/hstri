@@ -27,13 +27,12 @@ main =
        setCams [Cam (-2.8 *& vec3Y) ((pi/2) *& vec3X) defaultFOV] . 
        defaultScene .
        transformCoords rot $
-       (fromSpqwc spqwc_oneTet
-        `disjointUnion` 
-        fromNormalSurface spqwc_oneTet (stc :: StandardCoordinates Int)
+       (fromSpqwcAndIntegerNormalSurface spqwc_oneTet stc)
+            
        
 
        
-       ))
+       )
         --`disjointUnion` abnormalCurve
   where
     rot = rotate3 (pi*0.05) vec3X . rotate3 (pi*0.42) vec3Z

@@ -201,3 +201,9 @@ glDom = fst
 
 glCod :: Gluing -> OITriangle
 glCod = snd
+
+glDomTet :: Gluing -> TIndex
+glDomTet = getTIndex . glDom
+
+glCodTet :: Gluing -> TIndex
+glCodTet = getTIndex . glCod

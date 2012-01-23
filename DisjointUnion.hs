@@ -2,14 +2,21 @@
 {-# LANGUAGE Rank2Types, NoMonomorphismRestriction, RecordWildCards, CPP, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, PolymorphicComponents, DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS -Wall #-}
-module DisjointUnion(module Either1, DisjointUnionable(..), GDisjointUnionable, defaultDisjointUnion, CoDisjointUnionable(..), isRegardedAsSimplexByDisjointUnionDeriving) where
+module DisjointUnion(module Either1, module Data.SumType, DisjointUnion(..), DisjointUnionable(..), disjointUnion, GDisjointUnionable, defaultDisjointUnion, CoDisjointUnionable(..), isRegardedAsSimplexByDisjointUnionDeriving, djZapUnits, DJSimp(..),DJSimps(..),DJSimpsH(..)) where
 
 import Control.Monad
 import Simplicial.DeltaSet3
 import Either1
 import GHC.Generics
 import Language.Haskell.TH
+import ZapUnits
+import Data.SumType
+import ShortShow
+import PrettyUtil
+import Language.Haskell.TH.Lift
 
 data DisjointUnion c inj1 inj2 djEither = 
     DisjointUnion {
@@ -26,11 +33,17 @@ disjointUnion :: DisjointUnionable a b c inj1 inj2 djEither => a -> b -> c
 disjointUnion = fmap djObject . disjointUnionWithInjs
 
 
+defaultDisjointUnion
+  :: (Generic a1,
+      Generic a2,
+      Generic c,
+      GDisjointUnionable (Rep a1) (Rep a2) (Rep c) inj1 inj2 djEither) =>
+     a1 -> a2 -> DisjointUnion c inj1 inj2 djEither
 defaultDisjointUnion a b = 
     case gDisjointUnion (from a) (from b) of
 
          DisjointUnion o inj1 inj2 ei -> 
-            DisjointUnion (to o) (to inj1) (to inj2) (to ei) 
+            DisjointUnion (to o) inj1 inj2 ei
 
 -- instance DisjointUnionable (a -> r) (a' -> r) (Either a a' -> r) where
 --     disjointUnion = either
@@ -38,8 +51,10 @@ defaultDisjointUnion a b =
 class CoDisjointUnionable a b c | a b -> c where
     coDjEither :: (a -> r) -> (b -> r) -> (c -> r)
 
-instance (CoDisjointUnionable a b c) => DisjointUnionable (a -> r) (b -> r) (c -> r) where
-    disjointUnion = coDjEither
+instance (CoDisjointUnionable a b c) => 
+    DisjointUnionable (a -> r) (b -> r) (c -> r) () () () where
+
+    disjointUnionWithInjs fa fb = DisjointUnion (coDjEither fa fb) () () ()
 
 -- instance CoDisjointUnionable (a n) (a' n) (Either1 a a' n) where
 --     coDjEither = either1
@@ -49,38 +64,40 @@ instance (CoDisjointUnionable a b c) => DisjointUnionable (a -> r) (b -> r) (c -
 
 
 class GDisjointUnionable a b c inj1 inj2 ei | a b -> c inj1 inj2 ei, c -> a b where
-    gDisjointUnion :: a p -> b p -> DisjointUnion (c p) (inj1 p) (inj2 p) (ei p)
+    gDisjointUnion :: a p -> b p -> DisjointUnion (c p) inj1 inj2 ei
 
-instance GDisjointUnionable U1 U1 U1 U1 U1 U1 where
-    gDisjointUnion _ _ = DisjointUnion U1 U1 U1 U1
+instance GDisjointUnionable U1 U1 U1 () () () where
+    gDisjointUnion _ _ = DisjointUnion U1 () () ()
 
 instance (DisjointUnionable c1 c2 c inj1 inj2 ei) => 
-    GDisjointUnionable (K1 i1 c1) (K1 i2 c2) (K1 i c) (K1 i_ inj1) (K1 i__ inj2) (K i___ ei)  where
+    GDisjointUnionable (K1 i1 c1) (K1 i2 c2) (K1 i c) inj1 inj2 ei  where
 
     gDisjointUnion (K1 c1) (K1 c2) = 
         case disjointUnionWithInjs c1 c2 of
-             DisjointUnion o inj1 inj2 ei -> DisjointUnion (K1 o) (K1 inj1) (K1 inj2) (K1 ei)
+             DisjointUnion o inj1 inj2 ei -> DisjointUnion (K1 o) inj1 inj2 ei
 
 instance (GDisjointUnionable f1 f2 f inj1 inj2 ei) => 
     GDisjointUnionable (M1 i1 c1 f1) (M1 i2 c2 f2) 
-        (M1 i c f) (M1 i_ c_ inj1) (M1 i__ c__ inj2) (M1 i___ c___ ei) where
+        (M1 i c f) inj1 inj2 ei where
 
     gDisjointUnion (M1 c1) (M1 c2) = 
         case gDisjointUnion c1 c2 of
-             DisjointUnion o inj1 inj2 ei -> DisjointUnion (M1 o) (M1 inj1) (M1 inj2) (M1 ei)
+             DisjointUnion o inj1 inj2 ei -> DisjointUnion (M1 o) inj1 inj2 ei
 
 instance (GDisjointUnionable c1 c2 c inj1 inj2 ei) => 
-    GDisjointUnionable (Rec1 c1) (Rec1 c2) (Rec1 c) (Rec1 inj1) (Rec1 inj2) (Rec1 ei) where
+    GDisjointUnionable (Rec1 c1) (Rec1 c2) (Rec1 c) inj1 inj2 ei where
 
     gDisjointUnion (Rec1 c1) (Rec1 c2) = 
         case gDisjointUnion c1 c2 of
              DisjointUnion o inj1 inj2 ei -> 
-                DisjointUnion (Rec1 o) (Rec1 inj1) (Rec1 inj2) (Rec1 ei)
+                DisjointUnion (Rec1 o) inj1 inj2 ei
 
-instance (GDisjointUnionable f1 f2 f finj1 finj2 fei, GDisjointUnionable g1 g2 g ginj1 ginj2 gei) =>
+instance 
+    (GDisjointUnionable f1 f2 f finj1 finj2 fei, 
+     GDisjointUnionable g1 g2 g ginj1 ginj2 gei) =>
 
     GDisjointUnionable (f1 :*: g1) (f2 :*: g2) 
-        (f :*: g) (finj1 :*: ginj1) (finj2 :*: ginj2) (fei :*: gei) where
+        (f :*: g) (finj1, ginj1) (finj2, ginj2) (fei, gei) where
 
     gDisjointUnion (f1 :*: g1) (f2 :*: g2) = 
     
@@ -88,7 +105,7 @@ instance (GDisjointUnionable f1 f2 f finj1 finj2 fei, GDisjointUnionable g1 g2 g
              ( DisjointUnion o inj1 inj2 ei
               ,DisjointUnion o' inj1' inj2' ei') ->
 
-                 DisjointUnion (o:*:o') (inj1:*:inj1') (inj2:*:inj2') (ei :*: ei')
+                 DisjointUnion (o:*:o') (inj1, inj1') (inj2, inj2') (ei, ei')
 
 
 
@@ -122,16 +139,104 @@ instance (CoDisjointUnionable v1 v2 v, CoDisjointUnionable e1 e2 e,
 
 
 
+
+
+
+djZapUnits
+  :: (ZapUnits a inj1, ZapUnits a1 inj2, ZapUnits a2 djEither) =>
+     DisjointUnion c a a1 a2 -> DisjointUnion c inj1 inj2 djEither
+djZapUnits (DisjointUnion o a b c) = DisjointUnion o (zapUnits a) (zapUnits b) (zapUnits c)
+
+
+
+
+
+
+type instance L (DJSimp a b) = a
+type instance Data.SumType.R (DJSimp a b) = b
+
+-- | Disjoint union simplex
+newtype DJSimp a b = DJSimp (Either a b)
+    deriving(Show,Eq,Ord,SubSumTy,SuperSumTy,Pretty)
+
+deriving instance ShortShow (Either a b) => ShortShow (DJSimp a b)
+
+instance CoDisjointUnionable a (DJSimp b b') (DJSimp a (DJSimp b b'))
+
+            where
+
+                coDjEither = either'
+
 isRegardedAsSimplexByDisjointUnionDeriving :: TypeQ -> DecsQ
 isRegardedAsSimplexByDisjointUnionDeriving t = 
     let
         a = varT (mkName "a")
+        go x y = instanceD 
+            (cxt [])
+            (conT ''CoDisjointUnionable `appT` x `appT` y `appT` [t|DJSimp $(x) $(y)|]) 
+            [valD (varP 'coDjEither) (normalB (varE 'either')) []]
+          
     in
         sequence
-        [instanceD 
-            (cxt [])
-            (conT ''CoDisjointUnionable `appT` a `appT` t `appT` [t|Either $(a) $(t)|]) 
-            [valD (varP 'coDjEither) (normalB (varE 'either)) []]
-            ]
+        [ go a t
+        ]
+--         , go t a
+--         , go t t]
 
 
+
+-- | Mixed collection of simplices from the first and second summand complex
+data DJSimps as bs = DJSimps { leftSimps :: as, rightSimps :: bs } 
+    deriving Show
+
+type instance Element (DJSimps as bs) = DJSimp (Element as) (Element bs) 
+
+instance (AsList as, AsList bs) => AsList (DJSimps as bs) where
+    asList (DJSimps as bs) = (map left' . asList) as ++ (map right' . asList) bs
+
+type instance L (DJSimpsH a b) = a
+type instance Data.SumType.R (DJSimpsH a b) = b
+
+-- | Either a collection of simplices from the first summand complex, or from the second
+newtype DJSimpsH as bs = DJSimpsH (Either as bs)
+    deriving(SubSumTy,SuperSumTy,Show)
+
+type instance Element (DJSimpsH as bs) = DJSimp (Element as) (Element bs) 
+
+instance (AsList as, AsList bs) => AsList (DJSimpsH as bs) where
+    asList = (map left' . asList) |||| (map right' . asList)
+
+-- #define F(Vertices,Verts,Vert,vertices,Pair,map2)\
+--     instance (Vertices a, Vertices b, Verts a ~ Pair (Vert a), Verts b ~ Pair (Vert b))\
+--         => Vertices (DJSimp a b) where {\
+--     \
+--         type Verts (DJSimp a b) = Pair (DJSimp (Vert a) (Vert b));\
+--     \
+--         vertices = (map2 left' . vertices) |||| (map2 right' . vertices)};
+-- 
+-- 
+-- #define G(X,Y)\
+-- F(Vertices,Verts,Vert,vertices,X,Y)\
+-- F(Edges,Eds,Ed,edges,X,Y)\
+-- F(Triangles,Tris,Tri,triangles,X,Y)\
+-- F(Tetrahedra,Tets,Tet,tetrahedra,X,Y)
+-- 
+-- G(Pair,map2)
+-- G(Triple,map3)
+-- G(Quadruple,map4)
+-- 
+-- #undef F
+
+instance (Vertices a, Vertices b) => Vertices (DJSimp a b) where
+    type Verts (DJSimp a b) = DJSimpsH (Verts a) (Verts b) 
+
+    vertices = vertices ++++ vertices
+-- 
+-- instance (Edges a, Edges b) => Edges (DJSimp a b) where
+--     type Eds (DJSimp a b) = DJSimpsH (Eds a) (Eds b) 
+-- 
+--     edges = edges ++++ edges
+
+
+
+deriveLiftMany [''DJSimp]

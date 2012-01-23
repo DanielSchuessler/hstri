@@ -22,11 +22,11 @@ import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import TriangulationCxtObject
-import Util
 import ZeroDefaultMap
 import qualified Data.Foldable as Fold
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
+import Data.SumType
 
 newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
     deriving(AdditiveGroup,InnerSpace,Eq)
@@ -59,66 +59,6 @@ prop_standardToQuad_VertexLinkingSurface (tr :: Triangulation) =
         (\v -> standardToQuad (vertexLinkingSurface v) == zeroV)
 
 
-canonExtDbg
-  :: (Num r, Ord r, Pretty r) =>
-     Triangulation -> QuadCoordinates r -> StandardCoordinates r
-canonExtDbg tr qc =
-    case canonExt tr qc of
-         sc ->
-
-             case admissible tr sc of
-                Right () -> sc
-                Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
-                                    $(showExps ['qc,'sc]))
-
-
-canonExt :: forall r. (Pretty r, Ord r, Num r) => 
-    Triangulation -> QuadCoordinates r -> StandardCoordinates r
-canonExt tr qc = 
-        stc_fromMap (unionsWith 
-                        (\ _ _ -> assert False undefined) 
-                        (mapKeys iNormalDisc (quad_toMap qc)
-                         :
-                         vertexLinkCoeffss))
-                         
-
-    where
-        vertexLinkCoeffss = fmap (mapKeys iNormalDisc . goVertex) (vertices tr)
-       
-        goVertex :: TVertex -> Map INormalTri r  
-        goVertex v =
-            let vertexLinkCoeffs = 
-                    case dfsVertexLink v of
-                        Node tri0 edges_ -> 
-                            execState 
-                                (mapM_ (goVertexLinkArc tri0) edges_) 
-                                (singleton tri0 0)
-            in
-                fmap 
-                    (subtract (minimum (elems vertexLinkCoeffs)))
-                    vertexLinkCoeffs
-
-        
-        goVertexLinkArc :: INormalTri -> 
-                    (Pair INormalArc, EdgeLabelledTree INormalTri (Pair INormalArc)) ->
-                    State (Map INormalTri r) ()
-        goVertexLinkArc tri0 ((arc0,arc1), Node tri1 edges_) = do
-
-
-            modify (\sc ->
-                    insertWith
-                        (\_ _ -> 
-                            error ("canonExt: tri1 visited twice"
-                                    ++ $(showExps ['qc,'tri0,'arc0,'arc1,'tri1,'edges_])))
-                        tri1
-                        ( 
-                            quad_coefficient qc (iNormalQuadByNormalArc arc0)
-                          + (sc ! tri0)
-                          - quad_coefficient qc (iNormalQuadByNormalArc arc1)
-                        )
-                        sc)
-
-            mapM_ (goVertexLinkArc tri1) edges_
 
 
             
