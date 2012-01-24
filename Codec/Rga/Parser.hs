@@ -16,7 +16,6 @@ import Text.XML.HXT.Core as HXT
 import Triangulation
 import Util(fi)
 import Data.Tuple.Index
-import Text.XML.Generator
 import Codec.Rga.Util
 
 

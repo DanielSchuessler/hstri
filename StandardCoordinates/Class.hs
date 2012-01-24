@@ -1,5 +1,5 @@
-{-# LANGUAGE UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
-{-# OPTIONS -Wall #-}
+{-# LANGUAGE TupleSections, UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
+--{-# OPTIONS -Wall #-}
 module StandardCoordinates.Class where
 
 import INormalDisc
@@ -13,6 +13,10 @@ import Data.Ratio
 import QuadCoordinates.Class
 import Data.Maybe
 import Util
+import Control.Monad
+import Control.Exception
+import qualified Data.Map as M
+import Data.Map(Map)
 
 
 -- | 
@@ -29,12 +33,25 @@ class QuadCoords s i => StandardCoords s i | s -> i where
     -- | May (but need not) omit zero coefficients. May contain repeated tris.
     triAssocs :: s -> [(INormalTri,i)]
 
+    -- | May (but need not) omit zero coefficients.
+    discAssocsDistinct :: s -> [(INormalDisc,i)]
+
+    -- | May (but need not) omit zero coefficients.
+    triAssocsDistinct :: s -> [(INormalTri,i)]
+
+
     discCount = eitherIND <$> triCount <*> quadCount
     triCount = (. iNormalDisc) <$> discCount
 
     triAssocs = mapMaybe (traverseFst (eitherIND Just (const Nothing))) . nsToAssocs
     nsToAssocs = (++) <$> (map (first iNormalDisc) . triAssocs) 
                       <*> (map (first iNormalDisc) . quadAssocs) 
+
+
+    triAssocsDistinct = M.toList . M.fromListWith (+) . triAssocs
+    discAssocsDistinct = M.toList . M.fromListWith (+) . nsToAssocs
+
+
 
 
 -- | Superclass default; requires implementation of 'discCount'
@@ -56,7 +73,8 @@ numberOfQuadsContainingArcType
 numberOfQuadsContainingArcType = (. iNormalQuadByNormalArc) <$> quadCount
 
 numberOfArcsOfType :: StandardCoords s c => s -> INormalArc -> c
-numberOfArcsOfType = liftA2 (+) <$> numberOfTrisContainingArcType <*> numberOfQuadsContainingArcType
+numberOfArcsOfType = 
+    (liftA2 . liftA2) (+) numberOfTrisContainingArcType numberOfQuadsContainingArcType
 
 numberOfCornersOfType
   :: StandardCoords s a => s -> INormalCorner -> a
@@ -112,10 +130,24 @@ eulerC
 eulerC tr ns = sum (f <$> nsToAssocs ns)
     where
         f (d,n) = fromIntegral n*eitherIND ft fq d
-        ft t = sum3 (map3 recipDeg (normalCorners t)) - 1/2 
+        ft t = sum3 (map3 recipDeg (normalCorners t)) - 1/2
+               - triArcCorrection t
         fq q = sum4 (map4 recipDeg (normalCorners q)) - 1
+               - quadArcCorrection q
         
         recipDeg = recip . fromIntegral . degreeOfEdge . pMap tr . iNormalCornerGetContainingEdge
+
+        (triArcCorrection,quadArcCorrection) = 
+            if isClosedTriangulation tr
+               then (const 0,const 0)
+               else ( sum3 . map3 oneHalfIfBoundaryNormalArc . normalArcs
+                    , sum4 . map4 oneHalfIfBoundaryNormalArc . normalArcs
+                    )
+
+        oneHalfIfBoundaryNormalArc na =
+            if isBoundaryNormalArc . pMap tr $ na
+               then 0.5
+               else 0
 
 
 eulerCRatio
@@ -124,4 +156,19 @@ eulerCRatio
 eulerCRatio = eulerC
 
 is2Sphere :: (Integral n, StandardCoords a n) => Triangulation -> a -> Bool
-is2Sphere tr = (==2) . eulerCRatio tr
+is2Sphere tr s = eulerCRatio tr s == 2 && isClosedSurface tr s
+
+is2SphereOrDisk
+  :: (Integral n, StandardCoords a n) => Triangulation -> a -> Bool
+is2SphereOrDisk = (liftM2 . liftM2) (||) is2Sphere isDisk
+
+-- surfaceBoundaryComponents tr s =
+--     mkEquivalence0 (do
+--         d <- normalDiscs s
+
+isDisk tr s = assert False undefined
+
+isClosedSurface tr s = assert False undefined
+
+arcAssocs :: StandardCoords a t => a -> [(INormalArc, t)]
+arcAssocs = concatMap (\(d,n) -> map (,n) (normalArcList d)) . nsToAssocs

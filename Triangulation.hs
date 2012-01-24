@@ -37,6 +37,7 @@ module Triangulation(
     lookupGluingAsGluing,
     tetGetGluings,
     dfsFacePairingGraph,
+    isClosedTriangulation,
     -- ** Equivalences
     oEdgeEqv,vertexEqv,
     iEdgeEqv,
@@ -59,38 +60,41 @@ module Triangulation(
     
     ) where
 
+
 import AbstractTetrahedron
-import Collections
 import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Exception
+import Control.Monad
+import Data.EdgeLabelledTree
 import Data.Function
+import Data.List(sort)
 import Data.Maybe
+import Data.Numbering
+import Data.SumType
+import Data.Typeable(Typeable)
 import Equivalence
-import Triangulation.FacetGluing
 import HomogenousTuples
 import INormalDisc
-import Tetrahedron.NormalDisc
+import Language.Haskell.TH.Lift
 import Prelude hiding(catch,lookup)
 import Quote
-import qualified Data.List as List
-import Data.Numbering
-import qualified Data.Binary as Binary
+import Tetrahedron.NormalDisc
+import Triangulation.FacetGluing
 import Util
-import Data.EdgeLabelledTree
-import Data.SumType
-import Language.Haskell.TH.Lift
-import Control.Monad
-import Data.Typeable(Typeable)
-import Data.List(sort)
-
+import qualified Data.Binary as Binary
+import qualified Data.List as List
+import qualified Data.Map as M
+import Data.Map(Map,lookup,(!))
+import qualified Data.Set as S
+import Data.Set(member)
 
 
 tGluingsIrredundant :: Triangulation -> [Gluing]
 tGluingsIrredundant tr = 
     let
         gluings = tOriginalGluings tr
-        gluingsFirstTris = setFromList (fst <$> gluings) 
+        gluingsFirstTris = S.fromList (fst <$> gluings) 
 
         isRedundant (tri,unpackOrderedFace -> (tri',_)) =
             (tri > tri') && member tri' gluingsFirstTris 
@@ -195,7 +199,7 @@ mkTriangulationSafe tNumberOfTetrahedra_ tOriginalGluings
             concatMap vertexList allIEdges
 
     let addGluing mrec (t,f1) = mrec >>= (\r -> case lookup t r of
-                                                        Nothing -> return (mapInsert t f1 r)
+                                                        Nothing -> return (M.insert t f1 r)
                                                         Just f2 
                                                             | f2==f1 -> return r
                                                             | otherwise -> _err t f1 f2)
@@ -263,7 +267,7 @@ triang gluings = mkTriangulation n gluings
 
 
 isBoundaryITriangle ::  Triangulation -> ITriangle -> Bool
-isBoundaryITriangle t x = not (x `memberOfMap` tGlueMap_ t)
+isBoundaryITriangle t x = not (x `M.member` tGlueMap_ t)
 
 
 
@@ -285,7 +289,7 @@ mkTriangulationG
 mkTriangulationG tets gluings =
     let
         tetIxs = [tindex 0..]
-        tetIxMap = fromListWithKey 
+        tetIxMap = M.fromListWithKey 
                     (\k _ _ -> error ("Duplicate tetrahedron: "++show k)) 
                     (zip tets tetIxs)
 
@@ -524,6 +528,9 @@ tetGetGluings tr (i :: TIndex) =
 dfsFacePairingGraph
   :: Triangulation -> TIndex -> EdgeLabelledTree TIndex Gluing
 dfsFacePairingGraph tr = flip dfs (map (id &&& (getTIndex . glCod)) . tetGetGluings tr)
+
+isClosedTriangulation :: Triangulation -> Bool
+isClosedTriangulation tr = M.size (tGlueMap_ tr) == 4 * tNumberOfTetrahedra tr  
 
 
 -- | Note: This instance checks exact equality of 'tNumberOfTetrahedra_' and @sort . 'tNormalizedGluings'@.

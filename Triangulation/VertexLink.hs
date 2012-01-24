@@ -37,7 +37,7 @@ instance StandardCoords VertexLink Integer where
 
 isManifoldTriangulation :: ToTriangulation t => t -> Bool
 isManifoldTriangulation (toTriangulation -> tr) = 
-    all (is2Sphere tr . vertexLinkingSurface) (vertices tr) 
+    all (is2SphereOrDisk tr . vertexLinkingSurface) (vertices tr) 
 
 
 -- | For QuickCheck.

@@ -72,6 +72,7 @@ module TriangulationCxtObject(
     -- ** Properties
     normalArcPreimage,
     isBoundaryNormalArc,
+    isInnerNormalArc,
 
     -- * Normal dics
     TNormalTri,
@@ -528,6 +529,10 @@ isBoundaryNormalArc :: TNormalArc -> Bool
 isBoundaryNormalArc na = case normalArcPreimage na of 
                              BoundaryNormalArc {} -> True
                              _ -> False
+
+-- | Negation of 'isBoundaryNormalArc'.
+isInnerNormalArc :: TNormalArc -> Bool
+isInnerNormalArc = not . isBoundaryNormalArc
 
 innerNormalArcs :: Triangulation -> [TNormalArc]
 innerNormalArcs = filter (not . isBoundaryNormalArc) . normalArcs

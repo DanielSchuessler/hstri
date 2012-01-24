@@ -40,6 +40,7 @@ module HsTri(
     module Triangulation.Transformations,
     module QuadCoordinates.MatchingEquations,
     module StandardCoordinates.MatchingEquations,
+    module Codec.Rga.Writer
     ) where
 
 
@@ -81,4 +82,4 @@ import QuadCoordinates.MatchingEquations
 import StandardCoordinates.MatchingEquations
 import QuadCoordinates.Dense
 import StandardCoordinates.Dense
-
+import Codec.Rga.Writer

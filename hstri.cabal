@@ -74,7 +74,9 @@ Library
     OrphanInstances
     OrphanInstances.Lift
     ParseJvx
-    ParseRga
+    Codec.Rga.Util
+    Codec.Rga.Parser
+    Codec.Rga.Writer
     PolymakeInterface
     PreRenderable
     PreRenderable.TriangleLabel
