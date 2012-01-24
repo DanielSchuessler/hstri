@@ -8,8 +8,10 @@ module Simplicial.DeltaSet1(
     module FaceClasses,
     module Element,
     module Data.SumType,
+    module Data.Tuple.Index,
 
     DeltaSet1(..),
+    face10,
     AnySimplex1,
     OneSkeletonable(..),
     foldAnySimplex1,
@@ -20,7 +22,9 @@ module Simplicial.DeltaSet1(
     faces10Ascending,
     EdgesContainingVertex_Cache,
     lookupEdgesContainingVertex,
-    mkECVC
+    mkECVC,
+    UnitInterval(..),
+    UnitIntervalPoint
     ) where
 
 import TypeLevel.TF.Nat.Small
@@ -32,13 +36,19 @@ import Control.Applicative
 import PrettyUtil
 import Data.SumType
 import Language.Haskell.TH.Lift
+import ShortShow
+import Data.Tuple.Index
+import MathUtil
+import Data.Tuple.OneTuple
 
 
 class (Vertices s, Edges s) => 
     DeltaSet1 s where
 
-    faces10 :: s -> Arc s -> Pair (Vert s)
+    faces10 :: s -> Ed s -> Pair (Vert s)
 
+face10 :: DeltaSet1 a => a -> Ed a -> Index2 -> Vert a
+face10 = (.) tupleToFun2 . faces10
 
 vertToAnySimplex1 :: v -> AnySimplex1 v e
 vertToAnySimplex1 = left'
@@ -68,7 +78,7 @@ faces10Ascending
 faces10Ascending = fmap reverse2 . faces10
 
 newtype EdgesContainingVertex_Cache vert ed = 
-    ECVC { lookupEdgesContainingVertex :: vert -> [(ed,Int)] } 
+    ECVC { lookupEdgesContainingVertex :: vert -> [(ed,Index2)] } 
 
 mkECVC
   :: (Ord (Vert s), DeltaSet1 s) => s -> EdgesContainingVertex_Cache (Vert s) (Ed s)
@@ -79,7 +89,7 @@ mkECVC s = ECVC (m M.!)
                         asList 
                             (zipTuple2 
                                 (faces10 s e) 
-                                (map2 ((:[]) . (e,)) (0,1))))
+                                (map2 ((:[]) . (e,)) allIndex2' )))
                     $ edgeList s
                 
 
@@ -96,4 +106,21 @@ biMapAnySimplex1
   :: (v -> v') -> (e -> e') -> AnySimplex1 v e -> AnySimplex1 v' e'
 biMapAnySimplex1 = (++++)
 
+instance (ShortShow v, ShortShow e) => ShortShow (AnySimplex1 v e) where
+    shortShow = foldAnySimplex1 shortShow shortShow 
+
+
 deriveLiftMany [''AnySimplex1]
+
+data UnitInterval = UnitInterval
+
+instance Vertices UnitInterval where
+    type Verts UnitInterval = Pair UnitIntervalPoint
+    vertices UnitInterval = (1,0)
+
+instance Edges UnitInterval where
+    type Eds UnitInterval = OneTuple UnitInterval
+    edges UnitInterval = OneTuple UnitInterval
+
+instance DeltaSet1 UnitInterval where
+    faces10 _ _ = vertices UnitInterval 

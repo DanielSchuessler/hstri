@@ -53,6 +53,7 @@ import Data.Vector(Vector)
 import HomogenousTuples
 import Control.Arrow((&&&))
 import qualified Data.List as L
+import Data.Vect.Double.Util.Dim2
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -484,9 +485,16 @@ incircleRadius a b c =
     in sqrt ((s-a)*(s-b)*(s-c)/s)
 
 
-type UnitInterval = Double
-type Standard2Simplex = Vec2
+type UnitIntervalPoint = Double
 
+-- | Convex hull of @(0,0), (1,0), (0,1)@
+type Unit2SimplexPoint = Vec2
+
+-- | Convex hull of @(0,0), (1,0), (0,1), (1,1)@
+type UnitSquare = Vec2
+
+toUnitSquareNE :: Unit2SimplexPoint -> UnitSquare
+toUnitSquareNE = (Vec2 1 1 &-)
 
 
 -- | Triangulation of the triangle with corners @(0,0),(0,steps),(steps,0)@, using isosceles triangles with scele length 1
@@ -527,3 +535,37 @@ hillClimb successors badness initial = go (initial,badness initial)
                 Nothing -> x
                 Just suc -> go suc
 
+data SolidTorusPoint = STP {
+    long :: Double, 
+    lat :: Double, 
+    -- | 0 to 1, 1 is on the boundary
+    boundaryness :: Double 
+
+}
+
+mapSolidTorus
+  :: Mat2 -> SolidTorusPoint -> SolidTorusPoint
+mapSolidTorus (Mat2 (Vec2 a b) (Vec2 c d)) (STP long lat boundaryness) =
+    STP (a*long + b*lat) (c*long + d*lat) boundaryness
+
+torusBoundary :: UnitSquare -> SolidTorusPoint
+torusBoundary (Vec2 long lat) = STP (2*pi*long) (2*pi*lat) 1
+
+meridionalDisc :: UnitSquare -> SolidTorusPoint
+meridionalDisc (Vec2 x y) = STP 0 (2*pi*x) y
+-- meridionalDisc p0 = STP 0 (angle2 p) (2*max (abs x) (abs y))
+--     where
+--         p@(Vec2 x y) = p0 &- Vec2 0.5 0.5 
+
+torusCoords :: 
+       Double -- ^ Major radius
+    -> Double -- ^ Minor radius
+    -> SolidTorusPoint
+    -> Vec3
+torusCoords major minor (STP long lat boundaryness) =
+    let
+        minor' = minor * boundaryness 
+        r = major + cos lat * minor' 
+    in
+        Vec3 (cos long * r) (sin long * r) (sin lat * minor') 
+        

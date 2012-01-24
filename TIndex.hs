@@ -16,13 +16,38 @@ import GHC.Generics(Generic)
 import Control.Exception
 import OrphanInstances()
 import Language.Haskell.TH.Lift
+import Data.Ix
+import Control.Arrow
+import System.Random
+import THUtil
 
 
 
 
 -- | Tetrahedron index
 newtype TIndex = TIndex Word
-    deriving(Eq,Ord,Pretty,Enum,Num,Real,Integral,Binary)
+    deriving(Eq,Ord,Pretty,Enum,Real,Integral,Binary,Ix,Random)
+
+instance Num TIndex where
+    (+) (TIndex a) (TIndex b) = 
+        let c = a+b
+        in
+            if a<=c && b<=c
+               then TIndex (a+b)
+               else $(problem) ("TIndex "++show a++ " + TIndex "++show b)
+
+    (-) (TIndex a) (TIndex b) | a < b =
+            $(problem) ("TIndex "++show a++ " - TIndex "++show b)
+
+            | otherwise = TIndex (a-b)
+
+    (*) = $(problem) ("* not supported for TIndex")
+    abs = $(problem) ("abs not supported for TIndex")
+    signum = $(problem) ("signum not supported for TIndex")
+
+    fromInteger i | i < 0 || i > toInteger (maxBound :: Word) 
+                        = $(problem) ("fromInteger "++show i++" :: TIndex")
+                  | otherwise = TIndex (fromInteger i)
 
 tindex ::  Word -> TIndex
 tindex = TIndex
@@ -37,7 +62,7 @@ tindex = TIndex
 
 -- | Thing with a tetrahedron index attached to it
 data I a = I TIndex a 
-    deriving(Eq,Ord,Generic)
+    deriving(Eq,Ord,Generic,Ix)
 
 instance Binary a => Binary (I a) where
     put = derivePut
@@ -45,7 +70,7 @@ instance Binary a => Binary (I a) where
 
 
 -- | Instances of this class essentially say that @ia@ is isomorphic to @('TIndex',a)@ (but the representation is left open to for optimization)
-class HasTIndex ia a | ia -> a, a -> ia where
+class MapTIndices ia => HasTIndex ia a | ia -> a, a -> ia where
     -- | Unpack some tetrahedron-indexed entity
     viewI :: ia -> I a
     -- | Attach a tetrahedron index to some entity
@@ -59,6 +84,9 @@ getTIndex (viewI -> I i _) = i
 
 forgetTIndex ::  HasTIndex a a' => a -> a'
 forgetTIndex (viewI -> I _ a) = a 
+
+unviewI :: HasTIndex ia a => I a -> ia
+unviewI (I i a)= i ./ a
 
 -- instance HasTIndex (I a) a where
 --     viewI = id
@@ -150,4 +178,25 @@ withTIndexEqualC = curry . withTIndexEqual . uncurry
 inIOf :: (HasTIndex ia a, HasTIndex ib b) => b -> ia -> ib
 inIOf b ia = getTIndex ia ./ b
 
+class MapTIndices a where
+    mapTIndices :: (TIndex -> TIndex) -> (a -> a)
+
+instance MapTIndices (I a) where
+    mapTIndices f (I i x) = I (f i) x
+
+instance MapTIndices TIndex where
+    mapTIndices = id
+
+
+-- | Default 'mapTIndices' implementation for 'HasTIndex' instances. 
+mapTIndicesI :: HasTIndex ia a => (TIndex -> TIndex) -> ia -> ia
+mapTIndicesI f = unviewI . mapTIndices f . viewI
+
+mapTIndicesFromHasTIndex :: TypeQ -> Q [Dec]
+mapTIndicesFromHasTIndex t = [d| instance MapTIndices $(t) where mapTIndices = mapTIndicesI |]
+
 deriveLiftMany [''TIndex,''I]
+
+instance (MapTIndices a, MapTIndices b) => MapTIndices (a,b) where
+    mapTIndices f = mapTIndices f *** mapTIndices f
+

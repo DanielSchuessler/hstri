@@ -1,37 +1,28 @@
 {-# OPTIONS -Wall #-}
-import AbstractNeighborhood
-import AbstractTetrahedron
 import MathUtil
-import Tetrahedron.NormalDisc
-import QuadCoordinates
-import StandardCoordinates
+import QuadCoordinates.Tests
 import Triangulation.Tests
 import TriangulationCxtObject
-import VerboseDD
 import Math.Groups.Tests
 import Tetrahedron.Tests
 import Util
 import Orientation.Tests
 import Control.Monad
 import System.Exit
+import Tests
+import Equivalence.Tests
 
 
 tests :: [IO Bool]
 tests = [ 
-        qc_AbstractTetrahedron, 
-        qc_StandardCoordinates, 
-        qc_NormalArc, 
-        qc_NormalDisc, 
         qc_Triangulation, 
         qc_Equivalence,
         qc_Util,
         qc_QuadCoordinates,
-        qc_AbstractNeighbordhood,
         qc_MathUtil,
-        qc_FacetGluing,
-        qc_VerboseDD,
+        qc_Tests,
         qc_Math_Groups_Tests,
-        qc_Tetrahedron_Tests,
+        qc_Tetrahedron,
         qc_Orientation
         ]
 

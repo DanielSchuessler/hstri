@@ -17,7 +17,7 @@ prop_s2group = polyprop_group (undefined :: Proxy S2)
 prop_s3group = polyprop_group (undefined :: Proxy S3)
 
 prop_tupleFromToFun :: (Int, Int, Int) -> Property
-prop_tupleFromToFun (x :: (Int,Int,Int)) = x .=. tupleFromFun (tupleToFun x) 
+prop_tupleFromToFun (x :: (Int,Int,Int)) = x .=. tupleFromFun3 (tupleToFun3 x) 
 
 prop_toFun_homomorphism :: S3 -> S3 -> Index3 -> Property
 prop_toFun_homomorphism g2 g1 x = 

@@ -22,7 +22,6 @@ import Triangulation.FacetGluing
 import QuickCheckUtil
 import Data.Proxy
 import Triangulation
-import Triangulation.Random()
 
 
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
-module NormalSurface where
+module StandardCoordinates.Class where
 
 import INormalDisc
 import Control.Applicative
@@ -19,7 +19,7 @@ import Util
 -- Minimal definition: ('discCount' || 'triCount') && 'nsToAssocs'
 --
 -- Law: If more than the minimum is implemented, the impls must be equivalent to the default implementations
-class QuadCoords s i => NormalSurface s i | s -> i where
+class QuadCoords s i => StandardCoords s i | s -> i where
     discCount :: s -> INormalDisc -> i 
     triCount :: s -> INormalTri -> i 
 
@@ -38,29 +38,28 @@ class QuadCoords s i => NormalSurface s i | s -> i where
 
 
 -- | Superclass default; requires implementation of 'discCount'
-defaultQuadCount :: NormalSurface s c => s -> INormalQuad -> c
+defaultQuadCount :: StandardCoords s c => s -> INormalQuad -> c
 defaultQuadCount = (. iNormalQuadToINormalDisc) <$> discCount
 
 -- | Superclass default; requires implementation of 'nsToAssocs'
-defaultQuadAssocs :: NormalSurface a t1 => a -> [(INormalQuad, t1)]
+defaultQuadAssocs :: StandardCoords a t1 => a -> [(INormalQuad, t1)]
 defaultQuadAssocs = mapMaybe (traverseFst (eitherIND (const Nothing) Just)) . nsToAssocs
 
 -- The number of normal triangles in the first arg containing a normal arc of the given type.
 -- Note that this is only well-defined in the disjoint union of tetrahedra, not in the quotient space!
 numberOfTrisContainingArcType
-  :: NormalSurface s i => s -> INormalArc -> i
+  :: StandardCoords s i => s -> INormalArc -> i
 numberOfTrisContainingArcType = (. iNormalTriByNormalArc) <$> triCount
 
 numberOfQuadsContainingArcType
-  :: NormalSurface s i => s -> INormalArc -> i
+  :: StandardCoords s i => s -> INormalArc -> i
 numberOfQuadsContainingArcType = (. iNormalQuadByNormalArc) <$> quadCount
 
-numberOfArcsOfType
-  :: (Num i, NormalSurface s i) => s -> INormalArc -> i
+numberOfArcsOfType :: StandardCoords s c => s -> INormalArc -> c
 numberOfArcsOfType = liftA2 (+) <$> numberOfTrisContainingArcType <*> numberOfQuadsContainingArcType
 
 numberOfCornersOfType
-  :: (Num i, NormalSurface s i) => s -> INormalCorner -> i
+  :: StandardCoords s a => s -> INormalCorner -> a
 numberOfCornersOfType ns nc =
     sum4
         (map4 
@@ -70,45 +69,45 @@ numberOfCornersOfType ns nc =
 
 -- | In the same order as 'tINormalDiscs'
 ns_toDenseAssocs
-  :: NormalSurface s i => Triangulation -> s -> [(INormalDisc, i)]
+  :: StandardCoords s i => Triangulation -> s -> [(INormalDisc, i)]
 ns_toDenseAssocs tr ns = fmap (id &&& discCount ns) (tINormalDiscs tr)
 
 -- | In the same order as 'tINormalDiscs'
-ns_toDenseList :: NormalSurface s i => Triangulation -> s -> [i]
+ns_toDenseList :: StandardCoords s i => Triangulation -> s -> [i]
 ns_toDenseList tr = fmap snd . ns_toDenseAssocs tr 
 
 
-instance NormalSurface INormalDisc Integer where
+instance StandardCoords INormalDisc Integer where
     discCount d d' = if d==d' then 1 else 0
     nsToAssocs d = [(d,1)] 
 
-instance NormalSurface INormalTri Integer where
+instance StandardCoords INormalTri Integer where
     discCount = discCount . iNormalDisc 
     nsToAssocs = nsToAssocs . iNormalDisc
 
-instance NormalSurface INormalQuad Integer where
+instance StandardCoords INormalQuad Integer where
     discCount = discCount . iNormalDisc 
     nsToAssocs = nsToAssocs . iNormalDisc
 
-instance (Num n, NormalSurface s n) => NormalSurface [s] n where
+instance (Num n, StandardCoords s n) => StandardCoords [s] n where
     discCount xs d = sum (flip discCount d <$> xs) 
     nsToAssocs = concatMap nsToAssocs 
 
 
-instance (Num n, NormalSurface s n) => NormalSurface (FormalProduct n s) n where
+instance (Num n, StandardCoords s n) => StandardCoords (FormalProduct n s) n where
     discCount (n :* s) = (n *) <$> discCount s
 
     nsToAssocs (n :* s) = second (n *) <$> nsToAssocs s
 
 
-instance (Num n, NormalSurface s n, NormalSurface s' n) => NormalSurface (FormalSum s s') n where
+instance (Num n, StandardCoords s n, StandardCoords s' n) => StandardCoords (FormalSum s s') n where
     discCount (s :+ s') = (+) <$> discCount s <*> discCount s'
 
     nsToAssocs (s :+ s') = ((++) $ nsToAssocs s) $ nsToAssocs s'
 
 
 eulerC
-  :: (Fractional a, Integral n, NormalSurface s n) =>
+  :: (Fractional a, Integral n, StandardCoords s n) =>
      Triangulation -> s -> a
 eulerC tr ns = sum (f <$> nsToAssocs ns)
     where
@@ -120,6 +119,9 @@ eulerC tr ns = sum (f <$> nsToAssocs ns)
 
 
 eulerCRatio
-  :: (NormalSurface s n, Integral n) =>
+  :: (StandardCoords s n, Integral n) =>
      Triangulation -> s -> Ratio n
 eulerCRatio = eulerC
+
+is2Sphere :: (Integral n, StandardCoords a n) => Triangulation -> a -> Bool
+is2Sphere tr = (==2) . eulerCRatio tr

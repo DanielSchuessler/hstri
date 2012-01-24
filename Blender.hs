@@ -512,7 +512,8 @@ data BlenderCurve = BlenderCurve {
 data BlenderSpline = Nurbs {
     spline_points :: V.Vector SplinePoint,
     use_endpoint_u :: Bool,
-    order_u :: Int
+    order_u :: Int,
+    use_cyclic_u :: Bool
 }
 
 type SplinePoint = Vec3
@@ -540,6 +541,7 @@ newCurveObj BlenderCurve{..} = do
                 concatMap (asList . extendVec34) (V.toList spline_points))
             splineVar <.> "order_u" .= order_u
             splineVar <.> "use_endpoint_u" .= use_endpoint_u
+            splineVar <.> "use_cyclic_u" .= use_cyclic_u
             splineVar <.> "use_smooth" .= True
     
     newObj "Cu" curveVar
@@ -589,7 +591,7 @@ materialToBlender m@Material{..} = do
 --                     | i <- dims ]
 
 
-blenderCurvedEdge :: Int -> Double -> (UnitInterval -> Vec3) -> Either String (Python ())
+blenderCurvedEdge :: Int -> Double -> (UnitIntervalPoint -> Vec3) -> Either String (Python ())
 blenderCurvedEdge (steps :: Int) thickness f =
     let
         m = steps - 1
@@ -604,7 +606,8 @@ blenderCurvedEdge (steps :: Int) thickness f =
             curve_spline = Nurbs {
                 use_endpoint_u = True,
                 order_u = 3,
-                spline_points = ys
+                spline_points = ys,
+                use_cyclic_u = normsqr (f 0 - f 1) < 1E-10
             }
          })
 

@@ -6,6 +6,7 @@
 -- | 
 -- Description : Test
 module Tikz.Gen(
+    module Tikz.StructureGraphLayout,
     tikzStructureGraph,
     tikzStructureGraphForVertexLink,
     PaperTriangleCorner(..),
@@ -19,11 +20,9 @@ module Tikz.Gen(
     Way(..),
     tsgAuto,
     StructureGraphLayout(..),
-    StructureGraphExtraOptions,
+    StructureGraphExtraOptions(..),
     defaultSGEE,
     PtcToVertex(..),
-    ptcToIVertex_fromS3s,
-    ptcToVertex_fromFunction
 
 
 

@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveDataTypeable, NoMonomorphismRestriction, ViewPatterns, Arrows #-}    
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, DeriveDataTypeable, NoMonomorphismRestriction, ViewPatterns, Arrows #-}    
 {-# OPTIONS -Wall #-}
-module ParseRga(readRgaFile,readRgaZip,RequiredAttributeNotPresentException(..)) where
+module Codec.Rga.Parser(readRgaFile,readRgaZip,RequiredAttributeNotPresentException(..)) where
 
 import Codec.Compression.GZip(decompress)
 import Control.Exception
@@ -15,6 +15,9 @@ import Prelude hiding(readFile)
 import Text.XML.HXT.Core as HXT
 import Triangulation
 import Util(fi)
+import Data.Tuple.Index
+import Text.XML.Generator
+import Codec.Rga.Util
 
 
 readRgaZip :: FilePath -> IO [LabelledTriangulation]
@@ -89,18 +92,15 @@ translateGluings ntet gluingRows =
                     assert (faceIx >= 0 && faceIx < 4) $
                     assert (tetIxInBounds tet') $
                     let
-                        divMod4 = (`divMod` 4)
-                        (dcb,a) = divMod4 dcba
-                        (dc,b) = divMod4 dcb
-                        (d,c) = divMod4 dc
+                        s4 = s4fromInt dcba
 
-                        vis :: Triple Int
-                        vis = deleteAt4 faceIx (0,1,2,3)
+                        vis :: Triple Index4
+                        vis = deleteAt4 faceIx allIndex4'
 
                         vs,us :: Triple Vertex
-                        vs = map3 toEnum vis
+                        vs = map3 index4ToVertex vis
 
-                        us = map3 (toEnum . ([a,b,c,d] !!)) vis
+                        us = map3 (index4ToVertex . (tupleToFun4 s4)) vis
 
                         res_ :: Gluing
                         res_ =
@@ -118,6 +118,10 @@ data RequiredAttributeNotPresentException = RequiredAttributeNotPresentException
     deriving (Show,Typeable)
 
 instance Exception RequiredAttributeNotPresentException
+
+
+
+
 
 
 

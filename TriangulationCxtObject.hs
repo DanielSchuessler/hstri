@@ -27,7 +27,6 @@ module TriangulationCxtObject(
     dfsVertexLink,
     preimageListOfVertex,
     degreeOfVertex,
-    innNAsAroundVertex,
 
     -- * Edges
     TEdge,
@@ -65,29 +64,19 @@ module TriangulationCxtObject(
 
     -- * Normal arcs
     TNormalArc,
-    InnNA(..),innNA_fst,innNA_snd,
     -- ** Construction
     MakeTNormalArc(..),
     boundaryNormalArcs,
     innerNormalArcs,
     tNormalArcsAroundVertex,
-    toInnNA,
-    innNAs,
-    innNAFromPreimage,
     -- ** Properties
     normalArcPreimage,
     isBoundaryNormalArc,
-    normalTrisContainingInnNA,
-    -- ** Misc
-    innNANU,
 
     -- * Normal dics
     TNormalTri,
     TNormalQuad,
     TNormalDisc,
-
-    -- * Misc
-    triArcGraph,
 
     -- * For testing
     isSubface_ET,isSubface_VE,isSubface_TTet
@@ -97,26 +86,21 @@ module TriangulationCxtObject(
 
 import AbstractTetrahedron
 import Collections
-import Control.Arrow((&&&))
 import Control.Exception
 import Control.Monad.Reader
 import Data.EdgeLabelledTree
 import Data.Function
 import Data.Functor
-import Data.Graph.Inductive.Graph hiding(edges)
-import Data.Graph.Inductive.Tree
 import Data.Maybe
 import Element
 import Equivalence
 import HomogenousTuples
 import INormalDisc
 import Tetrahedron.NormalDisc
-import Data.Numbering
 import Prelude hiding(catch,lookup)
 import PrettyUtil
 import Quote
 import ShortShow
-import THUtil
 import Triangulation
 import Triangulation.CanonOrdered
 import Util
@@ -163,8 +147,6 @@ preimageList = asList
 
 preimageListOfVertex :: TVertex -> [IVertex]
 preimageListOfVertex y = eqvEquivalents (vertexEqv (getTriangulation y)) (unT y)
-ecMember_T :: IVertex -> TVertex -> Bool
-ecMember_T x y = eqvRep (vertexEqv (getTriangulation y)) x == unT y
 degreeOfVertex :: TVertex -> Int
 degreeOfVertex y = ecSize (eqvClassOf (vertexEqv (getTriangulation y)) (unT y))
 
@@ -586,53 +568,6 @@ tNormalArcsAroundVertex v =
   where
     p = pMap (getTriangulation v)
 
-normalTrisContainingInnNA :: InnNA -> Pair INormalTri
-normalTrisContainingInnNA (InnNA ina1 ina2) = 
-                        map2 iNormalTriByNormalArc (ina1, ina2)
-
-data InnNA = InnNA INormalArc INormalArc 
-    deriving (Eq,Ord,Show)
-
-innNA_fst :: InnNA -> INormalArc
-innNA_fst (InnNA x _) = x
-
-innNA_snd :: InnNA -> INormalArc
-innNA_snd (InnNA _ x) = x
-
-innNAFromPreimage :: INormalArc -> INormalArc -> InnNA
-innNAFromPreimage ina1 ina2 = 
-    $(assrt [|ina1/=ina2|] ['ina1,'ina2])
-    (uncurry InnNA (sort2 (ina1,ina2)))
-
-innNANU :: Triangulation -> Numbering InnNA
-innNANU = join (prodNu innNA_fst innNA_snd InnNA) . tINormalArcNu
-        
-
-toInnNA :: TNormalArc -> Maybe InnNA
-toInnNA tna = 
-    case normalArcPreimage tna of
-                BoundaryNormalArc _ -> Nothing
-                InnerNormalArc ina1 ina2 ->
-                        Just (innNAFromPreimage ina1 ina2)
-                                    
-
-innNAs :: Triangulation -> [InnNA]
-innNAs = mapMaybe toInnNA . normalArcs
-
-innNAsAroundVertex :: TVertex -> [InnNA]
-innNAsAroundVertex = mapMaybe toInnNA . tNormalArcsAroundVertex
-
-triArcGraph :: Triangulation -> Gr INormalTri InnNA
-triArcGraph tr = 
-    mkGraph 
-        (map (fromEnum &&& id) (tINormalTris tr)) 
-        (map f (innNAs tr)) 
-
-  where
-    f tna = 
-        let
-            (t1,t2) = normalTrisContainingInnNA tna
-        in (fromEnum t1,fromEnum t2,tna)
 
 
 prettyEdgeEquivalence :: Triangulation -> Doc

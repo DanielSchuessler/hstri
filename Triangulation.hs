@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, PatternGuards, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
+{-# LANGUAGE DeriveDataTypeable, TupleSections, PatternGuards, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module Triangulation(
@@ -41,7 +41,10 @@ module Triangulation(
     oEdgeEqv,vertexEqv,
     iEdgeEqv,
     -- * Construction 
-    mkTriangulation,mkTriangulationSafe,mkTriangulationG,triang,
+    mkTriangulation,
+    mkTriangulationSafe,mkTriangulationG,triang,
+    TriangulationConstructionError(..),
+    describeTriangulationConstructionError,
     -- * Transformation
     addGluings,
     -- * Canonical representatives for things that are glued
@@ -78,6 +81,8 @@ import Data.EdgeLabelledTree
 import Data.SumType
 import Language.Haskell.TH.Lift
 import Control.Monad
+import Data.Typeable(Typeable)
+import Data.List(sort)
 
 
 
@@ -135,60 +140,111 @@ tNumberOfTetrahedra = fi . tNumberOfTetrahedra_
 mkTriangulation :: Word -> [Gluing] -> Triangulation
 mkTriangulation = (fmap . fmap) fromRight mkTriangulationSafe 
 
-mkTriangulationSafe :: Word -> [Gluing] -> Either String Triangulation
+data TriangulationConstructionError =
+        EdgeGluedToSelfInReverse IEdge
+    |   TriangleGluedToSelf OITriangle   
+    |   ThreeTrianglesGlued ITriangle OITriangle OITriangle
+
+    deriving (Show,Typeable,Eq)
+
+instance Exception TriangulationConstructionError
+
+describeTriangulationConstructionError
+  :: TriangulationConstructionError -> String
+describeTriangulationConstructionError er =
+    case er of
+         EdgeGluedToSelfInReverse e ->
+               "Edge "++show e++" is glued to itself in reverse"
+
+         TriangleGluedToSelf f1 ->
+                                "Triangle "++show (forgetVertexOrder f1)++
+                                    " is glued to itself (in order "++show f1++")"
+
+         ThreeTrianglesGlued t f1 f2 ->
+                                "Three triangles glued together: "++show (t,f1,f2)
+        
+
+
+
+mkTriangulationSafe :: Word -> [Gluing] 
+    -> Either TriangulationConstructionError Triangulation
 mkTriangulationSafe tNumberOfTetrahedra_ tOriginalGluings
-        =
+        = 
+            
+
             (do
 
-    let tets = [0..tindex (tNumberOfTetrahedra_-1)] 
+    let tets = 
+            if tNumberOfTetrahedra_ > 0
+            then [0.. tindex (pred tNumberOfTetrahedra_)] 
+            else []
+
     
         allIEdges :: [IEdge]
-        allIEdges = concatMap edgeList tets
-        _allOIEdges = concatMap (asList . allOIEdges) tets
+        allIEdges = 
+            {-# SCC "mkTriangulationSafe/allIEdges" #-}
+            concatMap edgeList tets
+
+        _allOIEdges = 
+            {-# SCC "mkTriangulationSafe/allOIEdges" #-}
+            concatMap (asList . allOIEdges) tets
 
         allIVertices :: [IVertex]
-        allIVertices = concatMap vertexList allIEdges
+        allIVertices = 
+            {-# SCC "mkTriangulationSafe/allIVertices" #-}
+            concatMap vertexList allIEdges
 
     let addGluing mrec (t,f1) = mrec >>= (\r -> case lookup t r of
                                                         Nothing -> return (mapInsert t f1 r)
                                                         Just f2 
                                                             | f2==f1 -> return r
-                                                            | otherwise -> err t f1 f2)
+                                                            | otherwise -> _err t f1 f2)
 
-        err t f1 f2 = Left 
+        _err t f1 f2 = Left 
                         (if t == forgetVertexOrder f1
-                            then 
-                                ("Triangle "++show t++" is glued to itself (in order "++show f1++")")
-                            else    
-                                ("Triangle "++show t++" is glued to both triangle "
-                                    ++show f1++" and "++show f2))
+                            then TriangleGluedToSelf f1
+                            else ThreeTrianglesGlued t f1 f2)
         
-    tGlueMap_ <- List.foldl' addGluing (return mempty) 
+    tGlueMap_ <- 
+                    List.foldl' addGluing (return mempty) 
                         (tOriginalGluings ++ fmap flipGluing tOriginalGluings)
 
 
     let vertexEqv :: Equivalence IVertex 
-        vertexEqv = mkEquivalence
+        vertexEqv =  {-# SCC "mkTriangulationSafe/vertexEqv" #-}
+                    mkEquivalence
                         (inducedVertexEquivalences =<< tOriginalGluings)
                         allIVertices
 
-        oEdgeEqv = mkEquivalence
+        oEdgeEqv = 
+                    {-# SCC "mkTriangulationSafe/oEdgeEqv" #-}
+                    mkEquivalence
                     (inducedOEdgeEquivalences =<< tOriginalGluings)
                     _allOIEdges
 
 
 
-    checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv
+    {-# SCC "mkTriangulationSafe/call:checkForEdgeGluedToSelfInReverse" #-}
+     checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv
                             
-    return Triangulation{ tNumberOfTetrahedra_, tGlueMap_, oEdgeEqv, vertexEqv, tOriginalGluings })
+    {-# SCC "mkTriangulationSafe/return" #-}
+     return Triangulation{ tNumberOfTetrahedra_, tGlueMap_, oEdgeEqv, vertexEqv, tOriginalGluings })
 
 
-checkForEdgeGluedToSelfInReverse :: [IEdge] -> Equivalence OIEdge -> Either String ()
-checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv = mapM_ go allIEdges
+checkForEdgeGluedToSelfInReverse :: [IEdge] -> Equivalence OIEdge 
+    -> Either TriangulationConstructionError ()
+checkForEdgeGluedToSelfInReverse allIEdges oEdgeEqv = 
+
+        
+
+
+
+        mapM_ go allIEdges
     where
         go e = 
+            {-# SCC "checkForEdgeGluedToSelfInReverse/go" #-}
             if eqv_classOf oEdgeEqv (toOrderedFace e) == eqv_classOf oEdgeEqv (packOrderedFace e Flip)
-               then Left ("Edge "++show e++" is glued to itself in reverse")
+               then Left (EdgeGluedToSelfInReverse e)
                else Right ()
     
 
@@ -224,7 +280,8 @@ triangTetCount = length `liftM` tTetrahedra_
 -- | Allows an arbitrary tetrahedron index set
 mkTriangulationG
   :: (Ord tet, Show tet) =>
-     [tet] -> [((tet, Triangle), (tet, OTriangle))] -> Either String Triangulation
+     [tet] -> [((tet, Triangle), (tet, OTriangle))] 
+        -> Either TriangulationConstructionError Triangulation
 mkTriangulationG tets gluings =
     let
         tetIxs = [tindex 0..]
@@ -377,7 +434,10 @@ instance TriangulationDSnakeItem INormalDisc where
 
 
 
-addGluings :: Triangulation -> [Gluing] -> Either String Triangulation
+addGluings
+  :: Triangulation
+     -> [Gluing]
+     -> Either TriangulationConstructionError Triangulation
 addGluings tr gluings = 
     assert (all (\g -> getTIndex (fst g) < tindex n && getTIndex (snd g) < tindex n) gluings) $
 
@@ -465,4 +525,8 @@ dfsFacePairingGraph
   :: Triangulation -> TIndex -> EdgeLabelledTree TIndex Gluing
 dfsFacePairingGraph tr = flip dfs (map (id &&& (getTIndex . glCod)) . tetGetGluings tr)
 
+
+-- | Note: This instance checks exact equality of 'tNumberOfTetrahedra_' and @sort . 'tNormalizedGluings'@.
+instance Eq Triangulation where
+    (==) = (==) `on` (tNumberOfTetrahedra_ &&& (sort . tNormalizedGluings))
 

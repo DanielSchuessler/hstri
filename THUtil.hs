@@ -13,7 +13,10 @@ module THUtil(
     assrt,
     stringQuote,
     printQuote,
-    liftFunction
+    liftFunction,
+    straceExp,
+    ltraceExp,
+    problem
     ) where
 
 import Language.Haskell.TH
@@ -30,6 +33,7 @@ import OrphanInstances.Lift()
 import Element
 import Data.Generics
 import Data.Maybe
+import FileLocation
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
@@ -151,4 +155,11 @@ charListToStringLit e = do
     Just (LitE (StringL cs)) 
 
 
+ltraceExp :: [Char] -> ExpQ -> ExpQ
+ltraceExp msg e = traceExps msg e `appE` e
 
+straceExp :: ExpQ -> ExpQ
+straceExp = ltraceExp ""
+
+problem :: Q Exp
+problem = [| error . ($(lift . (++ ": ") . locationToString =<< location) ++) |]

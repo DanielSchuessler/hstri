@@ -29,12 +29,10 @@ module Tetrahedron.Triangle(
     triangleMemo,
 
     -- ** Vertex indices
-    VertexIndexInTriangle(..),
+    Index3(..),
     triangleGetVertexAt,
     triangleGetEdgeAt,
     triangleGetIndexOf,
-    allTriangleVertexIndices,
-    allTriangleVertexIndices',
 
     -- * Ordered
     OTriangle,
@@ -100,6 +98,7 @@ import Test.QuickCheck
 import Tetrahedron.Edge
 import Util
 import Data.Numbering
+import Data.Tuple.Index
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
@@ -435,37 +434,17 @@ instance OEdges OTriangle where
     type OEds OTriangle = Triple OEdge
     oedges (vertices -> (v0,v1,v2)) = (oedge (v0,v1), oedge (v1,v2), oedge(v2,v0)) 
 
-data VertexIndexInTriangle = VT0 | VT1 | VT2
-    deriving(Eq,Show,Enum)
 
-allTriangleVertexIndices'
-  :: (VertexIndexInTriangle,
-      VertexIndexInTriangle,
-      VertexIndexInTriangle)
-allTriangleVertexIndices' = (VT0,VT1,VT2)
-allTriangleVertexIndices :: [VertexIndexInTriangle]
-allTriangleVertexIndices = asList allTriangleVertexIndices'
-
-triangleGetEdgeAt :: Triangle -> VertexIndexInTriangle -> Edge
+triangleGetEdgeAt :: Triangle -> Index3 -> Edge
 triangleGetEdgeAt t vi = edgeByOppositeVertexAndTriangle (triangleGetVertexAt t vi) t
 
 triangleGetVertexAt
-  :: (Vertices a, Verts a ~ Triple t) => a -> VertexIndexInTriangle -> t
-triangleGetVertexAt (vertices -> (v0,v1,v2)) i = 
-    case i of
-         VT0 -> v0
-         VT1 -> v1
-         VT2 -> v2
+  :: (Vertices t, Verts t ~ Triple v) => t -> Index3 -> v
+triangleGetVertexAt = tupleToFun3 . vertices 
 
 triangleGetIndexOf
-  :: (Eq a1, Vertices a, Verts a ~ Triple a1) =>
-     a -> a1 -> Maybe VertexIndexInTriangle
-triangleGetIndexOf (vertices -> (v0,v1,v2)) v 
-    | v == v0 = Just VT0
-    | v == v1 = Just VT1
-    | v == v2 = Just VT2
-    | otherwise = Nothing
-
+  :: (Eq v, Vertices t, Verts t ~ Triple v) => t -> v -> Maybe Index3
+triangleGetIndexOf = indexOf3 . vertices
 
 -- | 'getTIndex's must be equal
 oiTriangleByVertices
@@ -601,3 +580,6 @@ oTriangleNu = finiteTypeNu
 
 instance Lift ITriangle where
     lift (viewI -> I x y) = [| x ./ y |] 
+
+mapTIndicesFromHasTIndex [t|ITriangle|]
+

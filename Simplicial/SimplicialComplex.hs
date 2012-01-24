@@ -19,6 +19,7 @@ import Simplicial.DeltaSet3
 import Util
 import Simplicial.SimplicialComplex.Class
 import Language.Haskell.TH.Lift
+import OrphanInstances()
 
 fromTets
   :: (Ord v, Show v) => [Quadruple v] -> SC3 v
@@ -277,7 +278,6 @@ instance (Pretty ts, Pretty sk) => Pretty (SCCons ts sk) where
 --     prettyPrec prec (DJ a b) = 
 --         prettyPrecApp prec "DJ"
 --             [anyPretty a, anyPretty b]
-
 
 
 

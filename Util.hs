@@ -304,3 +304,7 @@ traverseSnd f (x,y) = (x,) <$> f y
 
 sequenceSnd :: Functor f => (t, f a) -> f (t, a)
 sequenceSnd = traverseSnd id
+
+catPairs ::  [(b, b)] -> [b]
+catPairs = concatMap (\(a1,a2) -> [a1,a2])
+

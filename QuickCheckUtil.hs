@@ -13,12 +13,22 @@ import Element
 cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
 cart = liftM2 (,)
 
-forAllElements :: (Testable prop, Show a) => [a] -> (a -> prop) -> Property
-forAllElements [] _ = label "Vacuously true (empty domain)" True
-forAllElements xs p = forAll (elements xs) p
+forAllElements
+  :: (Show (Element xs), AsList xs, Testable prop) =>
+     xs -> (Element xs -> prop) -> Property
+forAllElements (asList -> xs) p = 
+    if null xs
+       then label "Vacuously true (empty domain)" True
+       else forAll (elements xs) p
 
-forAllElements2 :: (Testable prop, Show a1, Show a2) =>[a1] -> [a2] -> ((a1, a2) -> prop) -> Property
-forAllElements2 xs ys p = forAllElements (xs `cart` ys) p
+forAllElements2
+  :: (Show (Element xs),
+      Show (Element xs1),
+      AsList xs,
+      AsList xs1,
+      Testable prop) =>
+     xs -> xs1 -> ((Element xs, Element xs1) -> prop) -> Property
+forAllElements2 xs ys p = forAllElements (asList xs `cart` asList ys) p
 
 
 forAll2 :: (Testable prop, Show a1, Show a) =>Gen a -> Gen a1 -> (a -> a1 -> prop) -> Property

@@ -1,26 +1,8 @@
-{-# LANGUAGE CPP, TupleSections, ExtendedDefaultRules #-}
-import ExampleTriangulations
-import NormalEverything
-import Element
-import Blenderable
-import Blender
-import DisjointUnion
-import ConcreteNormal.PreRenderable
-import Simplicial.DeltaSet
-import Simplicial.AnySimplex
-import TriangulationCxtObject
-import HomogenousTuples
-import Data.Function
-import PrettyUtil
-import Data.Vect.Double.Base
-import Latexable
-import EqvGraphs
-import QuadCoordinates
-import VerboseDD
-import Control.Applicative
+{-# LANGUAGE ImplicitParams, CPP, TupleSections, ExtendedDefaultRules #-}
+import HsTri
 import qualified Data.Map as M
-import Tikz.Gen
-import Tikz.Preview
+import Data.Map(Map)
+import Control.Applicative
 
 
 
@@ -33,19 +15,27 @@ smes = putStr (latexifyStandardMatchingEquations tr)
 
 qmes = putStr (latexifyQMatchingEquations tr)
 
-main = (testBlender . setCams [twoTetCam])
-        (defaultScene $
-            (
-                (fromSpqwcAndIntegerNormalSurface 
+go ba = (testBlender . setCams [twoTetCam])
+        (defaultScene $ ba)
+
+
+main = do
+    go baVertexLinkA0
+    go baVertexLinkD0
+    
+
+
+(baVertexLinkA0,baVertexLinkD0) = 
+    map2 (\v ->
+                fromSpqwcAndIntegerNormalSurface 
                     spqwc
-                    (canonExtDbg tr (quad_fromNormalSurface [0./Q_ab,1./Q_ab]))
-                    )
+                    (vertexLinkingSurface (pMap tr (0./ v))))
+
+         (vA,vD)
 
 
 --             `disjointUnion`
    --             fromNormalSurface spqwc (standardCoordinates [0./Q_ac,1./Q_ac,2./Q_ad,3./Q_ad])
-            )
-        )
     
 
 
@@ -68,13 +58,18 @@ vl_A0 way =
             ]
                     
 
-        tikz = tikzStructureGraphForVertexLink 
-                v 
-                (ptcToIVertex_fromS3s nodePerm)
-                (regularPolygonLocs triOrder) 
-                ("x=3cm,y=3cm,scale=0.8,scale="++show scaleTweak)
-                noExtraEdgeStyles
-                way
+        tikz = 
+            let ?layout = 
+                    SGL 
+                        (ptcToIVertex_fromS3s nodePerm)
+                        (regularPolygonLocs triOrder) 
+            in
+                tikzStructureGraphForVertexLink 
+                    v 
+                    (SGEE
+                        ("x=3cm,y=3cm,scale=0.8,scale="++show scaleTweak)
+                        noExtraEdgeStyles
+                        way)
     in 
         writeFileOrPreview ("/tmp/L31VertexLinkA0"++suf++".tex") tikz
 
@@ -89,13 +84,18 @@ vl_D0 way =
             ]
                     
 
-        tikz = tikzStructureGraphForVertexLink 
-                v 
-                (ptcToIVertex_fromS3s nodePerm)
-                (regularPolygonLocs triOrder) 
-                ("x=3cm,y=3cm,shift={(0.5,2)},scale=0.4,scale="++show scaleTweak)
-                (\x -> if x == 0 ./ tABD then "looseness=2" else "") 
-                way
+        tikz = 
+            let ?layout = 
+                    SGL
+                        (ptcToIVertex_fromS3s nodePerm)
+                        (regularPolygonLocs triOrder) 
+            in
+                tikzStructureGraphForVertexLink 
+                    v 
+                    (SGEE
+                        ("x=3cm,y=3cm,shift={(0.5,2)},scale=0.4,scale="++show scaleTweak)
+                        (\x -> if x == 0 ./ tABD then "looseness=2" else "") 
+                        way)
                 
     in 
         writeFileOrPreview ("/tmp/L31VertexLinkD0"++suf++".tex") tikz

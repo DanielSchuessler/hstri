@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
-import ParseRga
+import Codec.Rga.Parser
 import Quote
 import Control.Monad
 import Data.List

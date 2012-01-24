@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, CPP, NoMonomorphismRestriction, FlexibleInstances, FunctionalDependencies, DeriveDataTypeable, TypeFamilies, TemplateHaskell, DeriveGeneric, DeriveFoldable #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
+-- | Description:  Strictly ascending tuples
 module Data.AscTuples where
 
 import Control.Arrow
@@ -17,6 +18,8 @@ import qualified Data.Foldable as Fold
 import DisjointUnion
 import FaceClasses
 import Language.Haskell.TH.Lift
+import Data.Tuple.Index
+import Data.Maybe
 
 #define DEBUG
 
@@ -148,6 +151,18 @@ instance Vertices (Asc3 v) where
 instance Vertices (Asc4 v) where
     type Verts (Asc4 v) = Asc4 v
     vertices = id
+
+
+indexOfAsc3 :: Ord a => a -> Asc3 a -> Maybe Index3
+indexOfAsc3 x (UnsafeAsc3 (a, b, c)) =
+    case compare x b of
+         EQ -> Just I3_1 
+         LT -> if x==a then Just I3_0 else Nothing
+         GT -> if x==c then Just I3_2 else Nothing
+         
+
+elemAsc3 :: Ord a => a -> Asc3 a -> Bool
+elemAsc3 = (.) isJust . indexOfAsc3
 
 
 deriveLiftMany [''Asc2,''Asc3,''Asc4]

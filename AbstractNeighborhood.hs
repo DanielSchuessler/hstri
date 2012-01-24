@@ -5,19 +5,13 @@ module AbstractNeighborhood(
     IEdgeNeighborhoodTet,
     ent_top,ent_bot,ent_left,ent_right,ent_leftTri,ent_rightTri,
     innerEdgeNeighborhood,
-    prop_innerEdgeNeighborhood,
-    -- * Testing
-    qc_AbstractNeighbordhood
     ) where
 import TriangulationCxtObject
 import Data.Function
 import Control.Arrow((&&&))
 import PrettyUtil
 import Data.List(unfoldr)
-import Test.QuickCheck
-import QuickCheckUtil
 import Data.Maybe
-import Test.QuickCheck.All
 
 data EdgeNeighborhoodTet = 
     ENTet {
@@ -89,18 +83,3 @@ innerEdgeNeighborhood te =
              (_,[]) -> Nothing
 
         
-prop_innerEdgeNeighborhood :: Triangulation -> Property
-prop_innerEdgeNeighborhood (tr :: Triangulation) =
-    forAllElements (edges tr)
-        (\te -> case innerEdgeNeighborhood te of
-                     Nothing -> property (isBoundaryEdge te)
-                     Just xs -> length xs .=. ecSize te)
-
-  where
-    isBoundaryEdge = 
-        any (isNothing . lookupGluingOfITriangle tr)
-            . itrianglesContainingEdge
-
-
-qc_AbstractNeighbordhood :: IO Bool
-qc_AbstractNeighbordhood = $quickCheckAll

@@ -54,7 +54,7 @@ corn pos n u0 u1 =
                    else Corn (n - pos - 1) n u1 u0
 
 normalSurfaceToPreRenderable
-  :: forall s v i. (Integral i, Show v, Ord v, Pretty i, ShortShow v, NormalSurface s i) =>
+  :: forall s v i. (Integral i, Show v, Ord v, Pretty i, ShortShow v, StandardCoords s i) =>
      SPQWithCoords v
      -> s
      -> PreRenderable (SC2 (Corn v))

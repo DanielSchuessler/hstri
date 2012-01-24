@@ -1,5 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction, ViewPatterns #-}
-import ParseRga
+import Codec.Rga.Parser
 import Data.Vect.Double hiding((.*))
 import EdgeCentered
 import Test.QuickCheck

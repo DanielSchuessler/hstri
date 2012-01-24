@@ -1,23 +1,25 @@
-{-# LANGUAGE TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module VerboseDD 
     (module InnerProductRepresentation,
      dd,
+     dds,
      PairFate(..),
      PairFateKind(..),
      ddSolutions,
      ddSolutions',
+     ddSolutionsToSDense,
+     ddSolutionsToQDense,
      ppDDRes,
+     qVertexSolutions,
+     qVertexSolutionExts
      
-        -- * Testing
-        qc_VerboseDD
      )
 
 
     where
 
 import Control.Applicative
-import Control.Exception
 import Control.Monad.State
 import Data.Function
 import Data.List as L
@@ -27,14 +29,16 @@ import InnerProductRepresentation
 import MathUtil
 import PrettyUtil
 import QuadCoordinates
-import StandardCoordinates
-import Test.QuickCheck
-import Test.QuickCheck.All
+import QuadCoordinates.Dense
 import TriangulationCxtObject
 import Util
 import VectorUtil
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
+import QuadCoordinates.CanonExt
+--import QuadCoordinates.Class
+import HomogenousTuples
+import StandardCoordinates.MatchingEquations
 
 data PairFate = 
     PairFate {
@@ -83,21 +87,54 @@ ipr_init d k meColumn ix =
                             (V.fromList meColumn)
                             (V.generate d (\j -> if j==k then 1 else 0)) 
 
+
+data DDInput = DDInput {
+    numberOfVariables :: Int,
+    hyperplanes :: [[Rational]],
+    compatible :: IPR -> IPR -> Bool
+}
+
 dd
   :: Triangulation -> DDResult 
-dd tr =
+dd tr = ddWith DDInput {
+    numberOfVariables = tNumberOfNormalQuadTypes tr,
+    hyperplanes = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr,
+    compatible = ipr_compatible
+                    [ (i,i+1,i+2) | i <- map (3*) [0.. tNumberOfTetrahedra tr - 1] ]
+
+    }
+
+dds
+  :: Triangulation -> DDResult 
+dds tr = ddWith DDInput {
+    numberOfVariables = tNumberOfNormalDiscTypes tr,
+    hyperplanes = 
+        [ map (toRational . evalMatchingEquation me) (tINormalDiscs tr)
+            | me <- matchingEquationReasons tr ],
+
+
+    compatible = ipr_compatible
+                    [ map3 (fromEnum . iNormalQuadToINormalDisc) 
+                        (normalQuads (tindex i))
+                            | i <- [0.. tNumberOfTetrahedra tr - 1] ]
+
+    }
+
+
+
+ddWith :: DDInput -> DDResult
+ddWith DDInput{..} =
     let
-        d = tNumberOfNormalQuadTypes tr 
-        mes = sortBy (comparing (fmap (/=0))) . fmap (quad_toDenseList tr) . qMatchingEquationsRat 
-                    $ tr
+        mes = sortBy (comparing (fmap (/=0))) hyperplanes
+
         g = length mes
 
         mes' = transpose mes
 
         go = do
-            _V0 <- V.zipWithM (\k meColumn -> ipr_init d k meColumn <$> nextIndex)
+            _V0 <- V.zipWithM (\k meColumn -> ipr_init numberOfVariables k meColumn <$> nextIndex)
 
-                        (V.enumFromN 0 d) (V.fromList mes')
+                        (V.enumFromN 0 numberOfVariables) (V.fromList mes')
 
 
             loop mempty 1 _V0
@@ -115,7 +152,7 @@ dd tr =
                 goPair :: IPR -> IPR -> State VectorIndex PairFate
                 goPair x y = PairFate x y <$>
                     (case () of
-                          _ | not (ipr_compatible x y) -> 
+                          _ | not (compatible x y) -> 
                                 return Incompatible                
                             | Just z <- (disproveAdjacency _Vp x y) -> 
                                 return (NotAdjacent z)
@@ -151,24 +188,20 @@ dd tr =
 
 
 
-ipr_compatible :: IPR -> IPR -> Bool
-ipr_compatible = zeroSetCompatible `on` zeroSet 
+ipr_compatible :: [Triple Int] -> IPR -> IPR -> Bool
+ipr_compatible quadIndexTriples = zeroSetCompatible `on` zeroSet 
     where
         zeroSetCompatible z1 z2 = zeroSetAdmissible (VU.zipWith (&&) z1 z2)
 
         zeroSetAdmissible z =
-            let
-                (t,t') = VU.length z `divMod` 3 
-            in
-                assert (t'==0) $
 
-                    all (\((*3) -> i) -> 
-                        atLeastTwo
-                            (VU.unsafeIndex z (i))
-                            (VU.unsafeIndex z (i+1))
-                            (VU.unsafeIndex z (i+2)))
+                    all (\(i0,i1,i2) ->
+                            atLeastTwo
+                                (VU.unsafeIndex z i0)
+                                (VU.unsafeIndex z i1)
+                                (VU.unsafeIndex z i2))
 
-                        [0 .. t-1]
+                        quadIndexTriples
                         
 
 
@@ -232,34 +265,16 @@ ddSolutions = V.map ipr_value . snd
 ddSolutions' :: DDResult -> Vector (Vector Integer)
 ddSolutions' = V.map makeVecIntegral . ddSolutions
 
-ddSolutionsQC
-  :: Triangulation
-     -> DDResult -> Vector (QuadCoordinates Integer)
-ddSolutionsQC tr = V.map (quad_fromVector tr) . ddSolutions' 
+ddSolutionsToQDense :: DDResult -> Vector QuadDenseI
+ddSolutionsToQDense = V.map qd_fromVector . ddSolutions' 
 
-ddSolutionsSC
-  :: Triangulation
-     -> DDResult -> Vector (StandardCoordinates Integer)
-ddSolutionsSC tr = V.map (canonExt tr) . ddSolutionsQC tr
+ddSolutionsToSDense :: Triangulation -> DDResult -> Vector (CanonExt QuadDenseI Integer)
+ddSolutionsToSDense tr = V.map (canonExt tr) . ddSolutionsToQDense
 
-               
-prop_dd :: Triangulation -> Bool
-prop_dd tr =
-    let
-        sols = ddSolutionsQC tr (dd tr)
-    in
-        either error (const True) 
-            (V.mapM_ (quad_admissible tr) sols)
+qVertexSolutions :: Triangulation -> Vector QuadDenseI
+qVertexSolutions tr = ddSolutionsToQDense  (dd tr) 
 
-prop_dd' :: Triangulation -> Property
-prop_dd' tr =
-    tNumberOfTetrahedra_ tr <= 10 ==>
-                                                               
-    let
-        sols = ddSolutionsQC tr (dd tr)
-    in V.all (either error (const True) . admissible tr . canonExtDbg tr) sols
-
-
-qc_VerboseDD :: IO Bool
-qc_VerboseDD = $quickCheckAll
+qVertexSolutionExts
+  :: Triangulation -> Vector (CanonExt QuadDenseI Integer)
+qVertexSolutionExts tr = ddSolutionsToSDense tr (dd tr) 
 

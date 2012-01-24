@@ -9,10 +9,8 @@ import HomogenousTuples
 import Data.Maybe
 import INormalDisc
 import Control.Exception
-import QuickCheckUtil
 import Test.QuickCheck
 import THUtil
-import Test.QuickCheck.All
 import PrettyUtil
 import Either1
 import PreRenderable.TriangleLabel
@@ -98,17 +96,6 @@ instance GluingMappable OITriangle where
         assert (tri == tri')
             (otri *. g)
 
-prop_gluingMapVertex :: Gluing -> Property
-prop_gluingMapVertex gl =
-    glCod gl .=. oiTriangleByVertices us
-  where
-    us = map3 (gluingMap gl) (vertices (glDom gl))
-
-
-prop_gluingMapOITriangle :: OITriangle -> OITriangle -> Property
-prop_gluingMapOITriangle ot1 ot2 =
-    gluingMap (oiTriangleGluing ot1 ot2) ot1 .=. ot2
-
 
 
 inducedVertexEquivalences :: Gluing -> [(IVertex, IVertex)]
@@ -156,11 +143,7 @@ normalizeGluing = snd . normalizeGluing'
 gluingGen :: Gen Gluing
 gluingGen = arbitrary `suchThat` \gl -> fst gl /= forgetVertexOrder (snd gl)
 
-prop_normalizeGluing :: Property
-prop_normalizeGluing = forAll gluingGen (isGluingNormalized . ngToGluing . normalizeGluing)
 
-qc_FacetGluing :: IO Bool
-qc_FacetGluing = $quickCheckAll
 
 
 -- | INVARIANT: @ngDom < 'forgetVertexOrder' ngCod@
@@ -168,7 +151,7 @@ data NormalizedGluing = UnsafeNormalizedGluing {
     ngDom :: ITriangle,
     ngCod :: OITriangle
 }
-    deriving Show
+    deriving (Eq,Ord,Show)
 
 instance Pretty NormalizedGluing where
     prettyPrec = prettyPrecFromShow
@@ -207,3 +190,4 @@ glDomTet = getTIndex . glDom
 
 glCodTet :: Gluing -> TIndex
 glCodTet = getTIndex . glCod
+

@@ -33,7 +33,9 @@ Library
     ConcreteNormal.PreRenderable
     Data.AscTuples
     Data.EdgeLabelledTree
+    Data.FormalOps
     Data.Numbering
+    Data.SumType
     Data.Tuple.Index
     DisjointUnion
     DotUtil
@@ -54,6 +56,7 @@ Library
     INormalDisc
     IndexedSimplices
     InnerProductRepresentation
+    Triangulation.InnerNormalArc
     Interactive.Command
     Interactive.Floor
     Interactive.ReadInput
@@ -64,7 +67,6 @@ Library
     Math.Groups.S3
     MathUtil
     NormalEverything
-    NormalSurface
     Normalizable
     ONormal
     OrderableFace
@@ -78,6 +80,10 @@ Library
     PreRenderable.TriangleLabel
     PrettyUtil
     QuadCoordinates
+    QuadCoordinates.Dense
+    QuadCoordinates.Class
+    QuadCoordinates.CanonExt
+    QuadCoordinates.MatchingEquations
     QuickCheckUtil
     Quote
     ShortShow
@@ -88,6 +94,9 @@ Library
     Simplicial.SimplicialComplex.Class
     SimplicialPartialQuotient
     StandardCoordinates
+    StandardCoordinates.Dense
+    StandardCoordinates.MatchingEquations
+    StandardCoordinates.Class
     THUtil
     TIndex
     Tetrahedron.Edge
@@ -105,6 +114,8 @@ Library
     ToPython
     TriArcGraph
     Triangulation
+    Triangulation.Transformations
+    Triangulation.VertexLink
     Triangulation.CanonOrdered
     Triangulation.Class
     Triangulation.FacetGluing
@@ -115,10 +126,9 @@ Library
     VectorUtil
     VerboseDD
     ZeroDefaultMap
-    Data.SumType
 
 
-  Build-depends: yices-painless, syb, th-lift, 
+  Build-depends: file-location, yices-painless, syb, th-lift, 
          MemoTrie 
         ,TypeCompose
         ,GLFW-b
@@ -174,6 +184,7 @@ Library
         ,vector-space >= 0.8.0
         ,xml
         ,xml-monad
+        ,xmlgen
         ,zlib
 
   -- Buildable: False

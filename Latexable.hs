@@ -29,6 +29,7 @@ import MathUtil
 import QuadCoordinates
 import StandardCoordinates
 import Triangulation
+import Triangulation.InnerNormalArc
 import Triangulation.CanonOrdered
 import TriangulationCxtObject
 import ZeroDefaultMap
@@ -173,7 +174,7 @@ sim = "\\sim"
 
 instance Latexable Integer where toLatex = show
 instance Latexable Int where toLatex = show
-instance Latexable VertexIndexInTriangle where toLatex = show . fromEnum
+instance Latexable Index3 where toLatex = show . fromEnum
 
 
 -- latexIntegral :: Integral a => a -> Latex

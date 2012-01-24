@@ -19,6 +19,8 @@ module Tetrahedron.Vertex
     otherVertices,
     otherIVerticesInSameTet,
     vertexNu,
+    index4ToVertex,
+    vertexToIndex4,
 
     Link(..),
     Star(..),
@@ -55,9 +57,12 @@ import THUtil
 import TIndex
 import Test.QuickCheck
 import Util
+import Data.Ix
+import FileLocation
+import Data.Tuple.Index
 
 data Vertex = A | B | C | D
-    deriving(Eq,Ord,Enum,Bounded)
+    deriving(Eq,Ord,Enum,Bounded,Ix)
 
 type VertexView = Vertex
 
@@ -137,7 +142,7 @@ vertexTripleToString (u,v,w) = concatMap show [u,v,w]
 
 -- | A 'Vertex' with a tetrahedron index attached to it
 data IVertex = IVertex {-# UNPACK #-} !TIndex {- UNPACK -} !Vertex
-    deriving(Eq,Ord,Generic)
+    deriving(Eq,Ord,Generic,Ix)
 
 instance Binary IVertex where
     put = derivePut
@@ -146,6 +151,8 @@ instance Binary IVertex where
 instance HasTIndex IVertex Vertex where
     viewI (IVertex i x) = I i x
     (./) = IVertex
+
+mapTIndicesFromHasTIndex [t|IVertex|]
 
 instance Enum IVertex where
     toEnum (toEnum -> I i x) = (./) i x
@@ -219,3 +226,10 @@ otherIVerticesInSameTet = traverseI map3 otherVertices
 vertexNu :: Numbering Vertex
 vertexNu = finiteTypeNu
                     
+
+index4ToVertex :: Index4 -> Vertex
+index4ToVertex = tupleToFun4 allVertices'
+
+vertexToIndex4 :: Vertex -> Index4
+vertexToIndex4 = $(fromJst) . indexOf4 allVertices'
+

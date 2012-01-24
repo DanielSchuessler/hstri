@@ -76,6 +76,11 @@ deriving instance Binary (BitSet Vertex)
 newtype Edge = Edge (BitSet Vertex) 
     deriving(Eq,Ord,Binary) 
 
+edgeToBitSet :: Edge -> BitSet Vertex
+edgeToBitSet (Edge bs) = bs
+
+bitSetToEdge :: BitSet Vertex -> Edge
+bitSetToEdge = Edge
 
 instance Enum Edge where
     toEnum n = allEdges !! n
@@ -111,7 +116,20 @@ isVertexOfEdge :: Vertex -> Edge -> Bool
 isVertexOfEdge v (Edge x) = BitSet.member v x
 
 edgeVertices :: Edge -> (Pair Vertex)
-edgeVertices e = fromList2 ( filter4 (`isVertexOfEdge` e) allVertices' ) 
+edgeVertices e = 
+    --    fromList2 ( filter4 (`isVertexOfEdge` e) allVertices' ) 
+
+    case unBitSet (edgeToBitSet e) of
+        3 -> (A,B)
+        5 -> (A,C)
+        9 -> (A,D)
+        6 -> (B,C)
+        10 -> (B,D)
+        12 -> (C,D)
+        _ -> assert False undefined
+
+    -- table made with: 
+    -- concatMap (\x@(Edge w) -> show (unBitSet w) ++ " -> " ++ show (edgeVertices x) ++ "\n") allEdges
 
 edgeByVertices :: (Pair Vertex) -> Edge
 edgeByVertices (v0,v1) = assert (v0 /= v1) $ Edge (BitSet.insert v0 $ BitSet.singleton v1)
@@ -308,11 +326,6 @@ instance Link IVertex OIEdge IVertex where
     link = flip otherVertex
 
 
-edgeToBitSet :: Edge -> BitSet Vertex
-edgeToBitSet (Edge bs) = bs
-
-bitSetToEdge :: BitSet Vertex -> Edge
-bitSetToEdge = Edge
 
 instance Edges TIndex where
     type Eds TIndex = Sextuple IEdge
@@ -342,4 +355,6 @@ oEdgeNu = finiteTypeNu
 
 instance Lift IEdge where
     lift (viewI -> I x y) = [| x ./ y |] 
+
+mapTIndicesFromHasTIndex [t|IEdge|]
 

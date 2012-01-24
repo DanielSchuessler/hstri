@@ -3,6 +3,7 @@
 module Triangulation.Tests where
 
 import Triangulation
+import Triangulation.InnerNormalArc
 import Triangulation.CanonOrdered
 import TriangulationCxtObject
 import Triangulation.Random()
@@ -15,6 +16,8 @@ import QuickCheckUtil
 import Data.Proxy
 import Data.EdgeLabelledTree
 import HomogenousTuples
+import Triangulation.Transformations
+import Equivalence.Tests
 
 
 
@@ -138,10 +141,36 @@ prop_dfsVertexLink tr = forAllElements (vertices tr)
                         
                         ))
 
--- prop_tNormalArcsAroundVertex tr =
---     forAllElements (vertices tr) $ \v ->
---         setEq
---             (tNormalArcsAroundVertex v)
---             (filter 
+prop_normalizedGluings_noDupes :: Triangulation -> Property
+prop_normalizedGluings_noDupes = noDupes . tNormalizedGluings
+
+prop_deleteTwoTets :: Triangulation -> Property
+prop_deleteTwoTets tr =
+    let 
+        n = tNumberOfTetrahedra tr
+    in
+        n >= 2 ==>
+
+        forAll (choose (0,n-2)) (\i -> 
+            forAll (choose (i+1,n-1)) (\j ->
+
+                    (deleteTetSafe i <=< deleteTetSafe j) tr
+                    .=.
+                    (deleteTetSafe (j-1) <=< deleteTetSafe i) tr))
+
+                    
+prop_normalizeGluing :: Property
+prop_normalizeGluing = forAll gluingGen (isGluingNormalized . ngToGluing . normalizeGluing)
+
+prop_gluingMapVertex :: Gluing -> Property
+prop_gluingMapVertex gl =
+    glCod gl .=. oiTriangleByVertices us
+  where
+    us = map3 (gluingMap gl) (vertices (glDom gl))
+
+
+prop_gluingMapOITriangle :: OITriangle -> OITriangle -> Property
+prop_gluingMapOITriangle ot1 ot2 =
+    gluingMap (oiTriangleGluing ot1 ot2) ot1 .=. ot2
 
 

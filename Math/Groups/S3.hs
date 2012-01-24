@@ -83,7 +83,7 @@ s3ToFun g = case g of
         mkFun _ _ imC _ = imC
 
 s3FromFunMay ::  (Index3 -> Index3) -> Maybe S3
-s3FromFunMay f = case tupleFromFun f of
+s3FromFunMay f = case tupleFromFun3 f of
                  (I3_0,I3_1,I3_2) -> Just S3abc
                  (I3_0,I3_2,I3_1) -> Just S3acb
                  (I3_1,I3_0,I3_2) -> Just S3bac
@@ -159,7 +159,7 @@ instance Group S3 where
     inv g = s3the (\g' -> g' .*. g == S3abc)
 
 instance RightAction S3 (a,a,a) where
-    xs *. g = tupleFromFun . (. s3ToFun g) . tupleToFun $ xs 
+    xs *. g = tupleFromFun3 . (. s3ToFun g) . tupleToFun3 $ xs 
 
 
 

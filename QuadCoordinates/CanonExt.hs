@@ -1,13 +1,24 @@
-{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, ScopedTypeVariables #-}
 module QuadCoordinates.CanonExt where
 
-import QuadCoordinates.Class
-import StandardCoordinates
-import TriangulationCxtObject
+import Control.Exception
+import Control.Monad.State.Lazy
+import Data.EdgeLabelledTree
+import Data.Map(Map,unionsWith,singleton,elems,insertWith,(!))
+import HomogenousTuples
 import PrettyUtil
-import NormalSurface
+import QuadCoordinates.Class
+import StandardCoordinates.Class
+import StandardCoordinates.MatchingEquations
+import THUtil
+import TriangulationCxtObject
+import ZeroDefaultMap
+import qualified Data.Map as M
 
 
+canonExtDbg
+  :: (Ord r, Pretty (CanonExt a r), Pretty a, QuadCoords a r) =>
+     Triangulation -> a -> CanonExt a r
 canonExtDbg tr qc =
     case canonExt tr qc of
          sc ->
@@ -21,24 +32,33 @@ data CanonExt q r = CanonExt {
     canonExt_quads :: q,
     canonExt_tris :: ZeroDefaultMap INormalTri r
 }
+    deriving (Eq, Ord, Show)
 
-instance QuadCoords q e => QuadCoords (CanonExt q r) where
+instance (Pretty q, Pretty r, Num r, Ord r) => Pretty (CanonExt q r) where
+    prettyPrec prec x = parensIf (prec>10)
+        (prettyRecord "CanonExt"
+            [("quads",pretty (canonExt_quads x))
+            ,("tris",pretty (canonExt_tris x))])
+
+instance QuadCoords q r => QuadCoords (CanonExt q r) r where
     quadCount = quadCount . canonExt_quads
     quadAssocs = quadAssocs . canonExt_quads
 
-instance QuadCoords q e => NormalSurface (CanonExt q r) where
-    q
+instance (Num r, QuadCoords q r) => StandardCoords (CanonExt q r) r where
+    triCount = zdm_get . canonExt_tris 
+    triAssocs = zdm_toAssocs . canonExt_tris 
 
-canonExt tr qc = 
-        stc_fromMap (unionsWith 
+canonExt :: forall q r. (Pretty q, QuadCoords q r, Ord r) => 
+    Triangulation -> q -> CanonExt q r
+canonExt tr qc = CanonExt qc
+                    (zdm_fromMap 
+                     (unionsWith 
                         (\ _ _ -> assert False undefined) 
-                        (mapKeys iNormalDisc (quad_toMap qc)
-                         :
                          vertexLinkCoeffss))
                          
 
     where
-        vertexLinkCoeffss = fmap (mapKeys iNormalDisc . goVertex) (vertices tr)
+        vertexLinkCoeffss = map goVertex (vertices tr)
        
         goVertex :: TVertex -> Map INormalTri r  
         goVertex v =
@@ -67,9 +87,9 @@ canonExt tr qc =
                                     ++ $(showExps ['qc,'tri0,'arc0,'arc1,'tri1,'edges_])))
                         tri1
                         ( 
-                            quad_coefficient qc (iNormalQuadByNormalArc arc0)
+                            quadCount qc (iNormalQuadByNormalArc arc0)
                           + (sc ! tri0)
-                          - quad_coefficient qc (iNormalQuadByNormalArc arc1)
+                          - quadCount qc (iNormalQuadByNormalArc arc1)
                         )
                         sc)
 

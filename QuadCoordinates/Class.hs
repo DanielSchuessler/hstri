@@ -11,21 +11,16 @@ module QuadCoordinates.Class
     where
 
 import INormalDisc
-import qualified Data.Vector as V
 import Data.FormalOps
 import Control.Applicative
 import Control.Arrow
 import Data.Monoid
 
-class QuadCoords q r | q -> r where
+class Num r => QuadCoords q r | q -> r where
      quadCount :: q -> INormalQuad -> r
                                          
      -- | May (but need not) omit zero coefficients. May contain repeated quads.
      quadAssocs :: q -> [(INormalQuad,r)]
-
-instance Num r => QuadCoords (V.Vector r) r where
-    quadCount v i = v V.! fromEnum i
-    quadAssocs = filter ((/= 0) . snd) . zip [toEnum 0 ..] . V.toList
 
 instance QuadCoords INormalQuad Integer where
     quadCount q q' = if q==q' then 1 else 0

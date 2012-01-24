@@ -55,7 +55,7 @@ inducedOrient21 :: SimplexOrientation Triangle -> Triangle -> Edge -> SimplexOri
 inducedOrient21 o t e = castSimplexOrientation $
     case triangleGetIndexOf t (link e t) of
         Nothing -> error ("inducedOrient21 "++ $(showExps ['t,'e])) 
-        Just VT1 -> o *. Flip
+        Just I3_1 -> o *. Flip
         _ -> o
 
 inducedOrient10 :: SimplexOrientation Edge -> Edge -> Vertex -> SimplexOrientation Vertex

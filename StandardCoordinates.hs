@@ -2,7 +2,7 @@
 {-# OPTIONS -Wall #-}
 module StandardCoordinates(
     module Data.VectorSpace,
-    module NormalSurface,
+    module StandardCoordinates.Class,
     StandardCoordinates,
     stc_toMap,
     stc_fromMap,
@@ -10,8 +10,6 @@ module StandardCoordinates(
     stc_toAssocs,
     stc_fromAssocs,
     ToStandardCoordinates(..),
-    vertexLinkingSurface,
-    vertexLinkEulerC,
     -- * Properties
     stc_coefficient,
     stc_coefficientIsZero,
@@ -23,7 +21,9 @@ module StandardCoordinates(
 
     -- * Matching equations
     MatchingEquationReason(..),
+    matchingEquations,
     matchingEquationsWithReasons,
+    explainMatchingEquations,
 
     -- * Vertex solutions
     getVertexSolutions,
@@ -36,8 +36,6 @@ module StandardCoordinates(
     mkEdgeSolution,
     krBasis,
 
-    -- * Testing
-    qc_StandardCoordinates
 
 
     ) where
@@ -56,21 +54,20 @@ import HomogenousTuples
 import INormalDisc
 import IndexedSimplices
 import MathUtil
-import NormalSurface
 import PolymakeInterface
 import Prelude hiding(lookup)
 import PrettyUtil
-import QuickCheckUtil
 import Quote
 import Test.QuickCheck
-import Test.QuickCheck.All
 import Triangulation
 import TriangulationCxtObject
 import ZeroDefaultMap
-import qualified Data.Foldable as Fold
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.SumType
+import StandardCoordinates.Class
+import StandardCoordinates.MatchingEquations
+import QuadCoordinates.Class
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
@@ -120,13 +117,10 @@ mkNormalTri :: (Num r) => IVertex -> StandardCoordinates r
 mkNormalTri = standardCoordinates . iNormalTri
 
 
-mkNormalQuadByDisjointEdge :: (Num r) => TIndex -> Abstract.Edge -> StandardCoordinates r
-mkNormalQuadByDisjointEdge ti e = standardCoordinates (ti ./ normalQuadByDisjointEdge e)
 
 mkNormalQuadByVertexAndTTriangle :: (Num r) => Vertex -> ITriangle -> StandardCoordinates r
-mkNormalQuadByVertexAndTTriangle v (viewI -> I i f) = 
-    mkNormalQuadByDisjointEdge i (edgeByOppositeVertexAndTriangle v f)
-
+mkNormalQuadByVertexAndTTriangle v t =
+    standardCoordinates (iNormalQuadByVertexAndITriangle v t)
 
 mkTetrahedralSolution :: (Num r) => TIndex -> StandardCoordinates r
 mkTetrahedralSolution ti = 
@@ -152,7 +146,12 @@ stc_coefficient
   :: (Num r, MakeINormalDisc a) => StandardCoordinates r -> a -> r
 stc_coefficient (SC sc) = zdm_get sc . iNormalDisc
 
-instance Num i => NormalSurface (StandardCoordinates i) i where
+
+instance Num i => QuadCoords (StandardCoordinates i) i where
+    quadCount = defaultQuadCount
+    quadAssocs = defaultQuadAssocs
+
+instance Num i => StandardCoords (StandardCoordinates i) i where
     discCount = stc_coefficient
     nsToAssocs = stc_toAssocs
 
@@ -167,74 +166,13 @@ stc_coefficientIsZero (SC sc) = zdm_isZero sc . iNormalDisc
 
 -- type StandardCoordinateFunctional tindex r = StandardCoordinates tindex r -> r
 
--- | Identified through the standard inner product
-type StandardCoordinateFunctional r = StandardCoordinates r 
-
-matchingEquations ::  Num r => Triangulation -> [StandardCoordinateFunctional r]
-matchingEquations = liftM (fmap matchingEquationReasonToVector) matchingEquationReasons
-
-data MatchingEquationReason = MatchingEquationReason ITriangle OITriangle Vertex Vertex
-
-instance Show MatchingEquationReason where
-    show (MatchingEquationReason x x' v v')
-        = unwords [ "Gluing", show x, "to", show x', 
-                    "identifies the normal arcs",
-                    show (iNormalArc (x, v)),
-                    "and",
-                    show (iNormalArc (x', v'))
-                  ]
-                            
-matchingEquationReasons
-  :: Triangulation -> [MatchingEquationReason]
-matchingEquationReasons t =
-      [
-         MatchingEquationReason x x' (forgetTIndex v) (forgetTIndex v')
-               
-        |
-            (x,x') <- tOriginalGluings t,
-            (v,v') <- zip (vertexList x) (vertexList x')
-
-            ]
-
-matchingEquationReasonToVector
-  :: Num r => MatchingEquationReason -> StandardCoordinateFunctional r
-matchingEquationReasonToVector (MatchingEquationReason x x' v v') =
-                              (mkNormalTri (getTIndex x ./ v)
-                          ^+^ mkNormalQuadByVertexAndTTriangle v x)
-                          ^-^ mkNormalTri (getTIndex x' ./ v')
-                          ^-^ mkNormalQuadByVertexAndTTriangle v' (forgetVertexOrder x')
-
-matchingEquationsWithReasons :: Num r => Triangulation -> 
-    [(StandardCoordinates r, MatchingEquationReason)]
-matchingEquationsWithReasons =
-    fmap (matchingEquationReasonToVector &&& id) . matchingEquationReasons
-    
-
-
-explainMatchingEquations ::  Triangulation -> IO ()
-explainMatchingEquations t = putStrLn $
-    unlines (concatMap (\(x,y) -> [show (x :: StandardCoordinateFunctional Double), 
-                                   "\t"++show y]) 
-                       (matchingEquationsWithReasons t)) 
-
-
-
--- | Test that each element of krBasis satisfies the matching equations
-prop_krBasisMatchingEquations ::  Triangulation -> Gen Prop
-prop_krBasisMatchingEquations t =
-        (let
-            krB = krBasis t :: [StandardCoordinates Int]
-            mE = matchingEquations t
-         in
-            conjoin' [ (x <.> y) == 0 
-                        | x <- krB
-                        , y <- mE ])
 
 
 
 
-qc_StandardCoordinates ::  IO Bool
-qc_StandardCoordinates = $(quickCheckAll)
+
+
+
 
 
 getVertexSolutions :: forall s. PmScalar s => Triangulation -> IO [[s]]
@@ -277,7 +215,7 @@ getFundamentalEdgeSurfaces
   :: Triangulation -> IO [StandardCoordinates Integer]
 getFundamentalEdgeSurfaces tr =
     fmap 
-        (L.filter (isRight . satisfiesQuadrilateralConstraints (tTetrahedra_ tr)) 
+        (L.filter (isRight . satisfiesQuadrilateralConstraints tr) 
             . fmap toFundamentalEdgeSurface)
         (getVertexSolutions' tr :: IO [ StandardCoordinates Rational ])
 
@@ -323,37 +261,6 @@ instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
 
                                           
 
-admissible
-  :: (Num r, Ord r) => Triangulation -> StandardCoordinates r -> Either String ()
-admissible tr stc@(SC m) = do
-    Fold.mapM_ (\r -> unless (r >= 0) (Left ("Negative coefficient"))) m
-    satisfiesQuadrilateralConstraints (tTetrahedra_ tr) stc 
-    satisfiesMatchingEquations tr stc
-
-satisfiesMatchingEquations
-  :: Num r =>
-     Triangulation -> StandardCoordinates r -> Either [Char] ()
-satisfiesMatchingEquations tr stc =
-        mapM_ p (matchingEquationReasons tr)
-    where
-        p me = unless (r==0)
-                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
-            where
-                r = matchingEquationReasonToVector me <.> stc
-
-satisfiesQuadrilateralConstraints
-  :: (Num r, Ord r) =>
-     [TIndex] -> StandardCoordinates r -> Either String ()
-satisfiesQuadrilateralConstraints tets stc = 
-        mapM_ p tets
-    where
-        p tet = 
-            unless (sum3 (map3 f (normalQuads tet)) <= (1::Int))
-                   (Left ("Quadrilateral constraints violated at tet "++show tet))
-
-        f quad = if stc_coefficient stc (iNormalDisc quad) == 0 
-                    then 0
-                    else 1
 
 
 
@@ -368,15 +275,35 @@ instance ToStandardCoordinates a => ToStandardCoordinates [a] where
     standardCoordinates xs = sumV (fmap standardCoordinates xs)
 
 
-vertexLinkingSurface :: TVertex -> StandardCoordinates Integer
-vertexLinkingSurface = standardCoordinates . vertexLinkingSurfaceTris
-
-vertexLinkEulerC :: TVertex -> Rational
-vertexLinkEulerC v = eulerCRatio (getTriangulation v) . vertexLinkingSurface $ v 
 
 stc_set
   :: (Num r, MakeINormalDisc a) =>
      a -> r -> StandardCoordinates r -> StandardCoordinates r
 stc_set d r (SC m) = SC (zdm_set (iNormalDisc d) r m)
+
+-- | Identified through the standard inner product
+type StandardCoordinateFunctional r = StandardCoordinates r 
+
+matchingEquationReasonToVector
+  :: Num r => MatchingEquationReason -> StandardCoordinateFunctional r
+matchingEquationReasonToVector (MatchingEquationReason x x' v v') =
+                              (mkNormalTri (getTIndex x ./ v)
+                          ^+^ mkNormalQuadByVertexAndTTriangle v x)
+                          ^-^ mkNormalTri (getTIndex x' ./ v')
+                          ^-^ mkNormalQuadByVertexAndTTriangle v' (forgetVertexOrder x')
+
+matchingEquations ::  Num r => Triangulation -> [StandardCoordinateFunctional r]
+matchingEquations = liftM (fmap matchingEquationReasonToVector) matchingEquationReasons
+
+matchingEquationsWithReasons :: Num r => Triangulation -> 
+    [(StandardCoordinates r, MatchingEquationReason)]
+matchingEquationsWithReasons =
+    fmap (matchingEquationReasonToVector &&& id) . matchingEquationReasons
+
+explainMatchingEquations ::  Triangulation -> IO ()
+explainMatchingEquations t = putStrLn $
+    unlines (concatMap (\(x,y) -> [show (x :: StandardCoordinateFunctional Double), 
+                                   "\t"++show y]) 
+                       (matchingEquationsWithReasons t)) 
 
 

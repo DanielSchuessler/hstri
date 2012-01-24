@@ -12,6 +12,7 @@ module Triangulation.Random
     where
 
 import ClosedOrCensus6
+import ClosedNorCensus8
 import Collections(elemOfSetAt,deleteAt)
 import Control.Applicative
 import Control.Monad.State
@@ -25,21 +26,32 @@ import Util
 import qualified Data.List as L
 import qualified Data.Set as S
 import Data.SumType
+import Data.Maybe
     
 
 arbitraryTriangulation :: Gen Triangulation
 arbitraryTriangulation =
-        frequency 
-            [(1,
-                sized (\n -> do
-                    nTets <- choose (1::Int,max 1 (n`div`5))
-                    nGluings <- choose (0,2*nTets)
-                    randT nTets nGluings
-                    ))
-            ,(1,
-                snd <$> elements closedOrCensus6)
-             
-            ]
+    sized (\n ->
+        let
+            small = (< n) . tNumberOfTetrahedra
+        in
+            frequency $ 
+                (2,
+                    do
+                        nTets <- choose (1::Int,max 1 (n`div`5))
+                        nGluings <- choose (0,2*nTets)
+                        randT nTets nGluings)
+
+                : mapMaybe 
+                    (\(w,census) ->
+                        case filter small . map snd $ census of
+                             [] -> Nothing
+                             ts -> Just (w, elements ts))
+
+                    [(2, closedOrCensus6)
+                    ,(1, closedNorCensus8)]
+                
+                )
 
 
 

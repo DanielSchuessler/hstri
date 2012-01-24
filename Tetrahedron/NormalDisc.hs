@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables, GADTs, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
 {-# LANGUAGE Rank2Types #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
@@ -46,8 +46,6 @@ module Tetrahedron.NormalDisc(
 
 
 
-        -- * Testing
-        qc_NormalDisc
 
 
 
@@ -57,7 +55,6 @@ import AbstractTetrahedron
 import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Monad
-import Data.List(sort)
 import Data.Maybe
 import Data.SumType
 import Element
@@ -66,13 +63,16 @@ import Language.Haskell.TH.Syntax
 import Tetrahedron.NormalArc
 import Prelude hiding(catch,lookup)
 import PrettyUtil
-import QuickCheckUtil
 import Quote
 import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import TupleTH
 import Util
+import Data.Ix
+
+type instance L NormalDisc = NormalTri
+type instance R NormalDisc = NormalQuad
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
     deriving(Eq,Ord,Arbitrary,SubSumTy,SuperSumTy)
@@ -87,7 +87,7 @@ class MakeNormalDisc a where
     normalDisc :: a -> NormalDisc
     
 
-newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary,Finite)
+newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary,Finite,Ix)
 
 instance Show NormalTri where
     showsPrec = prettyShowsPrec 
@@ -108,7 +108,7 @@ data NormalQuad =
     -- | The quad disjoint from the edges 'eAD' and 'eBC'.                  
     Q_ad 
     
-    deriving(Enum,Bounded,Eq,Ord,Show)
+    deriving(Enum,Bounded,Eq,Ord,Show,Ix)
 
 
 --     show q = "{Normal quad separating "++show v0++","++show v1++" from "++show v2++","++show v3++"}"
@@ -176,24 +176,6 @@ normalQuadGetIntersectedEdges q =
             go vs = $(zipTupleWith 4) (curry edge) (rotate4_1 vs) vs
 
 
-prop_normalQuadGetIntersectedEdges ::  NormalQuad -> Bool
-prop_normalQuadGetIntersectedEdges nqt = 
-    sort allEdges == sort (toList4 (normalQuadGetIntersectedEdges nqt) 
-        ++ asList (normalQuadGetDisjointEdges nqt))
-
-
-
-
-
-
-
-prop_NormalDisc_NormalArcs_correct :: NormalDisc -> Bool
-prop_NormalDisc_NormalArcs_correct ndt = all (`isSubface` ndt) (normalArcs ndt) 
-
-prop_NormalDisc_NormalArcs_complete :: NormalArc -> NormalDisc -> Property
-prop_NormalDisc_NormalArcs_complete nat ndt = 
-    isSubface nat ndt ==> 
-        any (==nat) (normalArcs ndt) 
 
 
 -- | Constructs a normal quad specified by one of the two edges disjoint from it
@@ -234,7 +216,7 @@ instance Quote NormalTri where quote nt = "nt" ++ show (normalTriGetVertex nt)
 instance Quote NormalQuad where quote = show
 
 
--- | Constructs a normal quad by indirectly specifying one of the two edges disjoint from it using 'edgeByOppositeVertexAndTriangle' 
+-- | The normal quad type having a normal arc of type 'normalArcByTriangleAndVertex'
 normalQuadByVertexAndTriangle :: Vertex -> Triangle -> NormalQuad
 normalQuadByVertexAndTriangle v f = normalQuadByDisjointEdge (edgeByOppositeVertexAndTriangle v f) 
 
@@ -243,8 +225,6 @@ normalQuadByVertexAndTriangle v f = normalQuadByDisjointEdge (edgeByOppositeVert
 normalQuadByNormalArc :: NormalArc -> NormalQuad
 normalQuadByNormalArc na = normalQuadByVertexAndTriangle (normalArcGetVertex na) (normalArcGetTriangle na)
 
-prop_normalQuadByNormalArc :: NormalArc -> Bool
-prop_normalQuadByNormalArc na = isSubface na (normalQuadByNormalArc na) 
 
 
 instance NormalArcs NormalTri (Triple NormalArc) where
@@ -339,8 +319,6 @@ instance NormalCorners NormalQuad (Quadruple NormalCorner) where
 normalTriByNormalArc :: NormalArc -> NormalTri
 normalTriByNormalArc = normalTri . normalArcGetVertex
 
-prop_normalTriByNormalArc :: NormalArc -> Bool
-prop_normalTriByNormalArc na = isSubface na (normalTriByNormalArc na) 
 
 normalTrisContainingNormalCorner :: NormalCorner -> Pair NormalTri
 normalTrisContainingNormalCorner = map2 normalTri . vertices . normalCornerGetContainingEdge
@@ -397,19 +375,6 @@ instance Link NormalCorner NormalQuad (Pair NormalCorner) where
 instance Link NormalCorner NormalDisc (Pair NormalCorner) where
     link nc = eitherND (link nc) (link nc) 
 
-prop_link_nc_nq :: NormalCorner -> NormalQuad -> Property
-prop_link_nc_nq nc nq =
-    isSubface nc nq ==>
-        let
-            (nc0,nc1) = link nc nq 
-        in
-            conjoin' [
-                isSubface nc0 nq,
-                isSubface nc1 nq,
-                nc0 /= nc,
-                nc1 /= nc,
-                nc0 /= nc1
-            ]
 
 
 
@@ -457,3 +422,27 @@ getShape1 = const isDiscShapeProof
 
 eitherND' :: (forall a. IsDiscShape a => a -> r) -> NormalDisc -> r
 eitherND' k = eitherND k k
+
+
+instance Ix NormalDisc where
+    range (x,y) =
+        either'
+            (\xt ->
+                either'
+                    (\yt -> map left' (range (xt, yt)))
+                    (\yq -> map left'  (range (xt, maxBound)) ++ 
+                            map right' (range (minBound, yq))) 
+                    y)
+
+            (\xq ->
+                either' 
+                    (const [])
+                    (\yq -> map right' (range (xq, yq)))
+                    y)
+            x
+            
+    index (x,_) z = fromEnum z - fromEnum x 
+    inRange (x,y) z = x <= z && z <= y
+    rangeSize (x,y) = max 0 (fromEnum y - fromEnum x + 1)
+
+

@@ -53,3 +53,5 @@ instance ShortShow S3 where shortShow = show
 instance ShortShow Int where shortShow = show
 instance ShortShow Word where shortShow = show
 instance ShortShow Integer where shortShow = show
+
+instance ShortShow Bool where shortShow b = [if b then 'T' else 'F'] 

@@ -2,39 +2,40 @@
 {-# OPTIONS -Wall #-}
 module QuadCoordinates where
 
-import AbstractNeighborhood
 import AbstractTetrahedron
 import Control.Applicative
 import Control.Arrow((&&&))
-import Control.Exception
 import Control.Monad.State
-import Data.EdgeLabelledTree
 import Data.Foldable(Foldable)
 import Data.Function
 import Data.Map as M hiding(mapMaybe)
 import Data.Maybe as May
-import HomogenousTuples
 import INormalDisc
 import PrettyUtil
-import QuickCheckUtil
-import StandardCoordinates
-import THUtil
+import StandardCoordinates.Class
+import QuadCoordinates.Class
 import Test.QuickCheck
-import Test.QuickCheck.All
 import TriangulationCxtObject
 import ZeroDefaultMap
-import qualified Data.Foldable as Fold
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
-import Data.SumType
+import Data.VectorSpace
+import Data.List as L
+import QuadCoordinates.MatchingEquations
 
 newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
     deriving(AdditiveGroup,InnerSpace,Eq)
 
+instance (Num r) => QuadCoords (QuadCoordinates r) r where
+    quadCount = quad_coefficient
+    quadAssocs = quad_toAssocs
+
 quad_toMap :: QuadCoordinates r -> Map INormalQuad r
-quad_toMap = zdm_toMap . quad_toZDM 
+quad_toMap = illdefinedZdmToMap . quad_toZDM 
+
 quad_fromMap :: Num r => Map INormalQuad r -> QuadCoordinates r
 quad_fromMap = QC . zdm_fromMap 
+
 quad_fromAssocs
   :: (Functor f, Num r, Foldable f) =>
      f (INormalQuad, r) -> QuadCoordinates r
@@ -47,16 +48,13 @@ instance Num r => VectorSpace (QuadCoordinates r) where
 quad_coefficient :: Num r => QuadCoordinates r -> INormalQuad -> r
 quad_coefficient = zdm_get . quad_toZDM
 
-standardToQuad :: (Num r) => StandardCoordinates r -> QuadCoordinates r
+
+standardToQuad :: StandardCoords a r => a -> QuadCoordinates r
 standardToQuad = 
       quad_fromAssocs
     . May.mapMaybe (\(d,r) -> eitherIND (const Nothing) (\q -> Just (q,r)) d) 
-    . stc_toAssocs
+    . nsToAssocs
 
-prop_standardToQuad_VertexLinkingSurface :: Triangulation -> Property
-prop_standardToQuad_VertexLinkingSurface (tr :: Triangulation) = 
-    forAll (elements (vertices tr)) 
-        (\v -> standardToQuad (vertexLinkingSurface v) == zeroV)
 
 
 
@@ -72,30 +70,9 @@ prop_standardToQuad_VertexLinkingSurface (tr :: Triangulation) =
         
 qMatchingEquation
   :: Num r => TEdge -> Maybe (QuadCoordinates r)
-qMatchingEquation = fmap (quad_fromAssocs . concatMap (toList2 . snd)) . qMatchingEquation0
+qMatchingEquation = fmap (quad_fromAssocs . 
+    concatMap (\(_,(u,d)) -> [(u,1),(d,-1)])) . qMatchingEquation0
 
-
-qMatchingEquation0
-  :: (Num r) =>
-     TEdge
-     -> Maybe
-          [(IEdgeNeighborhoodTet, ((INormalQuad, r), (INormalQuad, r)))]
-qMatchingEquation0 te = do
-    triPairs <- innerEdgeNeighborhood te
-    (return . fmap f ) triPairs
-        
-  where
-    f = id &&&
-        (\(viewI -> I i ent ) ->
-            let 
-                a = ent_top ent
-                b = ent_bot ent
-                c = ent_left ent
-                q = curry ((i./) . normalQuadByDisjointEdge . edge)
-            in
-                (   ( q a c, 1 ) 
-                ,   ( q b c, -1 ) 
-                ))
 
         
 type QuadCoordinateFunctional = QuadCoordinates
@@ -109,11 +86,6 @@ qMatchingEquationsInteger = qMatchingEquations
 qMatchingEquationsRat :: Triangulation -> [QuadCoordinateFunctional Rational]
 qMatchingEquationsRat = qMatchingEquations
 
-qMatchingEquations0
-  :: (Num r) =>
-     Triangulation
-     -> [[(IEdgeNeighborhoodTet, ((INormalQuad, r), (INormalQuad, r)))]]
-qMatchingEquations0 = mapMaybe qMatchingEquation0 . edges
 
 quad_toAssocs :: QuadCoordinates r -> [(INormalQuad, r)]
 quad_toAssocs = M.assocs . quad_toMap
@@ -151,11 +123,6 @@ unrestrictedQCGen
   :: (Num r, Arbitrary r) => Triangulation -> Gen (QuadCoordinates r)
 unrestrictedQCGen tr = QC <$> zdm_gen (tINormalQuads tr) 
 
-prop_toFromDenseList :: Triangulation -> Property
-prop_toFromDenseList tr =
-        forAll (unrestrictedQCGen tr) 
-            (\(qc :: QuadCoordinates Int) -> 
-                quad_fromDenseList tr (quad_toDenseList tr qc) .=. qc)
 
 qMatchingEquationsMatrix
   :: Num a =>
@@ -187,50 +154,11 @@ quad_toNonzeroAssocs
   :: Num b => QuadCoordinates b -> [(INormalQuad, b)]
 quad_toNonzeroAssocs = zdm_toNonzeroAssocs . quad_toZDM
 
-quad_admissible
-  :: (Num r, Ord r, Pretty r) => Triangulation -> QuadCoordinates r -> Either String ()
-quad_admissible tr qc@(QC m) = do
-    Fold.mapM_ (\r -> unless (r >= 0) (Left ("Negative coefficient"))) m
-    quad_satisfiesQuadrilateralConstraints (tTetrahedra_ tr) qc 
-    satisfiesQMatchingEquations tr qc
-
-satisfiesQMatchingEquations
-  :: (Pretty r, Num r) =>
-     Triangulation -> QuadCoordinates r -> Either [Char] ()
-satisfiesQMatchingEquations tr qc =
-        mapM_ p (qMatchingEquations tr)
-    where
-        p me = unless (r==0)
-                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
-            where
-                r = me <.> qc
-
-prop_satisfiesQMatchingEquationsControl
-  :: Triangulation -> Property
-prop_satisfiesQMatchingEquationsControl tr =
-    expectFailure (forAll (unrestrictedQCGen tr
-        :: Gen (QuadCoordinates Integer)) (isRight . satisfiesQMatchingEquations tr))
-
-quad_satisfiesQuadrilateralConstraints
-  :: (Num r, Ord r) =>
-     [TIndex] -> QuadCoordinates r -> Either String ()
-quad_satisfiesQuadrilateralConstraints tets qc = 
-        mapM_ p tets
-    where
-        p tet = 
-            unless (sum3 (map3 f (normalQuads tet)) <= (1::Int))
-                   (Left ("Quadrilateral constraints violated at tet "++show tet))
-
-        f quad = if quad_coefficient qc quad == 0 
-                    then 0
-                    else 1
 
 
-qc_QuadCoordinates :: IO Bool
-qc_QuadCoordinates = $(quickCheckAll)
 
 quad_fromNormalSurface
-  :: (Num r, NormalSurface s r) => s -> QuadCoordinates r
+  :: (Num r, StandardCoords s r) => s -> QuadCoordinates r
 quad_fromNormalSurface = quad_fromAssocs . mapMaybe f . nsToAssocs 
     where
         f (d,r) = eitherIND (const Nothing) (Just . (,r)) d

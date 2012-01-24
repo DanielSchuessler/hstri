@@ -22,6 +22,7 @@ import StandardCoordinates
 import PrettyUtil
 import TriangulationCxtObject
 import Util
+import QuadCoordinates.Class
 
 -- | Quads are numbered away from their 'firstDisjointEdge'
 firstDisjointEdge :: NormalQuad -> Edge
@@ -51,7 +52,7 @@ discPosToCornerPos_helper
   :: (Integral i,
       HasTIndex ia a,
       MakeNormalDisc a,
-      NormalSurface s i) =>
+      StandardCoords s i) =>
      (s -> Concrete ia -> NormalArc -> ArcPosition)
      -> s -> Concrete ia -> NormalCorner -> Bool -> CornerPosition
 discPosToCornerPos_helper cns_x_arcPos nc x corner takeFst =
@@ -73,14 +74,14 @@ discPosToCornerPos_helper cns_x_arcPos nc x corner takeFst =
          
 
 posOfCornerOfTri
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalTri -> NormalCorner -> CornerPosition
 posOfCornerOfTri nc x c = assert (r1==r2) $ r1
   where
     (r1,r2) = map2 (discPosToCornerPos_helper triPosToArcPos nc x c) (True,False)
 
 posOfCornerOfQuad
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalQuad -> NormalCorner -> CornerPosition
 posOfCornerOfQuad nc x c = 
   let
@@ -93,7 +94,7 @@ posOfCornerOfQuad nc x c =
 
 
 posOfCornerOfArc
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalArc -> NormalCorner -> Int
 posOfCornerOfArc nc (Concrete arcPos arc) corner =
                 let
@@ -114,12 +115,12 @@ posOfCornerOfArc nc (Concrete arcPos arc) corner =
 
 
 triPosToArcPos
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalTri -> NormalArc -> ArcPosition
 triPosToArcPos _ (Concrete u _) _ = u
 
 quadPosToArcPos
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalQuad -> NormalArc -> ArcPosition
 quadPosToArcPos nc (Concrete u quad) arc =
   let
@@ -140,7 +141,7 @@ quadPosToArcPos nc (Concrete u quad) arc =
 
 
 concreteTris
-  :: (Integral a, NormalSurface s a) =>
+  :: (Integral a, StandardCoords s a) =>
      Triangulation -> s -> [Concrete INormalTri]
 concreteTris tr ns = do
             tri <- tINormalTris tr
@@ -149,8 +150,8 @@ concreteTris tr ns = do
             return (Concrete u tri)
 
 concreteQuads
-  :: (Integral a, NormalSurface s a) =>
-     Triangulation -> s -> [Concrete INormalQuad]
+  :: (Integral a, QuadCoords q a) =>
+     Triangulation -> q -> [Concrete INormalQuad]
 concreteQuads tr ns = do
             quad <- tINormalQuads tr
             u <- [ 0 .. fi (quadCount ns quad-1) ]
@@ -159,7 +160,7 @@ concreteQuads tr ns = do
                     
 
 cns_arcsOfTri
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalTri -> Triple (Concrete INormalArc)
 cns_arcsOfTri nc cnt =
             map3 
@@ -173,7 +174,7 @@ cns_arcsOfTri nc cnt =
 
 
 cns_arcsOfQuad
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalQuad -> Quadruple (Concrete INormalArc)
 cns_arcsOfQuad nc cnq =
                     map4 
@@ -182,7 +183,7 @@ cns_arcsOfQuad nc cnq =
 
 
 cns_cornersOfArc
-  :: (Integral i, NormalSurface s i) =>
+  :: (Integral i, StandardCoords s i) =>
      s -> Concrete INormalArc -> Pair (Concrete INormalCorner)
 cns_cornersOfArc nc cna =
                 map2 

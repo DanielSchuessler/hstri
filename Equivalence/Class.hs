@@ -79,23 +79,23 @@ polyprop_Equivalence er dom =
                 cls_x = eqvClassOf er x
             in
                 conjoin' [
-                      label "Check class" $ polyprop_EquivalenceClass cls_x
+                      printTestCase "Check class" $ polyprop_EquivalenceClass cls_x
                     , 
                       forAllElements (asList cls_x) 
                         (\x' -> 
-                            label "Class of elements of class" $ 
+                            printTestCase "Class of elements of class" $ 
                             clsEql cls_x (eqvClassOf er x'))
-                    , label "Reflexivity" (eqv x x)
-                    , forAll dom (\y -> label "Symmetry" $ eqv x y .=. eqv y x)
-                    , forAll2 dom dom (\y z -> label "Transitivity" $ 
+                    , printTestCase "Reflexivity" (eqv x x)
+                    , forAll dom (\y -> printTestCase "Symmetry" $ eqv x y .=. eqv y x)
+                    , forAll2 dom dom (\y z -> printTestCase "Transitivity" $ 
                         if eqv x y && eqv y z 
                            then eqv x z 
                            else True)
 
                     , forAll dom (\y -> 
-                        label "Consistency of eqvEquivalent,canonicalRep,eqvClassOf" $ 
+                        printTestCase "Consistency of eqvEquivalent,canonicalRep,eqvClassOf" $ 
                         let e = eqvEquivalent er x y
-                        in classify e "eqvEquivalent er x y" $
+                        in 
                             e .=. (eqvRep er x == eqvRep er y))
                     ])
 

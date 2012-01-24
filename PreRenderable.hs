@@ -1,7 +1,7 @@
-{-# LANGUAGE ViewPatterns, RecordWildCards, TemplateHaskell, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
+{-# LANGUAGE NoMonomorphismRestriction, ViewPatterns, RecordWildCards, TemplateHaskell, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall -fno-warn-missing-signatures #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-orphans #-}
 module PreRenderable(
     -- * Reex
     module Math.Groups.S3,
@@ -28,21 +28,32 @@ module PreRenderable(
     pr_popDimension,
     pr_faceName,
     pr_setVisibility,
+    pr_setEdVisibility,
+    pr_setTriVisibility,
+    pr_hide,
+    pr_hideEds,
+    pr_hideTris,
     pr_triangleLabel,
     pr_setTriangleEmbedding,
     pr_mbGeneralTriangleEmbedding,
     pr_coords,
     pr_edgeEmbedding,
     pr_triangleEmbedding,
-    pr_visibility
+    pr_visibility,
+    pr_vertVisibility,
+    pr_edVisibility,
+    pr_triVisibility,
+    pr_quad
 
     ) where
 
 import Control.Arrow
 import Control.Exception(assert)
 import Control.Monad
+import Data.AscTuples
 import Data.String
 import Data.Vect.Double.Base hiding((*.),(.*),(.*.))
+import Data.Vect.Double.Interpolate
 import DisjointUnion
 import GHC.Generics
 import Language.Haskell.TH.Lift
@@ -62,7 +73,7 @@ class Coords t where
     transformCoords :: (Vec3 -> Vec3) -> t -> t
 
 data Visibility = Visible | Invisible
-    deriving Show
+    deriving (Eq,Ord,Show)
 
 instance Pretty Visibility where prettyPrec = prettyPrecFromShow
 
@@ -77,10 +88,48 @@ data PreRenderable s = PreRenderable {
     -- | Overriden ('pr_coords') by the GeneralTriangleEmbedding in pr_triangleInfo, if it exists for at least one triangle containing the vertex
     pr_coords0 :: Vert s -> Vec3,
     pr_faceInfo :: AnySimplex2Of s -> (Visibility,FaceName), 
-    pr_triangleInfo :: Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleEmbedding)
+    pr_triangleInfo :: Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleEmbedding),
+    pr_edgeInfo :: Ed s -> Maybe GeneralEdgeEmbedding
 }
     deriving(Generic)
 
+pr_quad
+  :: Resolution -> (UnitSquare -> Vec3) -> PreRenderable (SC2 (Bool, Bool))
+pr_quad reso f = 
+    PreRenderable {
+        pr_ds = ds,
+        pr_coords0 = const (assert False undefined),
+        pr_faceInfo = \asi -> ( if asi == edToAnySimplex2 _diag then Invisible else Visible
+                              , mkFaceName $ shortShow asi),
+
+        pr_triangleInfo = 
+            \t -> 
+                (Nothing,
+                 
+                    let pretransform =
+                            if elemAsc3 ff t 
+                                then id
+                                else \(Vec2 u v) -> Vec2 (u+v) (1-v)
+
+                    in (Just . GTE reso) (f . pretransform)
+                    )
+
+            
+            
+                ,
+
+        pr_edgeInfo = const (assert False undefined)
+
+    }
+
+  where
+    ff = (False,False)
+    ft = (False,True)
+    tf = (True,False)
+    tt = (True,True)
+
+    ds = fromTris [(ff,ft,tf),(ft,tf,tt)] 
+    _diag = asc2 (ft,tf)
 
 
 pr_mbGeneralTriangleEmbedding
@@ -122,7 +171,8 @@ mkPreRenderableWithTriangleLabels triangleLabels pr_coords_ pr_ds_ =
         pr_ds = pr_ds_,
         pr_coords0 = pr_coords_, 
         pr_triangleInfo = triangleLabels &&& const Nothing,
-        pr_faceInfo = const Visible &&& (mkFaceName . foldAnySimplex2 shortShow shortShow shortShow)
+        pr_faceInfo = const Visible &&& (mkFaceName . shortShow),
+        pr_edgeInfo = const Nothing
     }
 
 instance OneSkeletonable s => OneSkeletonable (PreRenderable s) where
@@ -141,7 +191,7 @@ pr_mapDs
       Ed t ~ Ed s,
       Tri t ~ Tri s) =>
      (t -> s) -> PreRenderable t -> PreRenderable s
-pr_mapDs f (PreRenderable a b c d) = PreRenderable (f a) b c d
+pr_mapDs f (PreRenderable a b c d e) = PreRenderable (f a) b c d e
 
 pr_popDimension :: PreRenderable (SC3 v) -> PreRenderable (SC2 v)
 pr_popDimension = pr_mapDs sccons_skeleton
@@ -154,6 +204,31 @@ pr_setVisibility
      -> PreRenderable s -> PreRenderable s
 pr_setVisibility f pr = pr { pr_faceInfo = f &&& pr_faceName pr } 
 
+pr_setEdVisibility
+  :: (Ed s -> Visibility) -> PreRenderable s -> PreRenderable s
+pr_setEdVisibility f pr = 
+    pr_setVisibility (foldAnySimplex2 
+        (pr_vertVisibility pr)
+        f
+        (pr_triVisibility pr))
+
+                     pr
+
+pr_setTriVisibility f pr = 
+    pr_setVisibility (foldAnySimplex2 
+        (pr_vertVisibility pr)
+        (pr_edVisibility pr)
+        f)
+
+                     pr
+
+
+pr_vertVisibility pr = pr_visibility pr . vertToAnySimplex2 
+pr_edVisibility pr = pr_visibility pr . edToAnySimplex2 
+pr_triVisibility pr = pr_visibility pr . triToAnySimplex2 
+
+
+
 pr_triangleLabel :: PreRenderable s -> Tri s -> Maybe TriangleLabel
 pr_triangleLabel = fmap fst . pr_triangleInfo
 
@@ -165,13 +240,13 @@ pr_setTriangleEmbedding f pr = pr { pr_triangleInfo = pr_triangleLabel pr &&& f 
 type Resolution = Int
 
 data GeneralTriangleEmbedding = 
-    GTE Resolution (Standard2Simplex -> Vec3)
+    GTE Resolution (Unit2SimplexPoint -> Vec3)
 
 data TriangleEmbedding = 
         FlatTriangle Vec3 Vec3 Vec3
     |   GeneralTriangle GeneralTriangleEmbedding
 
-data GeneralEdgeEmbedding = GEE Resolution (UnitInterval -> Vec3)
+data GeneralEdgeEmbedding = GEE Resolution (UnitIntervalPoint -> Vec3)
 
 data EdgeEmbedding =
         FlatEdge Vec3 Vec3
@@ -192,10 +267,13 @@ pr_edgeEmbedding pr tcec e =
                  . lookupTrianglesContainingEdge tcec
                  $ e of 
 
-                 Nothing -> flatFace pr (uncurry FlatEdge) map2 faces10Ascending e 
+                 Nothing -> 
+                    case pr_edgeInfo pr e of
+                        Just gee -> GeneralEdge gee 
+                        Nothing -> flatFace pr (uncurry FlatEdge) map2 faces10Ascending e 
 
                  -- edge is contained in some curved triangle
-                 Just (triangle, i, GTE res emb) -> 
+                 Just (_, i, GTE res emb) -> 
                     GeneralEdge
                         (GEE
                             res
@@ -203,11 +281,8 @@ pr_edgeEmbedding pr tcec e =
 
                   where
                     pretransform = 
-                        case i of
-                             0 -> \t -> Vec2 (1-t) t 
-                             1 -> \t -> Vec2 0 t 
-                             2 -> \t -> Vec2 t 0    
-                             _ -> error ("pr_edgeEmbedding/pretransform "++ $(showExps ['e,'triangle,'i]))
+                        let (v0,v1) = faces10 Unit2Simplex (face21 Unit2Simplex Unit2Simplex i)
+                        in \x -> interpolate x v1 v0
 
 flatFace pr ctor mapN verticesAscending face =    
                                 ctor
@@ -240,10 +315,7 @@ pr_coords pr tcec ecvc v =
                     case pr_edgeEmbedding pr tcec e of
                          FlatEdge {} -> Nothing
                          GeneralEdge (GEE _ emb) ->
-                            Just (case i of
-                                       0 -> emb 1
-                                       1 -> emb 0
-                                       _ -> assert False undefined))
+                            Just (emb (face10 UnitInterval UnitInterval i)))
 
                  . lookupEdgesContainingVertex ecvc
                  $ v 
@@ -302,5 +374,46 @@ instance (DeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
                 pr_ds = pr_ds,
                 pr_coords0 = $(liftFunction (vertexList pr_ds) pr_coords0),
                 pr_faceInfo = $(liftFunction (anySimplex2s pr_ds) pr_faceInfo),
-                pr_triangleInfo = $(liftFunction (triangleList pr_ds) pr_triangleInfo)
+                pr_triangleInfo = $(liftFunction (triangleList pr_ds) pr_triangleInfo),
+                pr_edgeInfo = $(liftFunction (edgeList pr_ds) pr_edgeInfo)
         } |]
+
+
+pr_ghide
+  :: ((t1 -> Visibility) -> PreRenderable s -> t)
+     -> (t1 -> AnySimplex2Of s) -> (t1 -> Bool) -> PreRenderable s -> t
+pr_ghide _setVisibility f p pr =
+    _setVisibility (\asi -> visibleIf (not (p asi)) * pr_visibility pr (f asi)) pr
+
+pr_hide
+  :: (AnySimplex2Of s -> Bool) -> PreRenderable s -> PreRenderable s
+pr_hide = pr_ghide pr_setVisibility id
+
+
+--pr_hideVerts = pr_ghide pr_setVertVisibility vertToAnySimplex2
+
+pr_hideEds :: (Ed s -> Bool) -> PreRenderable s -> PreRenderable s
+pr_hideEds = pr_ghide pr_setEdVisibility edToAnySimplex2
+
+pr_hideTris
+  :: (Tri s -> Bool) -> PreRenderable s -> PreRenderable s
+pr_hideTris = pr_ghide pr_setTriVisibility triToAnySimplex2 
+
+visibleIf b = if b then Visible else Invisible
+
+instance Num Visibility where
+    (*) Visible Visible = Visible
+    (*) _ _ = Invisible
+
+    (+) Invisible Invisible = Invisible
+    (+) _ _ = Visible
+
+    negate Visible = Invisible
+    negate Invisible = Visible
+
+    abs = assert False undefined
+    signum = assert False undefined
+    fromInteger = assert False undefined
+
+
+isRegardedAsSimplexByDisjointUnionDeriving [t| (Bool,Bool) |]

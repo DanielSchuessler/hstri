@@ -7,8 +7,9 @@ module Tetrahedron.NormalArc(
         -- * Construction
         allNormalArcs,
         normalArcsAroundVertex,
-        normalArcByTriangleAndVertexIndex,
         normalArcByTriangleAndVertex,
+        normalArcByTriangleAndVertexIndex,
+        normalArcByOTriangleAndVertexIndex,
         MakeNormalArc(..),
         NormalArcs(..),
         normalArcList,
@@ -20,8 +21,6 @@ module Tetrahedron.NormalArc(
         normalArcGetVertexIndex,
         normalArcGetAngle,
 
-        -- * Testing
-        qc_NormalArc
     )
 
 
@@ -35,10 +34,8 @@ import HomogenousTuples
 import Language.Haskell.TH.Syntax
 import Tetrahedron.NormalCorner
 import PrettyUtil
-import QuickCheckUtil
 import Quote
 import Test.QuickCheck
-import Test.QuickCheck.All
 import Util
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
@@ -57,8 +54,6 @@ instance NormalCorners NormalArc (Pair NormalCorner) where
 
 
 
-prop_NormalCornersOfNormalArc_distinct :: NormalArc -> Bool
-prop_NormalCornersOfNormalArc_distinct nat = let (c1,c2) = normalCorners nat in c1 /= c2
 
 
 class MakeNormalArc a where
@@ -98,13 +93,19 @@ normalArcGetVertex ::  NormalArc -> Vertex
 normalArcGetVertex (NormalArc _ v) = v
 
 
-normalArcGetVertexIndex :: NormalArc -> VertexIndexInTriangle
+-- | The index of the enclosed vertex in its triangle
+normalArcGetVertexIndex :: NormalArc -> Index3
 normalArcGetVertexIndex (NormalArc t v) = 
     fromMaybe (assert False undefined)
     (triangleGetIndexOf t v)
 
-normalArcByTriangleAndVertexIndex :: Triangle -> VertexIndexInTriangle -> NormalArc
-normalArcByTriangleAndVertexIndex t i = NormalArc t (triangleGetVertexAt t i) 
+normalArcByTriangleAndVertexIndex :: Triangle -> Index3 -> NormalArc
+normalArcByTriangleAndVertexIndex t i = 
+    normalArcByTriangleAndVertex t (triangleGetVertexAt t i) 
+
+normalArcByOTriangleAndVertexIndex :: OTriangle -> Index3 -> NormalArc
+normalArcByOTriangleAndVertexIndex t i = 
+    normalArcByTriangleAndVertex (forgetVertexOrder t) (triangleGetVertexAt t i) 
 
 -- | Gets the edge which is contained in the 'normalArcGetTriangle' of the 
 -- given normal arc, but disjoint from the normal arc
@@ -159,26 +160,9 @@ instance NormalArcs OTriangle (Triple NormalArc) where
     normalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
 
 
-prop_Triangle_NormalArcs_correct :: Triangle -> Bool
-prop_Triangle_NormalArcs_correct t = all3 (`isSubface` t) (normalArcs t) 
-
-prop_Triangle_NormalArcs_complete :: NormalArc -> Triangle -> Property
-prop_Triangle_NormalArcs_complete nat t = 
-    isSubface nat t ==> 
-        any3 (==nat) (normalArcs t) 
 
 
-qc_NormalArc :: IO Bool
-qc_NormalArc = $(quickCheckAll)
 
-
-prop_normalArcByNormalCorners :: NormalArc -> Property
-prop_normalArcByNormalCorners na = 
-        na == normalArc (nc1,nc2)
-        .&.
-        na == normalArc (nc2,nc1)
-    where
-        (nc1,nc2) = normalCorners na 
 
 
 instance IsSubface NormalCorner NormalArc where
@@ -197,24 +181,6 @@ normalArcGetAngle na = (v0,v,v1)
         v = normalArcGetVertex na
         (v0,v1) = vertices (edgeByOppositeVertexAndTriangle v (normalArcGetTriangle na))
 
-
-prop_normalArcGetAngle :: NormalArc -> Property
-prop_normalArcGetAngle na =
-        v .=. normalArcGetVertex na
-        .&.
-        triangle vs .=. normalArcGetTriangle na
-
-    where
-        vs@(_,v,_) = normalArcGetAngle na
-
-prop_normalArcGetAngle_corners :: NormalArc -> Property
-prop_normalArcGetAngle_corners na =
-        na .=. normalArc (nc0,nc1)
-
-    where
-        (v0,v,v1) = normalArcGetAngle na
-        nc0 = normalCorner (v0,v) 
-        nc1 = normalCorner (v1,v) 
         
 
 instance Quote NormalArc where
@@ -234,10 +200,5 @@ normalArcsAroundVertex :: Vertex -> Triple NormalArc
 normalArcsAroundVertex v = 
     map3 (`normalArcByTriangleAndVertex` v) (trianglesContainingVertex v)
 
-prop_normalArcsAroundVertex :: Vertex -> Property
-prop_normalArcsAroundVertex v =
-    setEq
-        (asList . normalArcsAroundVertex $ v)
-        (filter ((==v) . normalArcGetVertex) allNormalArcs)
 
 instance Finite NormalArc

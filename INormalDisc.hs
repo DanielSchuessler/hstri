@@ -131,7 +131,7 @@ iNormalArcGetVertex = mapI normalArcGetVertex
 
 -- | Get the index of the 'iNormalArcGetVertex' in the 'iNormalArcGetTriangle'
 iNormalArcGetVertexIndex
-  :: I NormalArc -> VertexIndexInTriangle
+  :: I NormalArc -> Index3
 iNormalArcGetVertexIndex = normalArcGetVertexIndex . unI
 
 -- | Get the triangle containing representatives of this normal arc type
@@ -153,10 +153,12 @@ iNormalArcByOTriangleAndVertex
 iNormalArcByOTriangleAndVertex = iNormalArcByTriangleAndVertex . forgetVertexOrder
 
 iNormalArcByTriangleAndVertexIndex
-  :: ITriangle -> VertexIndexInTriangle -> I NormalArc
-iNormalArcByTriangleAndVertexIndex (viewI -> I ti t) vi = 
-    ti ./ normalArcByTriangleAndVertexIndex t vi
+  :: ITriangle -> Index3 -> I NormalArc
+iNormalArcByTriangleAndVertexIndex = traverseI (.) normalArcByTriangleAndVertexIndex
 
+iNormalArcByOITriangleAndVertexIndex
+  :: I OTriangle -> Index3 -> I NormalArc
+iNormalArcByOITriangleAndVertexIndex = traverseI (.) normalArcByOTriangleAndVertexIndex
     
 -- | Case analysis on whether a given 'INormalDisc' is a tri or a quad
 eitherIND
@@ -215,3 +217,7 @@ iNormalQuadToINormalDisc (x :: INormalQuad) = mapI normalDisc x
 
 iNormalTriToINormalDisc :: INormalTri -> INormalDisc
 iNormalTriToINormalDisc (x :: INormalTri) = mapI normalDisc x 
+ 
+iNormalQuadByVertexAndITriangle
+  :: Vertex -> ITriangle -> INormalQuad
+iNormalQuadByVertexAndITriangle = mapI . normalQuadByVertexAndTriangle

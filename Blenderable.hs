@@ -281,12 +281,12 @@ instance (Ord v, ShortShow v, Pretty v, Show v) => ToBlenderable (SPQWithCoords 
     toBlenderable = fromSpqwc
 
 fromNormalSurface
-  :: (Integral i, Ord v, Pretty i, ShortShow v, NormalSurface s i, Show v) =>
+  :: (Integral i, Ord v, Pretty i, ShortShow v, StandardCoords s i, Show v) =>
      SPQWithCoords v -> s -> Blenderable (SC2 (Corn v))
 fromNormalSurface spqwc stc = mkBlenderable normalSurfaceStyle (normalSurfaceToPreRenderable spqwc stc) 
 
 fromIntegerNormalSurface
-  :: (Ord v, ShortShow v, NormalSurface s Integer, Show v) =>
+  :: (Ord v, ShortShow v, StandardCoords s Integer, Show v) =>
      SPQWithCoords v -> s -> Blenderable (SC2 (Corn v))
 fromIntegerNormalSurface = fromNormalSurface
 
@@ -296,7 +296,7 @@ fromSpqwcAndIntegerNormalSurface
       Show v,
       Pretty v,
       ShortShow v,
-      NormalSurface s Integer) =>
+      StandardCoords s Integer) =>
      SPQWithCoords v
      -> s
      -> Blenderable
@@ -311,7 +311,7 @@ fromSpqwcAndIntegerNormalSurface spqwc s =
 
 
 -- | = @uncurry 'fromSpqwcAndIntegerNormalSurface'@
--- instance (Ord v, ShortShow v, NormalSurface s Integer, Pretty v, Show v) => 
+-- instance (Ord v, ShortShow v, StandardCoords s Integer, Pretty v, Show v) => 
 --     ToBlenderable (SPQWithCoords v, s) (DJ (SC2 v) (SC2 (Corn v))) where
 -- 
 --     toBlenderable = uncurry fromSpqwcAndIntegerNormalSurface
@@ -352,6 +352,7 @@ ba_visibility = pr_visibility . ba_pr
 ba_faceMat :: Blenderable s -> AnySimplex2Of s -> Material
 ba_faceMat = fmap faceMat . ba_faceInfo
 
+-- | Read the result of printing @(cam.location,cam.rotation_euler,cam.data.angle)@ in Blender-python
 readCam :: String -> Cam
 readCam s = 
     case parseFloatLiterals s of

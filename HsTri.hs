@@ -6,6 +6,7 @@ module HsTri(
     module Blenderable,
     module ClosedOrCensus6,
     module ConcreteNormal.PreRenderable,
+    module Data.AscTuples,
     module Data.Vect.Double.Base,
     module DisjointUnion,
     module DotUtil,
@@ -16,31 +17,40 @@ module HsTri(
     module HomogenousTuples,
     module INormalDisc,
     module Latexable,
-    module Tetrahedron.NormalConstants,
-    module Tetrahedron.NormalDisc,
-    module NormalSurface,
     module PreRenderable,
     module PrettyUtil,
     module QuadCoordinates,
+    module Simplicial.SimplicialComplex,
     module StandardCoordinates,
+    module Triangulation.VertexLink,
     module THUtil,
+    module Tetrahedron.NormalConstants,
+    module Tetrahedron.NormalDisc,
+    module Tikz.Gen,
+    module Tikz.Preview,
     module TriArcGraph,
-    module Triangulation.Random,
     module Triangulation.Class,
+    module Triangulation.Random,
     module TriangulationCxtObject,
     module VerboseDD,
-    module Tikz.Gen,
-    module Simplicial.SimplicialComplex,
-    module Data.AscTuples
-
+    module QuadCoordinates.CanonExt,
+    module QuadCoordinates.Dense,
+    module StandardCoordinates.Dense,
+    module Data.FormalOps,
+    module Triangulation.Transformations,
+    module QuadCoordinates.MatchingEquations,
+    module StandardCoordinates.MatchingEquations,
     ) where
 
 
 import Blender
 import Blenderable
+import ClosedOrCensus6
 import ConcreteNormal.PreRenderable
+import Data.AscTuples
 import Data.Vect.Double.Base(Vec3)
 import DisjointUnion
+import DotUtil(viewDot)
 import Either1
 import EqvGraphs
 import ExampleTriangulations
@@ -48,21 +58,27 @@ import FaceLattice
 import HomogenousTuples
 import INormalDisc
 import Latexable
-import Tetrahedron.NormalConstants
-import Tetrahedron.NormalDisc
-import NormalSurface
 import PreRenderable
 import PrettyUtil
 import QuadCoordinates
-import StandardCoordinates
-import THUtil
-import TriangulationCxtObject
-import Triangulation.Random
-import Triangulation.Class
-import VerboseDD
-import TriArcGraph
-import DotUtil(viewDot)
-import ClosedOrCensus6
-import Tikz.Gen
 import Simplicial.SimplicialComplex
-import Data.AscTuples
+import StandardCoordinates
+import QuadCoordinates.CanonExt
+import THUtil
+import Tetrahedron.NormalConstants
+import Tetrahedron.NormalDisc
+import Tikz.Gen
+import Tikz.Preview
+import TriArcGraph
+import Triangulation.Class
+import Triangulation.Random
+import TriangulationCxtObject
+import VerboseDD
+import Triangulation.VertexLink
+import Data.FormalOps
+import Triangulation.Transformations
+import QuadCoordinates.MatchingEquations
+import StandardCoordinates.MatchingEquations
+import QuadCoordinates.Dense
+import StandardCoordinates.Dense
+

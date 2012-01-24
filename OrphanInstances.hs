@@ -67,7 +67,9 @@ instance (Pretty n, Pretty e) => Pretty (Pat.Gr n e) where
 instance Arbitrary Vect.Vec4 where
     arbitrary = gen4 arbitrary
 
+deriving instance Ord Vect.Vec2
 deriving instance Ord Vect.Vec3
+deriving instance Ord Vect.Vec4
 
 instance (NFData n, NFData e) => NFData (Pat.Gr n e) where
     rnf g = rnf (labNodes g, labEdges g)

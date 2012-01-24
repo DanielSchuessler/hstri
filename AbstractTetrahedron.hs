@@ -17,9 +17,7 @@ module AbstractTetrahedron(
     IsSubface(..),liftIsSubface,
     Intersection(..),
 
-
-    -- * Testing
-    qc_AbstractTetrahedron)
+   )
     
     where
 
@@ -31,15 +29,12 @@ import HomogenousTuples
 import Prelude hiding(catch,lookup)
 import Math.Groups.S2
 import Math.Groups.S3
-import Test.QuickCheck
-import Test.QuickCheck.All
 import Tetrahedron.Vertex
 import Tetrahedron.Edge
 import Tetrahedron.Triangle
 import TIndex
 import OrderableFace
 import Data.Monoid(Monoid(..),mconcat)
-import QuickCheckUtil
 import Data.Word
 import qualified Data.List as L
 import Control.Arrow((+++))
@@ -59,33 +54,7 @@ instance IsSubface Vertex Triangle where
 instance IsSubface Edge Triangle where
     isSubface = isEdgeOfTriangle
 
-prop_IsSubface_transitive :: Vertex -> Edge -> Triangle -> Property
-prop_IsSubface_transitive v e f = (isSubface v e && isSubface e f) ==> isSubface v e  
 
-prop_IsSubface_count_VE :: Vertex -> Bool
-prop_IsSubface_count_VE v = length ( filter6 (v `isSubface`) allEdges' ) == 3
-
-prop_IsSubface_count_VF :: Vertex -> Bool
-prop_IsSubface_count_VF v = length ( filter4 (v `isSubface`) allTriangles' ) == 3
-
-prop_IsSubface_count_EF :: Edge -> Bool
-prop_IsSubface_count_EF e = length ( filter4 (e `isSubface`) allTriangles' ) == 2
-
-prop_edgeByOppositeVertexAndTriangle :: Vertex -> Triangle -> Property
-prop_edgeByOppositeVertexAndTriangle v t | isSubface v t = (isSubface e t .&. not (isSubface v e)) 
-                                         | otherwise = expectFailure (seq e True)
-    where
-        e = edgeByOppositeVertexAndTriangle v t
-
-
-prop_edgesContainingVertex :: Vertex -> Bool
-prop_edgesContainingVertex v = all3 (isSubface v) (star v (OneSkeleton AbsTet))
-
-prop_trianglesContainingVertex :: Vertex -> Bool
-prop_trianglesContainingVertex v = all3 (isSubface v) (star v (TwoSkeleton AbsTet))
-
-qc_AbstractTetrahedron ::  IO Bool
-qc_AbstractTetrahedron = $(quickCheckAll)
 
 class Intersection a b c | a b -> c where
     intersect :: a -> b -> c
@@ -123,23 +92,6 @@ instance Intersection Triangle Triangle (Either Triangle Edge) where
 
 
 
-prop_VerticesToOTriangle ::  Vertex -> Property
-prop_VerticesToOTriangle v0 =
-    forAll (arbitrary `suchThat` (/= v0)) $ \v1 ->
-    forAll (arbitrary `suchThat` (liftM2 (&&) (/= v0) (/= v1))) $ \v2 ->
-        
-        let vs = (v0,v1,v2) in vs .=. vertices (oTriangleByVertices vs) 
-
-
-prop_VerticesToOEdge ::  Vertex -> Property
-prop_VerticesToOEdge v0 =
-    forAll (arbitrary `suchThat` (/= v0)) $ \v1 ->
-        let vs = (v0,v1) in vs .=. vertices (verticesToOEdge vs) 
-
-
-
-prop_MakeEdge :: (Vertex,Vertex) -> Property
-prop_MakeEdge vs@(v0,v1) = v0 < v1 ==> (vertices (edge vs) == vs)
                             
 
 

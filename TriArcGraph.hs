@@ -13,8 +13,11 @@ import Latexable
 import MathUtil
 import Prelude hiding(writeFile)
 import PrettyUtil
-import QuadCoordinates
+import QuadCoordinates(QuadCoordinates,qMatchingEquationsMatrixRat)
+import QuadCoordinates.Class
+import QuadCoordinates.Dense
 import Triangulation.CanonOrdered
+import Triangulation.InnerNormalArc
 import Triangulation.Class
 import TriangulationCxtObject
 import ZeroDefaultMap
@@ -91,7 +94,7 @@ ta_toDot gr mbQuadVector = graphToDot params gr
                             , Len 1.6 ]
                         Just v ->
                             let 
-                                coeff q = v `quad_coefficient` q
+                                coeff q = v `quadCount` q
                                 coeffArc = coeff . iNormalQuadByNormalArc
                                 c = coeffArc ina2 ^-^ coeffArc ina1
                             in
@@ -115,23 +118,23 @@ markings = "decoration={markings,mark=between positions 0 and 1 step 0.1 with {\
                 
 
 
-triArcGraphDot
-  :: (Num a, AdditiveGroup a, ToTriangulation t, Latexable a) =>
-     t -> Maybe (QuadCoordinates a) -> DotGraph Node
 triArcGraphDot (toTriangulation -> tr) mbQuadVector = ta_toDot (triArcGraph tr) mbQuadVector
 
 triArcGraphDotNoQuad :: ToTriangulation t => t -> DotGraph Node
 triArcGraphDotNoQuad tr = triArcGraphDot tr (Nothing :: Maybe (QuadCoordinates Integer))
 
 
-ta_symSol tr me = triArcGraphDot tr (Just . quad_fromVector tr . snd $ symbolicSolution me quadVar)
+ta_symSol tr me = triArcGraphDot tr (Just . qd_fromVector . snd $ symbolicSolution me quadVar)
 
 ta :: ToTriangulation t => t -> IO ExitCode
 ta tr = viewDot (triArcGraphDotNoQuad tr)
 
 taq
-  :: (Num a, AdditiveGroup a, ToTriangulation t, Latexable a) =>
-     t -> QuadCoordinates a -> IO ExitCode
+  :: (AdditiveGroup a,
+      QuadCoords q a,
+      ToTriangulation t,
+      Latexable a) =>
+     t -> q -> IO ExitCode
 taq tr quad = viewDot (triArcGraphDot tr (Just quad)) 
 
 test tr = 
@@ -140,7 +143,7 @@ test tr =
     in do
         case symbolicSolution mes quadVar of
              ((mtx,_,_),s) -> do
-                viewDot $ ta_toDot (triArcGraph tr) (Just (quad_fromVector tr s))
+                viewDot $ ta_toDot (triArcGraph tr) (Just (qd_fromVector s))
                 print tr
                 putStrLn (prettyMatrix mes)
                 putStrLn "~>"
