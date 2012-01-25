@@ -18,7 +18,7 @@ import Data.Monoid
 import qualified Data.Map as M
 import Data.Map(Map)
 
-class Num r => QuadCoords q r | q -> r where
+class (Ord q, Num r, Ord r) => QuadCoords q r | q -> r where
      quadCount :: q -> INormalQuad -> r
                                          
      -- | May (but need not) omit zero coefficients. May contain repeated quads.

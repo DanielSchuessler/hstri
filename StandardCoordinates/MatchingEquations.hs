@@ -15,7 +15,7 @@ admissible
      Triangulation -> q -> Either [Char] ()
 admissible tr stc = do
     mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient")))
-          (nsToAssocs stc)
+          (discAssocs stc)
     satisfiesQuadrilateralConstraints tr stc 
     satisfiesMatchingEquations tr stc
 

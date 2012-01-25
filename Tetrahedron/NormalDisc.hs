@@ -445,4 +445,5 @@ instance Ix NormalDisc where
     inRange (x,y) z = x <= z && z <= y
     rangeSize (x,y) = max 0 (fromEnum y - fromEnum x + 1)
 
-
+instance NormalCorners NormalDisc [NormalCorner] where
+    normalCorners = eitherND normalCornerList normalCornerList

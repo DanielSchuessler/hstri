@@ -153,7 +153,7 @@ instance Num i => QuadCoords (StandardCoordinates i) i where
 
 instance Num i => StandardCoords (StandardCoordinates i) i where
     discCount = stc_coefficient
-    nsToAssocs = stc_toAssocs
+    discAssocs = stc_toAssocs
 
 stc_coefficientIsZero
   :: (Num r, MakeINormalDisc a) =>

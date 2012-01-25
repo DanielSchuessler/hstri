@@ -72,6 +72,9 @@ instance NormalCorners INormalTri (Triple INormalCorner) where
 instance NormalCorners INormalQuad (Quadruple INormalCorner) where
     normalCorners = traverseI map4 normalCorners
 
+instance NormalCorners INormalDisc [INormalCorner] where
+    normalCorners = traverseI map normalCorners
+
 instance MakeINormalTri IVertex where
     iNormalTri = mapI normalTri
 

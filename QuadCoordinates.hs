@@ -53,7 +53,7 @@ standardToQuad :: StandardCoords a r => a -> QuadCoordinates r
 standardToQuad = 
       quad_fromAssocs
     . May.mapMaybe (\(d,r) -> eitherIND (const Nothing) (\q -> Just (q,r)) d) 
-    . nsToAssocs
+    . discAssocs
 
 
 
@@ -159,6 +159,6 @@ quad_toNonzeroAssocs = zdm_toNonzeroAssocs . quad_toZDM
 
 quad_fromNormalSurface
   :: (Num r, StandardCoords s r) => s -> QuadCoordinates r
-quad_fromNormalSurface = quad_fromAssocs . mapMaybe f . nsToAssocs 
+quad_fromNormalSurface = quad_fromAssocs . mapMaybe f . discAssocs 
     where
         f (d,r) = eitherIND (const Nothing) (Just . (,r)) d

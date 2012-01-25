@@ -40,7 +40,6 @@ import ShortShow
 import StandardCoordinates
 import TriangulationCxtObject
 import Util
-import qualified Data.Map as M
 import Tetrahedron.NormalDisc
 import Tetrahedron.NormalConstants
 import INormalDisc
@@ -69,11 +68,12 @@ coercePos (Pos i) = Pos i
 
 instance Show (Pos a) where show = show . unPos
 
-data Concrete a = Concrete !(Pos a) !a
+data Concrete a = Concrete (AnyStandardCoords Integer) !(Pos a) !a
     deriving(Eq,Ord,Show)
 
 c_pos :: Concrete t -> Pos t
 c_pos (Concrete u _) = u
+
 c_type ::  Concrete t -> t
 c_type (Concrete _ a) = a
 
@@ -180,11 +180,15 @@ posOfArcOfQuad nc cquad arc = Pos $
             (fi (numberOfArcsOfType nc iarc) - 1) - u
 
 
+concreteTris
+  :: (Integral a, StandardCoords s a) => s -> [Concrete INormalTri]
 concreteTris ns = do
             (x,n) <- triAssocsDistinct ns
             u <- [ 0 .. fi n - 1 ]
             return (Concrete u x) 
 
+concreteQuads
+  :: (Integral a, QuadCoords q a) => q -> [Concrete INormalQuad]
 concreteQuads ns = do
             (x,n) <- quadAssocsDistinct ns
             u <- [ 0 .. fi n - 1 ]
@@ -194,7 +198,7 @@ concreteQuads ns = do
 concreteArcs
   :: (Integral i, StandardCoords a i) => a -> [Concrete INormalArc]
 concreteArcs ns = do
-    (a,n) <- M.toList . M.fromListWith (+) . arcAssocs $ ns 
+    (a,n) <- arcAssocsDistinct ns 
     u <- [0..fi n - 1]
     return (Concrete u a)
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, TupleSections, MultiParamTypeClasses #-}
+{-# LANGUAGE NoMonomorphismRestriction, ViewPatterns, TupleSections, MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
 module Triangulation.VertexLink where
@@ -39,11 +39,19 @@ isManifoldTriangulation :: ToTriangulation t => t -> Bool
 isManifoldTriangulation (toTriangulation -> tr) = 
     all (is2SphereOrDisk tr . vertexLinkingSurface) (vertices tr) 
 
+isClosedManifoldTriangulation :: ToTriangulation t => t -> Bool
+isClosedManifoldTriangulation (toTriangulation -> tr) = 
+    all (is2Sphere tr . vertexLinkingSurface) (vertices tr) 
+
 
 -- | For QuickCheck.
 newtype ManifoldTriangulation t = ManifoldTriangulation t
     deriving (Show,ToTriangulation)
 
--- | Generates only manifold triangulations.
+-- | Uses ' arbitraryManifoldTriangulation '
 instance (Arbitrary t, ToTriangulation t) => Arbitrary (ManifoldTriangulation t) where
-    arbitrary = ManifoldTriangulation <$> (arbitrary `suchThat` isManifoldTriangulation) 
+    arbitrary = ManifoldTriangulation <$> arbitraryManifoldTriangulation
+
+-- | Generates only manifold triangulations.
+arbitraryManifoldTriangulation :: (Arbitrary t, ToTriangulation t) => Gen t
+arbitraryManifoldTriangulation = arbitrary `suchThat` isManifoldTriangulation 

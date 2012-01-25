@@ -38,7 +38,7 @@ instance (VG.Vector v r, Num r) => QuadCoords (StandardDense v r) r where
 
 instance (VG.Vector v r, Num r) => StandardCoords (StandardDense v r) r where
     discCount v i = sd_toVector v VG.! fromEnum i
-    nsToAssocs = filter ((/= 0) . snd) . zip [toEnum 0 ..] . VG.toList . sd_toVector
+    discAssocs = filter ((/= 0) . snd) . zip [toEnum 0 ..] . VG.toList . sd_toVector
 
 sd_fromStandardCoords
   :: StandardCoords s r =>

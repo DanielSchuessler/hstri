@@ -59,13 +59,19 @@ prop_qVertexSolutionExts (ManifoldTriangulation tr) =
 qc_Tests :: IO Bool
 qc_Tests = $quickCheckAll
 
+forAllCensusTriangulations = forAllClosedCensusTriangulations
 
+forAllClosedCensusTriangulations p = 
+    forAllElements closedOrCensus6 p .&.
+    forAllElements closedNorCensus8 p
 
 prop_censuses_manifoldTriangulations :: Property
 prop_censuses_manifoldTriangulations =
-    forAllElements closedOrCensus6 isManifoldTriangulation
-    .&.
-    forAllElements closedNorCensus8 isManifoldTriangulation
+    forAllCensusTriangulations isManifoldTriangulation
+
+prop_censuses_closedManifoldTriangulations :: Property
+prop_censuses_closedManifoldTriangulations =
+    forAllClosedCensusTriangulations isClosedManifoldTriangulation
 
 prop_innerEdgeNeighborhood :: Triangulation -> Property
 prop_innerEdgeNeighborhood (tr :: Triangulation) =

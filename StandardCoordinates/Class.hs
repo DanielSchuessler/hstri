@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TupleSections, UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
 --{-# OPTIONS -Wall #-}
 module StandardCoordinates.Class where
 
@@ -28,7 +28,7 @@ class QuadCoords s i => StandardCoords s i | s -> i where
     triCount :: s -> INormalTri -> i 
 
     -- | May (but need not) omit zero coefficients. May contain repeated discs.
-    nsToAssocs :: s -> [(INormalDisc,i)]
+    discAssocs :: s -> [(INormalDisc,i)]
 
     -- | May (but need not) omit zero coefficients. May contain repeated tris.
     triAssocs :: s -> [(INormalTri,i)]
@@ -43,15 +43,26 @@ class QuadCoords s i => StandardCoords s i | s -> i where
     discCount = eitherIND <$> triCount <*> quadCount
     triCount = (. iNormalDisc) <$> discCount
 
-    triAssocs = mapMaybe (traverseFst (eitherIND Just (const Nothing))) . nsToAssocs
-    nsToAssocs = (++) <$> (map (first iNormalDisc) . triAssocs) 
-                      <*> (map (first iNormalDisc) . quadAssocs) 
+    triAssocs = triAssocsDefaultFromDiscAssocs
+    discAssocs = discAssocsDefaultFromTriQuadAssocs 
+
+    triAssocsDistinct = triAssocsDistinctDefaultFromTriAssocs
+    discAssocsDistinct = discAssocsDistinctDefaultFromDiscAssocs
+
+triAssocsDefaultFromDiscAssocs, triAssocsDistinctDefaultFromTriAssocs :: StandardCoords s i => s -> [(INormalTri,i)]
+triAssocsDefaultFromDiscAssocs = mapMaybe (traverseFst (eitherIND Just (const Nothing))) . discAssocs
 
 
-    triAssocsDistinct = M.toList . M.fromListWith (+) . triAssocs
-    discAssocsDistinct = M.toList . M.fromListWith (+) . nsToAssocs
+discAssocsDefaultFromTriQuadAssocs, discAssocsDistinctDefaultFromDiscAssocs, discAssocsDistinctDefaultFromTriQuadDistinctAssocs :: StandardCoords s i => s -> [(INormalDisc,i)]
+discAssocsDefaultFromTriQuadAssocs =
+                  (++) <$> (map (first iNormalDisc) . triAssocs) 
+                       <*> (map (first iNormalDisc) . quadAssocs) 
 
-
+triAssocsDistinctDefaultFromTriAssocs = M.toList . M.fromListWith (+) . triAssocs                 
+discAssocsDistinctDefaultFromDiscAssocs = M.toList . M.fromListWith (+) . discAssocs
+discAssocsDistinctDefaultFromTriQuadDistinctAssocs = 
+                  (++) <$> (map (first iNormalDisc) . triAssocsDistinct) 
+                       <*> (map (first iNormalDisc) . quadAssocsDistinct) 
 
 
 -- | Superclass default; requires implementation of 'discCount'
@@ -60,7 +71,7 @@ defaultQuadCount = (. iNormalQuadToINormalDisc) <$> discCount
 
 -- | Superclass default; requires implementation of 'nsToAssocs'
 defaultQuadAssocs :: StandardCoords a t1 => a -> [(INormalQuad, t1)]
-defaultQuadAssocs = mapMaybe (traverseFst (eitherIND (const Nothing) Just)) . nsToAssocs
+defaultQuadAssocs = mapMaybe (traverseFst (eitherIND (const Nothing) Just)) . discAssocs
 
 -- The number of normal triangles in the first arg containing a normal arc of the given type.
 -- Note that this is only well-defined in the disjoint union of tetrahedra, not in the quotient space!
@@ -97,37 +108,61 @@ ns_toDenseList tr = fmap snd . ns_toDenseAssocs tr
 
 instance StandardCoords INormalDisc Integer where
     discCount d d' = if d==d' then 1 else 0
-    nsToAssocs d = [(d,1)] 
+    discAssocs = discAssocsDistinct
+    discAssocsDistinct d = [(d,1)] 
+
+    triAssocs = triAssocsDefaultFromDiscAssocs
+    triAssocsDistinct = triAssocs
+    
 
 instance StandardCoords INormalTri Integer where
     discCount = discCount . iNormalDisc 
-    nsToAssocs = nsToAssocs . iNormalDisc
+    discAssocs = discAssocsDistinct
+    discAssocsDistinct = discAssocsDistinct . iNormalDisc
+
+    triCount t t' = if t==t' then 1 else 0
+    triAssocs = triAssocsDistinct
+    triAssocsDistinct t = [(t,1)]
 
 instance StandardCoords INormalQuad Integer where
     discCount = discCount . iNormalDisc 
-    nsToAssocs = nsToAssocs . iNormalDisc
+    discAssocs = discAssocs . iNormalDisc
+    discAssocsDistinct = discAssocsDistinct . iNormalDisc
+
+    triCount = const (const 0) 
+    triAssocs = const []
+    triAssocsDistinct = const []
 
 instance (Num n, StandardCoords s n) => StandardCoords [s] n where
     discCount xs d = sum (flip discCount d <$> xs) 
-    nsToAssocs = concatMap nsToAssocs 
+    discAssocs = concatMap discAssocs 
+    triAssocs = concatMap triAssocs 
 
 
 instance (Num n, StandardCoords s n) => StandardCoords (FormalProduct n s) n where
     discCount (n :* s) = (n *) <$> discCount s
 
-    nsToAssocs (n :* s) = second (n *) <$> nsToAssocs s
+    discAssocs (n :* s) = second (n *) <$> discAssocs s
+    discAssocsDistinct (n :* s) = second (n *) <$> discAssocsDistinct s
 
+    triCount (n :* s) = (n *) <$> triCount s
+
+    triAssocs (n :* s) = second (n *) <$> triAssocs s
+    triAssocsDistinct (n :* s) = second (n *) <$> triAssocsDistinct s
 
 instance (Num n, StandardCoords s n, StandardCoords s' n) => StandardCoords (FormalSum s s') n where
     discCount (s :+ s') = (+) <$> discCount s <*> discCount s'
 
-    nsToAssocs (s :+ s') = ((++) $ nsToAssocs s) $ nsToAssocs s'
+    discAssocs (s :+ s') = discAssocs s ++ discAssocs s'
 
+    triCount (s :+ s') = (+) <$> triCount s <*> triCount s'
+
+    triAssocs (s :+ s') = triAssocs s ++ triAssocs s'
 
 eulerC
   :: (Fractional a, Integral n, StandardCoords s n) =>
      Triangulation -> s -> a
-eulerC tr ns = sum (f <$> nsToAssocs ns)
+eulerC tr ns = sum (f <$> discAssocs ns)
     where
         f (d,n) = fromIntegral n*eitherIND ft fq d
         ft t = sum3 (map3 recipDeg (normalCorners t)) - 1/2
@@ -170,5 +205,39 @@ isDisk tr s = assert False undefined
 
 isClosedSurface tr s = assert False undefined
 
-arcAssocs :: StandardCoords a t => a -> [(INormalArc, t)]
-arcAssocs = concatMap (\(d,n) -> map (,n) (normalArcList d)) . nsToAssocs
+arcAssocs :: StandardCoords a r => a -> [(INormalArc, r)]
+arcAssocs = concatMap (\(d,n) -> map (,n) (normalArcList d)) . discAssocs
+
+arcAssocsDistinct :: StandardCoords a r => a -> [(INormalArc, r)]
+arcAssocsDistinct = M.toList . M.fromListWith (+) . arcAssocs
+
+cornerAssocs :: StandardCoords a r => a -> [(INormalCorner, r)]
+cornerAssocs = concatMap (\(d,n) -> map (,n) (normalCornerList d)) . discAssocs
+
+cornerAssocsDistinct :: StandardCoords a r => a -> [(INormalArc, r)]
+cornerAssocsDistinct = M.toList . M.fromListWith (+) . arcAssocs
+
+--standardCoordsToSparse = zdm_from
+
+data AnyStandardCoords i = 
+    forall s. (StandardCoords s i) => AnyStandardCoords s
+
+instance Show (AnyStandardCoords i) where
+    show _ = "<AnyStandardCoords>"
+
+
+#define F(X) X (AnyStandardCoords s) = X s
+instance (Num i) => QuadCoords (AnyStandardCoords i) i where
+    F(quadCount)
+    F(quadAssocs)
+    F(quadAssocsDistinct)
+
+instance (Num i) => StandardCoords (AnyStandardCoords i) i where
+    F(discCount)
+    F(discAssocs)
+    F(discAssocsDistinct)
+    F(triCount)
+    F(triAssocs)
+    F(triAssocsDistinct)
+#undef F
+

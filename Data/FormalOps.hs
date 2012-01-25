@@ -7,12 +7,12 @@ import Control.Applicative
 import Data.Monoid
 
 data FormalProduct a b = a :* b
-    deriving (Show,Functor,Foldable,Traversable)
+    deriving (Show,Functor,Foldable,Traversable,Eq,Ord)
 
 infixl 7 :*
 
 data FormalSum a b = a :+ b
-    deriving (Show)
+    deriving (Show,Eq,Ord)
 
 infixl 6 :+
 
