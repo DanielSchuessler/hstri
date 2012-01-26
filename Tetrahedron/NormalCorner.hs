@@ -10,7 +10,7 @@ module Tetrahedron.NormalCorner(
 
                    where
 
-import AbstractTetrahedron
+import Tetrahedron
 import Element
 import PrettyUtil
 import Test.QuickCheck

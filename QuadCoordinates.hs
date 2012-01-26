@@ -2,8 +2,7 @@
 {-# OPTIONS -Wall #-}
 module QuadCoordinates where
 
-import AbstractTetrahedron
-import Control.Applicative
+import Tetrahedron
 import Control.Arrow((&&&))
 import Control.Monad.State
 import Data.Foldable(Foldable)
@@ -11,42 +10,32 @@ import Data.Function
 import Data.Map as M hiding(mapMaybe)
 import Data.Maybe as May
 import INormalDisc
-import PrettyUtil
 import StandardCoordinates.Class
-import QuadCoordinates.Class
 import Test.QuickCheck
 import TriangulationCxtObject
-import ZeroDefaultMap
+import Math.SparseVector
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
-import Data.VectorSpace
 import Data.List as L
 import QuadCoordinates.MatchingEquations
 
-newtype QuadCoordinates r = QC { quad_toZDM :: ZeroDefaultMap INormalQuad r }
-    deriving(AdditiveGroup,InnerSpace,Eq)
+type QuadCoordinates r = SparseVector INormalQuad r
 
-instance (Num r) => QuadCoords (QuadCoordinates r) r where
-    quadCount = quad_coefficient
-    quadAssocs = quad_toAssocs
 
 quad_toMap :: QuadCoordinates r -> Map INormalQuad r
-quad_toMap = illdefinedZdmToMap . quad_toZDM 
+quad_toMap = illdefinedSparseToMap 
 
 quad_fromMap :: Num r => Map INormalQuad r -> QuadCoordinates r
-quad_fromMap = QC . zdm_fromMap 
+quad_fromMap = sparse_fromMap 
 
 quad_fromAssocs
   :: (Functor f, Num r, Foldable f) =>
      f (INormalQuad, r) -> QuadCoordinates r
-quad_fromAssocs = QC . zdm_fromAssocs
+quad_fromAssocs = sparse_fromAssocs
 
-instance Num r => VectorSpace (QuadCoordinates r) where 
-    type Scalar (QuadCoordinates r) = r
-    r *^ QC x = QC (r *^ x)
 
 quad_coefficient :: Num r => QuadCoordinates r -> INormalQuad -> r
-quad_coefficient = zdm_get . quad_toZDM
+quad_coefficient = sparse_get 
 
 
 standardToQuad :: StandardCoords a r => a -> QuadCoordinates r
@@ -75,7 +64,7 @@ qMatchingEquation = fmap (quad_fromAssocs .
 
 
         
-type QuadCoordinateFunctional = QuadCoordinates
+type QuadCoordinateFunctional r = QuadCoordinates r
 
 qMatchingEquations :: Num r => Triangulation -> [QuadCoordinateFunctional r]
 qMatchingEquations = mapMaybe qMatchingEquation . edges
@@ -91,14 +80,10 @@ quad_toAssocs :: QuadCoordinates r -> [(INormalQuad, r)]
 quad_toAssocs = M.assocs . quad_toMap
 
 quad_singleton :: Num r => INormalQuad -> r -> QuadCoordinates r
-quad_singleton = fmap QC . zdm_singleton
+quad_singleton = sparse_singleton
 
 
-instance Pretty r => Pretty (QuadCoordinates r) where
-    pretty qc = pretty (quad_toAssocs qc) 
 
-instance (Pretty r) => Show (QuadCoordinates r) where
-    showsPrec = prettyShowsPrec
 
 
 quad_toDenseAssocs
@@ -121,7 +106,7 @@ quad_fromVector tr = quad_fromDenseList tr . VG.toList
 
 unrestrictedQCGen
   :: (Num r, Arbitrary r) => Triangulation -> Gen (QuadCoordinates r)
-unrestrictedQCGen tr = QC <$> zdm_gen (tINormalQuads tr) 
+unrestrictedQCGen tr = sparse_gen (tINormalQuads tr) 
 
 
 qMatchingEquationsMatrix
@@ -152,7 +137,7 @@ qMatchingEquationsMatrixRat = qMatchingEquationsMatrix
 
 quad_toNonzeroAssocs
   :: Num b => QuadCoordinates b -> [(INormalQuad, b)]
-quad_toNonzeroAssocs = zdm_toNonzeroAssocs . quad_toZDM
+quad_toNonzeroAssocs = sparse_toNonzeroAssocs 
 
 
 

@@ -2,7 +2,7 @@
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module Triangulation(
-    module AbstractTetrahedron,
+    module Tetrahedron,
     module Equivalence,
     module Triangulation.FacetGluing,
     Triangulation,
@@ -61,7 +61,7 @@ module Triangulation(
     ) where
 
 
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Exception

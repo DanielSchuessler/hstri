@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, NoMonomorphismRestriction #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, TemplateHaskell, NoMonomorphismRestriction #-}
 module Data.Numbering where
 
 import Data.Map as M
@@ -17,7 +17,7 @@ data Numbering a = Numbering {
 instance Show a => Show (Numbering a) where
     showsPrec prec nu = 
         showParen (prec > 10) 
-            (showString "nuFromList " . showsPrec 11 (nuElements nu))
+            (showString "nuFromDistinctList " . showsPrec 11 (nuElements nu))
 
 enumNu :: (Enum a) => a -> a -> Numbering a
 enumNu min_ max_ = enumNu' (fromEnum min_) (fromEnum max_)
@@ -103,21 +103,26 @@ nuFromSet m =
                     (lookupIndex a m)) 
         (size m)
 
-nuFromVector :: forall a. (Show a, Ord a) => V.Vector a -> Numbering a
-nuFromVector v =
+nuFromDistinctVector :: forall a. (Show a, Ord a) => V.Vector a -> Numbering a
+nuFromDistinctVector v =
     let
         m :: M.Map a Int 
-        m = V.ifoldl' (\r i a -> M.insert a i r) M.empty v
+        m = V.ifoldl' (\r i a -> M.insertWithKey _err a i r) M.empty v
+
+        _err a i1 i2 = error ("nuFromDistinctVector: duplicate: " ++ show a++ " at indices "++show (i1,i2))
     in
         Numbering
             (\a -> fromMaybe
-                        (error ("nuFromVector: Element not in Numbering: "++show a))
+                        (error ("nuFromDistinctVector: Element not in Numbering: "++show a))
                         (M.lookup a m)) 
             (v V.!)
             (V.length v)
 
+nuFromDistinctList :: (Ord a, Show a) => [a] -> Numbering a
+nuFromDistinctList = nuFromDistinctVector . V.fromList 
+
 nuFromList :: (Ord a, Show a) => [a] -> Numbering a
-nuFromList = nuFromVector . V.fromList 
+nuFromList = nuFromDistinctList . nub'
 
 finiteTypeNu :: (Finite a) => Numbering a
 finiteTypeNu = enumNu minBound maxBound

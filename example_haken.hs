@@ -3,7 +3,6 @@ import Codec.Rga.Parser
 import Data.Vect.Double hiding((.*))
 import EdgeCentered
 import Test.QuickCheck
-import IndexedSimplices
 import Data.Map as M
 import MathUtil
 import Blender

@@ -81,7 +81,7 @@ updateFPS state t1 = do
     writeIORef tR $ t0' + t
     --t0' <- get (t0 state)
     --t0 state $= t0' + t
-    when (t + t0' >= 5000) $ do
+    -- when (t + t0' >= 5000) $ do
     f <- readIORef fR --get (frames state)
     let seconds = (t + t0') / 1000
         fps = fromIntegral f / seconds

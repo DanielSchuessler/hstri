@@ -2,7 +2,7 @@
 module QuadCoordinates.Tests where
 
 import AbstractNeighborhood
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Monad.State
@@ -27,7 +27,7 @@ import Test.QuickCheck.All
 import Triangulation.Random()
 import Triangulation.VertexLink
 import TriangulationCxtObject
-import ZeroDefaultMap
+import Math.SparseVector
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 

@@ -39,6 +39,8 @@ import QuadCoordinates.CanonExt
 --import QuadCoordinates.Class
 import HomogenousTuples
 import StandardCoordinates.MatchingEquations
+import QuadCoordinates.MatchingEquations
+import Triangulation.Class
 
 data PairFate = 
     PairFate {
@@ -94,9 +96,8 @@ data DDInput = DDInput {
     compatible :: IPR -> IPR -> Bool
 }
 
-dd
-  :: Triangulation -> DDResult 
-dd tr = ddWith DDInput {
+dd :: ToTriangulation t => t -> DDResult
+dd (toTriangulation -> tr) = ddWith DDInput {
     numberOfVariables = tNumberOfNormalQuadTypes tr,
     hyperplanes = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr,
     compatible = ipr_compatible
@@ -104,9 +105,8 @@ dd tr = ddWith DDInput {
 
     }
 
-dds
-  :: Triangulation -> DDResult 
-dds tr = ddWith DDInput {
+dds :: ToTriangulation t => t -> DDResult
+dds (toTriangulation -> tr) = ddWith DDInput {
     numberOfVariables = tNumberOfNormalDiscTypes tr,
     hyperplanes = 
         [ map (toRational . evalMatchingEquation me) (tINormalDiscs tr)
@@ -265,16 +265,21 @@ ddSolutions = V.map ipr_value . snd
 ddSolutions' :: DDResult -> Vector (Vector Integer)
 ddSolutions' = V.map makeVecIntegral . ddSolutions
 
-ddSolutionsToQDense :: DDResult -> Vector QuadDenseI
-ddSolutionsToQDense = V.map qd_fromVector . ddSolutions' 
+ddSolutionsToQDense :: ToTriangulation tr => tr -> DDResult -> Vector (QAdmissible QuadDenseI)
+ddSolutionsToQDense tr = V.map (either _err id . quad_admissible tr . qd_fromVector) . ddSolutions' 
+    where
+        _err e =
+            error ("ddSolutionsToQDense: result vector not admissible: "++e)
 
-ddSolutionsToSDense :: Triangulation -> DDResult -> Vector (CanonExt QuadDenseI Integer)
-ddSolutionsToSDense tr = V.map (canonExt tr) . ddSolutionsToQDense
+ddSolutionsToSDense
+  :: ToTriangulation tr =>
+     tr -> DDResult -> Vector (Admissible (CanonExt QuadDenseI Integer))
+ddSolutionsToSDense tr = V.map (canonExt tr) . ddSolutionsToQDense tr
 
-qVertexSolutions :: Triangulation -> Vector QuadDenseI
-qVertexSolutions tr = ddSolutionsToQDense  (dd tr) 
+qVertexSolutions :: ToTriangulation t => t -> Vector (QAdmissible QuadDenseI)
+qVertexSolutions tr = ddSolutionsToQDense tr (dd tr) 
 
 qVertexSolutionExts
-  :: Triangulation -> Vector (CanonExt QuadDenseI Integer)
+  :: ToTriangulation t => t -> Vector (Admissible (CanonExt QuadDenseI Integer))
 qVertexSolutionExts tr = ddSolutionsToSDense tr (dd tr) 
 

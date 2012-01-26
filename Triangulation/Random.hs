@@ -1,10 +1,15 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Triangulation.Random
     (
+     
      randomTriangulation,randT,randomClosed,                                                
-     arbitraryTriangulation,shrinkTriangulation,
-     genTet
+     arbitraryTriangulation,arbitraryClosedTriangulation,shrinkTriangulation,
+     genTet, arbitraryManifoldTriangulation,
+
+     ClosedTriangulation(..),
+     ManifoldTriangulation(..),
 
     )
 
@@ -25,21 +30,34 @@ import Triangulation
 import Util
 import qualified Data.List as L
 import qualified Data.Set as S
-import Data.SumType
 import Data.Maybe
-    
+import QuickCheckUtil
+import Triangulation.Class
+import Triangulation.VertexLink
 
 arbitraryTriangulation :: Gen Triangulation
-arbitraryTriangulation =
+arbitraryTriangulation = arbitraryTriangulationG (\nTets -> choose (0,2*nTets)) 
+
+arbitraryClosedTriangulation :: Gen Triangulation
+arbitraryClosedTriangulation = arbitraryTriangulationG (\nTets -> return (2*nTets))
+
+newtype ClosedTriangulation = ClosedTriangulation Triangulation
+    deriving (ToTriangulation,Show)
+
+instance Arbitrary ClosedTriangulation where 
+    arbitrary = ClosedTriangulation <$> arbitraryClosedTriangulation
+
+arbitraryTriangulationG :: (Int -> Gen Int) -> Gen Triangulation
+arbitraryTriangulationG nGluingsGen =
     sized (\n ->
         let
-            small = (< n) . tNumberOfTetrahedra
+            small = (<= max 1 (n `div` 5)) . tNumberOfTetrahedra
         in
             frequency $ 
                 (2,
                     do
                         nTets <- choose (1::Int,max 1 (n`div`5))
-                        nGluings <- choose (0,2*nTets)
+                        nGluings <- nGluingsGen nTets
                         randT nTets nGluings)
 
                 : mapMaybe 
@@ -63,8 +81,6 @@ shrinkTriangulation t =
             removeGluing g = 
                 mkTriangulation (tNumberOfTetrahedra t) (L.delete g (tOriginalGluings t))
 
-generateUntilRight :: Show a => Gen (Either a b) -> Gen b
-generateUntilRight g = fromRight <$> (g `suchThat` isRight)
 
 randT :: Int -> Int -> Gen Triangulation
 randT nTets nGluings = 
@@ -116,4 +132,15 @@ genI t = liftM2 I (genTet t) arbitrary
 
 genTet ::  Triangulation -> Gen TIndex
 genTet = elements . tTetrahedra_ 
+
+newtype ManifoldTriangulation t = ManifoldTriangulation t
+    deriving (Show,ToTriangulation)
+
+-- | Uses ' arbitraryManifoldTriangulation '
+instance (Arbitrary t, ToTriangulation t) => Arbitrary (ManifoldTriangulation t) where
+    arbitrary = ManifoldTriangulation <$> arbitraryManifoldTriangulation
+
+-- | Generates only manifold triangulations.
+arbitraryManifoldTriangulation :: (Arbitrary t, ToTriangulation t) => Gen t
+arbitraryManifoldTriangulation = arbitrary `suchThat` isManifoldTriangulation 
 

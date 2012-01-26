@@ -1,8 +1,10 @@
-{-# LANGUAGE ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module QuadCoordinates.MatchingEquations where
+
 import AbstractNeighborhood
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Arrow((&&&))
 import Control.Monad.State
 import Data.Function
@@ -12,15 +14,18 @@ import StandardCoordinates.MatchingEquations
 import QuadCoordinates.Class
 import TriangulationCxtObject
 import Data.List as L
+import PrettyUtil
+import Triangulation.Class
 
 
 quad_admissible
-  :: (Ord r, QuadCoords q r) =>
-     Triangulation -> q -> Either [Char] ()
-quad_admissible tr qc = do
+  :: (ToTriangulation tr, Ord r, QuadCoords q r) =>
+     tr -> q -> Either [Char] (QAdmissible q)
+quad_admissible (toTriangulation -> tr) qc = do
     mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient"))) (quadAssocs qc) 
     satisfiesQuadrilateralConstraints tr qc 
     satisfiesQMatchingEquations tr qc
+    return (UnsafeToQAdmissible tr qc)
 
 evalQMatchingEquation
   :: QuadCoords q b => QMatchingEquation -> q -> b
@@ -74,3 +79,29 @@ qMatchingEquations0
      -> [QMatchingEquation]
 qMatchingEquations0 = mapMaybe qMatchingEquation0 . edges
 
+data QAdmissible q = UnsafeToQAdmissible {
+    qadm_Triangulation :: Triangulation,
+    qadm_coords :: q 
+}
+    deriving(Show)
+
+
+-- | Does /not/ compare the triangulations
+instance Eq q => Eq (QAdmissible q) where
+    (==) = (==) `on` qadm_coords
+
+-- | Does /not/ compare the triangulations
+instance Ord q => Ord (QAdmissible q) where
+    compare = compare `on` qadm_coords
+
+instance QuadCoords q r => QuadCoords (QAdmissible q) r where
+    quadCount = quadCount . qadm_coords
+    quadAssocs = quadAssocs . qadm_coords
+    quadAssocsDistinct = quadAssocsDistinct . qadm_coords
+    quadAsSparse = quadAsSparse . qadm_coords
+
+unsafeToQAdmissible :: Triangulation -> q -> QAdmissible q
+unsafeToQAdmissible = UnsafeToQAdmissible
+
+instance Pretty q => Pretty (QAdmissible q) where
+    prettyPrec prec = prettyPrec prec . qadm_coords

@@ -3,27 +3,23 @@
 {-# OPTIONS -Wall #-}
 module Blenderable where
 
-
+import ConcreteNormal.PreRenderable
+import Data.AscTuples
 import Data.Function
 import Data.List
-import Data.Vect.Double
 import DisjointUnion
-import HomogenousTuples
-import Prelude hiding(catch,mapM_,sequence_) 
-import ToPython
-import PreRenderable
 import GHC.Generics
-import SimplicialPartialQuotient
-import Simplicial.SimplicialComplex
-import Simplicial.DeltaSet2
-import ConcreteNormal.PreRenderable
+import HomogenousTuples
+import Language.Haskell.TH.Lift
 import NormalEverything
+import Prelude hiding(catch,mapM_,sequence_) 
 import PrettyUtil
 import ShortShow
-import Util
+import Simplicial.DeltaSet2
+import StandardCoordinates.MatchingEquations
 import THUtil
-import Data.AscTuples
-import Language.Haskell.TH.Lift
+import ToPython
+import Util
 
 data Blenderable s = Blenderable { 
     ba_pr :: PreRenderable s,
@@ -281,13 +277,13 @@ instance (Ord v, ShortShow v, Pretty v, Show v) => ToBlenderable (SPQWithCoords 
     toBlenderable = fromSpqwc
 
 fromNormalSurface
-  :: (Integral i, Ord v, Pretty i, ShortShow v, StandardCoords s i, Show v) =>
-     SPQWithCoords v -> s -> Blenderable (SC2 (Corn v))
+  :: (i ~ Integer, Integral i, Ord v, Pretty i, ShortShow v, StandardCoords s i, Show v) =>
+     SPQWithCoords v -> Admissible s -> Blenderable (SC2 (Corn v))
 fromNormalSurface spqwc stc = mkBlenderable normalSurfaceStyle (normalSurfaceToPreRenderable spqwc stc) 
 
 fromIntegerNormalSurface
   :: (Ord v, ShortShow v, StandardCoords s Integer, Show v) =>
-     SPQWithCoords v -> s -> Blenderable (SC2 (Corn v))
+     SPQWithCoords v -> Admissible s -> Blenderable (SC2 (Corn v))
 fromIntegerNormalSurface = fromNormalSurface
 
 
@@ -298,7 +294,7 @@ fromSpqwcAndIntegerNormalSurface
       ShortShow v,
       StandardCoords s Integer) =>
      SPQWithCoords v
-     -> s
+     -> Admissible s
      -> Blenderable
           (DJSCons
              (Asc3 v)

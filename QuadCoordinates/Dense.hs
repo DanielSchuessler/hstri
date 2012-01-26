@@ -62,7 +62,7 @@ qd_fromVector v =
     assert (mod (VG.length v) 3 == 0) $
     WrappedVector v
 
-instance (VG.Vector v r, Num r) => QuadCoords (QuadDense v r) r where
+instance (VG.Vector v r, Num r, Ord r, Ord (v r)) => QuadCoords (QuadDense v r) r where
     quadCount v i = qd_toVector v VG.! fromEnum i
     quadAssocs = filter ((/= 0) . snd) . zip [toEnum 0 ..] . VG.toList . qd_toVector
 

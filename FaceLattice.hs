@@ -18,13 +18,12 @@ import Data.GraphViz.Printing
 import Data.List(genericLength)
 import Data.Maybe
 import qualified Data.Text.Lazy as Text
-import IndexedSimplices
 import System.Process
 import System.SimpleArgs(getArgs)
 import Triangulation
 import TriangulationCxtObject
 import qualified Data.Text.Lazy.IO as TextIO
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Exception
 import QuickCheckUtil
 import System.Exit
@@ -142,7 +141,7 @@ faceLattice ::  Triangulation -> Gr FLN FLE
 faceLattice = do
         tets <- tTetrahedra_ 
         ts <- triangles 
-        es <- AbstractTetrahedron.edges
+        es <- Tetrahedron.edges
         vs <- vertices
 
         let 

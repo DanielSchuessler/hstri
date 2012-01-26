@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, NoMonomorphismRestriction, TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses #-} 
 module BarySD where
 
-import AbstractTetrahedron
+import Tetrahedron
 import HomogenousTuples
 
 data BaryTet = BaryTet (Triple Vertex)

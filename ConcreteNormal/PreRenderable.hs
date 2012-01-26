@@ -7,7 +7,7 @@ module ConcreteNormal.PreRenderable(
     module Simplicial.SimplicialComplex,
     Corn,corn,cornVerts,
     normalSurfaceToPreRenderable,
-    CornerPosition,CornerCount,
+    CornerPosition',CornerCount,
 
     ) where
 
@@ -18,20 +18,22 @@ import Data.Vect.Double(interpolate)
 import DisjointUnion
 import HomogenousTuples
 import Language.Haskell.TH
+import Language.Haskell.TH.Syntax
 import PreRenderable
 import PrettyUtil
 import ShortShow
 import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
+import StandardCoordinates.MatchingEquations
 import TriangulationCxtObject
 import Util
-import Language.Haskell.TH.Syntax
 
+type CornerPosition' = Int
 type CornerCount = Int
 
 -- | An interior point of an edge of the 'SimplicialPartialQuotient'
-data Corn v = Corn CornerPosition CornerCount v v
+data Corn v = Corn CornerPosition' CornerCount v v
                     -- INVARIANT: Third field <= fourth field
     deriving(Eq,Ord,Show)
 
@@ -47,40 +49,39 @@ instance Pretty v => Pretty (Corn v) where
         prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty v0,anyPretty v1] 
 
 
-corn :: (Ord v) => CornerPosition -> CornerCount -> v -> v -> Corn v
+corn :: (Ord v) => CornerPosition' -> CornerCount -> v -> v -> Corn v
 corn pos n u0 u1 =
                 if u0 <= u1
                    then Corn pos           n u0 u1
                    else Corn (n - pos - 1) n u1 u0
 
 normalSurfaceToPreRenderable
-  :: forall s v i. (Integral i, Show v, Ord v, Pretty i, ShortShow v, StandardCoords s i) =>
+  :: forall s v i. (i ~ Integer, Integral i, Show v, Ord v, Pretty i, ShortShow v, StandardCoords s i) =>
      SPQWithCoords v
-     -> s
+     -> Admissible s
      -> PreRenderable (SC2 (Corn v))
 normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =  
     let
-        tr = spq_tr spq
 
         tris :: [Triple (Corn v)]
         tris = do
-            cx <- concreteTris tr ns 
+            cx <- concreteTris ns 
             let (viewI -> I i x) = c_type cx
 
             let f corner = 
                     mkCorn 
-                        (posOfCornerOfTri ns cx corner)
+                        (unPos $ posOfCornerOfTri cx corner)
                         (i ./ corner)
 
             [ map3 f (normalCorners x) ]
 
         quads :: [Quadruple (Corn v)]
         quads = do
-            cx <- concreteQuads tr ns
+            cx <- concreteQuads ns
             let (viewI -> I i x) = c_type cx
             let f corner = 
                     mkCorn 
-                        (posOfCornerOfQuad ns cx corner)
+                        (unPos $ posOfCornerOfQuad cx corner)
                         (i ./ corner)
 
             [ map4 f (normalCorners x) ]
@@ -88,7 +89,7 @@ normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =
 
         (sc,quadDiagonals) = fromTrisAndQuads tris quads
 
-        mkCorn :: CornerPosition -> INormalCorner -> Corn v
+        mkCorn :: CornerPosition' -> INormalCorner -> Corn v
         mkCorn pos nonCanonicalINormalCorner =
             let
                 n = numberOfCornersOfType ns nonCanonicalINormalCorner

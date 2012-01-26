@@ -26,7 +26,7 @@ module Tetrahedron.NormalArc(
 
     where
 
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Exception
 import Data.Maybe
 import Element

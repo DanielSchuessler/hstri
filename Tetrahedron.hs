@@ -1,6 +1,6 @@
 {-# LANGUAGE NoMonomorphismRestriction, FlexibleInstances, TemplateHaskell, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
 {-# OPTIONS -Wall #-}
-module AbstractTetrahedron(
+module Tetrahedron(
     module Math.Groups.S2,
     module Math.Groups.S3,
     module TIndex,
@@ -9,7 +9,7 @@ module AbstractTetrahedron(
     module Tetrahedron.Edge,
     module Tetrahedron.Triangle,
     module AbsTet,
-    module AbstractTetrahedron2,
+    module Tetrahedron.Constants,
     module OrderableFace,
     module Data.Word,
 
@@ -21,7 +21,7 @@ module AbstractTetrahedron(
     
     where
 
-import AbstractTetrahedron2
+import Tetrahedron.Constants
 import AbsTet
 import Control.Exception
 import Control.Monad.RWS

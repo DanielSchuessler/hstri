@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns, FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, ScopedTypeVariables #-}
 module QuadCoordinates.CanonExt where
 
 import Control.Exception
@@ -8,29 +8,30 @@ import Data.Map(Map,unionsWith,singleton,elems,insertWith,(!))
 import HomogenousTuples
 import PrettyUtil
 import QuadCoordinates.Class
+import QuadCoordinates.MatchingEquations
 import StandardCoordinates.Class
 import StandardCoordinates.MatchingEquations
 import THUtil
 import TriangulationCxtObject
-import ZeroDefaultMap
+import Math.SparseVector
 import qualified Data.Map as M
+import Triangulation.Class
 
 
-canonExtDbg
-  :: (Ord r, Pretty (CanonExt a r), Pretty a, QuadCoords a r) =>
-     Triangulation -> a -> CanonExt a r
-canonExtDbg tr qc =
-    case canonExt tr qc of
-         sc ->
+canonExtDbg = canonExt
 
-             case admissible tr sc of
-                Right () -> sc
-                Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
-                                    $(showExps ['qc,'sc]))
-
+--canonExtDbg tr qc =
+--     case canonExt tr qc of
+--          sc ->
+-- 
+--              case admissible tr sc of
+--                 Right () -> sc
+--                 Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
+--                                     $(showExps ['qc,'sc]))
+-- 
 data CanonExt q r = CanonExt {
     canonExt_quads :: q,
-    canonExt_tris :: ZeroDefaultMap INormalTri r
+    canonExt_tris :: SparseVector INormalTri r
 }
     deriving (Eq, Ord, Show)
 
@@ -43,21 +44,40 @@ instance (Pretty q, Pretty r, Num r, Ord r) => Pretty (CanonExt q r) where
 instance QuadCoords q r => QuadCoords (CanonExt q r) r where
     quadCount = quadCount . canonExt_quads
     quadAssocs = quadAssocs . canonExt_quads
+    quadAssocsDistinct = quadAssocs . canonExt_quads
 
 instance (Num r, QuadCoords q r) => StandardCoords (CanonExt q r) r where
-    triCount = zdm_get . canonExt_tris 
-    triAssocs = zdm_toAssocs . canonExt_tris 
+    discCount = default_discCount_from_triQuadCount
+    discAssocs = default_discAssocs_from_triQuadAssocs
+    discAssocsDistinct = default_discAssocsDistinct_from_triQuadAssocsDistinct
 
-canonExt :: forall q r. (Pretty q, QuadCoords q r, Ord r) => 
-    Triangulation -> q -> CanonExt q r
-canonExt tr qc = CanonExt qc
-                    (zdm_fromMap 
-                     (unionsWith 
-                        (\ _ _ -> assert False undefined) 
-                         vertexLinkCoeffss))
+    standardAsSparse = sparse_fromAssocs . discAssocsDistinct
+
+
+    triCount = sparse_get . canonExt_tris 
+    triAssocs = triAssocsDistinct
+    triAssocsDistinct = sparse_toAssocs . canonExt_tris 
+
+canonExt :: forall q r tr. (ToTriangulation tr, Pretty q, QuadCoords q r, Ord r, Pretty r) => 
+    tr -> QAdmissible q -> Admissible (CanonExt q r)
+canonExt (toTriangulation -> tr) qc = 
+
+
+             case admissible tr preResult of
+                Right x -> x
+                Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
+                                    $(showExps ['qc,'preResult]))
+
                          
 
     where
+        preResult = CanonExt (qadm_coords qc)
+                        (sparse_fromMap 
+                        (unionsWith 
+                            (\ _ _ -> assert False undefined) 
+                            vertexLinkCoeffss))
+
+
         vertexLinkCoeffss = map goVertex (vertices tr)
        
         goVertex :: TVertex -> Map INormalTri r  

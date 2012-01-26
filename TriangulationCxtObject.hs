@@ -26,6 +26,7 @@ module TriangulationCxtObject(
     vertexLinkingSurfaceTris,
     dfsVertexLink,
     preimageListOfVertex,
+    preimageListOfVertexDistinct,
     degreeOfVertex,
 
     -- * Edges
@@ -85,7 +86,7 @@ module TriangulationCxtObject(
     ) where
 
 
-import AbstractTetrahedron
+import Tetrahedron
 import Collections
 import Control.Exception
 import Control.Monad.Reader
@@ -105,6 +106,7 @@ import ShortShow
 import Triangulation
 import Triangulation.CanonOrdered
 import Util
+import Triangulation.Class
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -147,7 +149,11 @@ preimageList :: IsEquivalenceClass (T a) => T a -> [Element (T a)]
 preimageList = asList
 
 preimageListOfVertex :: TVertex -> [IVertex]
-preimageListOfVertex y = eqvEquivalents (vertexEqv (getTriangulation y)) (unT y)
+preimageListOfVertex = preimageListOfVertexDistinct
+
+preimageListOfVertexDistinct :: TVertex -> [IVertex]
+preimageListOfVertexDistinct y = asList $ eqvClassOf (vertexEqv (getTriangulation y)) (unT y)
+
 degreeOfVertex :: TVertex -> Int
 degreeOfVertex y = ecSize (eqvClassOf (vertexEqv (getTriangulation y)) (unT y))
 
@@ -367,10 +373,14 @@ isBoundaryTriangle = (==1) . ecSize
 
 
 -- | This instance assumes the invariant that the @a@ in the @T a@ is always a canonical representative of its equivalence class!
+--
+-- Does not compare the triangulations.
 instance (Eq a) => Eq (T a) where 
     (==) = (==) `on` unT
 
 -- | This instance assumes the invariant that the @a@ in the @T a@ is always a canonical representative of its equivalence class!
+--
+-- Does not compare the triangulations.
 instance (Ord a) => Ord (T a) where 
     compare = compare `on` unT
 
@@ -488,9 +498,8 @@ instance Intersection TEdge TEdge TEdgeIntersection where
 
 -- | Maps a thing from the disjoint union of tetrahedra of a triangulation to its image in the quotient space
 pMap
-  :: TriangulationDSnakeItem a =>
-     Triangulation -> a -> T a
-pMap t x = UnsafeMakeT t (canonicalize t x)
+  :: (TriangulationDSnakeItem a, ToTriangulation t) => t -> a -> T a
+pMap (toTriangulation -> t) x = UnsafeMakeT t (canonicalize t x)
 
 -- instance MakeTVertex (Triangulation, IVertex) where
 --     tvertex (t, x) = UnsafeMakeT t (canonicalizeIVertex t x) 

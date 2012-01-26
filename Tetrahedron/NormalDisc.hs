@@ -3,7 +3,7 @@
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module Tetrahedron.NormalDisc(
-        module AbstractTetrahedron,
+        module Tetrahedron,
         module Tetrahedron.NormalArc,
 
         -- * Normal discs
@@ -51,7 +51,7 @@ module Tetrahedron.NormalDisc(
 
     ) where
 
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Applicative
 import Control.Arrow((&&&))
 import Control.Monad

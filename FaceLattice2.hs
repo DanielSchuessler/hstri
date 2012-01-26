@@ -3,7 +3,7 @@
 module FaceLattice2 where
 
 
-import AbstractTetrahedron
+import Tetrahedron
 import Control.DeepSeq
 import Control.Exception
 import Data.Colour as Colour
@@ -18,7 +18,6 @@ import Data.GraphViz.Attributes.Complete
 import Data.GraphViz.Printing(printIt)
 import Data.List(genericLength)
 import Data.Maybe
-import IndexedSimplices
 import Latexable
 import QuickCheckUtil
 import System.Exit

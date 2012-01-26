@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, ViewPatterns, NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell, FlexibleContexts, ViewPatterns, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module QuickCheckUtil where
 
@@ -9,6 +9,11 @@ import Data.Graph.Inductive.Tree
 import Data.Graph.Inductive.Graph
 import qualified Data.Vector as V
 import Element
+import qualified Data.Vector.Generic as VG
+import Data.SumType
+import Control.Applicative
+import Data.Maybe
+import Math.NumberTheory.Primes.Factorisation
 
 cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
 cart = liftM2 (,)
@@ -98,3 +103,38 @@ noDupes (asList -> xs) =
     S.size (S.fromList xs) .=. length xs 
 
 
+elementsV :: (Ord b, VG.Vector v b) => v b -> Gen b
+elementsV v | VG.null v = error "elementsV: empty vector"
+elementsV v = do
+    i <- choose (0,VG.maxIndex v)
+    return (v VG.! i)
+
+generateUntilRight :: Show a => Gen (Either a b) -> Gen b
+generateUntilRight g = fromRight <$> (g `suchThat` isRight)
+
+generateUntilJust :: Gen (Maybe b) -> Gen b
+generateUntilJust g = fromJust <$> (g `suchThat` isJust)
+
+
+arbitraryDivisor :: Integer -> Gen Integer
+arbitraryDivisor i =
+    let
+        factorisation = factorise i
+    in
+        do
+            powers <- mapM (\n -> choose (0,n)) (map snd factorisation)
+            return (product [ p ^ k | (p,k) <- zip (map fst factorisation) powers ])
+
+
+-- arbitraryConvexCombination v 
+--     | VG.null v = assert False undefined
+--     | otherwise = do
+-- 
+--         (coeffs,sum) <- (do
+--             coeffs <- vectorOf (VG.length v) (choose (0,1)) 
+--             return (coeffs, sum coeffs))
+-- 
+--                         `suchThat` (
+-- 
+-- 
+-- 

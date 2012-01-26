@@ -122,7 +122,7 @@ ptcToIVertex (ivertex :: IVertex) (ptc :: PaperTriangleCorner) =
 auto :: Triangulation -> [IVertex] -> IO StructureGraphLayout
 auto tr verts = 
     let
-        nnu = nuFromList (concatMap (asList . structureGraphPortsForVertex) verts)
+        nnu = nuFromDistinctList (concatMap (asList . structureGraphPortsForVertex) verts)
 
         _edges = [(sge_from e, sge_to e, Just e) | e <- structureGraphEdges tr verts ]
                  ++

@@ -5,8 +5,10 @@ module HsTri(
     module Blender,
     module Blenderable,
     module ClosedOrCensus6,
+    module Codec.Rga.Writer,
     module ConcreteNormal.PreRenderable,
     module Data.AscTuples,
+    module Data.FormalOps,
     module Data.Vect.Double.Base,
     module DisjointUnion,
     module DotUtil,
@@ -20,9 +22,14 @@ module HsTri(
     module PreRenderable,
     module PrettyUtil,
     module QuadCoordinates,
+    module QuadCoordinates.CanonExt,
+    module QuadCoordinates.Dense,
+    module QuadCoordinates.MatchingEquations,
     module Simplicial.SimplicialComplex,
     module StandardCoordinates,
-    module Triangulation.VertexLink,
+    module StandardCoordinates.Dense,
+    module StandardCoordinates.MatchingEquations,
+    module StandardCoordinates.SurfaceQueries,
     module THUtil,
     module Tetrahedron.NormalConstants,
     module Tetrahedron.NormalDisc,
@@ -31,24 +38,21 @@ module HsTri(
     module TriArcGraph,
     module Triangulation.Class,
     module Triangulation.Random,
+    module Triangulation.Transformations,
+    module Triangulation.VertexLink,
     module TriangulationCxtObject,
     module VerboseDD,
-    module QuadCoordinates.CanonExt,
-    module QuadCoordinates.Dense,
-    module StandardCoordinates.Dense,
-    module Data.FormalOps,
-    module Triangulation.Transformations,
-    module QuadCoordinates.MatchingEquations,
-    module StandardCoordinates.MatchingEquations,
-    module Codec.Rga.Writer
+
     ) where
 
 
 import Blender
 import Blenderable
 import ClosedOrCensus6
+import Codec.Rga.Writer
 import ConcreteNormal.PreRenderable
 import Data.AscTuples
+import Data.FormalOps
 import Data.Vect.Double.Base(Vec3)
 import DisjointUnion
 import DotUtil(viewDot)
@@ -62,9 +66,14 @@ import Latexable
 import PreRenderable
 import PrettyUtil
 import QuadCoordinates
+import QuadCoordinates.CanonExt
+import QuadCoordinates.Dense
+import QuadCoordinates.MatchingEquations
 import Simplicial.SimplicialComplex
 import StandardCoordinates
-import QuadCoordinates.CanonExt
+import StandardCoordinates.Dense
+import StandardCoordinates.MatchingEquations
+import StandardCoordinates.SurfaceQueries
 import THUtil
 import Tetrahedron.NormalConstants
 import Tetrahedron.NormalDisc
@@ -73,13 +82,8 @@ import Tikz.Preview
 import TriArcGraph
 import Triangulation.Class
 import Triangulation.Random
+import Triangulation.Transformations
+import Triangulation.VertexLink
 import TriangulationCxtObject
 import VerboseDD
-import Triangulation.VertexLink
-import Data.FormalOps
-import Triangulation.Transformations
-import QuadCoordinates.MatchingEquations
-import StandardCoordinates.MatchingEquations
-import QuadCoordinates.Dense
-import StandardCoordinates.Dense
-import Codec.Rga.Writer
+

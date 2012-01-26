@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, TupleSections, ScopedTypeVariables, DeriveFunctor, TypeFamilies, StandaloneDeriving, GeneralizedNewtypeDeriving, ImplicitParams, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-orphans #-}
 module StandardCoordinates(
     module Data.VectorSpace,
     module StandardCoordinates.Class,
@@ -9,7 +9,6 @@ module StandardCoordinates(
     stc_fromDenseList,
     stc_toAssocs,
     stc_fromAssocs,
-    ToStandardCoordinates(..),
     -- * Properties
     stc_coefficient,
     stc_coefficientIsZero,
@@ -40,7 +39,7 @@ module StandardCoordinates(
 
     ) where
 
-import AbstractTetrahedron as Abstract
+import Tetrahedron as Abstract
 import Control.Arrow
 import Control.Exception
 import Control.Monad.Reader
@@ -52,113 +51,92 @@ import Data.Ratio
 import Data.VectorSpace hiding(Sum)
 import HomogenousTuples
 import INormalDisc
-import IndexedSimplices
 import MathUtil
 import PolymakeInterface
 import Prelude hiding(lookup)
-import PrettyUtil
 import Quote
 import Test.QuickCheck
 import Triangulation
 import TriangulationCxtObject
-import ZeroDefaultMap
+import Math.SparseVector
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.SumType
 import StandardCoordinates.Class
 import StandardCoordinates.MatchingEquations
-import QuadCoordinates.Class
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 
-newtype StandardCoordinates r = SC { stc_toZDM :: ZeroDefaultMap INormalDisc r } 
-    deriving(AdditiveGroup,InnerSpace)
+type StandardCoordinates r = SparseVector INormalDisc r
+    
+stc_toZDM = id
+stc_fromZDM = id
+
 
 stc_toMap :: StandardCoordinates r -> Map INormalDisc r
-stc_toMap = illdefinedZdmToMap . stc_toZDM
+stc_toMap = illdefinedSparseToMap . stc_toZDM
 
 stc_fromMap :: Num r => Map INormalDisc r -> StandardCoordinates r
-stc_fromMap = SC . zdm_fromMap
+stc_fromMap = stc_fromZDM . sparse_fromMap
 
-instance Num r => VectorSpace (StandardCoordinates r) where 
-    type Scalar (StandardCoordinates r) = r
-    r *^ SC x = SC (r *^ x)
+-- instance Num r => VectorSpace (StandardCoordinates r) where 
+--     type Scalar (StandardCoordinates r) = r
+--     r *^ (stc_toZDM -> x) = stc_fromZDM (r *^ x)
 
 
 stc_map
   :: Num r' =>
      (r -> r') -> StandardCoordinates r -> StandardCoordinates r'
-stc_map f = SC . zdm_map f . stc_toZDM
+stc_map f = stc_fromZDM . sparse_map f . stc_toZDM
 
 
 
 
 --deriving instance (Pretty r) => Pretty (StandardCoordinates r)
 
-instance Pretty r => Pretty (StandardCoordinates r) where
-    pretty sc = pretty (stc_toAssocs sc) 
 
-instance (Pretty r) => Show (StandardCoordinates r) where
-    showsPrec = prettyShowsPrec
-
-class ToStandardCoordinates a where
-    standardCoordinates :: Num r => a -> StandardCoordinates r
-
-instance ToStandardCoordinates INormalDisc where
-    standardCoordinates x = SC (zdm_singleton x 1)
-
-instance ToStandardCoordinates INormalTri where
-    standardCoordinates = standardCoordinates . iNormalDisc
-
-instance ToStandardCoordinates INormalQuad where
-    standardCoordinates = standardCoordinates . iNormalDisc
-
-mkNormalTri :: (Num r) => IVertex -> StandardCoordinates r
-mkNormalTri = standardCoordinates . iNormalTri
+-- instance (Pretty r) => Show (StandardCoordinates r) where
+--     showsPrec = prettyShowsPrec
 
 
 
-mkNormalQuadByVertexAndTTriangle :: (Num r) => Vertex -> ITriangle -> StandardCoordinates r
-mkNormalQuadByVertexAndTTriangle v t =
-    standardCoordinates (iNormalQuadByVertexAndITriangle v t)
 
-mkTetrahedralSolution :: (Num r) => TIndex -> StandardCoordinates r
+
+
 mkTetrahedralSolution ti = 
-    sumV (fmap standardCoordinates (normalTriList ti)
+    sumV (fmap standardAsSparse (normalTriList ti)
           ++
-          fmap (negateV . standardCoordinates) (normalQuadList ti))
+          fmap (negateV . standardAsSparse) (normalQuadList ti))
 
-mkEdgeSolution :: (Num r) => TEdge -> StandardCoordinates r
 mkEdgeSolution e =
         sumV (f <$> equivalentIEdges e)
     where
         f preimage = (t1 ^+^ t2) ^-^ q
             where
-                (t1,t2) = map2 standardCoordinates (normalTris preimage)
-                q = standardCoordinates (iNormalQuadByDisjointEdge (forgetVertexOrder preimage))
+                (t1,t2) = map2 standardAsSparse (normalTris preimage)
+                q = standardAsSparse (iNormalQuadByDisjointEdge (forgetVertexOrder preimage))
 
 -- | Construct the Kang-Rubinstein basis for the solution space of the matching equations of tindex triangulation
-krBasis :: Num r => Triangulation -> [StandardCoordinates r]
 krBasis t = (mkTetrahedralSolution <$> tTetrahedra_ t) ++ (mkEdgeSolution <$> (edges t))
 
 
 stc_coefficient
   :: (Num r, MakeINormalDisc a) => StandardCoordinates r -> a -> r
-stc_coefficient (SC sc) = zdm_get sc . iNormalDisc
+stc_coefficient (stc_toZDM -> sc) = sparse_get sc . iNormalDisc
 
 
-instance Num i => QuadCoords (StandardCoordinates i) i where
-    quadCount = defaultQuadCount
-    quadAssocs = defaultQuadAssocs
-
-instance Num i => StandardCoords (StandardCoordinates i) i where
-    discCount = stc_coefficient
-    discAssocs = stc_toAssocs
+-- instance (Ord i, Num i) => QuadCoords (StandardCoordinates i) i where
+--     quadCount = defaultQuadCount
+--     quadAssocs = defaultQuadAssocs
+-- 
+-- instance (Ord i, Num i) => StandardCoords (StandardCoordinates i) i where
+--     discCount = stc_coefficient
+--     discAssocs = stc_toAssocs
 
 stc_coefficientIsZero
   :: (Num r, MakeINormalDisc a) =>
      StandardCoordinates r -> a -> Bool
-stc_coefficientIsZero (SC sc) = zdm_isZero sc . iNormalDisc
+stc_coefficientIsZero (stc_toZDM -> sc) = sparse_isZero sc . iNormalDisc
 
 
 
@@ -178,14 +156,14 @@ stc_coefficientIsZero (SC sc) = zdm_isZero sc . iNormalDisc
 getVertexSolutions :: forall s. PmScalar s => Triangulation -> IO [[s]]
 getVertexSolutions t = do 
     let k = triangTetCount t
-        matchingEquations_ = fmap ( (0 :) . ns_toDenseList t ) (matchingEquations t)
+        matchingEquations_ = fmap ( (0 :) . fmap fromInteger . ns_toDenseList t ) (matchingEquations t)
 
     liftIO (putStrLn ("matching equations = "++show matchingEquations_))
     
     let
         nonNegativityConditions :: [[s]]
         nonNegativityConditions = 
-            [ 0 : ns_toDenseList t (standardCoordinates x) | x <- tINormalDiscs t ]
+            [ 0 : fmap fromInteger (ns_toDenseList t (standardAsSparse x)) | x <- tINormalDiscs t ]
 
         sumOne :: [s]
         sumOne =
@@ -196,9 +174,7 @@ getVertexSolutions t = do
 
 stc_fromDenseList
   :: Num r => Triangulation -> [r] -> StandardCoordinates r
-stc_fromDenseList t = sumV . zipWith f (tINormalDiscs t)
-    where
-        f nd r = r *^ standardCoordinates nd 
+stc_fromDenseList tr = sparse_fromAssocs . zip (tINormalDiscs tr)
 
 
 getVertexSolutions' :: PmScalar s => Triangulation -> IO [StandardCoordinates s]
@@ -221,10 +197,10 @@ getFundamentalEdgeSurfaces tr =
 
 
 stc_toAssocs :: StandardCoordinates r -> [(INormalDisc, r)]
-stc_toAssocs = zdm_toAssocs . stc_toZDM
+stc_toAssocs = sparse_toAssocs . stc_toZDM
 
 stc_fromAssocs :: Num r => [(INormalDisc, r)] -> StandardCoordinates r
-stc_fromAssocs = SC . zdm_fromAssocs
+stc_fromAssocs = stc_fromZDM . sparse_fromAssocs
 
 
 toFundamentalEdgeSurface :: Integral i => StandardCoordinates (Ratio i) -> StandardCoordinates i
@@ -239,10 +215,10 @@ toFundamentalEdgeSurface stc =
 
 normalArcCounts
   :: Num a => StandardCoordinates a -> M.Map (I NormalArc) a
-normalArcCounts (SC m) = 
+normalArcCounts (stc_toZDM -> m) = 
     M.fromListWith (+)
     . concatMap (\(d,r) -> fmap (,r) (normalArcList d)) 
-    . zdm_toAssocs
+    . sparse_toAssocs
     $ m
 
 
@@ -270,27 +246,24 @@ instance Quote r => Quote (StandardCoordinates r) where
             (quoteApp "stc_fromAssocs" (stc_toAssocs x))
 
 
--- | Sum of the coordinates of the elements
-instance ToStandardCoordinates a => ToStandardCoordinates [a] where
-    standardCoordinates xs = sumV (fmap standardCoordinates xs)
 
 
 
 stc_set
   :: (Num r, MakeINormalDisc a) =>
      a -> r -> StandardCoordinates r -> StandardCoordinates r
-stc_set d r (SC m) = SC (zdm_set (iNormalDisc d) r m)
+stc_set d r (stc_toZDM -> m) = stc_fromZDM (sparse_set (iNormalDisc d) r m)
 
 -- | Identified through the standard inner product
 type StandardCoordinateFunctional r = StandardCoordinates r 
 
+
+
 matchingEquationReasonToVector
   :: Num r => MatchingEquationReason -> StandardCoordinateFunctional r
-matchingEquationReasonToVector (MatchingEquationReason x x' v v') =
-                              (mkNormalTri (getTIndex x ./ v)
-                          ^+^ mkNormalQuadByVertexAndTTriangle v x)
-                          ^-^ mkNormalTri (getTIndex x' ./ v')
-                          ^-^ mkNormalQuadByVertexAndTTriangle v' (forgetVertexOrder x')
+matchingEquationReasonToVector me =
+    sparse_fromAssocs (fmap (id &&& (fromInteger . evalMatchingEquation me))
+                            (asList (matchingEquationSupportDiscs me)))
 
 matchingEquations ::  Num r => Triangulation -> [StandardCoordinateFunctional r]
 matchingEquations = liftM (fmap matchingEquationReasonToVector) matchingEquationReasons
@@ -305,5 +278,5 @@ explainMatchingEquations t = putStrLn $
     unlines (concatMap (\(x,y) -> [show (x :: StandardCoordinateFunctional Double), 
                                    "\t"++show y]) 
                        (matchingEquationsWithReasons t)) 
-
+ 
 

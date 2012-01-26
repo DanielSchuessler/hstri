@@ -42,7 +42,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
-import ZeroDefaultMap
+import Math.SparseVector
 import qualified Data.DList as DL
 import Data.Char
 import Debug.Trace
@@ -141,10 +141,10 @@ ratioToIntegral :: Integral a => Ratio a -> Maybe a
 ratioToIntegral r = guard (denominator r == 1) >> Just (numerator r)
                   
 lcms :: (Integral b, Fold.Foldable t) => t b -> b
-lcms = Fold.foldr lcm 1
+lcms = Fold.foldl' lcm 1
 
 denomLcms :: (Integral b, Fold.Foldable t) => t (Ratio b) -> b
-denomLcms = Fold.foldr (\x r -> lcm (denominator x) r) 1
+denomLcms = Fold.foldl' (\r x -> lcm (denominator x) r) 1
 
 data ERT r =
       SwapRows {-# UNPACK #-} !Int {-# UNPACK #-} !Int
@@ -364,16 +364,16 @@ symbolicSolution
      Vector (v r)
      -> (Int -> variable)
      -> ((Vector (v r), [ERT r], [Int]),
-         Vector (ZeroDefaultMap variable r))
+         Vector (SparseVector variable r))
 symbolicSolution mtx0 mkVar = 
     case toReducedEchelon mtx0 of
       echelon@(mtx',_,pcis) -> (echelon, symbolicSolutionForEchelon mtx' pcis mkVar)
 
 symbolicSolutionForEchelon
   :: forall r variable v. (Fractional r, Ord variable, VG.Vector v r, Ord r, Show variable, Pretty r) =>
-     Vector (v r) -> [Int] -> (Int -> variable) -> Vector (ZeroDefaultMap variable r)
+     Vector (v r) -> [Int] -> (Int -> variable) -> Vector (SparseVector variable r)
 symbolicSolutionForEchelon mtx' [] mkVar = 
-            V.generate (cols mtx') (flip zdm_singleton 1 . mkVar)
+            V.generate (cols mtx') (flip sparse_singleton 1 . mkVar)
 
 
 symbolicSolutionForEchelon mtx' pivotColumnIndices mkVar = V.create creat 
@@ -381,17 +381,17 @@ symbolicSolutionForEchelon mtx' pivotColumnIndices mkVar = V.create creat
                 lastNonzeroRow = length pivotColumnIndices - 1
                 isPivot = flip S.member (S.fromList pivotColumnIndices) 
 
-                creat :: forall s. ST s (VM.MVector s (ZeroDefaultMap variable r)) 
+                creat :: forall s. ST s (VM.MVector s (SparseVector variable r)) 
                 creat = do
                     v <- VM.new (cols mtx')
                     let
-                        _write :: Int -> ZeroDefaultMap variable r -> ST s ()
+                        _write :: Int -> SparseVector variable r -> ST s ()
                         _write j y = 
 --                            $(traceExps "_write" ['j,'y]) 
                             
                             (VM.write v j y)
 
-                        setVarFree j' = _write j' (zdm_singleton (mkVar j') 1)
+                        setVarFree j' = _write j' (sparse_singleton (mkVar j') 1)
 
                     let
                         loop i j pcis0
@@ -412,7 +412,7 @@ symbolicSolutionForEchelon mtx' pivotColumnIndices mkVar = V.create creat
 
 
 
-                            let _sum = zdm_fromAssocs _sumAssocs
+                            let _sum = sparse_fromAssocs _sumAssocs
                                 _sumAssocs = 
                                         mapMaybe (\jj ->
                                             let

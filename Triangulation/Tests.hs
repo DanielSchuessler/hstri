@@ -6,7 +6,7 @@ import Triangulation
 import Triangulation.InnerNormalArc
 import Triangulation.CanonOrdered
 import TriangulationCxtObject
-import Triangulation.Random()
+import Triangulation.Random
 import Test.QuickCheck
 import Control.Applicative
 import THUtil
@@ -174,3 +174,7 @@ prop_gluingMapOITriangle ot1 ot2 =
     gluingMap (oiTriangleGluing ot1 ot2) ot1 .=. ot2
 
 
+prop_closedTriangulationGenGeneratesClosed
+  :: ClosedTriangulation -> Bool
+prop_closedTriangulationGenGeneratesClosed (ClosedTriangulation tr) =
+    isClosedTriangulation tr

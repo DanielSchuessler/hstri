@@ -6,7 +6,7 @@ module Simplicial.SimplicialComplex where
 
 
 --import Simplicial.Labels
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Arrow
 import Control.Exception
 import Control.Monad

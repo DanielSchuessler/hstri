@@ -3,7 +3,7 @@
 {-# OPTIONS -Wall #-}
 module Triangulation.FacetGluing where
 
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Applicative
 import HomogenousTuples
 import Data.Maybe

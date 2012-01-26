@@ -7,7 +7,7 @@ import Tetrahedron.NormalDisc
 import HomogenousTuples
 import ONormal
 import Control.Exception
-import AbstractTetrahedron()
+import Tetrahedron()
 import Control.Applicative
 
 type INormalCorner = I NormalCorner

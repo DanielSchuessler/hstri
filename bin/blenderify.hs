@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, GADTs, ScopedTypeVariables, TemplateHaskell, StandaloneDeriving #-} 
 
-import AbstractTetrahedron
+import Tetrahedron
 import Blender
 import Blenderable
 import Control.Applicative

@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell #-}
 module Tetrahedron.Tests where
 
-import AbstractTetrahedron
+import Tetrahedron
 import Test.QuickCheck
 import Test.QuickCheck.All
 import QuickCheckUtil

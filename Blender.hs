@@ -629,7 +629,7 @@ blenderTriangularSurface = memo prepare
         prepare steps = 
             let
                 m = steps - 1
-                nu = nuFromList vertices_intUV 
+                nu = nuFromDistinctList vertices_intUV 
                 toi = toInt nu
 
                 (vertices_intUV,tris_intUV) = 

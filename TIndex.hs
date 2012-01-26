@@ -93,7 +93,8 @@ unviewI (I i a)= i ./ a
 --     (./) = I
 
 instance Show TIndex where
-    show (TIndex i) = show i
+    showsPrec = prettyShowsPrec
+
 
 instance ShortShow TIndex where
     shortShow = show
@@ -118,13 +119,13 @@ traverseI map_ f (viewI -> I i x) = map_ (i ./) (f x)
 
 instance (Show a) => Show (I a) where 
 --    showsPrec prec (I i x) = showParen (prec >= 1) (showsPrec 10 i . showString " ./ " . showsPrec 10 x)
-    showsPrec _ (I i x) = shows i . showChar '.' . shows x
+    showsPrec _ (I i x) = shows i . showString "./" . shows x
     
 instance (ShortShow a) => ShortShow (I a) where 
     shortShowsPrec _ (I i x) = shortShows i . showChar '.' . shortShows x
 
 instance Quote TIndex where
-    quotePrec _ (TIndex i) = show i -- relies on Num TIndex instance
+    quotePrec _ (TIndex i) = show i
 
 instance (Quote a) => Quote (I a) where 
     quotePrec prec (I i x) = quoteParen (prec > 9) (quotePrec 10 i ++ " ./ " ++ quotePrec 10 x)

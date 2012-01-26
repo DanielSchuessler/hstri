@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module AbstractTetrahedron2 where
+module Tetrahedron.Constants where
 
 import Math.Groups.S3
 import Tetrahedron.Triangle

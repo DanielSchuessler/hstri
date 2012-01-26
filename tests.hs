@@ -1,16 +1,15 @@
 {-# OPTIONS -Wall #-}
-import MathUtil
-import QuadCoordinates.Tests
-import Triangulation.Tests
-import TriangulationCxtObject
-import Math.Groups.Tests
-import Tetrahedron.Tests
-import Util
-import Orientation.Tests
 import Control.Monad
+import Equivalence.Tests
+import Math.Groups.Tests
+import MathUtil
+import Orientation.Tests
+import QuadCoordinates.Tests
 import System.Exit
 import Tests
-import Equivalence.Tests
+import Tetrahedron.Tests
+import Triangulation.Tests
+import Util
 
 
 tests :: [IO Bool]

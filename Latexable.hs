@@ -32,7 +32,7 @@ import Triangulation
 import Triangulation.InnerNormalArc
 import Triangulation.CanonOrdered
 import TriangulationCxtObject
-import ZeroDefaultMap
+import Math.SparseVector
 import Util
 import Data.String.Interpolation
 import System.Process
@@ -301,9 +301,9 @@ instance (Integral i, Latexable i) => Latexable (Ratio i) where
         | otherwise = (op2 "frac" <$> numerator <*> denominator) x
 
 
-instance (Latexable k, Latexable r, Num r, Ord r) => Latexable (ZeroDefaultMap k r) where
+instance (Latexable k, Latexable r, Num r, Ord r) => Latexable (SparseVector k r) where
 
-    toLatex = zdm_showWith id "" (++) toLatex toLatex 
+    toLatex = sparse_showWith id "" (++) toLatex toLatex 
 
 instance Latexable Variable where toLatex = variableName
 

@@ -10,7 +10,7 @@ module Triangulation.CanonOrdered(
 
 
 
-import AbstractTetrahedron
+import Tetrahedron
 import Control.Applicative
 import Control.Monad.Reader
 import Data.Function

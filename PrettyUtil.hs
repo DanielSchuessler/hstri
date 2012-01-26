@@ -91,7 +91,7 @@ docAssocs xs =  spacedEncloseSep lbrace rbrace comma
                         | (k,v) <- xs ]
 
 prettyString ::  Pretty a => a -> String
-prettyString = ($"") . displayS . renderPretty 0.6 116 . pretty
+prettyString = ($"") . docToShowS . pretty
 
 pr ::  Pretty a => a -> IO ()
 pr = putStrLn . prettyString
@@ -206,7 +206,7 @@ prettyShowsPrec :: Pretty a => Int -> a -> ShowS
 prettyShowsPrec prec x = docToShowS (prettyPrec prec x)
 
 docToShowS :: Doc -> ShowS
-docToShowS = displayS . renderPretty 0.4 116
+docToShowS = displayS . renderPretty 0.6 116
 
 docToString :: Doc -> String
 docToString = ($"") . docToShowS

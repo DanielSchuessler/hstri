@@ -1,5 +1,6 @@
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# OPTIONS -Wall #-}
+{-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses, FlexibleInstances, ViewPatterns, TemplateHaskell, NoMonomorphismRestriction #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 module StandardCoordinates.MatchingEquations where
 
 import StandardCoordinates.Class
@@ -8,19 +9,28 @@ import Control.Monad
 import Triangulation
 import HomogenousTuples
 import Tetrahedron.NormalDisc
+import TupleTH
+import Data.SumType
+import Triangulation.Class
+import Data.Function
+import PrettyUtil
 
+isAdmissible
+  :: (ToTriangulation tr, StandardCoords s r) => tr -> s -> Bool
+isAdmissible = (.) isRight . admissible
 
 admissible
-  :: (Ord a, StandardCoords q a) =>
-     Triangulation -> q -> Either [Char] ()
-admissible tr stc = do
+  :: (ToTriangulation tr, StandardCoords s r) =>
+     tr -> s -> Either [Char] (Admissible s)
+admissible (toTriangulation -> tr) stc = do
     mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient")))
           (discAssocs stc)
     satisfiesQuadrilateralConstraints tr stc 
     satisfiesMatchingEquations tr stc
+    return (UnsafeToAdmissible tr stc)
 
 satisfiesMatchingEquations
-  :: StandardCoords q a => Triangulation -> q -> Either [Char] ()
+  :: StandardCoords q r => Triangulation -> q -> Either [Char] ()
 satisfiesMatchingEquations tr stc =
         mapM_ p (matchingEquationReasons tr)
     where
@@ -30,7 +40,7 @@ satisfiesMatchingEquations tr stc =
                 r = evalMatchingEquation me stc
 
 satisfiesQuadrilateralConstraints
-  :: QuadCoords q a => Triangulation -> q -> Either [Char] ()
+  :: QuadCoords s r => Triangulation -> s -> Either [Char] ()
 satisfiesQuadrilateralConstraints tr stc = 
         mapM_ p tets
     where
@@ -73,7 +83,7 @@ matchingEquationReasons t =
 
 
 evalMatchingEquation
-  :: StandardCoords q a => MatchingEquationReason -> q -> a
+  :: StandardCoords s r => MatchingEquationReason -> s -> r
 evalMatchingEquation (MatchingEquationReason x x' v v') stc =
                               (triCount stc (iNormalTri $ getTIndex x ./ v)
                           + quadCount stc (iNormalQuadByVertexAndITriangle v x))
@@ -83,4 +93,66 @@ evalMatchingEquation (MatchingEquationReason x x' v v') stc =
 
     
 
+matchingEquationSupport
+  :: MatchingEquationReason
+     -> (INormalTri, INormalQuad, INormalTri, INormalQuad)
+matchingEquationSupport (MatchingEquationReason x x' v v') =
+                        
+                          (iNormalTri $ getTIndex x ./ v
+                          ,iNormalQuadByVertexAndITriangle v x
+                          ,iNormalTri $ getTIndex x' ./ v'
+                          ,iNormalQuadByVertexAndITriangle v' (forgetVertexOrder x')
+                          )
 
+matchingEquationSupportDiscs
+  :: MatchingEquationReason
+     -> (INormalDisc, INormalDisc, INormalDisc, INormalDisc)
+matchingEquationSupportDiscs =
+    $(mapTuple' 4 [|iNormalDisc|]) . matchingEquationSupport
+
+
+data Admissible q = UnsafeToAdmissible {
+    adm_Triangulation :: Triangulation,
+    adm_coords :: q 
+}
+    deriving(Show)
+
+
+-- | Does /not/ compare the triangulations
+instance Eq q => Eq (Admissible q) where
+    (==) = (==) `on` adm_coords
+
+-- | Does /not/ compare the triangulations
+instance Ord q => Ord (Admissible q) where
+    compare = compare `on` adm_coords
+
+instance QuadCoords q r => QuadCoords (Admissible q) r where
+    quadCount = quadCount . adm_coords
+    quadAssocs = quadAssocs . adm_coords
+    quadAssocsDistinct = quadAssocsDistinct . adm_coords
+    quadAsSparse = quadAsSparse . adm_coords
+
+instance StandardCoords s r => StandardCoords (Admissible s) r where
+    discCount = discCount . adm_coords
+    discAssocs = discAssocs . adm_coords
+    discAssocsDistinct = discAssocsDistinct . adm_coords
+    standardAsSparse = standardAsSparse . adm_coords
+
+    triCount = triCount . adm_coords
+    triAssocs = triAssocs . adm_coords
+    triAssocsDistinct = triAssocsDistinct . adm_coords
+
+unsafeToAdmissible :: Triangulation -> q -> Admissible q
+unsafeToAdmissible = UnsafeToAdmissible
+
+instance Pretty s => Pretty (Admissible s) where
+    prettyPrec prec = prettyPrec prec . adm_coords
+
+
+toAdmissible
+  :: (Show a, ToTriangulation tr, StandardCoords a r) =>
+     tr -> a -> Admissible a
+toAdmissible tr x = either _err id . admissible tr $ x
+    where
+        _err e = error ("toAdmissible "++showsPrec 11 x ""++": "++e)
+    

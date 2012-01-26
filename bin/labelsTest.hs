@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, GADTs, ScopedTypeVariables, TemplateHaskell, StandaloneDeriving #-} 
 {-# OPTIONS -Wall #-}
 
-import AbstractTetrahedron
+import Tetrahedron
 import Blender
 import Data.Function
 import Data.Vect.Double
