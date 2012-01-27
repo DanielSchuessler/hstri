@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, TypeSynonymInstances, ScopedTypeVariables, MultiParamTypeClasses #-}
+{-# LANGUAGE ViewPatterns, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, ScopedTypeVariables, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module StandardCoordinates.Dense(
     module QuadCoordinates.Dense,
@@ -6,6 +6,8 @@ module StandardCoordinates.Dense(
     StandardDenseI,
     StandardDenseR,
     sd_fromVector,
+    sd_fromList,
+    sd_fromListU,
     sd_toVector,
     sd_fromStandardCoords
     
@@ -20,6 +22,7 @@ import Control.Exception
 import qualified Data.Vector.Generic as VG
 import Triangulation
 import Math.SparseVector
+import qualified Data.Vector.Unboxed as VU
 
 
 type StandardDense v r = WrappedVector INormalDisc v r
@@ -54,4 +57,38 @@ sd_fromStandardCoords
      Triangulation -> s -> StandardDense V.Vector r
 sd_fromStandardCoords tr x =
     sd_fromVector $ V.generate (tNumberOfNormalDiscTypes tr) (discCount x . toEnum)
+
+instance 
+    (VG.Vector v r, Num r, Ord r, Ord (v r)) =>
+    UpdatableStandardCoords 
+        (StandardDense v r)
+        (StandardDense v r)
+        r
+
+
+    where 
+        adjustTriCount f =
+            adjustDiscCount f . iNormalTriToINormalDisc 
+
+
+            
+adjustDiscCount
+  :: (VG.Vector v r) =>
+     (r -> r) -> INormalDisc -> StandardDense v r -> StandardDense v r
+adjustDiscCount f (fromEnum -> i) (WrappedVector v) =
+
+            WrappedVector (v VG.// [(i, f (v VG.! i))])
+
+            
+sd_fromList :: [r] -> StandardDense V.Vector r
+sd_fromList = sd_fromVector . V.fromList
+
+sd_fromListU :: VU.Unbox r => [r] -> StandardDense VU.Vector r
+sd_fromListU = sd_fromVector . VU.fromList
+
+instance Show r => Show (StandardDense V.Vector r) where
+    showsPrec prec x = showString "sd_" . showsPrec prec (unwrapVector x)
+
+instance (VU.Unbox r, Show r) => Show (StandardDense VU.Vector r) where
+    showsPrec prec x = showString "sd_fromListU" . showsPrec prec (VU.toList (unwrapVector x))
 

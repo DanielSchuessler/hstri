@@ -24,6 +24,8 @@ import PrettyUtil
 import Element
 import Equivalence.Class
 import Util
+import Control.DeepSeq.TH
+import OrphanInstances() -- NFData Set, NFData Map
 
 
 
@@ -205,3 +207,5 @@ eqv_reps ::  Equivalence b -> [b]
 eqv_reps e = ec_rep `fmap` eqv_classes e 
 
 
+deriveNFData ''Equivalence
+deriveNFData ''SetBasedEquivalenceClass

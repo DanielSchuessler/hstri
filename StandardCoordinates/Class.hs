@@ -269,3 +269,36 @@ instance (Num r, Ord r) => StandardCoords (SparseVector INormalDisc r) r where
 
     triAssocs = default_triAssocs_from_discAssocs 
     triAssocsDistinct = default_triAssocsDistinct_from_discAssocsDistinct
+
+
+
+class (StandardCoords s r, StandardCoords s' r) => UpdatableStandardCoords s s' r | s -> s' r where
+
+    adjustTriCount :: (r -> r) -> INormalTri -> s -> s' 
+    adjustDiscCount :: (r -> r) -> INormalDisc -> s -> s' 
+
+instance (Num r, Ord r) => 
+    UpdatableStandardCoords 
+        (SparseVector INormalDisc r) 
+        (SparseVector INormalDisc r) 
+        r
+        
+        where
+
+    adjustTriCount f = sparse_adjust f . iNormalTriToINormalDisc
+    adjustDiscCount f = sparse_adjust f
+
+partialCanonicalPart
+  :: UpdatableStandardCoords s s r => TVertex -> s -> s
+partialCanonicalPart v s =
+    let
+        tris = vertexLinkingSurfaceTris v
+        r = minimum . map (triCount s) $ tris
+    in
+        foldr (adjustTriCount (subtract r)) s tris 
+        
+
+
+
+
+

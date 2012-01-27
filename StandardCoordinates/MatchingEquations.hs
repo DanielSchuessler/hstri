@@ -156,3 +156,15 @@ toAdmissible tr x = either _err id . admissible tr $ x
     where
         _err e = error ("toAdmissible "++showsPrec 11 x ""++": "++e)
     
+
+
+instance UpdatableStandardCoords s s' r => UpdatableStandardCoords (Admissible s) s' r
+    where
+
+    adjustTriCount f t =
+        adjustTriCount f t . adm_coords
+
+
+-- scaleAdmissible s a
+--     | s <= 0 = error ("scaleAdmissible with negative coeff: "++show s)
+--     | otherwise = a { adm_coords = (s*)  

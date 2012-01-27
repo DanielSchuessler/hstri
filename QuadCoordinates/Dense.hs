@@ -12,6 +12,7 @@ import Control.Exception
 import PrettyUtil
 import Triangulation
 import qualified Data.Vector.Unboxed as VU
+import Control.DeepSeq
 
 
 newtype WrappedVector tag v r = WrappedVector (v r)
@@ -76,3 +77,7 @@ qd_fromList = qd_fromVector . V.fromList
 
 qd_fromListU :: VU.Unbox r => [r] -> QuadDense VU.Vector r
 qd_fromListU = qd_fromVector . VU.fromList
+
+instance (NFData r, VG.Vector v r) => NFData (WrappedVector tag v r) where
+
+    rnf x = rnf (VG.toList (unwrapVector x)) `seq` () 

@@ -4,12 +4,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS -Wall -fno-warn-unused-imports #-}
+{-# OPTIONS -Wall #-}
 
 module MathUtil where
 
 
-import Collections
 import Control.Applicative
 import Control.DeepSeq
 import Control.Exception
@@ -21,21 +20,12 @@ import Data.Monoid
 import Data.Ratio
 import Data.Vect.Double hiding(Vector)
 import qualified Data.Vect.Double as Vect
-import Data.Vect.Double.Instances
-import Data.Vect.Double.Util.Dim4
 import Data.VectorSpace
-import Data.Word
 import PrettyUtil
 import QuickCheckUtil
-import System.Directory
-import System.Exit
-import System.FilePath
-import System.Process
 import System.Random
 import Test.QuickCheck
 import Test.QuickCheck.All
-import Test.QuickCheck.Gen
-import TupleTH
 import qualified Data.Foldable as Fold
 import qualified Data.List as L
 import qualified Data.Vector as V
@@ -45,15 +35,13 @@ import qualified Data.Vector.Unboxed as VU
 import Math.SparseVector
 import qualified Data.DList as DL
 import Data.Char
-import Debug.Trace
 import THUtil
 import qualified Data.Set as S
 import Control.Monad.ST.Safe
 import Data.Vector(Vector)
 import HomogenousTuples
 import Control.Arrow((&&&))
-import qualified Data.List as L
-import Data.Vect.Double.Util.Dim2
+import Util
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -73,15 +61,13 @@ c2_to_r4 :: Complex Double -> Complex Double -> Vec4
 c2_to_r4 ((:+) !a !b) ((:+) !c !d) = Vec4 a b c d 
 
 
-gen4 :: Monad m => m Double -> m Vec4
-gen4 g = liftM4 Vec4 g g g g
 
 arb01 :: (Num a, Random a) => Gen a
 arb01 = frequency [(10,return 0),(30,choose (0,1)) ] 
 
 arbsimp :: Gen Vec4
 arbsimp = do
-    xs <- gen4 arb01 `suchThat` (/= Vect.zero)
+    xs <- liftM4join4 Vec4 arb01 `suchThat` (/= Vect.zero)
     return (xs &/ (xs `dotprod` 1))
     
 

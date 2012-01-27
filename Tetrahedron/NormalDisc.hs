@@ -64,30 +64,18 @@ import Tetrahedron.NormalArc
 import Prelude hiding(catch,lookup)
 import PrettyUtil
 import Quote
-import THUtil
 import Test.QuickCheck
-import Test.QuickCheck.All
 import TupleTH
 import Util
 import Data.Ix
-
-type instance L NormalDisc = NormalTri
-type instance R NormalDisc = NormalQuad
-
-newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
-    deriving(Eq,Ord,Arbitrary,SubSumTy,SuperSumTy)
-
-eitherND
-  :: (NormalTri -> r) -> (NormalQuad -> r) -> NormalDisc -> r
-eitherND kt kq = either kt kq . unNormalDisc
+import Control.DeepSeq
+import Control.DeepSeq.TH
+import Language.Haskell.TH.Lift
 
 
-
-class MakeNormalDisc a where
-    normalDisc :: a -> NormalDisc
     
 
-newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary,Finite,Ix)
+newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary,Finite,Ix,NFData)
 
 instance Show NormalTri where
     showsPrec = prettyShowsPrec 
@@ -110,6 +98,8 @@ data NormalQuad =
     
     deriving(Enum,Bounded,Eq,Ord,Show,Ix)
 
+
+deriveNFData ''NormalQuad
 
 --     show q = "{Normal quad separating "++show v0++","++show v1++" from "++show v2++","++show v3++"}"
 --         where
@@ -255,8 +245,6 @@ instance IsSubface NormalCorner NormalDisc where
     isSubface nat = eitherND (isSubface nat) (isSubface nat)
 
 
-qc_NormalDisc ::  IO Bool
-qc_NormalDisc = $(quickCheckAll)
 
 -- deriveCollectionKeyClass ''NormalArc
 -- deriveCollectionKeyClass ''NormalCorner
@@ -382,8 +370,6 @@ instance Link NormalCorner NormalDisc (Pair NormalCorner) where
 instance Lift NormalTri where
     lift (NormalTri v) = [| NormalTri v |] 
 
-instance Lift NormalQuad where
-    lift = liftByShow
 
 instance Lift NormalDisc where
     lift (NormalDisc x) = [| NormalDisc x |] 
@@ -447,3 +433,19 @@ instance Ix NormalDisc where
 
 instance NormalCorners NormalDisc [NormalCorner] where
     normalCorners = eitherND normalCornerList normalCornerList
+
+
+type instance L NormalDisc = NormalTri
+type instance R NormalDisc = NormalQuad
+
+newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
+    deriving(Eq,Ord,Arbitrary,SubSumTy,SuperSumTy,NFData)
+
+eitherND
+  :: (NormalTri -> r) -> (NormalQuad -> r) -> NormalDisc -> r
+eitherND kt kq = either kt kq . unNormalDisc
+
+class MakeNormalDisc a where
+    normalDisc :: a -> NormalDisc
+
+deriveLift ''NormalQuad

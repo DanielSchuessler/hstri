@@ -15,6 +15,9 @@ import Data.String
 import Data.Function
 import PrettyUtil
 import Data.Traversable(Traversable)
+import OrphanInstances() -- NFData Map
+import Control.DeepSeq
+
 
 isZero :: Num a => a -> Bool
 isZero = (==0)
@@ -24,7 +27,7 @@ zero = 0
 
 -- | Represents a function @k -> r@ with all but finitely many values being zero.
 newtype SparseVector k r = SparseV { illdefinedSparseToMap :: Map k r }
-    deriving(Foldable,Functor,Traversable)
+    deriving(Foldable,Functor,Traversable,NFData)
 
 instance (Eq r, Num r, Ord k) => Eq (SparseVector k r) where
     (==) = (==) `on` (illdefinedSparseToMap . sparse_normalize)
@@ -140,6 +143,12 @@ sparse_set k r (SparseV m) =
       | otherwise -> M.insert k r m 
 
 
+sparse_adjust
+  :: Ord k => (r -> r) -> k -> SparseVector k r -> SparseVector k r
+sparse_adjust k f (SparseV m) =
+    SparseV (M.adjust k f m)
+
+
 sparse_gen
   :: (Num r, Ord k, Arbitrary r) => [k] -> Gen (SparseVector k r)
 sparse_gen keys_ = sparse_fromAssocs <$> listOf ((,) <$> elements keys_ <*> arbitrary)
@@ -233,3 +242,4 @@ instance (Ord r, Show k, Ord k, Num r) => Num (SparseVector k r) where
 sparse_sumWith
   :: Ord k => (r -> r -> r) -> [SparseVector k r] -> SparseVector k r
 sparse_sumWith f (xs :: [SparseVector k r]) = SparseV (M.unionsWith f (L.map illdefinedSparseToMap xs))
+

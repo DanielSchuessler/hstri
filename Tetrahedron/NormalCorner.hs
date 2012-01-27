@@ -17,6 +17,8 @@ import Test.QuickCheck
 import HomogenousTuples
 import Language.Haskell.TH.Syntax
 import Quote
+import Control.DeepSeq
+
 
 class AsList normalCornerTuple => NormalCorners a normalCornerTuple | a -> normalCornerTuple where
     normalCorners :: a -> normalCornerTuple
@@ -26,7 +28,7 @@ normalCornerList ::  NormalCorners a normalCornerTuple => a -> [Element normalCo
 normalCornerList = asList . normalCorners
 
 newtype NormalCorner = NormalCorner Edge 
-    deriving (Eq,Ord,Enum,Bounded,Arbitrary)
+    deriving (Eq,Ord,Enum,Bounded,Arbitrary,NFData)
 
 class MakeNormalCorner a where
     normalCorner :: a -> NormalCorner

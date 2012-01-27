@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module QuadCoordinates.MatchingEquations where
@@ -16,6 +16,7 @@ import TriangulationCxtObject
 import Data.List as L
 import PrettyUtil
 import Triangulation.Class
+import Control.DeepSeq.TH
 
 
 quad_admissible
@@ -105,3 +106,6 @@ unsafeToQAdmissible = UnsafeToQAdmissible
 
 instance Pretty q => Pretty (QAdmissible q) where
     prettyPrec prec = prettyPrec prec . qadm_coords
+
+
+deriveNFData ''QAdmissible

@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
+{-# LANGUAGE ScopedTypeVariables, RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
+{-# LANGUAGE PolymorphicComponents, ExistentialQuantification #-}
 {-# OPTIONS -Wall #-}
 module VerboseDD 
     (module InnerProductRepresentation,
@@ -20,7 +21,7 @@ module VerboseDD
     where
 
 import Control.Applicative
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Data.Function
 import Data.List as L
 import Data.Ord
@@ -34,37 +35,37 @@ import TriangulationCxtObject
 import Util
 import VectorUtil
 import qualified Data.Vector as V
-import qualified Data.Vector.Unboxed as VU
 import QuadCoordinates.CanonExt
 --import QuadCoordinates.Class
-import HomogenousTuples
 import StandardCoordinates.MatchingEquations
 import QuadCoordinates.MatchingEquations
 import Triangulation.Class
+import Data.BitVector.Adaptive
+import Data.Proxy
 
-data PairFate = 
+data PairFate w = 
     PairFate {
-        pf_fst, pf_snd :: IPR,
-        pf_kind :: PairFateKind
+        pf_fst, pf_snd :: IPR w,
+        pf_kind :: PairFateKind w
     }
 
-instance Show PairFate where showsPrec = prettyShowsPrec
+instance BitVector w => Show (PairFate w) where showsPrec = prettyShowsPrec
 
-instance Pretty PairFate where
+instance BitVector w => Pretty (PairFate w) where
     pretty (PairFate x y z) = 
         string "P" <> 
             (parens $ hsep (punctuate comma 
                 [ pretty (ipr_index x), pretty (ipr_index y), pretty z ]))
 
 
-data PairFateKind =     
+data PairFateKind w =     
         Incompatible
-    |   NotAdjacent IPR
+    |   NotAdjacent (IPR w)
     |   OK VectorIndex
 
     deriving(Show)
 
-instance Pretty PairFateKind where pretty = string . show
+instance BitVector w => Pretty (PairFateKind w) where pretty = string . show
 
 
 
@@ -74,18 +75,23 @@ nextIndex = do
     put (succ i)
     return i
 
-data DDStepResult = DDSR { 
-    _Sneg, _S0, _Spos :: Vector IPR, 
-    pairFates :: Vector PairFate 
+data DDStepResult w = DDSR { 
+    _Sneg, _S0, _Spos :: Vector (IPR w), 
+    pairFates :: Vector (PairFate w) 
 }
 
-type DDResult = ([DDStepResult],Vector IPR)
+data DDResult =
+    forall w. BitVector w => 
+        DDResult {
+            _ddr_steps :: [DDStepResult w],
+            _ddr_final :: Vector (IPR w)
+        }
 
-ipr_init :: Int -> Int -> [Rational] -> VectorIndex -> IPR
-ipr_init d k meColumn ix =
- IPR 
+ipr_init :: BitVector w => Proxy w -> Int -> Int -> [Rational] -> VectorIndex -> (IPR w)
+ipr_init _ d k meColumn ix =
+    IPR
                             ix 
-                            (VU.generate d (/=k))
+                            (bvAllBut d k)
                             (V.fromList meColumn)
                             (V.generate d (\j -> if j==k then 1 else 0)) 
 
@@ -93,37 +99,49 @@ ipr_init d k meColumn ix =
 data DDInput = DDInput {
     numberOfVariables :: Int,
     hyperplanes :: [[Rational]],
-    compatible :: IPR -> IPR -> Bool
+    quadIndexOffsets :: [BitVectorPosition]
 }
 
 dd :: ToTriangulation t => t -> DDResult
-dd (toTriangulation -> tr) = ddWith DDInput {
-    numberOfVariables = tNumberOfNormalQuadTypes tr,
-    hyperplanes = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr,
-    compatible = ipr_compatible
-                    [ (i,i+1,i+2) | i <- map (3*) [0.. tNumberOfTetrahedra tr - 1] ]
+dd (toTriangulation -> tr) = 
+    let
+        d = tNumberOfNormalQuadTypes tr
+    in
 
-    }
+    withBitVectorType d ( 
+        ddWith DDInput {
+            numberOfVariables = d,
+            hyperplanes = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr,
+            quadIndexOffsets = map (3*) [0.. tNumberOfTetrahedra tr - 1]
+
+        }
+    )
 
 dds :: ToTriangulation t => t -> DDResult
-dds (toTriangulation -> tr) = ddWith DDInput {
-    numberOfVariables = tNumberOfNormalDiscTypes tr,
-    hyperplanes = 
-        [ map (toRational . evalMatchingEquation me) (tINormalDiscs tr)
-            | me <- matchingEquationReasons tr ],
+dds (toTriangulation -> tr) = 
+    let
+        d = tNumberOfNormalDiscTypes tr
+    in
+
+    withBitVectorType d ( 
+    ddWith DDInput {
+        numberOfVariables = d,
+        hyperplanes = 
+            [ map (toRational . evalMatchingEquation me) (tINormalDiscs tr)
+                | me <- matchingEquationReasons tr ],
 
 
-    compatible = ipr_compatible
-                    [ map3 (fromEnum . iNormalQuadToINormalDisc) 
-                        (normalQuads (tindex i))
-                            | i <- [0.. tNumberOfTetrahedra tr - 1] ]
+        quadIndexOffsets = 
+                        [ (fromEnum . iNormalQuadToINormalDisc) (tindex i ./ minBound)
+                                | i <- [0.. tNumberOfTetrahedra tr - 1] ]
 
-    }
-
+     })
 
 
-ddWith :: DDInput -> DDResult
-ddWith DDInput{..} =
+{-# SPECIALIZE ddWith :: DDInput -> Proxy (BitVectorSingle Word) -> DDResult #-}
+{-# SPECIALIZE ddWith :: DDInput -> Proxy (BitVectorSingle Word64) -> DDResult #-}
+ddWith :: forall w. BitVector w => DDInput -> Proxy w -> DDResult
+ddWith DDInput{..} bitvectorTypeProxy =
     let
         mes = sortBy (comparing (fmap (/=0))) hyperplanes
 
@@ -132,41 +150,52 @@ ddWith DDInput{..} =
         mes' = transpose mes
 
         go = do
-            _V0 <- V.zipWithM (\k meColumn -> ipr_init numberOfVariables k meColumn <$> nextIndex)
+            _V0 <- V.zipWithM 
+                        (\k meColumn -> ipr_init 
+                                            bitvectorTypeProxy 
+                                            numberOfVariables 
+                                            k 
+                                            meColumn 
+                                                <$> nextIndex)
 
-                        (V.enumFromN 0 numberOfVariables) (V.fromList mes')
+                        (V.enumFromN 0 numberOfVariables) 
+                        (V.fromList mes')
 
 
             loop mempty 1 _V0
 
         loop acc i _Vp 
-            | i == g+1 = return (reverse acc,_Vp) 
+            | i == g+1 = return (DDResult (reverse acc) _Vp) 
             | otherwise =
 
 --                 $(traceExps "dd/loop" [ [|i|],[|V.length _Vp|] ]) $
 
             let
-                (_Sneg,_Snn ) = V.partition ((<0)  . ipr_head) _Vp
-                (_S0  ,_Spos) = V.partition ((==0) . ipr_head) _Snn
+                (_Sneg,_S0,_Spos) = partitionBySign _Vp
 
-                goPair :: IPR -> IPR -> State VectorIndex PairFate
-                goPair x y = PairFate x y <$>
-                    (case () of
-                          _ | not (compatible x y) -> 
-                                return Incompatible                
-                            | Just z <- (disproveAdjacency _Vp x y) -> 
-                                return (NotAdjacent z)
-                            | otherwise ->
-                                OK <$> nextIndex)
+                goPair :: (IPR w) -> (IPR w) -> State VectorIndex (PairFate w)
+                goPair x y = {-# SCC "ddWith/goPair" #-} 
+
+                
+                        PairFate x y <$>
+                            (case (bvIntersect `on` zeroSet) x y of
+                                zeroSetIntersection 
+                                    | not (zeroSetAdmissible quadIndexOffsets zeroSetIntersection) -> 
+                                        return Incompatible                
+                                    | Just z <- (disproveAdjacency _Vp x y zeroSetIntersection) -> 
+                                        return (NotAdjacent z)
+                                    | otherwise ->
+                                        OK <$> nextIndex)
 
             in
                 do
-                    pairFates <- V.sequence 
+                    pairFates <- {-# SCC "ddWith/pairFates" #-} 
+                                 V.sequence 
                                     (V.concatMap 
                                         (\x -> V.map (goPair x) _Sneg)
                                         _Spos)
 
-                    let _V = 
+                    let _V = {-# SCC "ddWith/_V" #-} 
                             V.map ipr_tail _S0
                             V.++
                             v_mapMaybe (\pf -> 
@@ -187,38 +216,45 @@ ddWith DDInput{..} =
         evalState go 0 
 
 
-
-ipr_compatible :: [Triple Int] -> IPR -> IPR -> Bool
-ipr_compatible quadIndexTriples = zeroSetCompatible `on` zeroSet 
+partitionBySign
+  :: Vector (IPR w)
+     -> (Vector (IPR w), Vector (IPR w), Vector (IPR w))
+partitionBySign _Vp = (_Sneg,_S0,_Spos)
     where
-        zeroSetCompatible z1 z2 = zeroSetAdmissible (VU.zipWith (&&) z1 z2)
+                (_Sneg,_Snn ) = V.partition ((<0)  . ipr_head) _Vp
+                (_S0  ,_Spos) = V.partition ((==0) . ipr_head) _Snn
 
-        zeroSetAdmissible z =
 
-                    all (\(i0,i1,i2) ->
-                            atLeastTwo
-                                (VU.unsafeIndex z i0)
-                                (VU.unsafeIndex z i1)
-                                (VU.unsafeIndex z i2))
+-- ipr_compatible :: BitVector w => [Int] -> (IPR w) -> (IPR w) -> Bool
+-- ipr_compatible quadIndexOffsets = zeroSetCompatible `on` zeroSet 
+--     where
+--         zeroSetCompatible z1 z2 = zeroSetAdmissible (bvIntersect z1 z2)
 
-                        quadIndexTriples
+zeroSetAdmissible
+  :: BitVector w => [BitVectorPosition] -> w -> Bool
+zeroSetAdmissible quadIndexOffsets z =
+
+            all (\i ->
+                    atLeastTwo
+                        (bvUnsafeIndex z i)
+                        (bvUnsafeIndex z (i+1))
+                        (bvUnsafeIndex z (i+2))
+                        
+                        
+                        )
+
+                quadIndexOffsets
                         
 
 
 
 
-disproveAdjacency :: Vector IPR -> IPR -> IPR -> Maybe IPR 
-disproveAdjacency _Vp x y =
-    let
-        interxy = (VU.zipWith (&&) `on` zeroSet) x y 
-
-        implies b1 b2 = not b1 || b2
-
-    in
+disproveAdjacency :: BitVector w => Vector (IPR w) -> IPR w -> IPR w -> w -> Maybe (IPR w)
+disproveAdjacency _Vp x y xy_zeroSetIntersection =
         V.find (\z -> 
             ipr_index z /= ipr_index x && 
             ipr_index z /= ipr_index y && 
-            VU.and (VU.zipWith implies interxy (zeroSet z))) 
+            bvSubset xy_zeroSetIntersection (zeroSet z)) 
 
             _Vp
 
@@ -227,7 +263,7 @@ vsepVec :: Vector Doc -> Doc
 vsepVec = vsep . V.toList
 
 ppDDRes :: DDResult -> Doc
-ppDDRes (steps,res) =
+ppDDRes (DDResult steps res) =
            vsep (zipWith ppStep [1..] steps)
         <> line <> text "Result"
         <> line <> indent 2 (ppVecs res)
@@ -251,7 +287,7 @@ ppDDRes (steps,res) =
                                 <>  line
                                 <>  indent 2 (vsepVec (pretty <$> pairFates r)))
 
-ppVecs :: Vector IPR -> Doc
+ppVecs :: BitVector w => Vector (IPR w) -> Doc
 ppVecs vs =
     let 
         maxWidth = V.maximum (V.map ipr_maxScalarWidth vs)
@@ -260,7 +296,7 @@ ppVecs vs =
 
 
 ddSolutions :: DDResult -> Vector (Vector Rational)
-ddSolutions = V.map ipr_value . snd 
+ddSolutions (DDResult _ x) = V.map ipr_value x
 
 ddSolutions' :: DDResult -> Vector (Vector Integer)
 ddSolutions' = V.map makeVecIntegral . ddSolutions
@@ -274,7 +310,7 @@ ddSolutionsToQDense tr = V.map (either _err id . quad_admissible tr . qd_fromVec
 ddSolutionsToSDense
   :: ToTriangulation tr =>
      tr -> DDResult -> Vector (Admissible (CanonExt QuadDenseI Integer))
-ddSolutionsToSDense tr = V.map (canonExt tr) . ddSolutionsToQDense tr
+ddSolutionsToSDense tr = V.map canonExt . ddSolutionsToQDense tr
 
 qVertexSolutions :: ToTriangulation t => t -> Vector (QAdmissible QuadDenseI)
 qVertexSolutions tr = ddSolutionsToQDense tr (dd tr) 

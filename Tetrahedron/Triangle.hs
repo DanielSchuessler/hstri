@@ -99,11 +99,13 @@ import Tetrahedron.Edge
 import Util
 import Data.Numbering
 import Data.Tuple.Index
+import Control.DeepSeq
+import Control.DeepSeq.TH
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
 newtype Triangle = Triangle { triangleDualVertex :: Vertex }
-    deriving (Eq,Binary)
+    deriving (Eq,Binary,NFData)
 
 triangleByDualVertex :: Vertex -> Triangle
 triangleByDualVertex = Triangle
@@ -583,3 +585,5 @@ instance Lift ITriangle where
 
 mapTIndicesFromHasTIndex [t|ITriangle|]
 
+deriveNFData ''ITriangle
+deriveNFData ''OTriangle

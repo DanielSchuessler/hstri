@@ -49,17 +49,17 @@ import Element
 import FaceClasses
 import GHC.Generics hiding(prec)
 import HomogenousTuples
-import Language.Haskell.TH.Syntax as Syntax
 import PrettyUtil
 import Quote
 import ShortShow
-import THUtil
 import TIndex
 import Test.QuickCheck
 import Util
 import Data.Ix
 import FileLocation
 import Data.Tuple.Index
+import Control.DeepSeq.TH
+import Language.Haskell.TH.Lift
 
 data Vertex = A | B | C | D
     deriving(Eq,Ord,Enum,Bounded,Ix)
@@ -122,8 +122,6 @@ instance Pretty Vertex where pretty = vertexPrettyColor . text . show
 
 instance Arbitrary Vertex where arbitrary = elements allVertices
 
-instance Lift Vertex where
-    lift = liftByShow
 
 
 instance Finite Vertex
@@ -233,3 +231,6 @@ index4ToVertex = tupleToFun4 allVertices'
 vertexToIndex4 :: Vertex -> Index4
 vertexToIndex4 = $(fromJst) . indexOf4 allVertices'
 
+deriveNFData ''Vertex
+deriveNFData ''IVertex
+deriveLift ''Vertex

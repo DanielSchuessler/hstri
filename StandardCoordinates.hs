@@ -279,4 +279,3 @@ explainMatchingEquations t = putStrLn $
                                    "\t"++show y]) 
                        (matchingEquationsWithReasons t)) 
  
-

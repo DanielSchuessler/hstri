@@ -6,20 +6,26 @@ import Data.List
 import Data.String.Interpolation
 import Triangulation
 import Data.Binary
+import Control.Applicative
+import Data.Ord
 
-maxTets n = ((<= n). tNumberOfTetrahedra_ . snd)
+tetsp p = p . tNumberOfTetrahedra_ . snd
+maxTets n = filter (tetsp (<= n))
 
 main = do
     --go "/usr/share/regina-normal/examples/closed-or-census.rga" "ClosedOrCensus6" "closedOrCensus6" (maxTets 6) 
-    go "/usr/share/regina-normal/examples/closed-nor-census.rga" "ClosedNorCensus8" "closedNorCensus8" (maxTets 8)
+    --go "/usr/share/regina-normal/examples/closed-nor-census.rga" "ClosedNorCensus8" "closedNorCensus8" (maxTets 8)
+    go "/usr/share/regina-normal/examples/closed-hyp-census.rga" "Bench.Triangulations" "trs" 
+        (take 10 . filter (tetsp (liftM2 (&&) (>= 11) (<= 16))))
+    --go "/usr/share/regina-normal/examples/closed-hyp-census.rga" "ClosedHypCensus" "ClosedHypCensus" id
 
-go rga modname lowername predi = do
+go rga modname lowername filter_ = do
     let fn = "/tmp/"++modname++".hs"
     putStrLn fn
 
     trs0 <- readRgaZip rga
 
-    let trs = filter predi trs0 
+    let trs = filter_ trs0 
     let nam i = "tr_"++show i
 
     let
@@ -57,3 +63,6 @@ go rga modname lowername predi = do
 
 
     writeFile fn src
+
+
+-- vim: wrap

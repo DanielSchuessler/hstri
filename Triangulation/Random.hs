@@ -4,13 +4,15 @@
 module Triangulation.Random
     (
      
-     randomTriangulation,randT,randomClosed,                                                
+     randT,randomClosed,                                                
+     randomManifoldT,
      arbitraryTriangulation,arbitraryClosedTriangulation,shrinkTriangulation,
      genTet, arbitraryManifoldTriangulation,
 
      ClosedTriangulation(..),
      ManifoldTriangulation(..),
 
+     randomTriangulation,
     )
 
 
@@ -144,3 +146,6 @@ instance (Arbitrary t, ToTriangulation t) => Arbitrary (ManifoldTriangulation t)
 arbitraryManifoldTriangulation :: (Arbitrary t, ToTriangulation t) => Gen t
 arbitraryManifoldTriangulation = arbitrary `suchThat` isManifoldTriangulation 
 
+randomManifoldT :: Int -> Int -> Int -> Gen Triangulation
+randomManifoldT n minGl maxGl =
+     (randT n =<< choose (minGl,maxGl)) `suchThat` isManifoldTriangulation

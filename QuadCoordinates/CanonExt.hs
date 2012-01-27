@@ -16,6 +16,7 @@ import TriangulationCxtObject
 import Math.SparseVector
 import qualified Data.Map as M
 import Triangulation.Class
+import Control.DeepSeq.TH
 
 
 canonExtDbg = canonExt
@@ -58,19 +59,19 @@ instance (Num r, QuadCoords q r) => StandardCoords (CanonExt q r) r where
     triAssocs = triAssocsDistinct
     triAssocsDistinct = sparse_toAssocs . canonExt_tris 
 
-canonExt :: forall q r tr. (ToTriangulation tr, Pretty q, QuadCoords q r, Ord r, Pretty r) => 
-    tr -> QAdmissible q -> Admissible (CanonExt q r)
-canonExt (toTriangulation -> tr) qc = 
-
+canonExt :: forall q r tr. (Pretty q, QuadCoords q r, Ord r, Pretty r) => 
+    QAdmissible q -> Admissible (CanonExt q r)
+canonExt qc = 
 
              case admissible tr preResult of
                 Right x -> x
                 Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
                                     $(showExps ['qc,'preResult]))
 
-                         
 
     where
+        tr = qadm_Triangulation qc
+     
         preResult = CanonExt (qadm_coords qc)
                         (sparse_fromMap 
                         (unionsWith 
@@ -116,3 +117,4 @@ canonExt (toTriangulation -> tr) qc =
             mapM_ (goVertexLinkArc tri1) edges_
 
 
+deriveNFData ''CanonExt

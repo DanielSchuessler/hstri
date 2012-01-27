@@ -308,3 +308,7 @@ sequenceSnd = traverseSnd id
 catPairs ::  [(b, b)] -> [b]
 catPairs = concatMap (\(a1,a2) -> [a1,a2])
 
+liftM4join4
+  :: Monad m => (a4 -> a4 -> a4 -> a4 -> r) -> m a4 -> m r
+liftM4join4 f g = liftM4 f g g g g
+

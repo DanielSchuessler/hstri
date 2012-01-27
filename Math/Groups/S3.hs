@@ -16,15 +16,14 @@ import Data.Maybe
 import Data.Monoid
 import Data.Tuple.Index
 import HomogenousTuples
-import Language.Haskell.TH.Syntax
 import Math.Group
 import Math.Groups.S2
 import PrettyUtil
 import Quote
-import THUtil
 import Test.QuickCheck
 import Test.QuickCheck.All
 import Util
+import Language.Haskell.TH.Lift
 
 -- | Symmetric group / permutation group on 3 elements
 data S3 = S3abc | S3bca | S3cab | S3acb | S3bac | S3cba deriving(Read,Show,Eq,Enum,Bounded,Ord)
@@ -171,9 +170,6 @@ qc_S3 = $(quickCheckAll)
 instance Hashable S3 where hash = fromEnum
 instance Finite S3
 
-instance Lift S3 where
-    lift = liftByShow
-
 
 instance Quote S3 where
     quotePrec _ = show
@@ -220,3 +216,5 @@ s3sgn g = if g `elem3` transpositions
 
 instance Signum S3 where sgn = s3sgn
 
+
+deriveLift ''S3

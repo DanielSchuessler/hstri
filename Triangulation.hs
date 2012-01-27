@@ -88,6 +88,7 @@ import qualified Data.Map as M
 import Data.Map(Map,lookup,(!))
 import qualified Data.Set as S
 import Data.Set(member)
+import Control.DeepSeq.TH
 
 
 tGluingsIrredundant :: Triangulation -> [Gluing]
@@ -537,3 +538,4 @@ isClosedTriangulation tr = M.size (tGlueMap_ tr) == 4 * tNumberOfTetrahedra tr
 instance Eq Triangulation where
     (==) = (==) `on` (tNumberOfTetrahedra_ &&& (sort . tNormalizedGluings))
 
+deriveNFData ''Triangulation

@@ -20,13 +20,16 @@ import Data.Ix
 import Control.Arrow
 import System.Random
 import THUtil
+import Control.DeepSeq.TH
+import Control.DeepSeq
 
 
 
 
 -- | Tetrahedron index
 newtype TIndex = TIndex Word
-    deriving(Eq,Ord,Pretty,Enum,Real,Integral,Binary,Ix,Random)
+    deriving(Eq,Ord,Pretty,Enum,Real,Integral,Binary,Ix,Random,NFData)
+
 
 instance Num TIndex where
     (+) (TIndex a) (TIndex b) = 
@@ -201,3 +204,4 @@ deriveLiftMany [''TIndex,''I]
 instance (MapTIndices a, MapTIndices b) => MapTIndices (a,b) where
     mapTIndices f = mapTIndices f *** mapTIndices f
 
+deriveNFData ''I

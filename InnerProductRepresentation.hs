@@ -10,6 +10,7 @@ import OrphanInstances()
 import PrettyUtil
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
+import Data.BitVector.Adaptive
 
 #define IPR_WITHVALUES
 
@@ -22,22 +23,22 @@ instance Show VectorIndex where
 instance Pretty VectorIndex where
     pretty = dullyellow . text . show
 
-data IPR = IPR {
-    ipr_index :: VectorIndex,
-    zeroSet :: VU.Vector Bool,
-    innerProducts :: V.Vector Rational
+data IPR w = IPR {
+    ipr_index :: {-# UNPACK #-} !VectorIndex,
+    zeroSet :: !w,
+    innerProducts :: {-# UNPACK #-} !(V.Vector Rational)
 #ifdef IPR_WITHVALUES
-    , ipr_value :: V.Vector Rational
+    , ipr_value :: (V.Vector Rational)
 #endif
 }
 
-ipr_head :: IPR -> Rational
+ipr_head :: IPR w -> Rational
 ipr_head = V.head . innerProducts
 
-ipr_tail :: IPR -> IPR
+ipr_tail :: IPR w -> IPR w
 ipr_tail x = x { innerProducts = V.tail (innerProducts x) }
 
-ipr_combine :: IPR -> IPR -> VectorIndex -> IPR
+ipr_combine :: BitVector w => IPR w -> IPR w -> VectorIndex -> IPR w
 ipr_combine x y index = 
     let
         ipsx = innerProducts x
@@ -50,9 +51,9 @@ ipr_combine x y index =
                              /(hy-hx))
     in
         assert (hx > 0 && hy < 0) $
-        IPR 
+        IPR  
             index
-            (VU.zipWith (&&) (zeroSet x) (zeroSet y)) 
+            (bvIntersect (zeroSet x) (zeroSet y)) 
             (V.zipWith c
                 (V.tail ipsx)
                 (V.tail ipsy))
@@ -61,16 +62,16 @@ ipr_combine x y index =
             ((V.zipWith c `on` ipr_value) x y)
 #endif
 
-instance Pretty IPR where
+instance (BitVector w) => Pretty (IPR w) where
     pretty = ipr_pretty ShowZeros 6 
     
     
     
-ipr_pretty :: ZeroPrinting -> Int -> IPR -> Doc
+ipr_pretty :: BitVector w => ZeroPrinting -> Int -> IPR w -> Doc
 ipr_pretty zp scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = ips } = 
             hencloseSep lparen rparen (text " , ")
                 [   pretty i
-                ,   VU.ifoldr f empty z
+                ,   VU.ifoldr f empty (bvToVector z)
                 ,   V.foldr g empty ips
 #ifdef IPR_WITHVALUES
                 ,   V.foldr g empty (ipr_value ipr)
@@ -85,7 +86,7 @@ ipr_pretty zp scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = 
             g (showRational zp -> x) r =
                 text (pad scalarWidth x ++ " ") <> r
 
-ipr_maxScalarWidth :: IPR -> Int
+ipr_maxScalarWidth :: IPR w -> Int
 ipr_maxScalarWidth ipr = 
         V.maximum (V.snoc (V.map f (innerProducts ipr)) 0)
 #ifdef IPR_WITHVALUES
@@ -97,11 +98,11 @@ ipr_maxScalarWidth ipr =
         f = length . showRational ShowZeros
 
 
-instance Show IPR where
+instance BitVector w => Show (IPR w) where
     showsPrec = prettyShowsPrec
 
 
---     showsPrec _ (IPR i z ips) = showChar '(' . shows i . showString " , " 
+--     showsPrec _ (IPR w i z ips) = showChar '(' . shows i . showString " , " 
 --                                     . VU.foldr f id z . showString " , " 
 --                                     . shows ips . showChar ')'
 --         where
@@ -109,7 +110,7 @@ instance Show IPR where
 -- 
 --
 
-ipr_makeIntegral :: IPR -> IPR
+ipr_makeIntegral :: IPR w -> IPR w
 ipr_makeIntegral ipr =
 
     ipr 

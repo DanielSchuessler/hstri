@@ -11,12 +11,16 @@ import Data.GraphViz.Attributes
 import Data.GraphViz.Types
 import Data.Semigroup
 import GraphUtil
-import MathUtil
 import PrettyUtil
 import Test.QuickCheck
 import qualified Data.Graph.Inductive.PatriciaTree as Pat
 import qualified Data.Vect.Double as Vect
 import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
+import Control.DeepSeq.TH
+import qualified Data.Set as S
+import qualified Data.Map as M
+import Util
+import Data.Vect.Double.Instances() -- Eq
 
 
 
@@ -62,10 +66,13 @@ instance (Pretty n, Pretty e) => Pretty (Gr n e) where
 
 instance (Pretty n, Pretty e) => Pretty (Pat.Gr n e) where
     pretty = prettyGraph
-
+    
+    
+    
 
 instance Arbitrary Vect.Vec4 where
-    arbitrary = gen4 arbitrary
+    arbitrary = liftM4join4 Vect.Vec4 arbitrary
+
 
 deriving instance Ord Vect.Vec2
 deriving instance Ord Vect.Vec3
@@ -78,4 +85,5 @@ instance (Floating a, Ord a, NFData a) => NFData (Colour a) where
     rnf c = case toSRGB c of 
                  SRGB.RGB r g b -> rnf (r,g,b)
 
-
+deriveNFData ''S.Set
+deriveNFData ''M.Map

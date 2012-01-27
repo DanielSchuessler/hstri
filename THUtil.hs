@@ -3,7 +3,6 @@
 module THUtil(
     module Debug.Trace,
     Pretty,
-    liftByShow,
     mkConstantDecls,
     showVars,
     Printees(..),
@@ -39,13 +38,7 @@ atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
 
 
--- | Suitable for types with only nullable constructors and derived Show instance
-liftByShow ::  Show a => a -> ExpQ
-liftByShow = conE . mkName . show
 
--- -- | Suitable for types whose 'Quote' instance returns just a variable name
--- liftByShow ::  Show a => a -> ExpQ
--- liftByShow = conE . mkName . show
 
 mkConstantDecls :: Quote a => [a] -> (a -> ExpQ) -> Q [Dec]
 mkConstantDecls xs lift_ =

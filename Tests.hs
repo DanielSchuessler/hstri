@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns, ExistentialQuantification, StandaloneDeriving, ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-unused-imports #-}
 module Tests where
 
@@ -18,6 +18,7 @@ import QuadCoordinates.Dense
 import QuadCoordinates.MatchingEquations
 import QuickCheckUtil
 import StandardCoordinates
+import StandardCoordinates.Dense
 import StandardCoordinates.MatchingEquations
 import Test.QuickCheck
 import Test.QuickCheck.All
@@ -31,12 +32,9 @@ import qualified Data.Vector.Generic as VG
 import Triangulation.Class
 import StandardCoordinates.SurfaceQueries
 import Util
+import Control.Applicative
+import Tests.Gens
 
-eitherFuncToProp
-  :: Show a => (a -> Either String b) -> a -> Property
-eitherFuncToProp f x =
-    printTestCase (show x) $
-    either (\e -> printTestCase e False) (const (property True)) (f x)
 
 prop_qVertexSolutions (ManifoldTriangulation tr) =
     tNumberOfTetrahedra_ tr <= 10 ==>
@@ -59,12 +57,6 @@ prop_qVertexSolutionExts (ManifoldTriangulation tr) =
 
 qc_Tests :: IO Bool
 qc_Tests = $quickCheckAll
-
-forAllCensusTriangulations = forAllClosedCensusTriangulations
-
-forAllClosedCensusTriangulations p = 
-    forAllElements closedOrCensus6 p .&.
-    forAllElements closedNorCensus8 p
 
 prop_censuses_manifoldTriangulations :: Property
 prop_censuses_manifoldTriangulations =
@@ -99,21 +91,6 @@ prop_krBasisMatchingEquations t =
                         , y <- mE ])
 
 
-data FundamentalEdgeSolution tr = 
-        FundamentalEdgeSolution tr (Admissible (CanonExt QuadDenseI Integer))
-    deriving Show
-
-instance (ToTriangulation tr, Arbitrary tr) => Arbitrary (FundamentalEdgeSolution tr) where
-    arbitrary = sized (\n -> do
-        (tr,sols) <- (do
-                        tr <- resize (max n 40) arbitrary
-                        return (tr, qVertexSolutionExts tr))
-
-                        `suchThat` 
-                                (not . VG.null . snd)
-
-        sol <- elementsV sols                            
-        return (FundamentalEdgeSolution tr sol))
 
 
 
@@ -149,3 +126,18 @@ prop_iNormalDiscInGluinglessTriangulationIsDisk = do
     d <- elements allNormalDiscs
     property (isDisk (toAdmissible tr (i ./ d)))
 
+
+
+        
+
+
+prop_partialCanonicalPart_idempotent (TriangulationWithUnrestrictedStandardCoords tr s) =
+    forAllElements (vertices tr)
+        (\v -> partialCanonicalPart v s .=. partialCanonicalPart v (partialCanonicalPart v s))
+
+prop_partialCanonicalPart_commute (TriangulationWithUnrestrictedStandardCoords tr s) =
+    join forAllElements2 (vertices tr)
+        (\(v,w) -> 
+            partialCanonicalPart v (partialCanonicalPart w s)
+                .=.
+            partialCanonicalPart w (partialCanonicalPart v s))

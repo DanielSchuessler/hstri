@@ -37,9 +37,12 @@ import PrettyUtil
 import Quote
 import Test.QuickCheck
 import Util
+import Control.DeepSeq.TH
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
     deriving (Eq,Ord)
+
+deriveNFData ''NormalArc
 
 instance Show NormalArc where
     showsPrec = prettyShowsPrec 

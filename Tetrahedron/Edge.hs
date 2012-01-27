@@ -68,13 +68,16 @@ import Util
 import Tetrahedron.Vertex
 import Data.Numbering
 import OrphanInstances()
+import Control.DeepSeq.TH
+import Control.DeepSeq
 
 
 deriving instance Binary (BitSet Vertex)
+deriving instance NFData (BitSet Vertex)
 
 -- | Edge of an abstract tetrahedron (unoriented)
 newtype Edge = Edge (BitSet Vertex) 
-    deriving(Eq,Ord,Binary) 
+    deriving(Eq,Ord,Binary,NFData) 
 
 edgeToBitSet :: Edge -> BitSet Vertex
 edgeToBitSet (Edge bs) = bs
@@ -202,7 +205,7 @@ instance ShortShow IEdge where shortShow = shortShow . viewI
                             
 -- | Oriented edge of an abstract tetrahedron
 newtype OEdge = OEdge Word8 {- The lower nibble encodes the first vertex, the upper nibble encodes the second vertex. Invariant: The vertices are distinct. -}
-    deriving(Eq,Ord,Binary)
+    deriving(Eq,Ord,Binary,NFData)
 
 instance Enum OEdge where 
     fromEnum (unpackOrderedFace -> (e,g)) = fromEnum (EnumPair e g)
@@ -358,3 +361,4 @@ instance Lift IEdge where
 
 mapTIndicesFromHasTIndex [t|IEdge|]
 
+deriveNFData ''IEdge
