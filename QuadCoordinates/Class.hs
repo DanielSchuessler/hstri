@@ -1,13 +1,15 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE FlexibleContexts, EmptyDataDecls, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
 module QuadCoordinates.Class
     (module INormalDisc,
      module Data.FormalOps,
+     module CoordSys,
 
      QuadCoords(..),
      quadSupport,
      quadDominates,
+     quad_toFundEdgeSol,
 
 
      -- * Misc
@@ -17,23 +19,28 @@ module QuadCoordinates.Class
 
     where
 
-import INormalDisc
-import Data.FormalOps
 import Control.Applicative
 import Control.Arrow
-import Data.Monoid
-import qualified Data.Map as M
-import Data.Map(Map)
-import Math.SparseVector
-import Data.AdditiveGroup
-import Data.Maybe
-import Util
 import Control.Monad
+import Data.AdditiveGroup
+import Data.FormalOps
+import Data.Map(Map)
+import Data.Maybe
+import Data.Monoid
+import INormalDisc
+import Math.SparseVector
+import MathUtil
+import Util
+import qualified Data.Map as M
+import Data.Ratio
+import Control.Exception
+import CoordSys
+
 
 -- | Minimal implementation:
 --
 -- 'quadAsSparse' || 'quadCount' && ('quadAssocs' || 'quadAssocsDistinct') 
-class (Ord q, Num r, Ord r) => QuadCoords q r | q -> r where
+class (NormalSurfaceCoefficients q r, Ord q) => QuadCoords q r | q -> r where
      quadCount :: q -> INormalQuad -> r
                                          
      -- | May (but need not) omit zero coefficients. May contain repeated quads.
@@ -106,3 +113,22 @@ quadDominates x y =
     all 
         (\q -> quadCount x q /= 0)
         (quadSupport y)
+
+
+
+
+quad_toFundEdgeSol
+  :: (Integral i,
+      RatioToIntegral qr qi,
+      NonNegScalable (Ratio i) qr,
+      QuadCoords qr (Ratio i)) =>
+     qr -> qi
+quad_toFundEdgeSol q =
+    let
+        denoms = fmap (denominator . snd) . quadAssocsDistinct $ q 
+    in
+        fromMaybe (assert False undefined) .
+            ratioToIntegral . scaleNonNeg (lcms denoms % 1) $ q
+        
+
+

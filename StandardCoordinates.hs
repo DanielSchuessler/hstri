@@ -14,7 +14,7 @@ module StandardCoordinates(
     stc_coefficientIsZero,
     stc_set,
     normalArcCounts,
-    admissible,
+    standard_admissible,
     satisfiesMatchingEquations,
     satisfiesQuadrilateralConstraints,
 
@@ -64,6 +64,7 @@ import qualified Data.Map as M
 import Data.SumType
 import StandardCoordinates.Class
 import StandardCoordinates.MatchingEquations
+import QuadCoordinates.MatchingEquations
 
 -- Invariant: No value of the map is zero; zero coefficients are represented by the basis vector being absent from the map 
 

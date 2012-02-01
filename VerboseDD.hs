@@ -1,5 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables, RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
 {-# LANGUAGE PolymorphicComponents, ExistentialQuantification #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS -Wall #-}
 module VerboseDD 
     (module InnerProductRepresentation,
@@ -7,13 +8,14 @@ module VerboseDD
      dds,
      PairFate(..),
      PairFateKind(..),
-     ddSolutions,
-     ddSolutions',
-     ddSolutionsToSDense,
-     ddSolutionsToQDense,
+     DDableCoordSystem(..),
+     ddWrapSolutions,
      ppDDRes,
+     vertexSolutions,
      qVertexSolutions,
-     qVertexSolutionExts
+     sVertexSolutions,
+     fundEdgeSolutions,
+     qVertexSolutionExts,
      
      )
 
@@ -22,26 +24,40 @@ module VerboseDD
 
 import Control.Applicative
 import Control.Monad.State.Strict
+import Data.BitVector.Adaptive
 import Data.Function
 import Data.List as L
 import Data.Ord
+import Data.Proxy
 import Data.Vector(Vector)
 import InnerProductRepresentation
 import MathUtil
 import PrettyUtil
 import QuadCoordinates
+import QuadCoordinates.Class
+import QuadCoordinates.CanonExt
 import QuadCoordinates.Dense
-import TriangulationCxtObject
+import QuadCoordinates.MatchingEquations
+import StandardCoordinates.Class
+import StandardCoordinates.Dense
+import StandardCoordinates.MatchingEquations
+import Triangulation.Class
 import Util
 import VectorUtil
 import qualified Data.Vector as V
-import QuadCoordinates.CanonExt
---import QuadCoordinates.Class
-import StandardCoordinates.MatchingEquations
-import QuadCoordinates.MatchingEquations
-import Triangulation.Class
-import Data.BitVector.Adaptive
-import Data.Proxy
+import CheckAdmissibility
+import Data.Ratio
+import qualified Data.Vector.Generic as VG
+
+#if 0
+import Debug.Trace(trace)
+#else
+trace :: a -> b -> b
+trace = const id
+#endif
+
+
+
 
 data PairFate w = 
     PairFate {
@@ -80,7 +96,7 @@ data DDStepResult w = DDSR {
     pairFates :: Vector (PairFate w) 
 }
 
-data DDResult =
+data DDResult c =
     forall w. BitVector w => 
         DDResult {
             _ddr_steps :: [DDStepResult w],
@@ -96,69 +112,82 @@ ipr_init _ d k meColumn ix =
                             (V.generate d (\j -> if j==k then 1 else 0)) 
 
 
-data DDInput = DDInput {
-    numberOfVariables :: Int,
-    hyperplanes :: [[Rational]],
-    quadIndexOffsets :: [BitVectorPosition]
-}
 
-dd :: ToTriangulation t => t -> DDResult
-dd (toTriangulation -> tr) = 
-    let
-        d = tNumberOfNormalQuadTypes tr
-    in
+class ( CheckAdmissibility c (WrappedVector c V.Vector Rational) adm Rational
+      , RatioToIntegral 
+            (adm (WrappedVector c Vector Rational))
+            (adm (WrappedVector c Vector Integer))
+      , NonNegScalable Rational (adm (WrappedVector c Vector Rational))
+      ) 
 
-    withBitVectorType d ( 
-        ddWith DDInput {
-            numberOfVariables = d,
-            hyperplanes = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr,
-            quadIndexOffsets = map (3*) [0.. tNumberOfTetrahedra tr - 1]
+        => DDableCoordSystem c adm where
 
-        }
-    )
+    numberOfVariables :: c -> Triangulation -> Int
+    hyperplanes :: c -> Triangulation -> [[Rational]]
+    quadIndexOffsets :: c -> Triangulation -> [BitVectorPosition]
 
-dds :: ToTriangulation t => t -> DDResult
-dds (toTriangulation -> tr) = 
-    let
-        d = tNumberOfNormalDiscTypes tr
-    in
 
-    withBitVectorType d ( 
-    ddWith DDInput {
-        numberOfVariables = d,
-        hyperplanes = 
+
+instance DDableCoordSystem QuadCoordSys QAdmissible where
+    numberOfVariables _ = tNumberOfNormalQuadTypes 
+    hyperplanes _ tr = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr
+    quadIndexOffsets _ tr = map (3*) [0.. tNumberOfTetrahedra tr - 1]
+
+
+
+instance DDableCoordSystem StdCoordSys Admissible where
+        numberOfVariables _ = tNumberOfNormalDiscTypes
+        hyperplanes _ tr = 
             [ map (toRational . evalMatchingEquation me) (tINormalDiscs tr)
-                | me <- matchingEquationReasons tr ],
+                | me <- matchingEquationReasons tr ]
 
-
-        quadIndexOffsets = 
+        quadIndexOffsets _ tr = 
                         [ (fromEnum . iNormalQuadToINormalDisc) (tindex i ./ minBound)
                                 | i <- [0.. tNumberOfTetrahedra tr - 1] ]
 
-     })
+dd :: ToTriangulation t => t -> DDResult QuadCoordSys
+dd = ddWith0 (undefined :: QuadCoordSys)  
+
+dds :: ToTriangulation t => t -> DDResult StdCoordSys
+dds = ddWith0 (undefined :: StdCoordSys)  
+
+ddWith0
+  :: (ToTriangulation tr, DDableCoordSystem c adm) => c -> tr -> DDResult c
+ddWith0 coord (toTriangulation -> tr) = 
+    withBitVectorType 
+        (numberOfVariables coord tr) 
+        (ddWith coord tr) 
+    
 
 
-{-# SPECIALIZE ddWith :: DDInput -> Proxy (BitVectorSingle Word) -> DDResult #-}
-{-# SPECIALIZE ddWith :: DDInput -> Proxy (BitVectorSingle Word64) -> DDResult #-}
-ddWith :: forall w. BitVector w => DDInput -> Proxy w -> DDResult
-ddWith DDInput{..} bitvectorTypeProxy =
+{-# SPECIALIZE ddWith :: QuadCoordSys -> Triangulation -> Proxy (BitVectorSingle Word) -> DDResult QuadCoordSys #-}
+{-# SPECIALIZE ddWith :: QuadCoordSys -> Triangulation -> Proxy (BitVectorSingle Word64) -> DDResult QuadCoordSys #-}
+{-# SPECIALIZE ddWith :: StdCoordSys -> Triangulation -> Proxy (BitVectorSingle Word) -> DDResult StdCoordSys #-}
+{-# SPECIALIZE ddWith :: StdCoordSys -> Triangulation -> Proxy (BitVectorSingle Word64) -> DDResult StdCoordSys #-}
+ddWith :: forall w c adm. (DDableCoordSystem c adm, BitVector w) => 
+    c -> Triangulation -> Proxy w -> DDResult c
+
+ddWith coordSys tr bitvectorTypeProxy =
     let
-        mes = sortBy (comparing (fmap (/=0))) hyperplanes
+        mes = sortBy (comparing (fmap (/=0))) (hyperplanes coordSys tr)
 
+        d = numberOfVariables coordSys tr
         g = length mes
 
         mes' = transpose mes
+
+        zeroSetAdmissible_ = zeroSetAdmissible (quadIndexOffsets coordSys tr)
 
         go = do
             _V0 <- V.zipWithM 
                         (\k meColumn -> ipr_init 
                                             bitvectorTypeProxy 
-                                            numberOfVariables 
+                                            d 
                                             k 
                                             meColumn 
                                                 <$> nextIndex)
 
-                        (V.enumFromN 0 numberOfVariables) 
+                        (V.enumFromN 0 d) 
                         (V.fromList mes')
 
 
@@ -169,6 +198,7 @@ ddWith DDInput{..} bitvectorTypeProxy =
             | otherwise =
 
 --                 $(traceExps "dd/loop" [ [|i|],[|V.length _Vp|] ]) $
+                trace ("ddWith: length _Vp = "++show (VG.length _Vp)) $
 
             let
                 (_Sneg,_S0,_Spos) = partitionBySign _Vp
@@ -178,9 +208,9 @@ ddWith DDInput{..} bitvectorTypeProxy =
 
                 
                         PairFate x y <$>
-                            (case (bvIntersect `on` zeroSet) x y of
+                            (case (bvIntersection `on` zeroSet) x y of
                                 zeroSetIntersection 
-                                    | not (zeroSetAdmissible quadIndexOffsets zeroSetIntersection) -> 
+                                    | not (zeroSetAdmissible_ zeroSetIntersection) -> 
                                         return Incompatible                
                                     | Just z <- (disproveAdjacency _Vp x y zeroSetIntersection) -> 
                                         return (NotAdjacent z)
@@ -213,6 +243,7 @@ ddWith DDInput{..} bitvectorTypeProxy =
         
 
     in 
+        trace ("ddWith: d = "++show d++"; g = "++show g) $
         evalState go 0 
 
 
@@ -228,11 +259,11 @@ partitionBySign _Vp = (_Sneg,_S0,_Spos)
 -- ipr_compatible :: BitVector w => [Int] -> (IPR w) -> (IPR w) -> Bool
 -- ipr_compatible quadIndexOffsets = zeroSetCompatible `on` zeroSet 
 --     where
---         zeroSetCompatible z1 z2 = zeroSetAdmissible (bvIntersect z1 z2)
+--         zeroSetCompatible z1 z2 = zeroSetAdmissible (bvIntersection z1 z2)
 
 zeroSetAdmissible
   :: BitVector w => [BitVectorPosition] -> w -> Bool
-zeroSetAdmissible quadIndexOffsets z =
+zeroSetAdmissible _quadIndexOffsets z =
 
             all (\i ->
                     atLeastTwo
@@ -243,7 +274,7 @@ zeroSetAdmissible quadIndexOffsets z =
                         
                         )
 
-                quadIndexOffsets
+                _quadIndexOffsets
                         
 
 
@@ -262,7 +293,7 @@ disproveAdjacency _Vp x y xy_zeroSetIntersection =
 vsepVec :: Vector Doc -> Doc
 vsepVec = vsep . V.toList
 
-ppDDRes :: DDResult -> Doc
+ppDDRes :: DDResult c -> Doc
 ppDDRes (DDResult steps res) =
            vsep (zipWith ppStep [1..] steps)
         <> line <> text "Result"
@@ -295,27 +326,47 @@ ppVecs vs =
         vsepVec (ipr_pretty BlankZeros maxWidth <$> vs)
 
 
-ddSolutions :: DDResult -> Vector (Vector Rational)
-ddSolutions (DDResult _ x) = V.map ipr_value x
+ddWrapSolutions
+  :: (ToTriangulation tr,
+      CheckAdmissibility c (WrappedVector c Vector Rational) adm Rational) =>
+     tr
+     -> DDResult c -> Vector (adm (WrappedVector c Vector Rational))
 
-ddSolutions' :: DDResult -> Vector (Vector Integer)
-ddSolutions' = V.map makeVecIntegral . ddSolutions
+ddWrapSolutions tr (DDResult _ x :: DDResult c) = 
+    V.map (either _err id . admissible (undefined :: Proxy c) tr . WrappedVector . reconstruct) x
 
-ddSolutionsToQDense :: ToTriangulation tr => tr -> DDResult -> Vector (QAdmissible QuadDenseI)
-ddSolutionsToQDense tr = V.map (either _err id . quad_admissible tr . qd_fromVector) . ddSolutions' 
     where
         _err e =
-            error ("ddSolutionsToQDense: result vector not admissible: "++e)
+            error ("ddWrapSolutions: result vector not admissible: "++e)
 
-ddSolutionsToSDense
-  :: ToTriangulation tr =>
-     tr -> DDResult -> Vector (Admissible (CanonExt QuadDenseI Integer))
-ddSolutionsToSDense tr = V.map canonExt . ddSolutionsToQDense tr
 
-qVertexSolutions :: ToTriangulation t => t -> Vector (QAdmissible QuadDenseI)
-qVertexSolutions tr = ddSolutionsToQDense tr (dd tr) 
+        reconstruct = ipr_value
+
+vertexSolutions :: 
+    (   DDableCoordSystem c adm
+    ,   ToTriangulation tr)
+
+    => Proxy c -> tr -> V.Vector (adm (WrappedVector c V.Vector Rational))
+vertexSolutions _ tr = ddWrapSolutions tr . ddWith0 undefined $ tr 
+
+-- | The vertices of the projective solution space in quadrilateral coordinates. 
+--
+-- Type restriction of 'vertexSolutions'.
+qVertexSolutions :: ToTriangulation t => t -> Vector (QAdmissible QuadDenseR)
+qVertexSolutions = vertexSolutions quadCoordSys
+
+-- | The vertices of the projective solution space in standard coordinates. 
+--
+-- Type restriction of 'vertexSolutions'.
+sVertexSolutions :: ToTriangulation t => t -> Vector (Admissible StandardDenseR)
+sVertexSolutions = vertexSolutions stdCoordSys
+
+fundEdgeSolutions
+  :: ToTriangulation tr => tr -> Vector (Admissible StandardDenseI)
+fundEdgeSolutions = V.map standard_toFundEdgeSol . sVertexSolutions
 
 qVertexSolutionExts
-  :: ToTriangulation t => t -> Vector (Admissible (CanonExt QuadDenseI Integer))
-qVertexSolutionExts tr = ddSolutionsToSDense tr (dd tr) 
+  :: ToTriangulation tr =>
+     tr -> Vector (Admissible (CanonExt QuadDenseR Rational))
+qVertexSolutionExts = V.map canonExt . qVertexSolutions
 

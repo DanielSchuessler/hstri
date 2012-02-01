@@ -19,11 +19,13 @@ newtype VertexLink = VertexLink TVertex
 -- | Constructs the vertex link around the given vertex.
 vertexLinkingSurface :: TVertex -> Admissible VertexLink
 vertexLinkingSurface v_ = 
-    $(fromRht) . admissible (getTriangulation v_) . VertexLink $ v_
+    $(fromRht) . standard_admissible (getTriangulation v_) . VertexLink $ v_
 
 -- | Calculates the euler characteristic of the vertex link.
 vertexLinkEulerC :: TVertex -> Integer
 vertexLinkEulerC v = eulerC . vertexLinkingSurface $ v 
+
+instance NormalSurfaceCoefficients VertexLink Integer
 
 instance QuadCoords VertexLink Integer where
     quadCount = const (const 0)

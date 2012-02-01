@@ -32,7 +32,9 @@ module PrettyUtil(
     pad,
     prettyPrecFromShow,
     PrettyMatrix(..),
+    PrettyVector(..),
     ZeroPrinting(..),
+    PrettyScalar(..),
     -- * Class
     Pretty(..),
     
@@ -100,7 +102,7 @@ prettyStringMatrix
   :: (AsList (Element a), AsList a, Element (Element a) ~ String) =>
      a -> String
 prettyStringMatrix (asListOfLists -> xss) = 
-            intercalate "\n"
+            concatMap ('\n':)
         .   map (intercalate "  " . map fmtCell) 
         $   xss 
     where
@@ -184,11 +186,25 @@ instance
 
 prettyVector
   :: (Functor f,
-      AsList (f String),
+      AsList (Element (f [String])),
+      AsList (f [String]),
       PrettyScalar a,
-      Element (f String) ~ String) =>
+      Element (Element (f [String])) ~ [Char]) =>
      f a -> String
-prettyVector = prettyMatrix . (:[]) 
+prettyVector = prettyMatrix . fmap (:[]) 
+
+newtype PrettyVector a = PrettyVector { unPrettyVector :: a }
+    deriving Arbitrary
+
+instance
+ (Functor f,
+      AsList (Element (f [String])),
+      AsList (f [String]),
+      PrettyScalar a,
+      Element (Element (f [String])) ~ [Char])
+    => Show (PrettyVector (f a)) where
+
+     show = prettyVector . unPrettyVector
 
 prMatrix :: PrettyScalar a => [[a]] -> IO ()
 prMatrix = putStrLn . prettyMatrix 

@@ -46,7 +46,7 @@ eulerC_core adm = sum (f <$> discAssocs adm)
 eulerC
   :: forall q i. (Integral i, Show q, StandardCoords q i) =>
      Admissible q -> i
-eulerC s = case ratioToIntegral (eulerC_core s) of
+eulerC s = case ratioToIntegral (eulerC_core s :: Ratio i) of
                 Just i -> i
                 Nothing -> error ("eulerC_core returned "++show (eulerC_core s :: Ratio i)++
                                     " on input "++show s)

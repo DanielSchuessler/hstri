@@ -15,7 +15,8 @@ module THUtil(
     liftFunction,
     straceExp,
     ltraceExp,
-    problem
+    problem,
+    debugIndex
     ) where
 
 import Language.Haskell.TH
@@ -33,6 +34,7 @@ import Element
 import Data.Generics
 import Data.Maybe
 import FileLocation
+import qualified Data.Vector.Generic as VG
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
@@ -156,3 +158,12 @@ straceExp = ltraceExp ""
 
 problem :: Q Exp
 problem = [| error . ($(lift . (++ ": ") . locationToString =<< location) ++) |]
+
+
+debugIndex :: Q Exp
+debugIndex = do
+    l <- location
+    [| \_v _i -> case _v VG.!? _i of
+                    Just _x -> _x
+                    Nothing -> error ($(lift . (++ ": Index out of bounds") . locationToString $ l)) |] 
+

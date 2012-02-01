@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, CPP, ExistentialQuantification, TupleSections, UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
+{-# LANGUAGE FlexibleContexts, EmptyDataDecls, ViewPatterns, CPP, ExistentialQuantification, TupleSections, UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
 --{-# OPTIONS -Wall #-}
 module StandardCoordinates.Class where
 
@@ -19,6 +19,7 @@ import qualified Data.Map as M
 import Data.Map(Map)
 import Math.SparseVector
 import Triangulation.Class
+import MathUtil
 
 
 -- | 
@@ -54,6 +55,10 @@ class QuadCoords s i => StandardCoords s i | s -> i where
     triAssocsDistinct = default_triAssocsDistinct_from_discAssocsDistinct
     discAssocsDistinct = sparse_toAssocs . standardAsSparse
 
+class (StandardCoords s r, StandardCoords s' r) => UpdatableStandardCoords s s' r | s -> s' r where
+
+    adjustTriCount :: (r -> r) -> INormalTri -> s -> s' 
+    adjustDiscCount :: (r -> r) -> INormalDisc -> s -> s' 
 
 default_discCount_from_triQuadCount
   :: StandardCoords s r => s -> INormalDisc -> r
@@ -240,6 +245,8 @@ instance Ord (AnyStandardCoords i) where
     (AnyStandardCoords x) `compare` (AnyStandardCoords y) =
         stc_extensionalCompare x y
 
+instance (Num r, Ord r) => NormalSurfaceCoefficients (AnyStandardCoords r) r
+
 
 
 #define F(X) X (AnyStandardCoords s) = X s
@@ -272,10 +279,6 @@ instance (Num r, Ord r) => StandardCoords (SparseVector INormalDisc r) r where
 
 
 
-class (StandardCoords s r, StandardCoords s' r) => UpdatableStandardCoords s s' r | s -> s' r where
-
-    adjustTriCount :: (r -> r) -> INormalTri -> s -> s' 
-    adjustDiscCount :: (r -> r) -> INormalDisc -> s -> s' 
 
 instance (Num r, Ord r) => 
     UpdatableStandardCoords 
@@ -299,6 +302,20 @@ partialCanonicalPart v s =
         
 
 
+
+standard_toFundEdgeSol
+  :: (Integral i,
+      RatioToIntegral sr si,
+      NonNegScalable (Ratio i) sr,
+      StandardCoords sr (Ratio i)) =>
+     sr -> si
+standard_toFundEdgeSol q =
+    let
+        denoms = fmap (denominator . snd) . discAssocsDistinct $ q 
+    in
+        fromMaybe (assert False undefined) .
+            ratioToIntegral . scaleNonNeg (lcms denoms % 1) $ q
+        
 
 
 

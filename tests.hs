@@ -2,7 +2,7 @@
 import Control.Monad
 import Equivalence.Tests
 import Math.Groups.Tests
-import MathUtil
+import Math.GaussElim.Tests
 import Orientation.Tests
 import QuadCoordinates.Tests
 import System.Exit
@@ -14,12 +14,12 @@ import Util
 
 tests :: [IO Bool]
 tests = [ 
+        qc_Tests,
         qc_Triangulation, 
         qc_Equivalence,
         qc_Util,
         qc_QuadCoordinates,
-        qc_MathUtil,
-        qc_Tests,
+        qc_GaussElim,
         qc_Math_Groups_Tests,
         qc_Tetrahedron,
         qc_Orientation

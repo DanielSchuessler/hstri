@@ -25,7 +25,7 @@ import Math.SparseVector
 import qualified Data.Vector.Unboxed as VU
 
 
-type StandardDense v r = WrappedVector INormalDisc v r
+type StandardDense v r = WrappedVector StdCoordSys v r
 type StandardDenseI = StandardDense V.Vector Integer
 type StandardDenseR = StandardDense V.Vector Rational
 
@@ -67,17 +67,11 @@ instance
 
 
     where 
-        adjustTriCount f =
-            adjustDiscCount f . iNormalTriToINormalDisc 
-
-
+        adjustTriCount f = adjustDiscCount f . iNormalTriToINormalDisc 
             
-adjustDiscCount
-  :: (VG.Vector v r) =>
-     (r -> r) -> INormalDisc -> StandardDense v r -> StandardDense v r
-adjustDiscCount f (fromEnum -> i) (WrappedVector v) =
+        adjustDiscCount f (fromEnum -> i) (WrappedVector v) =
 
-            WrappedVector (v VG.// [(i, f (v VG.! i))])
+                    WrappedVector (v VG.// [(i, f (v VG.! i))])
 
             
 sd_fromList :: [r] -> StandardDense V.Vector r

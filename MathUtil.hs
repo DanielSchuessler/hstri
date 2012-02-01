@@ -1,47 +1,35 @@
-{-# LANGUAGE StandaloneDeriving, TemplateHaskell, RecordWildCards, ViewPatterns #-}
+{-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses, StandaloneDeriving, TemplateHaskell, RecordWildCards, ViewPatterns #-}
 {-# LANGUAGE NoMonomorphismRestriction #-} 
 {-# LANGUAGE TypeFamilies, FlexibleInstances, BangPatterns #-} 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 
 module MathUtil where
 
 
-import Control.Applicative
-import Control.DeepSeq
 import Control.Exception
 import Control.Monad
-import Data.AdditiveGroup
 import Data.Complex
 import Data.Maybe
-import Data.Monoid
 import Data.Ratio
 import Data.Vect.Double hiding(Vector)
 import qualified Data.Vect.Double as Vect
-import Data.VectorSpace
-import PrettyUtil
-import QuickCheckUtil
 import System.Random
 import Test.QuickCheck
-import Test.QuickCheck.All
 import qualified Data.Foldable as Fold
 import qualified Data.List as L
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
-import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
-import Math.SparseVector
-import qualified Data.DList as DL
-import Data.Char
-import THUtil
-import qualified Data.Set as S
-import Control.Monad.ST.Safe
+import Data.Vector.Unboxed(Unbox)
 import Data.Vector(Vector)
 import HomogenousTuples
 import Control.Arrow((&&&))
 import Util
+import OrphanInstances()
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -123,8 +111,6 @@ matrixApproxEq m1 m2 = matrixDistance m1 m2 < 1E-10
 
 
 
-ratioToIntegral :: Integral a => Ratio a -> Maybe a
-ratioToIntegral r = guard (denominator r == 1) >> Just (numerator r)
                   
 lcms :: (Integral b, Fold.Foldable t) => t b -> b
 lcms = Fold.foldl' lcm 1
@@ -132,189 +118,6 @@ lcms = Fold.foldl' lcm 1
 denomLcms :: (Integral b, Fold.Foldable t) => t (Ratio b) -> b
 denomLcms = Fold.foldl' (\r x -> lcm (denominator x) r) 1
 
-data ERT r =
-      SwapRows {-# UNPACK #-} !Int {-# UNPACK #-} !Int
-    | AddRowToRow {- dst -} {-# UNPACK #-} !Int !r {-# UNPACK #-} !Int 
-    | ScaleRow !r {-# UNPACK #-} !Int
-
-    deriving Show
-
-swapRows :: Int -> Int -> ERT r
-swapRows = SwapRows
-addRowToRow :: Int -> r -> Int -> ERT r
-addRowToRow i_dst r i_src = assert (i_dst /= i_src) $ AddRowToRow i_dst r i_src
-scaleRow :: Num r => r -> Int -> ERT r
-scaleRow r = assert (r/=0) $ ScaleRow r
-
-instance NFData r => NFData (ERT r) where
-    rnf SwapRows{} = ()
-    rnf (AddRowToRow _ r _) = rnf r `seq` ()
-    rnf (ScaleRow r _) = rnf r `seq` ()
-
-instance Show r => Pretty (ERT r) where prettyPrec = prettyPrecFromShow
-
-applyERT :: (Num r, VG.Vector v r) => ERT r -> Vector (v r) -> Vector (v r) 
-applyERT (SwapRows i i') !mtx
-    | i == i' =        mtx
-    | otherwise = V.modify (\mmtx -> VM.swap mmtx i i') mtx
-
-applyERT (AddRowToRow i_dst r i_src) !mtx
-    | r == 0 = mtx
-    | otherwise = 
-        mtx V.// [  ( i_dst
-                        , VG.zipWith (\x y -> x + r*y) 
-                            (mtx V.! i_dst) 
-                            (mtx V.! i_src)
-                        )
-                 ]
-
-applyERT (ScaleRow r i) !mtx
-    | r == 1 = mtx
-    | otherwise = mtx V.// [(i, scaleV r (mtx V.! i))]
-
-
-applyERTs
-  :: (Num r, VG.Vector v r) =>
-     [ERT r] -> Vector (v r) -> Vector (v r)
-applyERTs erts mtx = L.foldl' (flip applyERT) mtx erts
-
-scaleV :: (Num b, VG.Vector v b) => b -> v b -> v b
-scaleV r v = VG.map (r *) v
-
-(@@>) ::  VG.Vector v a => Vector (v a) -> (Int, Int) -> a
-(@@>) mtx_ (i, j) = (mtx_ V.! i) VG.! j
-infix 9 @@>
-
-
-rows, cols :: (VG.Vector v r) => Vector (v r) -> Int
-rows = V.length
-cols = VG.length . V.head 
-
-type BMatrix r = Vector (Vector r)
-type UMatrix r = Vector (VU.Vector r)
-
-
-topNonzero
-  :: (Num r, VG.Vector v r) =>
-     Vector (v r) -> Int -> Int -> Maybe Int
-topNonzero mtx i j = L.find (\i' -> (mtx @@> (i',j)) /= 0) [i..rows mtx-1]
-
--- | 
---
--- * The 'ERT's returned must be applied to the input matrix /from left to right/ to get the matrix in echelon form
---
--- * The third component of the result is the list of pivot column indices, descending
-toSomeEchelon
-  :: (Fractional r, VG.Vector v r) =>
-     Bool -> Vector (v r) -> (Vector (v r), [ERT r], [Int])
-toSomeEchelon doReduce mtx0 =
-    let
-        r = rows mtx0
-        c = cols mtx0
-
-
-        loop !i !j !mtx !erts !pivotColumnIndices
-            | i == r || j ==c = (mtx,DL.toList erts,DL.toList pivotColumnIndices)
-            | otherwise =
-
-                case topNonzero mtx i j of
-
-                     Nothing -> loop i (j+1) mtx erts pivotColumnIndices
-                     Just pivotRow ->
-
-                        let     recip_pivot = recip (mtx @@> (pivotRow,j))
-                        in let  swapERT = swapRows i pivotRow
-                        in let  mtx' = applyERT swapERT mtx 
-                        in let  scaleRowERT = scaleRow recip_pivot i
-                        in let  rowClearERT i' =
-                                    addRowToRow 
-                                            i' 
-                                            (-(mtx' @@> (i',j))) 
-                                            i 
-
-                        in let  i's = (if doReduce then ([0..i-1]++) else id) [i+1..r-1]
-                        in let  mtx'' = applyERT scaleRowERT mtx'
-                        in let  mtx''' = L.foldl' (\_r i' -> applyERT (rowClearERT i') _r) mtx'' i's 
-                        in let  rowClearERTs = DL.fromList (map rowClearERT i's)
-                        in let  newERTs =
-                                    (return swapERT) `mappend`
-                                    (return scaleRowERT) `mappend`
-                                    rowClearERTs
-                                
-                                        
-                        in 
-                            loop 
-                                (i+1) 
-                                (j+1) 
-                                mtx'''
-                                (erts `mappend` newERTs)
-                                (return j `mappend` pivotColumnIndices)
-
-
-    in
-        loop 0 0 mtx0 mempty mempty
-    
-
-toEchelon
-  :: (Fractional r, VG.Vector v r) =>
-     Vector (v r) -> (Vector (v r), [ERT r], [Int])
-toEchelon = toSomeEchelon False
-toReducedEchelon
-  :: (Fractional r, VG.Vector v r) =>
-     Vector (v r) -> (Vector (v r), [ERT r], [Int])
-toReducedEchelon = toSomeEchelon True
-
-arbMatrix :: Int -> Int -> Gen (PrettyMatrix (BMatrix Rational))
-arbMatrix r c = (PrettyMatrix . V.fromList . map V.fromList) 
-    <$> vectorOf r (vectorOf c s)
-
-  where
-    s = fromIntegral <$> choose (-4,4::Int)
-
-arbSquareMatrix :: Int -> Gen (PrettyMatrix (BMatrix Rational))
-arbSquareMatrix = join arbMatrix
-
-intSqrt :: Int -> Int
-intSqrt = round . (id :: Double -> Double) . sqrt . fromIntegral
-
-
-arbMatrix' :: Gen (PrettyMatrix (BMatrix Rational))
-arbMatrix' = sized (\n -> join (join (liftM2 arbMatrix) (choose (1,intSqrt n))))
-
-prop_toEchelon :: Property
-prop_toEchelon = 
-    forAll arbMatrix' 
-        (\(PrettyMatrix mtx) -> case toReducedEchelon mtx of
-                      (mtx',erts,_) ->
-                          printTestCase ("mtx' =\n"++prettyMatrix mtx') $
-                          printTestCase ("erts =\n"++show erts) $
-                            mtx' .=. applyERTs erts mtx
-                            .&&.
-                            isEchelon mtx')
-        
-
-adjacentsSatisfy
-  :: Fold.Foldable f => (t -> t -> Bool) -> f t -> Bool
-adjacentsSatisfy rel = go . Fold.toList
-    where
-        go (x0:xs@(x1:_)) = rel x0 x1 && go xs
-        go _ = True
-
-isEchelon :: (Num a, VG.Vector v a) => Vector (v a) -> Bool
-isEchelon mtx = adjacentsSatisfy rel (V.map leftmostNonzero mtx) 
-
-    where
-        leftmostNonzero = VG.findIndex (/= 0)
-
-        rel Nothing x = isNothing x
-        rel (Just _) Nothing = True
-        rel (Just x) (Just y) = x < y
-
-prop_isEchelon :: Property
-prop_isEchelon = expectFailure (forAll arbMatrix' (isEchelon . unPrettyMatrix))
-
-qc_MathUtil :: IO Bool
-qc_MathUtil = $quickCheckAll
 
         
 makeMatrixIntegral
@@ -340,117 +143,9 @@ makeVecIntegral ro =
 --     negateV = negate
 
 
-symbolicSolution
-  :: (Fractional r,
-      Ord variable,
-      Ord r,
-      Show variable,
-      VG.Vector v r,
-      Pretty r) =>
-     Vector (v r)
-     -> (Int -> variable)
-     -> ((Vector (v r), [ERT r], [Int]),
-         Vector (SparseVector variable r))
-symbolicSolution mtx0 mkVar = 
-    case toReducedEchelon mtx0 of
-      echelon@(mtx',_,pcis) -> (echelon, symbolicSolutionForEchelon mtx' pcis mkVar)
-
-symbolicSolutionForEchelon
-  :: forall r variable v. (Fractional r, Ord variable, VG.Vector v r, Ord r, Show variable, Pretty r) =>
-     Vector (v r) -> [Int] -> (Int -> variable) -> Vector (SparseVector variable r)
-symbolicSolutionForEchelon mtx' [] mkVar = 
-            V.generate (cols mtx') (flip sparse_singleton 1 . mkVar)
-
-
-symbolicSolutionForEchelon mtx' pivotColumnIndices mkVar = V.create creat 
-            where
-                lastNonzeroRow = length pivotColumnIndices - 1
-                isPivot = flip S.member (S.fromList pivotColumnIndices) 
-
-                creat :: forall s. ST s (VM.MVector s (SparseVector variable r)) 
-                creat = do
-                    v <- VM.new (cols mtx')
-                    let
-                        _write :: Int -> SparseVector variable r -> ST s ()
-                        _write j y = 
---                            $(traceExps "_write" ['j,'y]) 
-                            
-                            (VM.write v j y)
-
-                        setVarFree j' = _write j' (sparse_singleton (mkVar j') 1)
-
-                    let
-                        loop i j pcis0
-                          | j == -1 = 
---                                 $(traceExps "loop/done" ['i,'pcis0])
-                                (return ())
-                          | i == -1 =
-                                forM_ [0..j] setVarFree
-                                
-                                
-                          | (jp:pcis) <- pcis0 = do
-
-                            
-                            forM_ [jp+1..j] setVarFree
-                                                    
 
 
 
-
-
-                            let _sum = sparse_fromAssocs _sumAssocs
-                                _sumAssocs = 
-                                        mapMaybe (\jj ->
-                                            let
-                                                a = mtx' @@> (i,jj)
-                                            in if isPivot jj
-                                               then $(assrt [|a==0|] ['jj,'a]) Nothing
-                                               else Just (mkVar jj, a))
-                                            
-                                            [jp+1..cols mtx'-1]
-
-                                pivotCoeff = mtx' @@> (i,jp) 
-
-                            _write jp  
-                                ( negate (recip pivotCoeff)
-                                    *^ _sum ) 
-
-                            loop (i-1) (jp-1) pcis
-                                
-                          | otherwise = 
-                          
-                                    error ("loop/impossible " ++ $(showExps ['i,'j,'pcis0]))
-
-
-
-                    loop 
-                        lastNonzeroRow 
-                        (cols mtx'-1) 
-                        pivotColumnIndices
-
-                    return v
-
-
-
-dotprodWith
-  :: (Num a, VG.Vector v a1, VG.Vector v b, VG.Vector v a) =>
-     (a1 -> b -> a) -> v a1 -> v b -> a
-dotprodWith f x y = VG.sum (VG.zipWith f x y) 
-
-mulMVwith
-  :: (Num a, VG.Vector v a1, VG.Vector v b, VG.Vector v a) =>
-     (a1 -> b -> a) -> Vector (v a1) -> v b -> Vector a
-mulMVwith f mtx v = V.generate (rows mtx) (\i -> dotprodWith f (mtx V.! i) v)
-
-pro_symSol :: Property
-pro_symSol = forAll arbMatrix' (\(PrettyMatrix mtx) -> 
-    case symbolicSolution mtx (variable . return . chr . (+ ord 'a')) of
-            ((mtx',_,_),s) ->
-                printTestCase ("mtx' =\n"++prettyMatrix mtx') $
-                printTestCase (unlines ("s =":
-                                    map show (VG.toList s)++[";"])) $
-
-                    mulMVwith (*^) mtx s .=. V.replicate (rows mtx) zeroV)
 
 
 
@@ -555,3 +250,28 @@ torusCoords major minor (STP long lat boundaryness) =
     in
         Vec3 (cos long * r) (sin long * r) (sin lat * minor') 
         
+
+class NonNegScalable r a | a -> r where
+    scaleNonNeg :: r -> a -> a 
+
+instance Num r => NonNegScalable r (V.Vector r) where
+    scaleNonNeg = V.map . (*)
+
+instance (Unbox r, Num r) => NonNegScalable r (VU.Vector r) where
+    scaleNonNeg = VU.map . (*)
+
+ratioToIntegral_Ratio :: Integral a => Ratio a -> Maybe a
+ratioToIntegral_Ratio r = guard (denominator r == 1) >> Just (numerator r)
+
+class RatioToIntegral r i | r -> i where
+    -- | Map a rational value which is actually an integral value to the underlying integral type. Return @Nothing@ if the input isn't an integer. 
+    ratioToIntegral :: r -> Maybe i
+
+instance Integral i => RatioToIntegral (Ratio i) i where
+    ratioToIntegral = ratioToIntegral_Ratio
+
+instance RatioToIntegral r i => RatioToIntegral (V.Vector r) (V.Vector i) where
+    ratioToIntegral = V.mapM ratioToIntegral
+
+instance (Unbox r, Unbox i, RatioToIntegral r i) => RatioToIntegral (VU.Vector r) (VU.Vector i) where
+    ratioToIntegral = VU.mapM ratioToIntegral

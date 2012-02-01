@@ -1,26 +1,49 @@
-{-# LANGUAGE TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE FunctionalDependencies, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module QuadCoordinates.MatchingEquations where
 
 import AbstractNeighborhood
-import Tetrahedron
 import Control.Arrow((&&&))
+import Control.DeepSeq.TH
+import Control.Exception
 import Control.Monad.State
 import Data.Function
-import Data.Maybe as May
-import INormalDisc
-import StandardCoordinates.MatchingEquations
-import QuadCoordinates.Class
-import TriangulationCxtObject
 import Data.List as L
+import Data.Maybe as May
+import HomogenousTuples
+import INormalDisc
+import MathUtil
 import PrettyUtil
+import QuadCoordinates.Class
+import Tetrahedron
 import Triangulation.Class
-import Control.DeepSeq.TH
+import TriangulationCxtObject
+import Control.Applicative
+
+
+
+
+satisfiesQuadrilateralConstraints
+  :: QuadCoords s r => Triangulation -> s -> Either [Char] ()
+satisfiesQuadrilateralConstraints tr stc = 
+        mapM_ p tets
+    where
+        tets = tTetrahedra_ tr
+        
+        p tet = 
+            unless (sum3 (map3 f (normalQuads tet)) <= (1::Int))
+                   (Left ("Quadrilateral constraints violated at tet "++show tet))
+
+        f quad = if quadCount stc quad == 0 
+                    then 0
+                    else 1
+
 
 
 quad_admissible
-  :: (ToTriangulation tr, Ord r, QuadCoords q r) =>
+  :: (ToTriangulation tr, QuadCoords q r) =>
      tr -> q -> Either [Char] (QAdmissible q)
 quad_admissible (toTriangulation -> tr) qc = do
     mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient"))) (quadAssocs qc) 
@@ -80,12 +103,15 @@ qMatchingEquations0
      -> [QMatchingEquation]
 qMatchingEquations0 = mapMaybe qMatchingEquation0 . edges
 
+-- | INVARIANT: @'quad_isAdmissible' ('qadm_Triangulation' x) ('qadm_coords' x) == True@.
 data QAdmissible q = UnsafeToQAdmissible {
+    -- | The triangulation with respect to which the 'qadm_coords' are admissible.
     qadm_Triangulation :: Triangulation,
     qadm_coords :: q 
 }
     deriving(Show)
 
+instance NormalSurfaceCoefficients q r => NormalSurfaceCoefficients (QAdmissible q) r
 
 -- | Does /not/ compare the triangulations
 instance Eq q => Eq (QAdmissible q) where
@@ -109,3 +135,17 @@ instance Pretty q => Pretty (QAdmissible q) where
 
 
 deriveNFData ''QAdmissible
+
+
+qadm_unsafeMap :: (q1 -> q) -> QAdmissible q1 -> QAdmissible q
+qadm_unsafeMap f q = q { qadm_coords = f (qadm_coords q) } 
+
+instance (Num r, Ord r, NonNegScalable r q) => NonNegScalable r (QAdmissible q) where
+    scaleNonNeg r = assert (r>=0) $ qadm_unsafeMap (scaleNonNeg r)
+
+qadm_unsafeTraverse
+  :: Functor f => (q1 -> f q) -> QAdmissible q1 -> f (QAdmissible q)
+qadm_unsafeTraverse f q = (\x -> q { qadm_coords = x }) <$> f (qadm_coords q)
+
+instance RatioToIntegral qr qi => RatioToIntegral (QAdmissible qr) (QAdmissible qi) where
+    ratioToIntegral = qadm_unsafeTraverse ratioToIntegral

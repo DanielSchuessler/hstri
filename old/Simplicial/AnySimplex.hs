@@ -90,8 +90,6 @@ compareN x y = getOrd (prox x) (compare x y)
 
 
 
-prox :: a -> Proxy a
-prox _ = undefined
 
 instance (ShowN s1, ShowN s2) => ShowN (Either1 s1 s2) where
     getShow (_ :: Proxy (Either1 s1 s2 n)) r = 

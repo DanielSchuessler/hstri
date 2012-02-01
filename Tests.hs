@@ -1,10 +1,12 @@
-{-# LANGUAGE ViewPatterns, ExistentialQuantification, StandaloneDeriving, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts, ViewPatterns, ExistentialQuantification, StandaloneDeriving, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-unused-imports #-}
 module Tests where
 
 --import QuadCoordinates.Class
 import AbstractNeighborhood
 import ClosedNorCensus8
+import CheckAdmissibility
 import ClosedOrCensus6
 import ConcreteNormal
 import Control.Monad.State
@@ -14,6 +16,7 @@ import Data.Maybe
 import Data.Ord
 import Math.SparseVector 
 import QuadCoordinates.CanonExt
+import QuadCoordinates.Class
 import QuadCoordinates.Dense
 import QuadCoordinates.MatchingEquations
 import QuickCheckUtil
@@ -34,25 +37,40 @@ import StandardCoordinates.SurfaceQueries
 import Util
 import Control.Applicative
 import Tests.Gens
+import Data.Proxy
 
 
-prop_qVertexSolutions (ManifoldTriangulation tr) =
-    tNumberOfTetrahedra_ tr <= 10 ==>
 
+polyprop_vertexSolutions
+  :: (Show (adm (WrappedVector c V.Vector Rational)),
+      CheckAdmissibility
+        c (adm (WrappedVector c V.Vector Rational)) adm Rational,
+      DDableCoordSystem c adm) =>
+     Proxy c -> Int -> Property
+polyprop_vertexSolutions c n =
+    mapSize (min n) $ 
+
+    \(ManifoldTriangulation (tr :: Triangulation)) ->
     let
-        sols = qVertexSolutions tr
+        sols = vertexSolutions c tr
     in
         conjoin
-            (map (eitherFuncToProp (quad_admissible tr)) (V.toList sols))
+            (map (eitherFuncToProp (admissible c tr)) (V.toList sols))
 
-prop_qVertexSolutionExts (ManifoldTriangulation tr) =
-    tNumberOfTetrahedra_ tr <= 10 ==>
+prop_qVertexSolutions = polyprop_vertexSolutions quadCoordSys 50
+prop_sVertexSolutions = polyprop_vertexSolutions stdCoordSys 50
+
+prop_qVertexSolutionExts =
+    
+    mapSize (min 50) $ 
+    \(ManifoldTriangulation (tr :: Triangulation)) ->
                                                                
-    let
-        sols = qVertexSolutionExts tr
-    in 
-        conjoin
-            (map (eitherFuncToProp (admissible tr)) (V.toList sols))
+        let
+            sols = qVertexSolutionExts tr
+        in 
+            conjoin
+                (map (eitherFuncToProp (standard_admissible tr)) (V.toList sols))
+
 
 
 qc_Tests :: IO Bool
@@ -124,7 +142,7 @@ prop_iNormalDiscInGluinglessTriangulationIsDisk = do
     let tr = mkTriangulation n []
     i <- choose (0,fi n - 1)
     d <- elements allNormalDiscs
-    property (isDisk (toAdmissible tr (i ./ d)))
+    property (isDisk (toAdmissible stdCoordSys tr (i ./ d)))
 
 
 
@@ -141,3 +159,6 @@ prop_partialCanonicalPart_commute (TriangulationWithUnrestrictedStandardCoords t
             partialCanonicalPart v (partialCanonicalPart w s)
                 .=.
             partialCanonicalPart w (partialCanonicalPart v s))
+
+
+--prop_quad_admissible_no_change 

@@ -42,6 +42,8 @@ instance (Pretty q, Pretty r, Num r, Ord r) => Pretty (CanonExt q r) where
             [("quads",pretty (canonExt_quads x))
             ,("tris",pretty (canonExt_tris x))])
 
+instance NormalSurfaceCoefficients q r => NormalSurfaceCoefficients (CanonExt q r) r
+
 instance QuadCoords q r => QuadCoords (CanonExt q r) r where
     quadCount = quadCount . canonExt_quads
     quadAssocs = quadAssocs . canonExt_quads
@@ -63,7 +65,7 @@ canonExt :: forall q r tr. (Pretty q, QuadCoords q r, Ord r, Pretty r) =>
     QAdmissible q -> Admissible (CanonExt q r)
 canonExt qc = 
 
-             case admissible tr preResult of
+             case standard_admissible tr preResult of
                 Right x -> x
                 Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
                                     $(showExps ['qc,'preResult]))

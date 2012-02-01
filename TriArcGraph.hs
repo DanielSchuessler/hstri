@@ -24,6 +24,7 @@ import Math.SparseVector
 import qualified Data.Text.Lazy as Text
 import qualified Data.Vector as V
 import System.Exit
+import Math.GaussElim
 
 
 

@@ -3,26 +3,26 @@
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 module StandardCoordinates.MatchingEquations where
 
+import QuadCoordinates.MatchingEquations
 import StandardCoordinates.Class
 import QuadCoordinates.Class
 import Control.Monad
 import Triangulation
-import HomogenousTuples
-import Tetrahedron.NormalDisc
 import TupleTH
-import Data.SumType
 import Triangulation.Class
 import Data.Function
 import PrettyUtil
+import MathUtil
+import Control.Exception
+import Control.Applicative
 
-isAdmissible
-  :: (ToTriangulation tr, StandardCoords s r) => tr -> s -> Bool
-isAdmissible = (.) isRight . admissible
 
-admissible
+
+
+standard_admissible
   :: (ToTriangulation tr, StandardCoords s r) =>
      tr -> s -> Either [Char] (Admissible s)
-admissible (toTriangulation -> tr) stc = do
+standard_admissible (toTriangulation -> tr) stc = do
     mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient")))
           (discAssocs stc)
     satisfiesQuadrilateralConstraints tr stc 
@@ -30,7 +30,7 @@ admissible (toTriangulation -> tr) stc = do
     return (UnsafeToAdmissible tr stc)
 
 satisfiesMatchingEquations
-  :: StandardCoords q r => Triangulation -> q -> Either [Char] ()
+  :: StandardCoords s r => Triangulation -> s -> Either [Char] ()
 satisfiesMatchingEquations tr stc =
         mapM_ p (matchingEquationReasons tr)
     where
@@ -39,20 +39,6 @@ satisfiesMatchingEquations tr stc =
             where
                 r = evalMatchingEquation me stc
 
-satisfiesQuadrilateralConstraints
-  :: QuadCoords s r => Triangulation -> s -> Either [Char] ()
-satisfiesQuadrilateralConstraints tr stc = 
-        mapM_ p tets
-    where
-        tets = tTetrahedra_ tr
-        
-        p tet = 
-            unless (sum3 (map3 f (normalQuads tet)) <= (1::Int))
-                   (Left ("Quadrilateral constraints violated at tet "++show tet))
-
-        f quad = if quadCount stc quad == 0 
-                    then 0
-                    else 1
 
 
 
@@ -110,13 +96,15 @@ matchingEquationSupportDiscs
 matchingEquationSupportDiscs =
     $(mapTuple' 4 [|iNormalDisc|]) . matchingEquationSupport
 
-
-data Admissible q = UnsafeToAdmissible {
+-- | INVARIANT: @'isAdmissible' ('adm_Triangulation' x) ('adm_coords' x) == True@. 
+data Admissible s = UnsafeToAdmissible {
+    -- | The triangulation with respect to which the 'adm_coords' are admissible.
     adm_Triangulation :: Triangulation,
-    adm_coords :: q 
+    adm_coords :: s 
 }
     deriving(Show)
 
+instance NormalSurfaceCoefficients q r => NormalSurfaceCoefficients (Admissible q) r
 
 -- | Does /not/ compare the triangulations
 instance Eq q => Eq (Admissible q) where
@@ -149,22 +137,27 @@ instance Pretty s => Pretty (Admissible s) where
     prettyPrec prec = prettyPrec prec . adm_coords
 
 
-toAdmissible
-  :: (Show a, ToTriangulation tr, StandardCoords a r) =>
-     tr -> a -> Admissible a
-toAdmissible tr x = either _err id . admissible tr $ x
-    where
-        _err e = error ("toAdmissible "++showsPrec 11 x ""++": "++e)
     
 
 
 instance UpdatableStandardCoords s s' r => UpdatableStandardCoords (Admissible s) s' r
     where
 
-    adjustTriCount f t =
-        adjustTriCount f t . adm_coords
+    adjustTriCount f t = adjustTriCount f t . adm_coords
+    adjustDiscCount f t = adjustDiscCount f t . adm_coords
+
+adm_unsafeMap :: (s1 -> s) -> Admissible s1 -> Admissible s
+adm_unsafeMap f s = s { adm_coords = f (adm_coords s) } 
+
+instance (Num r, Ord r, NonNegScalable r s) => NonNegScalable r (Admissible s) where
+    scaleNonNeg r = assert (r>=0) $ adm_unsafeMap (scaleNonNeg r)
+
+adm_unsafeTraverse
+  :: Functor f => (s1 -> f s) -> Admissible s1 -> f (Admissible s)
+adm_unsafeTraverse f q = (\x -> q { adm_coords = x }) <$> f (adm_coords q)
+
+instance RatioToIntegral qr qi => RatioToIntegral (Admissible qr) (Admissible qi) where
+    ratioToIntegral = adm_unsafeTraverse ratioToIntegral
 
 
--- scaleAdmissible s a
---     | s <= 0 = error ("scaleAdmissible with negative coeff: "++show s)
---     | otherwise = a { adm_coords = (s*)  
+

@@ -1,5 +1,6 @@
-{-# LANGUAGE NoMonomorphismRestriction, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving, NoMonomorphismRestriction, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module QuadCoordinates.Dense where
 
@@ -13,10 +14,29 @@ import PrettyUtil
 import Triangulation
 import qualified Data.Vector.Unboxed as VU
 import Control.DeepSeq
+import MathUtil
+import Control.Applicative
 
 
 newtype WrappedVector tag v r = WrappedVector (v r)
     deriving(Eq,Ord,Pretty)
+
+instance (Num r, Ord r) => NormalSurfaceCoefficients (WrappedVector tag v r) r
+
+
+unwrapVector :: WrappedVector tag v r -> v r
+unwrapVector (WrappedVector v) = v
+
+
+instance (VG.Vector v r, Num r) => NonNegScalable r (WrappedVector tag v r) where
+
+    scaleNonNeg r = wv_under (VG.map (r *))
+
+
+instance (VG.Vector v r, VG.Vector v i, RatioToIntegral r i) => 
+    RatioToIntegral (WrappedVector tag v r) (WrappedVector tag v i) where
+
+            ratioToIntegral (WrappedVector v) = WrappedVector <$> VG.mapM ratioToIntegral v
 
 wv_under
   :: (t1 t2 -> v r) -> WrappedVector t t1 t2 -> WrappedVector tag v r
@@ -46,11 +66,9 @@ instance (VG.Vector v r, Num r) => VectorSpace (WrappedVector tag v r) where
 
     (*^) r = wv_under (VG.map (r*))
 
-unwrapVector :: WrappedVector tag v r -> v r
-unwrapVector (WrappedVector v) = v
     
 
-type QuadDense v r = WrappedVector INormalQuad v r
+type QuadDense v r = WrappedVector QuadCoordSys v r
 
 type QuadDenseI = QuadDense V.Vector Integer
 type QuadDenseR = QuadDense V.Vector Rational

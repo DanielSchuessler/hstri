@@ -14,11 +14,14 @@ Cabal-version:       >=1.2
 
 Library
     -- countering the -XHaskell98 passed by cabal
-  extensions: PatternGuards
+  extensions: PatternGuards, EmptyDataDecls
   ghc-options: -XMonoPatBinds
 
   Exposed-modules:     
     
+    Math.GaussElim
+    CoordSys
+    CheckAdmissibility
     StandardCoordinates.SurfaceQueries
     AbsTet
     AbstractNeighborhood
@@ -130,7 +133,7 @@ Library
     Math.SparseVector
 
 
-  Build-depends: arithmoi, file-location, yices-painless, syb, th-lift, 
+  Build-depends: deepseq-th, arithmoi, file-location, yices-painless, syb, th-lift, 
          MemoTrie 
         ,TypeCompose
         ,GLFW-b

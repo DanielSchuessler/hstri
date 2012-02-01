@@ -29,6 +29,7 @@ import Data.List.Split
 import Control.Applicative
 import Safe
 import Data.SumType
+import Data.Proxy
 
 
 fi :: (Integral a, Num b) => a -> b
@@ -311,4 +312,7 @@ catPairs = concatMap (\(a1,a2) -> [a1,a2])
 liftM4join4
   :: Monad m => (a4 -> a4 -> a4 -> a4 -> r) -> m a4 -> m r
 liftM4join4 f g = liftM4 f g g g g
+
+prox :: a -> Proxy a
+prox _ = undefined
 

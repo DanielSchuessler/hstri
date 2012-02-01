@@ -93,14 +93,14 @@ eitherFuncToProp f x =
     either (\e -> printTestCase e False) (const (property True)) (f x)
 
 data FundamentalEdgeSolution tr = 
-        FundamentalEdgeSolution tr (Admissible (CanonExt QuadDenseI Integer))
+        FundamentalEdgeSolution tr (Admissible StandardDenseI)
     deriving Show
 
 instance (ToTriangulation tr, Arbitrary tr) => Arbitrary (FundamentalEdgeSolution tr) where
     arbitrary = do
         (tr,sols) <- (do
                         tr <- arbitraryManifoldTriangulation
-                        return (tr, qVertexSolutionExts tr))
+                        return (tr, fundEdgeSolutions tr))
 
                         `suchThat` 
                                 (not . VG.null . snd)

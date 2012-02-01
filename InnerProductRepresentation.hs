@@ -53,7 +53,7 @@ ipr_combine x y index =
         assert (hx > 0 && hy < 0) $
         IPR  
             index
-            (bvIntersect (zeroSet x) (zeroSet y)) 
+            (bvIntersection (zeroSet x) (zeroSet y)) 
             (V.zipWith c
                 (V.tail ipsx)
                 (V.tail ipsy))
