@@ -54,7 +54,7 @@ tr_twoTets :: Triangulation
 tr_twoTets = mkTriangulation 2 [gluing (0./tABC) (1./oABC)]
 
 spqwc_oneTet :: SPQWithCoords Vertex
-spqwc_oneTet = geometrifySingleTetTriang tr_oneTet show
+spqwc_oneTet = oneTetWithDefaultCoords tr_oneTet show
 
 spqwc_twoTets :: SPQWithCoords TVertex
 spqwc_twoTets = twoTetsWithOneImplementedGluingWithCoords tr_twoTets (0./tABC) show
@@ -83,7 +83,7 @@ oneTetCam =
      defaultFOV
 
 l41 :: SPQWithCoords Vertex
-l41 = geometrifySingleTetTriang 
+l41 = oneTetWithDefaultCoords 
         (mkTriangulation 1 [(0./tBCD,0./oCDA),(0./tABD,0./oBCA)])
         (\gl@(ngDom -> forgetTIndex -> t) -> 
             case () of

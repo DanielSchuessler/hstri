@@ -9,7 +9,7 @@ import DisjointUnion
 tr = mkTriangulation 1 [ (0 ./ tABC, 0 ./ oDAB) ]
 
 
-spqwc = geometrifySingleTetTriang tr show
+spqwc = oneTetWithDefaultCoords tr show
 
 
 ntA' = standardCoordinates (0 ./ ntA)

@@ -3,6 +3,8 @@ import HsTri
 import qualified Data.Map as M
 import Data.Map(Map)
 import Control.Applicative
+import Control.Exception
+import Control.DeepSeq
 
 
 
@@ -20,6 +22,7 @@ go ba = (testBlender . setCams [twoTetCam])
 
 
 main = do
+    evaluate (rnf spqwc)
     go baVertexLinkA0
     go baVertexLinkD0
     

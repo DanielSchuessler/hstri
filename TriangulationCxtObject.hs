@@ -108,6 +108,7 @@ import Triangulation
 import Triangulation.CanonOrdered
 import Util
 import Triangulation.Class
+import Control.DeepSeq.TH
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -116,6 +117,8 @@ data T a =
         getTriangulation :: Triangulation,
         unT :: a
     }
+
+deriveNFData ''T
 
 -- | Vertex in the quotient space of a triangulation
 type TVertex = T IVertex

@@ -23,6 +23,7 @@ import TriangulationCxtObject
 import Util
 import qualified Data.List as L
 import qualified Data.Map as M
+import Control.DeepSeq
 
 -- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
@@ -33,6 +34,13 @@ data SimplicialPartialQuotient v = SimplicialPartialQuotient {
     spq_tets :: [Quadruple v]
 
 }
+
+instance NFData v => NFData (SimplicialPartialQuotient v) where
+    rnf SimplicialPartialQuotient{..} =
+
+        rnf spq_tr `seq`
+        rnf spq_tets `seq`
+        ()
 
 
 spq_verts :: Ord v => SimplicialPartialQuotient v -> [v]
@@ -224,9 +232,16 @@ data SPQWithCoords v = SPQWithCoords {
 nameMakeLens ''SPQWithCoords (Just . (++"L"))
 
 
-geometrifySingleTetTriang
+instance NFData v => NFData (SPQWithCoords v) where
+    rnf SPQWithCoords{..} =
+
+        rnf spqwc_spq `seq`
+        ()
+
+
+oneTetWithDefaultCoords
   :: Triangulation -> GluingLabeller -> SPQWithCoords Vertex
-geometrifySingleTetTriang tr gluingLabeller = 
+oneTetWithDefaultCoords tr gluingLabeller = 
     assert (tNumberOfTetrahedra tr == (1::Integer))
     $
         SPQWithCoords 
@@ -245,7 +260,7 @@ twoTetsWithOneImplementedGluing tr theTri =
             }
     where
         theGluedTri = fromMaybe (error ("twoTetsWithOneImplementedGluing: "++
-                                        "second must be an inner triangle"))                    
+                                        "second arg must be an inner triangle"))                    
                                         
                                 (lookupGluingOfITriangle tr theTri)
 
@@ -263,7 +278,7 @@ twoTetsWithOneImplementedGluingWithCoords tr theTri gluingLabeller =
     assert (tNumberOfTetrahedra tr == (2::Integer))
     $
         SPQWithCoords {
-            spqwc_spq = twoTetsWithOneImplementedGluing tr theTri,
+            spqwc_spq = spq,
             spqwc_coords = (M.fromList a M.!),
             spqwc_gluingLabeller = gluingLabeller
         }
@@ -275,13 +290,15 @@ twoTetsWithOneImplementedGluingWithCoords tr theTri gluingLabeller =
         cD' = (2/3) *& (cA &+ cB &+ cC) &- cD
 
         theGluedTri = fromMaybe (error ("twoTetsWithOneImplementedGluingWithCoords: "++
-                                        "second must be an inner triangle"))                    
+                                        "second arg must be an inner triangle"))                    
                                         
                                 (lookupGluingOfITriangle tr theTri)
 
 
+        spq = twoTetsWithOneImplementedGluing tr theTri
+
         -- | Triangulation containing only the chosen gluing
-        tr' = mkTriangulation 2 [(theTri,theGluedTri)]
+        tr' = spq_tr spq
 
         p = pMap tr' 
 

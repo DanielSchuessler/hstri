@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, TupleSections, PatternGuards, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
+{-# LANGUAGE DeriveDataTypeable, TupleSections, PatternGuards, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
 module Triangulation(
@@ -60,17 +60,18 @@ module Triangulation(
     
     ) where
 
-
-import Tetrahedron
 import Control.Applicative
 import Control.Arrow((&&&))
+import Control.DeepSeq.TH
 import Control.Exception
 import Control.Monad
 import Data.EdgeLabelledTree
 import Data.Function
 import Data.List(sort)
+import Data.Map(Map,lookup,(!))
 import Data.Maybe
 import Data.Numbering
+import Data.Set(member)
 import Data.SumType
 import Data.Typeable(Typeable)
 import Equivalence
@@ -79,16 +80,14 @@ import INormalDisc
 import Language.Haskell.TH.Lift
 import Prelude hiding(catch,lookup)
 import Quote
+import Tetrahedron
 import Tetrahedron.NormalDisc
 import Triangulation.FacetGluing
 import Util
 import qualified Data.Binary as Binary
 import qualified Data.List as List
 import qualified Data.Map as M
-import Data.Map(Map,lookup,(!))
 import qualified Data.Set as S
-import Data.Set(member)
-import Control.DeepSeq.TH
 
 
 tGluingsIrredundant :: Triangulation -> [Gluing]
