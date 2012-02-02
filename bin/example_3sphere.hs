@@ -3,7 +3,7 @@
 
 import Tetrahedron
 import Blender
-import Blenderable
+import Blender.Conversion
 import Data.Function
 import Data.Vect.Double
 import MathUtil

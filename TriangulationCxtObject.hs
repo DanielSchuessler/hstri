@@ -31,6 +31,7 @@ module TriangulationCxtObject(
 
     -- * Edges
     TEdge,
+    TOEdge,
     edgeEquivalence,
     -- ** Construction
     MakeTEdge(..),
@@ -121,6 +122,9 @@ type TVertex = T IVertex
 
 -- | Edge in the quotient space of a triangulation
 type TEdge = T IEdge
+
+-- | Directed edge in the quotient space of a triangulation. Note: The direction is *not* determined by the order of the endpoints, which may be identical.
+type TOEdge = T OIEdge
 
 -- | Triangle in the quotient space of a triangulation
 type TTriangle = T ITriangle

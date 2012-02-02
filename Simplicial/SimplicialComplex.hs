@@ -2,7 +2,34 @@
 {-# LANGUAGE Rank2Types, NoMonomorphismRestriction, ScopedTypeVariables, NamedFieldPuns, TypeFamilies, DefaultSignatures, FlexibleContexts, OverlappingInstances, StandaloneDeriving, UndecidableInstances, GeneralizedNewtypeDeriving, CPP #-} 
 {-# OPTIONS -Wall #-}
 -- | All 'Pair's, 'Triple's and 'Quadruple's are assumed to be strictly ascendingly ordered in this module.
-module Simplicial.SimplicialComplex where
+module Simplicial.SimplicialComplex(
+    module Simplicial.SimplicialComplex.Class,
+    module Data.AscTuples,
+    module DisjointUnion,
+    module Simplicial.DeltaSet3,
+
+    fromEdges,
+    fromOrderedEdges,
+    fromTris,
+    fromOrderedTris,
+    fromTrisAndQuads,
+    fromTets,
+    fromOrderedTets,
+
+    abstractEdge,
+    abstractTri,
+    abstractTet,
+
+    SCMinus1,
+    SCCons(..),
+    SC0,SC1,SC2,SC3,
+    SC0',SC1',SC2',SC3',
+    SimplicialMap,
+    DJSCons,
+
+
+
+    ) where
 
 
 --import Simplicial.Labels

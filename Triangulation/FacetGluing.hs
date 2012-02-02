@@ -191,3 +191,8 @@ glDomTet = getTIndex . glDom
 glCodTet :: Gluing -> TIndex
 glCodTet = getTIndex . glCod
 
+ngDomTet :: NormalizedGluing -> TIndex
+ngDomTet = getTIndex . ngDom
+
+ngCodTet :: NormalizedGluing -> TIndex
+ngCodTet = getTIndex . ngCod

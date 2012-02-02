@@ -30,6 +30,9 @@ import Control.Applicative
 import Safe
 import Data.SumType
 import Data.Proxy
+import Control.Comonad.Store.Lazy
+import Data.Lens.Common
+import Control.Arrow
 
 
 fi :: (Integral a, Num b) => a -> b
@@ -40,7 +43,42 @@ nub' ::  Ord a => [a] -> [a]
 nub' = S.toList . S.fromList
 
 
+-- |
+-- If at least one element of @xs@ doesn't satisfy @p . f@, then
+--
+-- @dropWhileOn f pred xs = Just (y,f y,rest)@, where @y@ is the first element of @xs@ such that @p (f y)@ fails and @rest@ is the tail of @xs@ following @y@.
+--
+-- Otherwise, @dropWhileOn f pred xs = Nothing@.
+dropWhileOn
+  :: Ord t => (a -> t) -> (t -> Bool) -> [a] -> Maybe (a, t, [a])
+dropWhileOn f p = _loop
+    where
+        _loop xs = case xs of
+                      (y:rest) -> case f y of                                  
+                                    fy | p fy -> _loop rest                   
+                                       | otherwise -> Just (y,fy,rest) 
+                      [] -> Nothing
+                          
 
+--         c y (rest,res) =
+--                 ( y:rest
+--                 , case f y of
+--                         fy | p fy -> res
+--                            | otherwise -> Just (y, fy, rest))
+-- 
+--         z = ([],Nothing) 
+-- 
+--     in
+--         snd . foldr c z 
+
+nubOn :: Ord t => (a -> t) -> [a] -> [a]
+nubOn f = 
+    unfoldr (\(seen,xs) -> 
+                case dropWhileOn f (`S.member` seen) xs of
+                     Nothing -> Nothing
+                     Just (x,fx,rest) -> Just (x,(S.insert fx seen, rest))) 
+
+    . (S.empty,)
 
 
 
@@ -315,4 +353,11 @@ liftM4join4 f g = liftM4 f g g g g
 
 prox :: a -> Proxy a
 prox _ = undefined
+
+firstLens :: Lens (a -> (b1,b2)) (a -> b1)
+firstLens = Lens (\f -> store (\f1 -> f1 &&& (snd . f)) (fst . f))
+
+secondLens :: Lens (a -> (b1,b2)) (a -> b2)
+secondLens = Lens (\f -> store (\f2 -> (fst . f) &&& f2) (snd . f))
+
 

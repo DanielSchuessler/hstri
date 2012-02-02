@@ -2,7 +2,7 @@
 {-# OPTIONS -Wall #-}
 module ExampleTriangulations where
 
-import Blenderable
+import Blender.Blenderable
 import Control.Exception
 import Data.Vect.Double
 import EdgeCentered
@@ -57,10 +57,10 @@ spqwc_oneTet :: SPQWithCoords Vertex
 spqwc_oneTet = geometrifySingleTetTriang tr_oneTet show
 
 spqwc_twoTets :: SPQWithCoords TVertex
-spqwc_twoTets = geometrifyTwoTetTriang tr_twoTets (0./tABC) show
+spqwc_twoTets = twoTetsWithOneImplementedGluingWithCoords tr_twoTets (0./tABC) show
 
 spqwc_l31 :: SPQWithCoords TVertex
-spqwc_l31 = geometrifyTwoTetTriang tr_l31 (0./tABC)
+spqwc_l31 = twoTetsWithOneImplementedGluingWithCoords tr_l31 (0./tABC)
                 (\(ngDom -> (viewI -> I i tri)) ->
                     assert (i==0) $
                         case tri of
@@ -105,4 +105,27 @@ torus3 = makeEdgeNeighborhood tr oiedge show
 -- | Equals tr_184 in ClosedOrCensus6
 tr_184' :: LabelledTriangulation
 tr_184' = ("T x S1 : #1", mkTriangulation 6 [(0 ./ tBCD, 1 ./ oCBD), (0 ./ tACD, 2 ./ oCDB), (0 ./ tABD, 3 ./ oCDB), (0 ./ tABC, 4 ./ oDCB), (1 ./ tBCD, 0 ./ oCBD), (1 ./ tACD, 2 ./ oDCA), (1 ./ tABD, 3 ./ oDCA), (1 ./ tABC, 5 ./ oDCB), (2 ./ tBCD, 0 ./ oDAC), (2 ./ tACD, 1 ./ oDCA), (2 ./ tABD, 4 ./ oDCA), (2 ./ tABC, 5 ./ oCDA), (3 ./ tBCD, 0 ./ oDAB), (3 ./ tACD, 1 ./ oDBA), (3 ./ tABD, 4 ./ oDBA), (3 ./ tABC, 5 ./ oBDA), (4 ./ tBCD, 0 ./ oCBA), (4 ./ tACD, 2 ./ oDBA), (4 ./ tABD, 3 ./ oDBA), (4 ./ tABC, 5 ./ oACB), (5 ./ tBCD, 1 ./ oCBA), (5 ./ tACD, 2 ./ oCAB), (5 ./ tABD, 3 ./ oCAB), (5 ./ tABC, 4 ./ oACB)])
+
+
+lensSpace :: Word -> Word -> SPQWithCoords EdgeNeighborhoodVertex
+lensSpace p (tindex -> q) = 
+        makeEdgeNeighborhood tr (0 ./ oedge(vB,vA)) 
+        (\gl -> '#':if (ngDomTet gl, ngCodTet gl) == (0,tindex p-1)
+                   then show (p-1)
+                   else (show . ngDomTet) gl) 
+
+    where
+        tr = mkTriangulation p (verticals ++ _outer) 
+
+        add i j = mod (i+j) (tindex p)
+
+        verticals = [ gluing (i ./ tABD) (add i 1 ./ oABC) | i <- [0..tindex p-1] ] 
+
+        _outer = [ gluing (i ./ tACD) (add i q ./ oBCD) | i <- [0..tindex p-1] ]
+                 
+
+
+
+                
+
 

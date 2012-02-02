@@ -6,6 +6,8 @@ module Data.SumType where
 import Control.Compose
 import Control.Arrow
 import Control.Exception
+import Data.Lens.Common
+import Control.Comonad.Store
 
 #define YES_CONSTRAINT_SYNONYM_INSTANCES
 
@@ -330,3 +332,18 @@ fromLeft' = either' id (const $ assert False undefined)
 
 fromRight' :: SubSumTy ab => ab -> R ab
 fromRight' = either' (const $ assert False undefined) id
+
+
+leftLens :: (SumType ab) => Lens (ab -> r) (L ab -> r)
+leftLens = 
+    Lens (\f ->
+        store
+            (\fl -> either' fl (f . right'))
+            (f . left'))
+
+rightLens :: (SumType ab) => Lens (ab -> r) (R ab -> r)
+rightLens = 
+    Lens (\f ->
+        store
+            (\fr -> either' (f . left') fr)
+            (f . right'))

@@ -29,7 +29,8 @@ Library
     Tetrahedron.Constants
     BarySD
     Blender
-    Blenderable
+    Blender.Blenderable
+    Blender.Conversion
     ClosedNorCensus8
     ClosedOrCensus6
     Collections
@@ -57,6 +58,7 @@ Library
     GraphUtil
     HomogenousTuples
     HsTri
+    HsTri.Console
     INormalDisc
     InnerProductRepresentation
     Triangulation.InnerNormalArc
@@ -133,7 +135,7 @@ Library
     Math.SparseVector
 
 
-  Build-depends: deepseq-th, arithmoi, file-location, yices-painless, syb, th-lift, 
+  Build-depends: failure, deepseq-th, arithmoi, file-location, yices-painless, syb, th-lift, 
          MemoTrie 
         ,TypeCompose
         ,GLFW-b

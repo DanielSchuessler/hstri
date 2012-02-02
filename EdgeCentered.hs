@@ -4,7 +4,6 @@ module EdgeCentered(
     module Triangulation,
     module SimplicialPartialQuotient,
     EdgeNeighborhoodVertex(..),
-    makeEdgeNeighborhoodMap,
     makeEdgeNeighborhood,
     prop_edgeIsGlued,
 
@@ -18,11 +17,11 @@ import HomogenousTuples
 import Test.QuickCheck
 import Data.Vect.Double hiding((.*))
 import Data.Maybe
-import Control.Monad
 import SimplicialPartialQuotient
 import PrettyUtil
 import ShortShow
 import DisjointUnion
+import AbstractNeighborhood
 
 data EdgeNeighborhoodVertex =
     Bottom |
@@ -42,83 +41,41 @@ instance Pretty EdgeNeighborhoodVertex where
 
 makeEdgeNeighborhoodMap :: Triangulation -> OIEdge -> SimplicialPartialQuotient EdgeNeighborhoodVertex
 makeEdgeNeighborhoodMap tr oiEdge =
+ case innerEdgeNeighborhood' tr oiEdge of
+  Nothing -> error ("makeEdgeNeighborhoodMap: This function only works on inner edges, not "
+                                ++ show oiEdge)
+
+  Just tets ->
     let               
-        oEdgeClass = tOIEdgeEquivalents tr oiEdge
-
-        n = length oEdgeClass
+        n = length tets
         
-        initialTet = getTIndex oiEdge
+        theAssocs = zipWith 
+                        (\i ent -> 
+                            ( ( mapI ent_bot ent   , Bottom)
+                            , ( mapI ent_top ent   , Top)
+                            , ( mapI ent_left ent  , EquatorVertex i)
+                            , ( mapI ent_right ent , EquatorVertex (mod (i+1) n))
+                            ) 
+                        )
+                        [0..]
+                        tets
 
-        (initialv0,initialv1) = vertices (forgetTIndex oiEdge)
+        res = M.fromListWith collision (concatMap toList4 theAssocs)
 
-        -- Arbitrary choice of orientation; these could be flipped
-        [initialv2,initialv3] = allVertices L.\\ [initialv0,initialv1] 
-
-        makeMapFragmentForTet tet i bottomPreimage topPreimage 
-                                equatorVertexPreimage equatorVertexPreimage'
-            = M.fromList
-                        [ ( tet ./ bottomPreimage, Bottom)
-                        , ( tet ./ topPreimage, Top)
-                        , ( tet ./ equatorVertexPreimage, EquatorVertex i)
-                        , ( tet ./ equatorVertexPreimage', EquatorVertex (mod (i+1) n))
-                        ] 
-
-        initialMap = makeMapFragmentForTet initialTet 0 initialv0 initialv1 initialv2 initialv3
-
-        loop 
-            i 
-            m 
-            prevTet
-            prevBottomPreimage
-            prevTopPreimage
-            prevRingVertexPreimage
-             
-             | i == n = m
-
-             | otherwise =
-                let
-                    prevTriangle :: OITriangle
-                    prevTriangle = prevTet ./ otriangle (prevBottomPreimage
-                                                           ,prevTopPreimage
-                                                           ,prevRingVertexPreimage)
-                    
-                    tri = case lookupGluingOfOITriangle tr prevTriangle of
-                               Just x -> x
-                               Nothing -> error ("Triangle "++show prevTriangle++
-                                                 " is a boundary triangle; expected a loop of gluings")
-
-                    currentTet = getTIndex tri
-
-                    vs@(v0,v1,v2) = vertices (forgetTIndex tri)
-                    
-                    [v3] = allVertices L.\\ toList3 vs 
-
-                    m' = M.unionWith collision m 
-                            (makeMapFragmentForTet currentTet i v0 v1 v2 v3) 
-
-                    collision _ _ = error (
-                        "Tet "++show currentTet++" already encountered; this function only works"
-                        ++" on an edge which only has one preimage in each tetrahedron. The equivalence"
-                        ++" class of the edge is:\n" ++ show oEdgeClass
-                        ++"\nThe mapping so far is:\n"
-                        ++(unlines . fmap show . M.toList) m)
-                    
-                in
-                    --trace (concat ["i=",show i,"; prevTriangle=",show prevTriangle,"; tri=",show tri]) $
-                    
-                    loop (i+1) m' currentTet v0 v1 v3
+            where
+                collision _ _ = error (
+                    prettyString (
+                        vsep [
+                            text (
+                               "makeEdgeNeighborhoodMap: This function only works"
+                            ++ " on an edge which only has one preimage in each tetrahedron."
+                            ++ " The preimage-containing tetrahedra are:")
+                          , indent 4 (pretty tets)
+                                 ]))
 
 
-        tets = ([ (Bottom,Top,EquatorVertex i,EquatorVertex (i+1))
-                                    
-                        | i <- [0..n-2] ]
-
-                        ++ [(Bottom,Top,EquatorVertex 0,EquatorVertex (n-1))])
-
-
-        res = loop 1 initialMap initialTet initialv0 initialv1 initialv3  
     in
-        fromMap tr res tets 
+        fromMap tr res (L.map (map4 snd) theAssocs) 
 
 
 

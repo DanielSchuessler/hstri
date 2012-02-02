@@ -4,6 +4,11 @@
 {-# OPTIONS -Wall #-}
 module VerboseDD 
     (module InnerProductRepresentation,
+     module StandardCoordinates.MatchingEquations,
+     module StandardCoordinates.Dense,
+     module QuadCoordinates.CanonExt,
+     module QuadCoordinates.MatchingEquations,
+     module QuadCoordinates.Dense,
      dd,
      dds,
      PairFate(..),

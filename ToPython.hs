@@ -182,9 +182,9 @@ instance ToPython a => ToPython (V.Vector a) where
     toPython = toPython . V.toList 
 
 
-foreach
+foreachStmt
   :: [Char] -> Python () -> (Python () -> Python ()) -> Python ()
-foreach varname xs b = do
+foreachStmt varname xs b = do
     py ("for " ++ varname ++ " in ")
     xs
     py ":\n"
@@ -193,3 +193,7 @@ foreach varname xs b = do
 
 instance Lift (Python ()) where
     lift (Python (execWriter -> x)) = [| py x |]
+
+instance Monoid (Python ()) where
+    mempty = return ()
+    mappend = (>>)

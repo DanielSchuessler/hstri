@@ -2,7 +2,7 @@
 
 import Tetrahedron
 import Blender
-import Blenderable
+import Blender.Conversion
 import Control.Applicative
 import Data.Function
 import Data.List

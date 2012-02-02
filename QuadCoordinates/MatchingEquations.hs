@@ -76,13 +76,10 @@ type QMatchingEquation = [(IEdgeNeighborhoodTet,
     )
     )]
 
-qMatchingEquation0
-  ::
-     TEdge
-     -> Maybe
-          QMatchingEquation
+-- | The sign of the resulting equation is chosen arbitrarily.
+qMatchingEquation0 :: TEdge -> Maybe QMatchingEquation
 qMatchingEquation0 te = do
-    triPairs <- innerEdgeNeighborhood te
+    triPairs <- innerEdgeNeighborhood' (getTriangulation te) (toOrderedFace . unT $ te)
     (return . fmap f ) triPairs
         
   where
@@ -97,6 +94,7 @@ qMatchingEquation0 te = do
                 (   q a c
                 ,   q b c
                 ))
+
 qMatchingEquations0
   ::
      Triangulation

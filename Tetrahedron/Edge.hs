@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, BangPatterns, TypeFamilies, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies, DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, BangPatterns, TypeFamilies, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.Edge (
     module Tetrahedron.Vertex,
@@ -17,7 +17,7 @@ module Tetrahedron.Edge (
     -- ** Construction
     MakeEdge(..),
     edgeByVertices,
-    oppositeEdge,
+    oppositeEdge0,
     bitSetToEdge,
 
 
@@ -38,7 +38,7 @@ module Tetrahedron.Edge (
     oiEdgeByVertices,
 
     -- * Misc
-    edgeNu,oEdgeNu,
+    edgeNu,oEdgeNu,TetrahedronEdge(..)
 
     )
     where
@@ -168,11 +168,11 @@ edgePrettyColor = cyan
 
 instance Pretty Edge where pretty = edgePrettyColor . text . show
 
-oppositeEdge :: Edge -> Edge
-oppositeEdge (Edge e) = Edge (BitSet.complement e)
+oppositeEdge0 :: Edge -> Edge
+oppositeEdge0 (Edge e) = Edge (BitSet.complement e)
 
 oppositeIEdge :: IEdge -> IEdge
-oppositeIEdge = mapI oppositeEdge
+oppositeIEdge = mapI oppositeEdge0
 
 
 instance Arbitrary Edge where arbitrary = elements allEdges
@@ -359,6 +359,15 @@ oEdgeNu = finiteTypeNu
 instance Lift IEdge where
     lift (viewI -> I x y) = [| x ./ y |] 
 
-mapTIndicesFromHasTIndex [t|IEdge|]
+class (Vertices e, Verts e ~ Pair v) => TetrahedronEdge v e | e -> v where
+    oppositeEdge :: e -> e
 
+instance TetrahedronEdge Vertex Edge where
+    oppositeEdge = oppositeEdge0
+
+instance TetrahedronEdge IVertex IEdge where
+    oppositeEdge = oppositeIEdge
+
+-- TH
+mapTIndicesFromHasTIndex [t|IEdge|]
 deriveNFData ''IEdge

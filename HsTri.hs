@@ -3,7 +3,6 @@
 module HsTri(
 
     module Blender,
-    module Blenderable,
     module ClosedOrCensus6,
     module Codec.Rga.Writer,
     module ConcreteNormal.PreRenderable,
@@ -42,12 +41,12 @@ module HsTri(
     module Triangulation.VertexLink,
     module TriangulationCxtObject,
     module VerboseDD,
+    module HsTri.Console
 
     ) where
 
 
 import Blender
-import Blenderable
 import ClosedOrCensus6
 import Codec.Rga.Writer
 import ConcreteNormal.PreRenderable
@@ -86,4 +85,4 @@ import Triangulation.Transformations
 import Triangulation.VertexLink
 import TriangulationCxtObject
 import VerboseDD
-
+import HsTri.Console

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell, GADTs, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
 {-# OPTIONS -Wall #-}
 module SimplicialPartialQuotient where
 
@@ -6,20 +6,23 @@ import Control.Applicative
 import Control.Exception
 import Control.Monad
 import Data.AscTuples
-import Data.Map as M
+import Data.Lens.Common
+import Data.Lens.Template
+import Data.Map(Map)
 import Data.Maybe
 import HomogenousTuples
 import INormalDisc
-import Tetrahedron.NormalDisc
 import PreRenderable
 import PrettyUtil
 import ShortShow
 import Simplicial.SimplicialComplex
 import Test.QuickCheck
+import Tetrahedron.NormalDisc
 import Triangulation
 import TriangulationCxtObject
 import Util
 import qualified Data.List as L
+import qualified Data.Map as M
 
 -- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
@@ -41,7 +44,7 @@ spq_verts = nub' . concatMap toList4 . spq_tets
 fromMap
   :: Triangulation
      -> Map IVertex v -> [Quadruple v] -> SimplicialPartialQuotient v
-fromMap t m tets = SimplicialPartialQuotient t (m !) tets
+fromMap t m tets = SimplicialPartialQuotient t (m M.!) tets
 
 
 mapEdge
@@ -218,6 +221,8 @@ data SPQWithCoords v = SPQWithCoords {
     spqwc_gluingLabeller :: GluingLabeller
 }
 
+nameMakeLens ''SPQWithCoords (Just . (++"L"))
+
 
 geometrifySingleTetTriang
   :: Triangulation -> GluingLabeller -> SPQWithCoords Vertex
@@ -229,20 +234,39 @@ geometrifySingleTetTriang tr gluingLabeller =
             vertexDefaultCoords
             gluingLabeller
 
+
+twoTetsWithOneImplementedGluing
+  :: Triangulation -> ITriangle -> SimplicialPartialQuotient (T IVertex)
+twoTetsWithOneImplementedGluing tr theTri =
+            SimplicialPartialQuotient {
+                spq_tr = tr, 
+                spq_map = p,
+                spq_tets = map (map4 p . vertices . tindex) [0,1]
+            }
+    where
+        theGluedTri = fromMaybe (error ("twoTetsWithOneImplementedGluing: "++
+                                        "second must be an inner triangle"))                    
+                                        
+                                (lookupGluingOfITriangle tr theTri)
+
+
+        -- | Triangulation containing only the chosen gluing
+        tr' = mkTriangulation 2 [(theTri,theGluedTri)]
+
+        p = pMap tr' 
+
 -- | Creates a partial quotient for the given 2-tetrahedron triangulation which implements the gluing of the given triangle (and no others) 
-geometrifyTwoTetTriang
+twoTetsWithOneImplementedGluingWithCoords
   :: Triangulation
      -> ITriangle -> GluingLabeller -> SPQWithCoords (T IVertex)
-geometrifyTwoTetTriang tr theTri gluingLabeller = 
+twoTetsWithOneImplementedGluingWithCoords tr theTri gluingLabeller = 
     assert (tNumberOfTetrahedra tr == (2::Integer))
     $
-        SPQWithCoords 
-            (SimplicialPartialQuotient 
-                tr 
-                p
-                (fmap (map4 p . vertices . tindex) [0,1]))
-            (M.fromList a !)
-            gluingLabeller
+        SPQWithCoords {
+            spqwc_spq = twoTetsWithOneImplementedGluing tr theTri,
+            spqwc_coords = (M.fromList a M.!),
+            spqwc_gluingLabeller = gluingLabeller
+        }
 
 
     where
@@ -250,8 +274,8 @@ geometrifyTwoTetTriang tr theTri gluingLabeller =
         (cA,cB,cC,cD) = map4 vertexDefaultCoords (vA,vB,vC,vD)
         cD' = (2/3) *& (cA &+ cB &+ cC) &- cD
 
-        theGluedTri = fromMaybe (error ("geometrifyTwoTetTriang:"++
-                                        "second arg is a boundary triangle"))                    
+        theGluedTri = fromMaybe (error ("twoTetsWithOneImplementedGluingWithCoords: "++
+                                        "second must be an inner triangle"))                    
                                         
                                 (lookupGluingOfITriangle tr theTri)
 
@@ -309,3 +333,10 @@ spqwc_map = spq_map . spqwc_spq
 
 spqwc_coords' :: SPQWithCoords v -> IVertex -> Vec3
 spqwc_coords' spqwc = spqwc_coords spqwc . spqwc_map spqwc
+
+instance Coords (SPQWithCoords v) where
+    transformCoords = modL spqwc_coordsL . (.)
+
+
+
+

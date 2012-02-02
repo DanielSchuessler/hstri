@@ -68,6 +68,24 @@ import Simplicial.SimplicialComplex
 import THUtil
 import Tetrahedron.Vertex
 import Util
+import Data.Lens.Template
+import Data.Lens.Common
+
+type Resolution = Int
+
+data GeneralTriangleEmbedding = 
+    GTE Resolution (Unit2SimplexPoint -> Vec3)
+
+data TriangleEmbedding = 
+        FlatTriangle Vec3 Vec3 Vec3
+    |   GeneralTriangle GeneralTriangleEmbedding
+
+data GeneralEdgeEmbedding = GEE Resolution (UnitIntervalPoint -> Vec3)
+
+data EdgeEmbedding =
+        FlatEdge Vec3 Vec3
+    |   GeneralEdge GeneralEdgeEmbedding
+
 
 class Coords t where
     transformCoords :: (Vec3 -> Vec3) -> t -> t
@@ -92,6 +110,9 @@ data PreRenderable s = PreRenderable {
     pr_edgeInfo :: Ed s -> Maybe GeneralEdgeEmbedding
 }
     deriving(Generic)
+
+nameMakeLens ''PreRenderable (Just . (++"L"))
+
 
 pr_quad
   :: Resolution -> (UnitSquare -> Vec3) -> PreRenderable (SC2 (Bool, Bool))
@@ -199,58 +220,42 @@ pr_popDimension = pr_mapDs sccons_skeleton
 pr_faceName :: PreRenderable s -> AnySimplex2Of s -> FaceName
 pr_faceName = (fmap . fmap) snd pr_faceInfo
 
-pr_setVisibility
-  :: (AnySimplex2Of s -> Visibility)
-     -> PreRenderable s -> PreRenderable s
-pr_setVisibility f pr = pr { pr_faceInfo = f &&& pr_faceName pr } 
+pr_visibilityL :: Lens (PreRenderable s) (AnySimplex2Of s -> Visibility)
+pr_visibilityL = pr_faceInfoL >>> firstLens
+
+pr_setVisibility :: (AnySimplex2Of s -> Visibility) -> PreRenderable s -> PreRenderable s
+pr_setVisibility = setL pr_visibilityL
+
+pr_triVisibilityL = pr_visibilityL >>> rightLens
+
+pr_edVisibilityL :: Lens (PreRenderable s) (Ed s -> Visibility)
+pr_edVisibilityL = pr_visibilityL >>> leftLens >>> rightLens
+
+pr_vertVisibilityL = pr_visibilityL >>> leftLens >>> leftLens
 
 pr_setEdVisibility
   :: (Ed s -> Visibility) -> PreRenderable s -> PreRenderable s
-pr_setEdVisibility f pr = 
-    pr_setVisibility (foldAnySimplex2 
-        (pr_vertVisibility pr)
-        f
-        (pr_triVisibility pr))
+pr_setEdVisibility = setL pr_edVisibilityL
 
-                     pr
+pr_setTriVisibility = setL pr_triVisibilityL
 
-pr_setTriVisibility f pr = 
-    pr_setVisibility (foldAnySimplex2 
-        (pr_vertVisibility pr)
-        (pr_edVisibility pr)
-        f)
-
-                     pr
-
-
-pr_vertVisibility pr = pr_visibility pr . vertToAnySimplex2 
-pr_edVisibility pr = pr_visibility pr . edToAnySimplex2 
-pr_triVisibility pr = pr_visibility pr . triToAnySimplex2 
+pr_vertVisibility = getL pr_vertVisibilityL 
+pr_edVisibility = getL pr_edVisibilityL
+pr_triVisibility = getL pr_triVisibilityL
 
 
 
 pr_triangleLabel :: PreRenderable s -> Tri s -> Maybe TriangleLabel
 pr_triangleLabel = fmap fst . pr_triangleInfo
 
+
+pr_triangleEmbeddingL = pr_triangleInfoL >>> secondLens
+
 pr_setTriangleEmbedding
   :: (Tri s -> Maybe GeneralTriangleEmbedding)
      -> PreRenderable s -> PreRenderable s
-pr_setTriangleEmbedding f pr = pr { pr_triangleInfo = pr_triangleLabel pr &&& f }
+pr_setTriangleEmbedding = setL pr_triangleEmbeddingL
 
-type Resolution = Int
-
-data GeneralTriangleEmbedding = 
-    GTE Resolution (Unit2SimplexPoint -> Vec3)
-
-data TriangleEmbedding = 
-        FlatTriangle Vec3 Vec3 Vec3
-    |   GeneralTriangle GeneralTriangleEmbedding
-
-data GeneralEdgeEmbedding = GEE Resolution (UnitIntervalPoint -> Vec3)
-
-data EdgeEmbedding =
-        FlatEdge Vec3 Vec3
-    |   GeneralEdge GeneralEdgeEmbedding
 
 pr_edgeEmbedding
   :: (DeltaSet2 s,
@@ -341,7 +346,7 @@ instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
 
 
 pr_visibility :: PreRenderable s -> AnySimplex2Of s -> Visibility
-pr_visibility = fmap fst . pr_faceInfo
+pr_visibility = getL pr_visibilityL
 
 
 
@@ -379,25 +384,28 @@ instance (DeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
         } |]
 
 
-pr_ghide
-  :: ((t1 -> Visibility) -> PreRenderable s -> t)
-     -> (t1 -> AnySimplex2Of s) -> (t1 -> Bool) -> PreRenderable s -> t
-pr_ghide _setVisibility f p pr =
-    _setVisibility (\asi -> visibleIf (not (p asi)) * pr_visibility pr (f asi)) pr
+-- pr_ghide
+--   :: ((t1 -> Visibility) -> PreRenderable s -> t)
+--      -> (t1 -> AnySimplex2Of s) -> (t1 -> Bool) -> PreRenderable s -> t
+-- pr_ghide _setVisibility f p pr =
+--     _setVisibility (\asi -> visibleIf (not (p asi)) * pr_visibility pr (f asi)) pr
+
+pr_ghide :: Lens a (t -> Visibility) -> (t -> Bool) -> a -> a
+pr_ghide _lens p = modL _lens (\oldVi -> \x -> visibleIf (not (p x)) * oldVi x) 
 
 pr_hide
   :: (AnySimplex2Of s -> Bool) -> PreRenderable s -> PreRenderable s
-pr_hide = pr_ghide pr_setVisibility id
+pr_hide = pr_ghide pr_visibilityL
 
 
 --pr_hideVerts = pr_ghide pr_setVertVisibility vertToAnySimplex2
 
 pr_hideEds :: (Ed s -> Bool) -> PreRenderable s -> PreRenderable s
-pr_hideEds = pr_ghide pr_setEdVisibility edToAnySimplex2
+pr_hideEds = pr_ghide pr_edVisibilityL
 
 pr_hideTris
   :: (Tri s -> Bool) -> PreRenderable s -> PreRenderable s
-pr_hideTris = pr_ghide pr_setTriVisibility triToAnySimplex2 
+pr_hideTris = pr_ghide pr_triVisibilityL
 
 visibleIf b = if b then Visible else Invisible
 

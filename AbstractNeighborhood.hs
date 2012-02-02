@@ -1,9 +1,10 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 module AbstractNeighborhood(
     EdgeNeighborhoodTet,
     IEdgeNeighborhoodTet,
     ent_top,ent_bot,ent_left,ent_right,ent_leftTri,ent_rightTri,
+    innerEdgeNeighborhood',
     innerEdgeNeighborhood,
     ) where
 import TriangulationCxtObject
@@ -12,6 +13,7 @@ import Control.Arrow((&&&))
 import PrettyUtil
 import Data.List(unfoldr)
 import Data.Maybe
+import HomogenousTuples
 
 data EdgeNeighborhoodTet = 
     ENTet {
@@ -28,24 +30,32 @@ instance Eq EdgeNeighborhoodTet where
 instance Pretty EdgeNeighborhoodTet where
     prettyPrec prec (ENTet a b c d) = prettyPrecApp prec (text "ENTet") [a,b,c,d] 
 
+instance Vertices EdgeNeighborhoodTet where
+    type Verts EdgeNeighborhoodTet = Quadruple Vertex
+    vertices x = (ent_bot x, ent_top x, ent_left x, ent_right x)
+
 ent_leftTri :: IEdgeNeighborhoodTet -> OITriangle
 ent_leftTri  = mapI (\ent -> otriangle (ent_top ent, ent_bot ent, ent_left  ent))
 ent_rightTri :: IEdgeNeighborhoodTet -> OITriangle
 ent_rightTri = mapI (\ent -> otriangle (ent_top ent, ent_bot ent, ent_right ent))
 
-
-abstractEdgeNeighborhood :: S2 -> TEdge -> [IEdgeNeighborhoodTet]
-abstractEdgeNeighborhood dir te = 
+-- | Returns a stream of tetrahedra containing a preimage of the given edge, with each tetrahedron's
+-- 'ent_rightTri' glued to the next tetrahedron's 'ent_leftTri'.
+--
+-- The result will be infinite iff the edge is an inner edge.
+--
+-- The 'ent_bot' of each result tet will be equivalent to the first vertex of the given 'OIEdge'; the 'ent_top of each result tet will be equivalent to the second vertex of the given 'OIEdge'. 
+edgeNeighborhoodTetStream :: Triangulation -> S2 -> OIEdge -> [IEdgeNeighborhoodTet]
+edgeNeighborhoodTetStream tr dir ie = 
     let
-        tr = getTriangulation te
-        
-        e = unT te
-        i0 = getTIndex e        
+        I i0 e = viewI ie        
+
 
         ient0 = i0 ./ ENTet {..}
             where
-                (ent_top,ent_bot) = vertices (forgetTIndex e)
-                (ent_left,ent_right) = vertices (oppositeEdge (forgetTIndex e)) *. dir
+                (ent_bot,ent_top) = vertices e
+                (ent_left,ent_right) = (vertices . oppositeEdge . forgetVertexOrder) e
+                                        *. dir
     in 
         ient0 :
 
@@ -71,15 +81,20 @@ abstractEdgeNeighborhood dir te =
 
 
 
-    
-innerEdgeNeighborhood :: TEdge -> Maybe [IEdgeNeighborhoodTet]
-innerEdgeNeighborhood te = 
+-- The 'ent_bot' of each result tet will be equivalent to the first vertex of the given 'OIEdge'; the 'ent_top of each result tet will be equivalent to the second vertex of the given 'OIEdge'. 
+innerEdgeNeighborhood' :: Triangulation -> OIEdge -> Maybe [IEdgeNeighborhoodTet]
+innerEdgeNeighborhood' tr e = 
     let
-        x0 : xs = abstractEdgeNeighborhood NoFlip te
+        x0 : xs = edgeNeighborhoodTetStream tr NoFlip e
     in
         case break (== x0) xs of
 
              (l,_:_) -> Just (x0:l)
              (_,[]) -> Nothing
+
+    
+{-# DEPRECATED innerEdgeNeighborhood "Use innerEdgeNeighborhood'" #-}
+innerEdgeNeighborhood :: TEdge -> Maybe [IEdgeNeighborhoodTet]
+innerEdgeNeighborhood x = innerEdgeNeighborhood' (getTriangulation x) (packOrderedFace (unT x) Flip)
 
         
