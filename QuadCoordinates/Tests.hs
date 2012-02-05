@@ -13,7 +13,7 @@ import Data.Map as M hiding(mapMaybe)
 import Data.Maybe as May
 import Data.SumType
 import Data.VectorSpace
-import INormalDisc
+import Tetrahedron.INormalDisc
 import PrettyUtil
 import QuadCoordinates
 import QuadCoordinates.Class

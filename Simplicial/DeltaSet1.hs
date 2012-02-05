@@ -3,7 +3,6 @@
 {-# OPTIONS -Wall #-}
 -- {-# OPTIONS -ddump-deriv #-}
 module Simplicial.DeltaSet1(
-    module TypeLevel.TF.Nat.Small,
     module HomogenousTuples,
     module FaceClasses,
     module Element,
@@ -27,7 +26,6 @@ module Simplicial.DeltaSet1(
     UnitIntervalPoint
     ) where
 
-import TypeLevel.TF.Nat.Small
 import HomogenousTuples
 import FaceClasses
 import Element
@@ -40,6 +38,7 @@ import ShortShow
 import Data.Tuple.Index
 import MathUtil
 import Data.Tuple.OneTuple
+import FileLocation
 
 
 class (Vertices s, Edges s) => 
@@ -82,7 +81,7 @@ newtype EdgesContainingVertex_Cache vert ed =
 
 mkECVC
   :: (Ord (Vert s), DeltaSet1 s) => s -> EdgesContainingVertex_Cache (Vert s) (Ed s)
-mkECVC s = ECVC (m M.!)
+mkECVC s = ECVC (flip $(indx) m)
     where
         m = M.fromListWith (++)
                     . concatMap (\e -> 

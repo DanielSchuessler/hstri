@@ -48,7 +48,6 @@ import Control.Exception
 import Control.Monad
 import Data.Binary
 import Data.Binary.Derive
-import Data.BitSet.Word8 as BitSet
 import Data.Function
 import Data.List as List
 import Data.Maybe
@@ -62,7 +61,7 @@ import Quote
 import Math.Groups.S2
 import ShortShow
 import THUtil() -- Lift BitSet
-import Test.QuickCheck
+import Test.QuickCheck(Arbitrary(..),elements)
 import TupleTH
 import Util
 import Tetrahedron.Vertex
@@ -70,20 +69,28 @@ import Data.Numbering
 import OrphanInstances()
 import Control.DeepSeq.TH
 import Control.DeepSeq
+import Data.Bits
+import Data.Monoid
+import Data.Foldable(foldMap)
+import Language.Haskell.TH.Lift
 
-
-deriving instance Binary (BitSet Vertex)
-deriving instance NFData (BitSet Vertex)
 
 -- | Edge of an abstract tetrahedron (unoriented)
-newtype Edge = Edge (BitSet Vertex) 
+newtype Edge = Edge Word8
+                    -- Only the least significant 4 bits are used.
+                    -- The i-th least significant bit signifies whether the i-th vertex is part of the edge
     deriving(Eq,Ord,Binary,NFData) 
 
-edgeToBitSet :: Edge -> BitSet Vertex
+edgeToBitSet :: Edge -> Word8
 edgeToBitSet (Edge bs) = bs
 
-bitSetToEdge :: BitSet Vertex -> Edge
-bitSetToEdge = Edge
+-- | The BitSet must have exactly two elements
+bitSetToEdge :: Word8 -> Edge
+bitSetToEdge b = 
+ assert (getSum (foldMap (\i -> Sum $ if testBit b i then 1::Int else 0) [0..3]) == 2) $
+                Edge b
+               
+
 
 instance Enum Edge where
     toEnum n = allEdges !! n
@@ -116,13 +123,13 @@ allEdges' ::  (Sextuple Edge)
 allEdges' = ( eAB , eAC , eAD , eBC , eBD , eCD  ) 
 
 isVertexOfEdge :: Vertex -> Edge -> Bool
-isVertexOfEdge v (Edge x) = BitSet.member v x
+isVertexOfEdge v (Edge x) = testBit x (fromEnum v)
 
 edgeVertices :: Edge -> (Pair Vertex)
 edgeVertices e = 
     --    fromList2 ( filter4 (`isVertexOfEdge` e) allVertices' ) 
 
-    case unBitSet (edgeToBitSet e) of
+    case edgeToBitSet e of
         3 -> (A,B)
         5 -> (A,C)
         9 -> (A,D)
@@ -135,7 +142,7 @@ edgeVertices e =
     -- concatMap (\x@(Edge w) -> show (unBitSet w) ++ " -> " ++ show (edgeVertices x) ++ "\n") allEdges
 
 edgeByVertices :: (Pair Vertex) -> Edge
-edgeByVertices (v0,v1) = assert (v0 /= v1) $ Edge (BitSet.insert v0 $ BitSet.singleton v1)
+edgeByVertices (v0,v1) = assert (v0 /= v1) $ Edge (shiftL 1 (fromEnum v0) .|. shiftL 1 (fromEnum v1))  
 
 -- | The argument vertices must be distinct.
 instance MakeEdge (Pair Vertex) where
@@ -143,8 +150,8 @@ instance MakeEdge (Pair Vertex) where
 
 
 -- | The BitSet must have exactly two elements
-instance MakeEdge (BitSet Vertex) where
-    edge b = assert (BitSet.size b == 2) (Edge b)
+instance MakeEdge Word8 where
+    edge = bitSetToEdge 
 
 -- | Construct a vertex as the intersection of two edges
 instance MakeVertex (Pair Edge) where
@@ -169,7 +176,7 @@ edgePrettyColor = cyan
 instance Pretty Edge where pretty = edgePrettyColor . text . show
 
 oppositeEdge0 :: Edge -> Edge
-oppositeEdge0 (Edge e) = Edge (BitSet.complement e)
+oppositeEdge0 (Edge e) = Edge (complement e .&. 0xF)
 
 oppositeIEdge :: IEdge -> IEdge
 oppositeIEdge = mapI oppositeEdge0
@@ -180,6 +187,9 @@ instance Finite Edge
 
 instance Quote Edge where
     quotePrec _ e = "e" ++ show e
+
+instance Quote OEdge where
+    quotePrec _ e = "o" ++ show e
 
 -- | An 'Edge' with a tetrahedron index attached to it
 data IEdge = IEdge {-# UNPACK #-} !TIndex {-# UNPACK #-} !Edge
@@ -206,6 +216,8 @@ instance ShortShow IEdge where shortShow = shortShow . viewI
 -- | Oriented edge of an abstract tetrahedron
 newtype OEdge = OEdge Word8 {- The lower nibble encodes the first vertex, the upper nibble encodes the second vertex. Invariant: The vertices are distinct. -}
     deriving(Eq,Ord,Binary,NFData)
+
+deriveLift ''OEdge
 
 instance Enum OEdge where 
     fromEnum (unpackOrderedFace -> (e,g)) = fromEnum (EnumPair e g)

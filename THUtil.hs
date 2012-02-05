@@ -2,6 +2,7 @@
 {-# OPTIONS -Wall #-}
 module THUtil(
     module Debug.Trace,
+    module FileLocation,
     Pretty,
     mkConstantDecls,
     showVars,
@@ -15,8 +16,12 @@ module THUtil(
     liftFunction,
     straceExp,
     ltraceExp,
-    problem,
-    debugIndex
+    -- * Error locations
+    liftedLocationString,
+    debugIndex,
+    -- ** Map-related functions
+    fromListNoCollision,
+    insertNoCollision
     ) where
 
 import Language.Haskell.TH
@@ -35,6 +40,7 @@ import Data.Generics
 import Data.Maybe
 import FileLocation
 import qualified Data.Vector.Generic as VG
+import Control.Applicative
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
@@ -136,7 +142,8 @@ printQuote = appE [|putStrLn|] . stringQuote False
 liftFunction
   :: (Ord (Element dom), Lift (Element dom), Lift y, AsList dom) =>
      dom -> (Element dom -> y) -> Q Exp
-liftFunction dom f = [| (M.!) $(lift . M.fromList . map (id &&& f) . asList $ dom) |] 
+liftFunction dom f =
+    [| flip $(indx) $(lift . M.fromList . map (id &&& f) . asList $ dom) |] 
     
 
 charListToStringLit :: Exp -> Maybe Exp
@@ -156,8 +163,6 @@ ltraceExp msg e = traceExps msg e `appE` e
 straceExp :: ExpQ -> ExpQ
 straceExp = ltraceExp ""
 
-problem :: Q Exp
-problem = [| error . ($(lift . (++ ": ") . locationToString =<< location) ++) |]
 
 
 debugIndex :: Q Exp
@@ -166,4 +171,21 @@ debugIndex = do
     [| \_v _i -> case _v VG.!? _i of
                     Just _x -> _x
                     Nothing -> error ($(lift . (++ ": Index out of bounds") . locationToString $ l)) |] 
+
+
+
+locationString :: Q String
+locationString = locationToString <$> location
+
+liftedLocationString :: Q Exp
+liftedLocationString = lift =<< locationString
+
+fromListNoCollision :: Q Exp
+fromListNoCollision =
+    [| M.fromListWith (\_ _ -> error ($liftedLocationString ++ ": fromListNoCollision: Collision")) |]
+
+insertNoCollision :: Q Exp
+insertNoCollision =
+    [| M.insertWith (\_ _ -> error ($liftedLocationString ++ ": insertNoCollision: Collision")) |] 
+
 

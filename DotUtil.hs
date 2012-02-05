@@ -55,6 +55,7 @@ import TriangulationCxtObject
 import Util
 import qualified Data.Map as M
 import qualified Data.Text.Lazy as Text
+import FileLocation
 
 testDot :: PrintDot a => (Triangulation -> a) -> IO ExitCode
 testDot mkdotGraph_ = do
@@ -217,7 +218,7 @@ bendMultiedges edges_ =
               lenFactor :: Double
 
               (extraAttrs,lenFactor) =
-                case edgeCount M.! endpoints e of
+                case $(indxShow) (endpoints e) edgeCount of
                      [_] -> ([],1)--0.82)
                      is -> 
                         let

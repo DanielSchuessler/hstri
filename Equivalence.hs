@@ -13,7 +13,6 @@ module Equivalence(
     eqv_classOf
     )   where
 
-import Collections as Set
 import Data.Equivalence.Monad
 import Data.Function
 import Data.Hashable
@@ -26,6 +25,11 @@ import Equivalence.Class
 import Util
 import Control.DeepSeq.TH
 import OrphanInstances() -- NFData Set, NFData Map
+import qualified Data.Set as S
+import Data.Set(Set)
+import qualified Data.Map as M
+import Data.Map(Map)
+import FileLocation
 
 
 
@@ -37,7 +41,7 @@ data SetBasedEquivalenceClass a = SetBasedEquivalenceClass {
 }
 
 ec_elementList :: SetBasedEquivalenceClass a -> [a]
-ec_elementList = setToList . ec_elements 
+ec_elementList = S.toList . ec_elements 
 
 type instance Element (SetBasedEquivalenceClass a) = a
 
@@ -47,17 +51,18 @@ instance AsList (SetBasedEquivalenceClass a) where
 instance Ord a => IsEquivalenceClass (SetBasedEquivalenceClass a) where
     canonicalRep = ec_rep 
 
-    ecSize = setSize . ec_elements
+    ecSize = S.size . ec_elements
 
 
 
 
 ec_map :: (Ord a, Ord b) => (a -> b) -> SetBasedEquivalenceClass a -> SetBasedEquivalenceClass b
-ec_map f SetBasedEquivalenceClass{ec_elements,ec_rep} = SetBasedEquivalenceClass{ec_elements= mapSet f ec_elements, ec_rep=f ec_rep}
+ec_map f SetBasedEquivalenceClass {ec_elements,ec_rep} = 
+    SetBasedEquivalenceClass {ec_elements= S.map f ec_elements, ec_rep=f ec_rep}
 
 ec_mapMonotonic :: (Ord a, Ord b) => (a -> b) -> SetBasedEquivalenceClass a -> SetBasedEquivalenceClass b
-ec_mapMonotonic f SetBasedEquivalenceClass{ec_elements,ec_rep} = 
-    SetBasedEquivalenceClass{ec_elements= mapSetMonotonic f ec_elements, ec_rep=f ec_rep}
+ec_mapMonotonic f SetBasedEquivalenceClass {ec_elements,ec_rep} = 
+    SetBasedEquivalenceClass {ec_elements= S.mapMonotonic f ec_elements, ec_rep=f ec_rep}
 
 deriving instance (Show a, Ord a) => Show (SetBasedEquivalenceClass a)
 
@@ -70,7 +75,7 @@ instance Ord a => Ord (SetBasedEquivalenceClass a) where
 
 
 ec_singleton :: Ord a => a -> SetBasedEquivalenceClass a
-ec_singleton a = SetBasedEquivalenceClass (singletonSet a) a
+ec_singleton a = SetBasedEquivalenceClass (S.singleton a) a
 
 ec_union :: Ord a => SetBasedEquivalenceClass a -> SetBasedEquivalenceClass a -> SetBasedEquivalenceClass a
 ec_union (SetBasedEquivalenceClass es1 r1) (SetBasedEquivalenceClass es2 _) = SetBasedEquivalenceClass (es1 `mappend` es2) r1
@@ -94,7 +99,7 @@ instance Ord a => EnumerableEquivalence (Equivalence a) where
     eqvClasses = eqv_classes
     
 eqv_classOf :: Ord k => Equivalence k -> k -> SetBasedEquivalenceClass k
-eqv_classOf e x = eqv_classmap e ! x
+eqv_classOf e x = $(indx) x (eqv_classmap e)
 
 
 -- | Checks whether the given elements are equivalent. Throws an error if the first argument is not in the domain of the equivalence.
@@ -150,12 +155,12 @@ mkEquivalence0 pairs = (runEquivM ec_singleton ec_union go)
                     cls <- classDesc a
 
 
-                    return $ if a `memberOfMap` cm0
+                    return $ if a `M.member` cm0
                                 -- if the current element is already in the result Equivalence, do nothing
                                 then r
 
                                 else r { 
-                                        eqv_classmap = mapInsert a cls cm0
+                                        eqv_classmap = M.insert a cls cm0
                                       , eqv_classes = 
                                             -- Add the equivalence class to the eqv_classes list
                                             -- only if the current element is the representative of the
@@ -166,7 +171,7 @@ mkEquivalence0 pairs = (runEquivM ec_singleton ec_union go)
                                      }
 
 
-            foldl' f (return (Equivalence emptyMap [] pairs)) allElems
+            foldl' f (return (Equivalence M.empty [] pairs)) allElems
             
 
         allElems = catPairs pairs
@@ -183,7 +188,7 @@ instance (Ord a, Pretty a) => Pretty (Equivalence a) where
     pretty = prettyEquivalence
 
 ec_join :: Ord a => SetBasedEquivalenceClass (SetBasedEquivalenceClass a) -> SetBasedEquivalenceClass a
-ec_join ecs = SetBasedEquivalenceClass { ec_elements = (foldr1 setUnion . fmap ec_elements . setToList . ec_elements) ecs
+ec_join ecs = SetBasedEquivalenceClass { ec_elements = (foldr1 S.union . fmap ec_elements . S.toList . ec_elements) ecs
                                , ec_rep = (ec_rep . ec_rep) ecs
                                }
 

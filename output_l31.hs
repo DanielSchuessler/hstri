@@ -1,10 +1,11 @@
-{-# LANGUAGE ImplicitParams, CPP, TupleSections, ExtendedDefaultRules #-}
+{-# LANGUAGE TemplateHaskell, ImplicitParams, CPP, TupleSections, ExtendedDefaultRules #-}
 import HsTri
 import qualified Data.Map as M
 import Data.Map(Map)
 import Control.Applicative
 import Control.Exception
 import Control.DeepSeq
+import FileLocation
 
 
 
@@ -54,7 +55,7 @@ vl_A0 way =
         v = pMap tr_l31 (head triOrder)
         triOrder = flip (./) <$> [vA,vC,vB] <*> [0,1] 
 
-        nodePerm = (M.!) . M.fromList . zip triOrder $
+        nodePerm = flip $(indx) . M.fromList . zip triOrder $
             [S3cba,mempty
             ,S3acb,S3cab
             ,mempty,S3acb
@@ -82,7 +83,7 @@ vl_D0 way =
         v = pMap tr_l31 (head triOrder)
         triOrder = flip (./) <$> [vD] <*> [1,0] 
 
-        nodePerm = (M.!) . M.fromList . zip triOrder $
+        nodePerm = flip $(indx) . M.fromList . zip triOrder $
             [S3acb,mempty
             ]
                     

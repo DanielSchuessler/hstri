@@ -1,11 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables, ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
-module INormalDisc where
+module Tetrahedron.INormalDisc where
 
 import Tetrahedron.NormalDisc
 import HomogenousTuples
-import ONormal
+import Tetrahedron.ONormal
 import Control.Exception
 import Tetrahedron()
 import Control.Applicative

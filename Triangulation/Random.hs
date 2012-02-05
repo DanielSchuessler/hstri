@@ -30,12 +30,12 @@ import Test.QuickCheck
 import Test.QuickCheck.Gen
 import Triangulation
 import Util
-import qualified Data.List as L
 import qualified Data.Set as S
 import Data.Maybe
 import QuickCheckUtil
 import Triangulation.Class
 import Triangulation.VertexLink
+import Data.SumType
 
 arbitraryTriangulation :: Gen Triangulation
 arbitraryTriangulation = arbitraryTriangulationG (\nTets -> choose (0,2*nTets)) 
@@ -78,10 +78,7 @@ arbitraryTriangulationG nGluingsGen =
 shrinkTriangulation :: Triangulation -> [Triangulation]
 shrinkTriangulation t = 
 --            concatMap removeTet (tTetrahedra_ t) ++ 
-            fmap removeGluing (tOriginalGluings t)
-        where
-            removeGluing g = 
-                mkTriangulation (tNumberOfTetrahedra t) (L.delete g (tOriginalGluings t))
+            mkTriangulation (tNumberOfTetrahedra t) <$> shrink (tGluingsIrredundant t)
 
 
 randT :: Int -> Int -> Gen Triangulation
@@ -90,7 +87,7 @@ randT nTets nGluings =
         $(assrt [| nGluings >= 0 |] 'nGluings) $
         $(assrt [| nGluings <= 2*nTets |] ['nGluings,'nTets]) $
             
-            generateUntilRight go
+            generateUntilJust (sumTypeToMaybe <$> go)
     where
         go = do
             let 

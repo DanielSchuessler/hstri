@@ -141,16 +141,24 @@ isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc3 `appT` varT (mkName "v")
 isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc4 `appT` varT (mkName "v"))
 
 instance Vertices (Asc2 v) where
-    type Verts (Asc2 v) = Asc2 v
-    vertices = id
+    type Verts (Asc2 v) = Pair v
+    vertices = unAsc2
 
 instance Vertices (Asc3 v) where
-    type Verts (Asc3 v) = Asc3 v
-    vertices = id
+    type Verts (Asc3 v) = Triple v
+    vertices = unAsc3
 
 instance Vertices (Asc4 v) where
-    type Verts (Asc4 v) = Asc4 v
-    vertices = id
+    type Verts (Asc4 v) = Quadruple v
+    vertices = unAsc4
+
+instance Edges (Asc3 v) where
+    type Eds (Asc3 v) = Triple (Asc2 v)
+    edges = map3 UnsafeAsc2 . $(subtuples 3 2) . unAsc3
+
+instance Triangles (Asc4 v) where
+    type Tris (Asc4 v) = Quadruple (Asc3 v)
+    triangles = map4 UnsafeAsc3 . $(subtuples 4 3) . unAsc4
 
 
 indexOfAsc3 :: Ord a => a -> Asc3 a -> Maybe Index3

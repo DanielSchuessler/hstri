@@ -5,7 +5,7 @@ module TriangulationCxtObject(
     module Element,
     module Triangulation,
     module Tetrahedron.NormalDisc,
-    module INormalDisc,
+    module Tetrahedron.INormalDisc,
 
 
 
@@ -86,9 +86,7 @@ module TriangulationCxtObject(
     
     ) where
 
-
-import Tetrahedron
-import Collections
+import Control.DeepSeq.TH
 import Control.Exception
 import Control.Monad.Reader
 import Data.EdgeLabelledTree
@@ -98,17 +96,18 @@ import Data.Maybe
 import Element
 import Equivalence
 import HomogenousTuples
-import INormalDisc
-import Tetrahedron.NormalDisc
-import Prelude hiding(catch,lookup)
+import Tetrahedron.INormalDisc
+import Prelude hiding(catch)
 import PrettyUtil
 import Quote
 import ShortShow
+import Tetrahedron
+import Tetrahedron.NormalDisc
 import Triangulation
 import Triangulation.CanonOrdered
-import Util
 import Triangulation.Class
-import Control.DeepSeq.TH
+import Util
+import qualified Data.Map as M
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -424,7 +423,7 @@ instance IsSubface TTriangle TIndex where
 
 
 eqvTriangles :: Triangulation -> ITriangle -> [ITriangle]
-eqvTriangles t x = x : case lookup x (tGlueMap_ t) of
+eqvTriangles t x = x : case M.lookup x (tGlueMap_ t) of
                           Just x' -> [forgetVertexOrder x']
                           Nothing -> []
 
@@ -456,7 +455,7 @@ instance Triangles (Triangulation, TIndex)  where
 
 
 lookupGluingOfTTriangle :: TTriangle -> Maybe OITriangle
-lookupGluingOfTTriangle (UnsafeMakeT t rep) = lookup rep (tGlueMap_ t)
+lookupGluingOfTTriangle (UnsafeMakeT t rep) = M.lookup rep (tGlueMap_ t)
 
 instance NormalArcs (T INormalTri) (Triple TNormalArc) where
     normalArcs (UnsafeMakeT t x) = map3 (pMap t) (normalArcs x) 
@@ -601,7 +600,7 @@ instance Pretty Triangulation where
           where
             fields = [ ("Quote", text (quote tr))
                      , ("Number of tetrahedra", pretty (tNumberOfTetrahedra_ tr))
-                     , ("Triangle gluings", pretty (tOriginalGluings tr))
+                     , ("Triangle gluings", pretty (tGluingsIrredundant tr))
                      , ("Canonically ordered edges", 
                             prettyEdgeEquivalence tr)
                      , ("Vertices", pretty (vertexEqv tr))

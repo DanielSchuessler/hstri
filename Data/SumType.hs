@@ -43,6 +43,7 @@ toEither = either' Left Right
 fromEither :: SuperSumTy ab => Either (L ab) (R ab) -> ab
 fromEither = either left' right' 
 
+-- | Alias for 'either''
 (||||) = either'
 
 (++++) kl kr = either' (left' . kl) (right' . kr) 
@@ -200,7 +201,7 @@ inRassoc (f :: rassocPre -> rassocPost) (x :: lassocPre) =
     (\(y :: lassocPost) -> y) -- fixes type variable name  
     (lassocSumTy (f (rassocSumTy x)))
 
--- | > (a + b) + (c + d) => (a + c) + (b + d)
+--  > (a + b) + (c + d) => (a + c) + (b + d)
 -- exchangeSum
 --   :: forall 
 --             a b c d 
@@ -347,3 +348,40 @@ rightLens =
         store
             (\fr -> either' (f . left') fr)
             (f . right'))
+
+
+sumTypeToMaybe :: SubSumTy ab => ab -> Maybe (R ab)
+sumTypeToMaybe = either' (const Nothing) Just
+
+type instance L (Maybe a) = ()
+type instance R (Maybe a) = a
+
+instance SubSumTy (Maybe a) where
+    either' = maybe . ($ ())
+
+instance SuperSumTy (Maybe a) where
+    left' = const Nothing
+    right' = Just
+
+type instance L [a] = ()
+type instance R [a] = (a,[a])
+
+instance SubSumTy [a] where
+    either' kl _ [] = kl () 
+    either' _ kr (x:xs) = kr (x,xs)
+
+instance SuperSumTy [a] where
+    left' = const []
+    right' = uncurry (:)
+
+type instance L Bool = () 
+type instance R Bool = () 
+
+-- | Left corresponds to 'False'
+instance SubSumTy Bool where
+    either' kl kr b = (if b then kr else kl) ()
+
+-- | Left corresponds to 'False'
+instance SuperSumTy Bool where
+    left' = const False
+    right' = const True

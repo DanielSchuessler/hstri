@@ -59,7 +59,7 @@ Library
     HomogenousTuples
     HsTri
     HsTri.Console
-    INormalDisc
+    Tetrahedron.INormalDisc
     InnerProductRepresentation
     Triangulation.InnerNormalArc
     Interactive.Command
@@ -73,7 +73,7 @@ Library
     MathUtil
     NormalEverything
     Normalizable
-    ONormal
+    Tetrahedron.ONormal
     OrderableFace
     Orientation
     OrphanInstances
@@ -121,6 +121,8 @@ Library
     ToPython
     TriArcGraph
     Triangulation
+    Triangulation.PreTriangulation
+    Triangulation.GlueMap
     Triangulation.Transformations
     Triangulation.VertexLink
     Triangulation.CanonOrdered
@@ -135,64 +137,72 @@ Library
     Math.SparseVector
 
 
-  Build-depends: failure, deepseq-th, arithmoi, file-location, yices-painless, syb, th-lift, 
-         MemoTrie 
-        ,TypeCompose
-        ,GLFW-b
-        ,Interpolation
-        ,MissingH
-        ,OneTuple
-        ,OpenGL
-        ,Printf-TH
-        ,QuickCheck
-        ,Tensor
-        ,ansi-wl-pprint
-        ,base >= 4 && < 5
-        ,binary
-        ,binary-derive
-        ,bit-set
-        ,bitset
-        ,bytestring
-        ,colour
-        ,containers
-        ,criterion
-        ,deepseq
-        ,directory
-        ,dlist
-        ,elerea
-        ,equivalence
-        ,fgl
-        ,filepath
-        ,ghc-prim
-        ,graphviz
-        ,hashable
-        ,hxt
-        ,mtl
-        ,parallel
-        ,parsec
-        ,process
-        ,random
-        ,semigroups
-        ,simpleargs
-        ,safe
-        ,split
-        ,tagged
-        ,template-haskell
-        ,text
-        ,time
-        ,transformers
-        ,transformers-compose
-        ,tuple-th >= 0.2.3
-        ,type-level-tf2
-        ,utf8-string
-        ,vect
-        ,vect-opengl
-        ,vector
-        ,vector-space >= 0.8.0
-        ,xml
-        ,xml-monad
-        ,xmlgen
-        ,zlib
+  Build-depends: 
+          comonads-fd
+        , data-lens
+        , data-lens-template
+        , failure
+        , deepseq-th
+        , arithmoi
+        , file-location
+--        , yices-painless
+        , syb
+        , th-lift
+        , MemoTrie 
+        , TypeCompose
+        , GLFW-b
+        , Interpolation
+        , MissingH
+        , OneTuple
+        , OpenGL
+        , Printf-TH
+        , QuickCheck
+        , Tensor
+        , ansi-wl-pprint
+        , base >= 4 && < 5
+        , binary
+        , binary-derive
+        , bitset
+        , bytestring
+        , colour
+        , containers
+        , criterion
+        , deepseq
+        , directory
+        , dlist
+        , elerea
+        , equivalence
+        , fgl
+        , filepath
+        , ghc-prim
+        , graphviz
+        , hashable
+        , hxt
+        , mtl
+        , parallel
+        , parsec
+        , process
+        , random
+        , semigroups
+        , simpleargs
+        , safe
+        , split
+        , tagged
+        , template-haskell
+        , text
+        , time
+        , transformers
+        , transformers-compose
+        , tuple-th >= 0.2.3
+        , utf8-string
+        , vect
+        , vect-opengl
+        , vector
+        , vector-space >= 0.8.0
+        , xml
+        , xml-monad
+        , xmlgen
+        , zlib
 
   -- Buildable: False
 

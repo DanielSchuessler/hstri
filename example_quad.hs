@@ -1,7 +1,7 @@
 import Blender
 import TriangulationCxtObject
 import Tetrahedron.NormalDisc
-import INormalDisc
+import Tetrahedron.INormalDisc
 import StandardCoordinates
 import Triangulation
 import EdgeCentered

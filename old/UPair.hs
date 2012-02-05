@@ -1,6 +1,5 @@
 {-# LANGUAGE TypeFamilies, ViewPatterns, DeriveFunctor #-}
 module UPair where
-import Collections
 import Normalizable
 import Data.Function
 import Element

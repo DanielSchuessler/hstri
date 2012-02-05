@@ -18,6 +18,8 @@ import Data.EdgeLabelledTree
 import HomogenousTuples
 import Triangulation.Transformations
 import Equivalence.Tests
+import Data.Function
+import Data.SumType
 
 
 
@@ -154,9 +156,9 @@ prop_deleteTwoTets tr =
         forAll (choose (0,n-2)) (\i -> 
             forAll (choose (i+1,n-1)) (\j ->
 
-                    (deleteTetSafe i <=< deleteTetSafe j) tr
-                    .=.
-                    (deleteTetSafe (j-1) <=< deleteTetSafe i) tr))
+                ((.=.) `on` sumTypeToMaybe) 
+                    ((deleteTetSafe i <=< deleteTetSafe j) tr)
+                    ((deleteTetSafe (j-1) <=< deleteTetSafe i) tr)))
 
                     
 prop_normalizeGluing :: Property

@@ -3,7 +3,6 @@
 
 module Equivalence.Tests where
 
-import Collections as Set
 import Data.Function
 import Test.QuickCheck
 import Test.QuickCheck.All
@@ -11,11 +10,13 @@ import QuickCheckUtil
 import Equivalence
 import Util
 import Control.Arrow
+import qualified Data.Set as S
+import qualified Data.Map as M
 
 mkProp :: Testable prop => ([Int] -> [(Int, Int)] -> Equivalence Int -> prop) -> Property
 mkProp p = forAll gen (\(pairs :: [(Int,Int)]) ->
     let
-        allElems = setToList . setFromList $ catPairs pairs
+        allElems = S.toList . S.fromList $ catPairs pairs
         n = length allElems
         e = mkEquivalence0 pairs
         classes = eqv_classes e
@@ -80,25 +81,25 @@ prop_hull = mkProp (\_ pairs e ->
 -- | A representative is contained in its own class
 prop_rep ::  Property
 prop_rep = mkProp (\_ _ e -> 
-                forAll (elements (eqv_classes e)) (\ec -> ec_rep ec `Set.member` ec_elements ec))
+                forAll (elements (eqv_classes e)) (\ec -> ec_rep ec `S.member` ec_elements ec))
 
 -- | The value set of 'eqv_classmap' equals 'eqv_classes'
 prop_classmap_classes ::  Property
 prop_classmap_classes = mkProp (\_ _ e -> naiveECSetEq 
-                                            (elems (eqv_classmap e))
+                                            (M.elems (eqv_classmap e))
                                             (eqv_classes e))
     where
-        naiveECSetEq = (==) `on`  (setFromList . fmap (ec_elements &&& ec_rep))
+        naiveECSetEq = (==) `on`  (S.fromList . fmap (ec_elements &&& ec_rep))
 
 -- | The key set of 'eqv_classmap' equals the set of elements occuring in the input pairs
 prop_domain ::  Property
-prop_domain = mkProp (\es _ e -> ((==) `on` setFromList) es (keys (eqv_classmap e))) 
+prop_domain = mkProp (\es _ e -> ((==) `on` S.fromList) es (M.keys (eqv_classmap e))) 
 
 -- | The union of the 'eqv_classes' equals the set of elements occuring in the input pairs
 prop_classes_union ::  Property
-prop_classes_union = mkProp (\es _ e -> ((==) `on` setFromList)
+prop_classes_union = mkProp (\es _ e -> ((==) `on` S.fromList)
                                 es
-                                (concatMap (setToList . ec_elements) (eqv_classes e)))
+                                (concatMap (S.toList . ec_elements) (eqv_classes e)))
 
 -- | The equivalence test as implemented is the same as testing equality of representatives
 prop_eq_by_reps ::  Property
@@ -107,7 +108,7 @@ prop_eq_by_reps = mkProp (\es _ e ->
                     eqv_eq e x y == (((==) `on` (eqv_rep e)) x y))) 
 
 prop_classes_distinct ::  Property
-prop_classes_distinct = mkProp (\_ _ e -> let cs = eqv_classes e in setSize (setFromList cs) == length cs)
+prop_classes_distinct = mkProp (\_ _ e -> let cs = eqv_classes e in S.size (S.fromList cs) == length cs)
                             
 
 qc_Equivalence ::  IO Bool

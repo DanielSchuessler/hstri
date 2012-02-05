@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, ViewPatterns, TemplateHaskell, MultiParamTypeClasses #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS -Wall #-}
 module Orientation where
 
@@ -16,10 +17,14 @@ import Control.Monad.State
 import Data.EdgeLabelledTree
 import Test.QuickCheck
 import Control.Exception as E
+import Control.DeepSeq
+
+#ifdef USE_YICES
 import Yices.Painless.Base as Yices
 import Control.Applicative
 import System.IO.Unsafe
-import Control.DeepSeq
+#endif
+
 
 data SimplexOrientation a = AscOr | FlipAscOr
     deriving(Show,Eq,Ord)
@@ -94,6 +99,7 @@ gluingIsAscOrPreserving gl =
                 ==
                 inducedOrient32o AscOr (unI (glCod gl))
 
+#ifdef USE_YICES
 orientTriangulation'
   :: Triangulation -> Either () TriangulationOrientation
 orientTriangulation' tr = unsafePerformIO go 
@@ -140,6 +146,7 @@ orientTriangulation' tr = unsafePerformIO go
              Undefined -> error "yices returned Undefined" 
                 
                         
+#endif
                 
 
 

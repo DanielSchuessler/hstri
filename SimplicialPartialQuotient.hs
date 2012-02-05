@@ -11,7 +11,7 @@ import Data.Lens.Template
 import Data.Map(Map)
 import Data.Maybe
 import HomogenousTuples
-import INormalDisc
+import Tetrahedron.INormalDisc
 import PreRenderable
 import PrettyUtil
 import ShortShow
@@ -24,6 +24,8 @@ import Util
 import qualified Data.List as L
 import qualified Data.Map as M
 import Control.DeepSeq
+import FileLocation
+import Debug.Trace
 
 -- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
@@ -34,6 +36,8 @@ data SimplicialPartialQuotient v = SimplicialPartialQuotient {
     spq_tets :: [Quadruple v]
 
 }
+
+nameMakeLens ''SimplicialPartialQuotient (Just . (++"L"))
 
 instance NFData v => NFData (SimplicialPartialQuotient v) where
     rnf SimplicialPartialQuotient{..} =
@@ -52,7 +56,7 @@ spq_verts = nub' . concatMap toList4 . spq_tets
 fromMap
   :: Triangulation
      -> Map IVertex v -> [Quadruple v] -> SimplicialPartialQuotient v
-fromMap t m tets = SimplicialPartialQuotient t (m M.!) tets
+fromMap t m tets = SimplicialPartialQuotient t (flip $(indx) m) tets
 
 
 mapEdge
@@ -151,7 +155,7 @@ notTooManyGluings m =
 --     let
 --         _triangleLabel = makeTriangleLabelling spq defaultGluingLabeller
 --     in
---         forAll (elements . tOriginalGluings . spq_tr $ spq)
+--         forAll (elements . tGluingsIrredundant . spq_tr $ spq)
 --             (\(tri,otri) ->
 -- 
 --                 let
@@ -250,57 +254,58 @@ oneTetWithDefaultCoords tr gluingLabeller =
             gluingLabeller
 
 
-twoTetsWithOneImplementedGluing
+spq_twoTetBipyramid
   :: Triangulation -> ITriangle -> SimplicialPartialQuotient (T IVertex)
-twoTetsWithOneImplementedGluing tr theTri =
+spq_twoTetBipyramid tr theTri =
             SimplicialPartialQuotient {
                 spq_tr = tr, 
                 spq_map = p,
                 spq_tets = map (map4 p . vertices . tindex) [0,1]
             }
     where
-        theGluedTri = fromMaybe (error ("twoTetsWithOneImplementedGluing: "++
+        theGluedTri = fromMaybe (error ("spq_twoTetBipyramid: "++
                                         "second arg must be an inner triangle"))                    
                                         
                                 (lookupGluingOfITriangle tr theTri)
 
 
-        -- | Triangulation containing only the chosen gluing
-        tr' = mkTriangulation 2 [(theTri,theGluedTri)]
 
-        p = pMap tr' 
+        p = pMap (twoTetBipyramid theTri theGluedTri) 
+
+
+twoTetBipyramid
+  :: ITriangle -> OITriangle -> Triangulation
+twoTetBipyramid theTri theGluedTri =
+        mkTriangulation 2 [(theTri,theGluedTri)]
 
 -- | Creates a partial quotient for the given 2-tetrahedron triangulation which implements the gluing of the given triangle (and no others) 
-twoTetsWithOneImplementedGluingWithCoords
+spqwc_twoTetBipyramid
   :: Triangulation
      -> ITriangle -> GluingLabeller -> SPQWithCoords (T IVertex)
-twoTetsWithOneImplementedGluingWithCoords tr theTri gluingLabeller = 
-    assert (tNumberOfTetrahedra tr == (2::Integer))
-    $
+spqwc_twoTetBipyramid tr theTri gluingLabeller = 
+    assert (tNumberOfTetrahedra tr == (2::Integer)) $
+    trace (prettyString m) $
+
         SPQWithCoords {
-            spqwc_spq = spq,
-            spqwc_coords = (M.fromList a M.!),
+            spqwc_spq = spq_twoTetBipyramid tr theTri,
+            spqwc_coords = (flip $(indxShow) m),
             spqwc_gluingLabeller = gluingLabeller
         }
 
 
     where
+
         cA,cB,cC,cD :: Vec3
         (cA,cB,cC,cD) = map4 vertexDefaultCoords (vA,vB,vC,vD)
         cD' = (2/3) *& (cA &+ cB &+ cC) &- cD
 
-        theGluedTri = fromMaybe (error ("twoTetsWithOneImplementedGluingWithCoords: "++
+        theGluedTri = fromMaybe (error ("spqwc_twoTetBipyramid: "++
                                         "second arg must be an inner triangle"))                    
                                         
                                 (lookupGluingOfITriangle tr theTri)
 
 
-        spq = twoTetsWithOneImplementedGluing tr theTri
-
-        -- | Triangulation containing only the chosen gluing
-        tr' = spq_tr spq
-
-        p = pMap tr' 
+        p = pMap (twoTetBipyramid theTri theGluedTri) 
 
 
         (u0,u1,u2) = vertices theTri 
@@ -309,12 +314,13 @@ twoTetsWithOneImplementedGluingWithCoords tr theTri gluingLabeller =
         v3 = oiTriangleDualVertex theGluedTri
 
 
-        a = [ (p u0, cA)
-            , (p u1, cB)
-            , (p u2, cC)
-            , (p u3, cD)
+        m = M.fromList
+            [ (p u0, cA) 
+            , (p u1, cB) 
+            , (p u2, cC) 
+            , (p u3, cD) 
             , (p v3, cD')
-            ]
+            ]            
 
 instance Pretty v => Show (SimplicialPartialQuotient v) where
     showsPrec = prettyShowsPrec
@@ -353,6 +359,16 @@ spqwc_coords' spqwc = spqwc_coords spqwc . spqwc_map spqwc
 
 instance Coords (SPQWithCoords v) where
     transformCoords = modL spqwc_coordsL . (.)
+
+
+
+
+spq_layerOn tr e spq = do
+    (tr',e') <- pt_layerOn
+
+
+
+
 
 
 

@@ -39,6 +39,7 @@ import ShortShow
 import MathUtil
 import Data.Tuple.OneTuple
 import Data.Vect.Double.Base
+import FileLocation
 
 class (DeltaSet1 s, Triangles s) => 
     DeltaSet2 s where
@@ -132,7 +133,7 @@ newtype TrianglesContainingEdge_Cache ed tri =
 
 mkTCEC
   :: (Ord (Ed s), DeltaSet2 s) => s -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
-mkTCEC s = TCEC (m M.!)
+mkTCEC s = TCEC (flip $(indx) m)
     where
         m = M.fromListWith (++)
                     . concatMap (\t -> 
@@ -194,4 +195,11 @@ instance DeltaSet2 Unit2Simplex where
             a = Vec2 0 0
             b = Vec2 0 1
             c = Vec2 1 0
+
+data LayeringEdge = LayeringEdge
+    deriving Show
+
+data LayeringFace = LayeringFace0 | LayeringFace1
+    deriving Show
+
 

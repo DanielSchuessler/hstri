@@ -9,7 +9,7 @@ import Data.Foldable(Foldable)
 import Data.Function
 import Data.Map as M hiding(mapMaybe)
 import Data.Maybe as May
-import INormalDisc
+import Tetrahedron.INormalDisc
 import StandardCoordinates.Class
 import Test.QuickCheck
 import TriangulationCxtObject

@@ -2,7 +2,6 @@
 {-# OPTIONS -Wall #-}
 module Math.Groups.S2 where
 
-import Collections
 import Data.Binary
 import Data.Hashable
 import Data.Monoid
@@ -42,7 +41,6 @@ instance Arbitrary S2 where
 instance CoArbitrary S2 where coarbitrary = variant . fromEnum
 
 
-deriveCollectionKeyClass ''S2
 
 instance Hashable S2 where hash = fromEnum
 

@@ -5,7 +5,7 @@
 module ConcreteNormal(
     module Tetrahedron.NormalDisc,
     module Tetrahedron.NormalConstants,
-    module INormalDisc,
+    module Tetrahedron.INormalDisc,
     module StandardCoordinates,
 
     -- * Positions
@@ -47,7 +47,7 @@ import TriangulationCxtObject
 import Util
 import Tetrahedron.NormalDisc
 import Tetrahedron.NormalConstants
-import INormalDisc
+import Tetrahedron.INormalDisc
 import Control.Arrow
 import Data.Function
 import StandardCoordinates.MatchingEquations

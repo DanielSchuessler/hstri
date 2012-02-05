@@ -17,7 +17,7 @@ tr = spqwc_tr torus3
 
 main = do
 --     [tr'] <- readRgaFile "/h/dev/regina-things/TxS1Triang.rga"
---     print (tOriginalGluings tr == tOriginalGluings tr')
+--     print (tGluingsIrredundant tr == tOriginalGluings tr')
 --     error ""
 
     putStrLn (toLatex tr)

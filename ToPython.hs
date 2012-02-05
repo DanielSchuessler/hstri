@@ -197,3 +197,5 @@ instance Lift (Python ()) where
 instance Monoid (Python ()) where
     mempty = return ()
     mappend = (>>)
+
+none = py "None"

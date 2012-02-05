@@ -10,4 +10,6 @@ import Util
 import Quote
 import THUtil
 
+mkConstantDecls [minBound .. maxBound :: OEdge] lift
 mkConstantDecls [minBound .. maxBound :: OTriangle] lift
+

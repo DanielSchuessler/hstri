@@ -275,3 +275,13 @@ instance RatioToIntegral r i => RatioToIntegral (V.Vector r) (V.Vector i) where
 
 instance (Unbox r, Unbox i, RatioToIntegral r i) => RatioToIntegral (VU.Vector r) (VU.Vector i) where
     ratioToIntegral = VU.mapM ratioToIntegral
+
+
+-- | @codegeneracy k@ monotonically maps the integers to themselves such that every integer has exactly one preimage, except @k@, which has these two:
+--
+-- @codegeneracy k k = codegeneracy k (k+1) = k@.
+codegeneracy :: (Num a, Ord a) => a -> a -> a
+codegeneracy k i = 
+    if i <= k
+        then i
+        else i-1

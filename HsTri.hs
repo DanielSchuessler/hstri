@@ -16,7 +16,7 @@ module HsTri(
     module ExampleTriangulations,
     module FaceLattice,
     module HomogenousTuples,
-    module INormalDisc,
+    module Tetrahedron.INormalDisc,
     module Latexable,
     module PreRenderable,
     module PrettyUtil,
@@ -41,7 +41,8 @@ module HsTri(
     module Triangulation.VertexLink,
     module TriangulationCxtObject,
     module VerboseDD,
-    module HsTri.Console
+    module HsTri.Console,
+    module EdgeCentered
 
     ) where
 
@@ -60,7 +61,7 @@ import EqvGraphs
 import ExampleTriangulations
 import FaceLattice
 import HomogenousTuples
-import INormalDisc
+import Tetrahedron.INormalDisc
 import Latexable
 import PreRenderable
 import PrettyUtil
@@ -86,3 +87,4 @@ import Triangulation.VertexLink
 import TriangulationCxtObject
 import VerboseDD
 import HsTri.Console
+import EdgeCentered

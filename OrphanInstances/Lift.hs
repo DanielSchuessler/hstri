@@ -2,7 +2,6 @@
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module OrphanInstances.Lift where
 
-import Data.BitSet.Word8
 import Data.Map(Map)
 import GHC.Word
 import Language.Haskell.TH
@@ -24,8 +23,8 @@ instance Lift Double where
             d = denominator r
             n = numerator r
 
-instance Lift (BitSet a) where
-    lift (BitSet w) = [| BitSet w |]
+-- instance Lift (BitSet a) where
+--     lift (BitSet w) = [| BitSet w |]
 
 instance (Ord k, Lift k, Lift v) => Lift (Map k v) where
     lift (M.toAscList -> al) = [| M.fromDistinctAscList al |]

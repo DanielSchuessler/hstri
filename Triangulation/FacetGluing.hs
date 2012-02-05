@@ -7,7 +7,7 @@ import Tetrahedron
 import Control.Applicative
 import HomogenousTuples
 import Data.Maybe
-import INormalDisc
+import Tetrahedron.INormalDisc
 import Control.Exception
 import Test.QuickCheck
 import THUtil
@@ -127,7 +127,7 @@ isGluingNormalized
   :: Gluing -> Bool
 isGluingNormalized (tri,otri) = 
     case compare tri (forgetVertexOrder otri) of
-         EQ -> error ("isGluingNormalized: Invalid gluing "
+         EQ -> $(err') ("isGluingNormalized: Invalid gluing "
                         ++ $(showExps ['tri,'otri]))
          LT -> True
          GT -> False
@@ -156,7 +156,7 @@ data NormalizedGluing = UnsafeNormalizedGluing {
 instance Pretty NormalizedGluing where
     prettyPrec = prettyPrecFromShow
 
-ngToGluing :: NormalizedGluing -> (ITriangle, OITriangle)
+ngToGluing :: NormalizedGluing -> Gluing
 ngToGluing ng = (ngDom ng, ngCod ng)
 
 ngMap :: GluingMappable a => NormalizedGluing -> a -> a
@@ -196,3 +196,7 @@ ngDomTet = getTIndex . ngDom
 
 ngCodTet :: NormalizedGluing -> TIndex
 ngCodTet = getTIndex . ngCod
+
+symmetrizeGluings :: [Gluing] -> [Gluing]
+symmetrizeGluings gls = gls ++ map flipGluing gls
+

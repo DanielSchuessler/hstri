@@ -4,6 +4,7 @@ module Tetrahedron.Vertex
     (
     module FaceClasses,
     module TIndex,
+
     Vertex(..),
     vA,vB,vC,vD,
     allVertices,allVertices',
@@ -35,11 +36,9 @@ module Tetrahedron.Vertex
 
     where
 
-import Collections
 import Control.Applicative
 import Data.Binary
 import Data.Binary.Derive
-import Data.BitSet.Word8
 import Data.Maybe
 import Data.Numbering
 import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
@@ -95,7 +94,6 @@ unviewVertex :: VertexView -> Vertex
 unviewVertex = id
 
 
-instance BitSetable Vertex
 
 instance Show Vertex where
     show v = case viewVertex v of
@@ -131,7 +129,6 @@ instance Finite Vertex
 instance Quote Vertex where
     quotePrec _ v = "v" ++ show v
 
-deriveCollectionKeyClass ''Vertex
 
 
 vertexTripleToString :: (Vertex,Vertex,Vertex) -> String

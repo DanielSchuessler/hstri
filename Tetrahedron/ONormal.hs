@@ -1,8 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances #-}
 {-# OPTIONS -Wall #-}
-module ONormal where
+module Tetrahedron.ONormal where
 
-import Collections
 import Element
 import Tetrahedron.NormalDisc
 import HomogenousTuples
@@ -34,4 +33,3 @@ instance ONormalArcs OTriangle (Triple NormalArc) where
     oNormalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
 
 
-deriveCollectionKeyClass ''ONormalArc

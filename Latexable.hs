@@ -24,7 +24,7 @@ import Data.Ord
 import Data.Ratio
 import Data.Semigroup
 import Element
-import INormalDisc
+import Tetrahedron.INormalDisc
 import MathUtil
 import QuadCoordinates
 import StandardCoordinates

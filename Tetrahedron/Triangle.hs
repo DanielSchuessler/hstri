@@ -309,11 +309,16 @@ gedgesOfTriangle f t = map3 f ((v0,v1),(v1,v2),(v2,v0))
         where
             (v0,v1,v2) = vertices t 
 
+gedgesOfTriangle_lex
+  :: (Vertices t, Verts t ~ Triple v) => ((v, v) -> e) -> t -> Triple e
+gedgesOfTriangle_lex f t = map3 f ((v0,v1),(v2,v0),(v1,v2)) 
+        where
+            (v0,v1,v2) = vertices t 
 
 -- | Edges contained in a given triangle
 edgesOfTriangle
   :: (Vertices t, Verts t ~ Triple v, MakeEdge (v, v)) => t -> Triple Edge
-edgesOfTriangle = gedgesOfTriangle edge
+edgesOfTriangle = gedgesOfTriangle_lex edge
 
 -- | Ordered edges contained in a given triangle (result is a cycle)
 oEdgesOfTriangle :: (Vertices t, Verts t ~ Triple Vertex) => t -> Triple OEdge

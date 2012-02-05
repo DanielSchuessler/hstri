@@ -111,6 +111,9 @@ defaultFOV = 0.8575560591178853
 
 setCams :: [Cam] -> Scene s -> Scene s
 setCams = setL scene_camsL
+
+setCam :: Cam -> Scene s -> Scene s
+setCam = setCams . return
                         
 setInitialSelection :: AnySimplex2Of s -> Scene s -> Scene s
 setInitialSelection = setL scene_initialSelectionL . Just

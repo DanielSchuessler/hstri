@@ -325,12 +325,12 @@ adjacentNormalCornersInTri
   :: (Eq a, Show a, Show a1, NormalCorners a1 (a, a, a)) =>
      a -> a1 -> (a, a)
 adjacentNormalCornersInTri nc nt = 
-             fromMaybe err
+             fromMaybe _err
                 (deleteTuple3 nc (normalCorners nt))
 
 
                 where
-                    err = (error (unwords ["link",show nc,show nt]
+                    _err = (error (unwords ["link",show nc,show nt]
                                     ++": Normal corner not contained in normal tri"))
 
 adjacentNormalCornersInQuad

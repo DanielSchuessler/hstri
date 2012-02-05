@@ -2,7 +2,6 @@
 {-# OPTIONS -Wall #-}
 
 module Util where
-import Collections
 import Control.Monad
 import Data.Bits
 import Data.Function
@@ -11,7 +10,6 @@ import Data.List as List
 import Data.Word
 import Test.QuickCheck hiding((.&.))
 import Test.QuickCheck.All
-import Data.BitSet.Word8(BitSet(..))
 import Control.Exception
 import QuickCheckUtil
 import Data.Set as S
@@ -236,7 +234,6 @@ prop_flipNibbles x = word8ToNibbles (flipNibbles x) == (y0,y1)
 
         
 
-deriveCollectionKeyClass ''BitSet
 
 
 

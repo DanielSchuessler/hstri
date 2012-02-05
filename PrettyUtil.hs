@@ -2,6 +2,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
+-- | Description: Pretty-printing utilities
 module PrettyUtil(
     -- * Reexports
     module Text.PrettyPrint.ANSI.Leijen,
@@ -42,10 +43,11 @@ module PrettyUtil(
 
     where
 
-import Collections
 import Control.Arrow((***),(&&&))
 import Data.List(intercalate)
+import Data.Map(Map)
 import Data.Ratio
+import Data.Set(Set)
 import Data.Vect.Double.Base
 import Data.Word
 import Element
@@ -54,14 +56,13 @@ import HomogenousTuples
 import Numeric
 import Test.QuickCheck(Arbitrary)
 import Text.PrettyPrint.ANSI.Leijen hiding((<$>),Pretty(..),(<>))
-import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
 import TupleTH
-import TypeLevel.TF.List(List,lToList)
 import qualified Data.Map as M
+import qualified Data.Semigroup as Semigroup
+import qualified Data.Set as S
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
-import qualified Data.Semigroup as Semigroup
-
+import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
 --import GHC.Generics hiding(prec)
 
 (<>) ::  Doc -> Doc -> Doc
@@ -278,7 +279,7 @@ instance Pretty Bool where pretty b = bool b
 instance Pretty Int where pretty i = int i
 
 instance (Ord a, Pretty a) => Pretty (Set a) where
-    pretty = prettyListAsSet . setToList 
+    pretty = prettyListAsSet . S.toList 
 
 instance (Ord a, Pretty a, Pretty b) => Pretty (Map a b) where
     pretty = prettyAssocs . M.assocs 
@@ -318,8 +319,8 @@ anyPretty = AnyPretty . flip prettyPrec
 instance Pretty AnyPretty where
     prettyPrec prec (AnyPretty prettyPrec_) = prettyPrec_ prec
 
-instance Pretty v => Pretty (List v n) where
-    pretty = tupled . fmap pretty . lToList
+-- instance Pretty v => Pretty (List v n) where
+--     pretty = tupled . fmap pretty . lToList
 
 
 prettyEqs :: [(String, Doc)] -> Doc

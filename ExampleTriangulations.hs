@@ -57,10 +57,10 @@ spqwc_oneTet :: SPQWithCoords Vertex
 spqwc_oneTet = oneTetWithDefaultCoords tr_oneTet show
 
 spqwc_twoTets :: SPQWithCoords TVertex
-spqwc_twoTets = twoTetsWithOneImplementedGluingWithCoords tr_twoTets (0./tABC) show
+spqwc_twoTets = spqwc_twoTetBipyramid tr_twoTets (0./tABC) show
 
 spqwc_l31 :: SPQWithCoords TVertex
-spqwc_l31 = twoTetsWithOneImplementedGluingWithCoords tr_l31 (0./tABC)
+spqwc_l31 = spqwc_twoTetBipyramid tr_l31 (0./tABC)
                 (\(ngDom -> (viewI -> I i tri)) ->
                     assert (i==0) $
                         case tri of

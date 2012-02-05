@@ -19,7 +19,7 @@ prop_closedOrCensus6_oriented =
         (\ltr ->
             let
                 tr = toTriangulation ltr 
-                r = orientTriangulation' tr 
+                r = orientTriangulation tr 
             in
                 case r of
                      Left r' ->
@@ -34,7 +34,7 @@ prop_closedNorCensus8_not_oriented =
         (\ltr ->
             let
                 tr = toTriangulation ltr 
-                r = orientTriangulation' tr 
+                r = orientTriangulation tr 
             in
                 printTestCase (show r) $
                 collect r $

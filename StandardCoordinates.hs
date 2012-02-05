@@ -50,7 +50,7 @@ import Data.Maybe
 import Data.Ratio
 import Data.VectorSpace hiding(Sum)
 import HomogenousTuples
-import INormalDisc
+import Tetrahedron.INormalDisc
 import MathUtil
 import PolymakeInterface
 import Prelude hiding(lookup)
@@ -156,7 +156,7 @@ stc_coefficientIsZero (stc_toZDM -> sc) = sparse_isZero sc . iNormalDisc
 
 getVertexSolutions :: forall s. PmScalar s => Triangulation -> IO [[s]]
 getVertexSolutions t = do 
-    let k = triangTetCount t
+    let k = tNumberOfTetrahedra t
         matchingEquations_ = fmap ( (0 :) . fmap fromInteger . ns_toDenseList t ) (matchingEquations t)
 
     liftIO (putStrLn ("matching equations = "++show matchingEquations_))

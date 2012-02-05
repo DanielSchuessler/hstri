@@ -2,7 +2,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE CPP #-}
 module CoordSys where
-import INormalDisc
+import Tetrahedron.INormalDisc
 import Data.FormalOps
 import Math.SparseVector
 import Data.Proxy

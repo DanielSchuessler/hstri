@@ -2,7 +2,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
 module QuadCoordinates.Class
-    (module INormalDisc,
+    (module Tetrahedron.INormalDisc,
      module Data.FormalOps,
      module CoordSys,
 
@@ -27,7 +27,7 @@ import Data.FormalOps
 import Data.Map(Map)
 import Data.Maybe
 import Data.Monoid
-import INormalDisc
+import Tetrahedron.INormalDisc
 import Math.SparseVector
 import MathUtil
 import Util

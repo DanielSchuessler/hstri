@@ -37,19 +37,19 @@ instance Num TIndex where
         in
             if a<=c && b<=c
                then TIndex (a+b)
-               else $(problem) ("TIndex "++show a++ " + TIndex "++show b)
+               else $err' ("TIndex "++show a++ " + TIndex "++show b)
 
     (-) (TIndex a) (TIndex b) | a < b =
-            $(problem) ("TIndex "++show a++ " - TIndex "++show b)
+            $err' ("TIndex "++show a++ " - TIndex "++show b)
 
             | otherwise = TIndex (a-b)
 
-    (*) = $(problem) ("* not supported for TIndex")
-    abs = $(problem) ("abs not supported for TIndex")
-    signum = $(problem) ("signum not supported for TIndex")
+    (*) = $err' ("* not supported for TIndex")
+    abs = $err' ("abs not supported for TIndex")
+    signum = $err' ("signum not supported for TIndex")
 
     fromInteger i | i < 0 || i > toInteger (maxBound :: Word) 
-                        = $(problem) ("fromInteger "++show i++" :: TIndex")
+                        = $err' ("fromInteger "++show i++" :: TIndex")
                   | otherwise = TIndex (fromInteger i)
 
 tindex ::  Word -> TIndex
@@ -184,6 +184,9 @@ inIOf b ia = getTIndex ia ./ b
 
 class MapTIndices a where
     mapTIndices :: (TIndex -> TIndex) -> (a -> a)
+
+    mapTIndicesStrictlyMonotonic :: (TIndex -> TIndex) -> (a -> a)
+    mapTIndicesStrictlyMonotonic = mapTIndices
 
 instance MapTIndices (I a) where
     mapTIndices f (I i x) = I (f i) x

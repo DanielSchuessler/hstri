@@ -2,7 +2,7 @@
 --{-# OPTIONS -Wall #-}
 module StandardCoordinates.Class where
 
-import INormalDisc
+import Tetrahedron.INormalDisc
 import Control.Applicative
 import HomogenousTuples
 import Triangulation

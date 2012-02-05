@@ -426,7 +426,7 @@ sphere loc radius = do
 cylinder :: Vec3 -> Vec3 -> Double -> Either String (Python ())
 cylinder from to radius = 
     if normsqr (from &- to) <= 1E-14
-       then Left ("cylinder: from = to") 
+       then Right (newEmptyObj "Crushed cylinder")
        else Right $
 
     
@@ -593,7 +593,8 @@ newObj name objData = do
             objVar .= (methodCallExpr (dat "objects") "new" (str name,objData))
             methodCall1 (sceneVar <.> "objects") "link" objVar
 
-
+newEmptyObj :: String -> Python ()
+newEmptyObj name = newObj name none
 
 --linkObjToScene =
 

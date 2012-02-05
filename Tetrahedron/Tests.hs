@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, TemplateHaskell #-}
 module Tetrahedron.Tests where
 
 import Tetrahedron
@@ -219,4 +219,85 @@ prop_Ix_NormalDisc (l :: NormalDisc) u =
     (map (index (l,u)) (range (l,u)) == [0..rangeSize (l,u)-1])
     .&&.
     (rangeSize (l,u) == length (range (l,u)))
+
+
+polyprop_faceMapConsistency2 t =
+    case edges t of
+         dits ->
+
+             printTestCase (show dits) $
+
+                 case map3 vertices dits of
+
+                     ( (d0d0,d1d0)
+                      ,(d0d1,d1d1)
+                      ,(d0d2,d1d2))
+
+                      ->
+                          printTestCase ("Checking d0 . d0 = d0 . d1")
+                            (d0d0 .=. d0d1)
+
+                          .&&.
+                          
+                          printTestCase ("Checking d1 . d0 = d0 . d2")
+                            (d1d0 .=. d0d2)
+
+                          .&&.
+
+                          printTestCase ("Checking d1 . d1 = d1 . d2")
+                            (d1d1 .=. d1d2)
+
+
+
+polyprop_faceMapConsistency3
+  :: (Eq e,
+      Show tri,
+      Show e,
+      Triangles tet,
+      Edges tri,
+      Tris tet ~ (tri, tri, tri, tri),
+      Eds tri ~ (e, e, e)) =>
+     tet -> Property
+polyprop_faceMapConsistency3 t =
+    case triangles t of
+         dits ->
+
+             printTestCase (show dits) $
+
+                 case map4 edges dits of
+
+                     ( (d0d0,d1d0,d2d0)
+                      ,(d0d1,d1d1,d2d1)
+                      ,(d0d2,d1d2,d2d2)
+                      ,(d0d3,d1d3,d2d3)
+                      )
+
+                      ->
+                          printTestCase ("Checking d0 . d0 = d0 . d1")
+                            (d0d0 .=. d0d1)
+
+                          .&&.
+                          
+                          printTestCase ("Checking d1 . d0 = d0 . d2")
+                            (d1d0 .=. d0d2)
+
+                          .&&.
+
+                          printTestCase ("Checking d1 . d1 = d1 . d2")
+                            (d1d1 .=. d1d2)
+
+                          .&&.
+                          
+                          printTestCase ("Checking d2 . d0 = d0 . d3")
+                            (d2d0 .=. d0d3)
+
+                          .&&.
+
+                          printTestCase ("Checking d2 . d1 = d1 . d3")
+                            (d2d1 .=. d1d3)
+
+                          .&&.
+
+                          printTestCase ("Checking d2 . d2 = d2 . d3")
+                            (d2d2 .=. d2d3)
 

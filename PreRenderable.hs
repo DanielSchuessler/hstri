@@ -18,6 +18,7 @@ module PreRenderable(
     GeneralEdgeEmbedding(..),
     PreRenderable(..),
     Coords(..),
+    rotateAngleAxis,
     mkPreRenderable,
     mkPreRenderableWithTriangleLabels,
     tet3d,
@@ -34,16 +35,17 @@ module PreRenderable(
     pr_hideEds,
     pr_hideTris,
     pr_triangleLabel,
-    pr_setTriangleEmbedding,
-    pr_mbGeneralTriangleEmbedding,
+    pr_mbGeneralTriangleEmbeddingL,
     pr_coords,
     pr_edgeEmbedding,
+    pr_setTriangleEmbedding,
     pr_triangleEmbedding,
     pr_visibility,
     pr_vertVisibility,
     pr_edVisibility,
     pr_triVisibility,
-    pr_quad
+    pr_quad,
+    pr_makeEmbeddingsGeneral
 
     ) where
 
@@ -70,17 +72,44 @@ import Tetrahedron.Vertex
 import Util
 import Data.Lens.Template
 import Data.Lens.Common
+import Data.Vect.Double.Util.Dim3(rotate3)
+import Data.Vect.Double.Util.Dim2
 
 type Resolution = Int
 
 data GeneralTriangleEmbedding = 
+    -- | SEMANTICS: 
+    --
+    -- Let (e0,e1,e2) = faces21 t
+    --
+    -- The arc from vec2X to vec2Y corresponds to e0 
+    --
+    -- The arc from zero to vec2Y corresponds to e1 
+    --
+    -- The arc from zero to vec2X corresponds to e2 
     GTE Resolution (Unit2SimplexPoint -> Vec3)
+
+instance Coords GeneralTriangleEmbedding where
+    transformCoords f (GTE res g) = GTE res (f . g)
 
 data TriangleEmbedding = 
         FlatTriangle Vec3 Vec3 Vec3
     |   GeneralTriangle GeneralTriangleEmbedding
 
-data GeneralEdgeEmbedding = GEE Resolution (UnitIntervalPoint -> Vec3)
+data GeneralEdgeEmbedding = 
+    -- | SEMANTICS: 
+    --
+    -- Let (v0,v1) = faces10 e
+    --
+    -- 0 corresponds to v1
+    --
+    -- 1 corresponds to v0
+    --
+    -- (for consistency o_o - you see, the index of the face map says which vertex is *omitted*)
+    GEE Resolution (UnitIntervalPoint -> Vec3)
+
+instance Coords GeneralEdgeEmbedding where
+    transformCoords f (GEE res g) = GEE res (f . g)
 
 data EdgeEmbedding =
         FlatEdge Vec3 Vec3
@@ -89,6 +118,10 @@ data EdgeEmbedding =
 
 class Coords t where
     transformCoords :: (Vec3 -> Vec3) -> t -> t
+
+rotateAngleAxis :: Coords t => Double -> Vec3 -> t -> t
+rotateAngleAxis = (.) transformCoords  . rotate3
+
 
 data Visibility = Visible | Invisible
     deriving (Eq,Ord,Show)
@@ -153,12 +186,13 @@ pr_quad reso f =
     _diag = asc2 (ft,tf)
 
 
-pr_mbGeneralTriangleEmbedding
-  :: PreRenderable s -> Tri s -> Maybe GeneralTriangleEmbedding
-pr_mbGeneralTriangleEmbedding = fmap snd . pr_triangleInfo
+pr_mbGeneralTriangleEmbeddingL = pr_triangleInfoL >>> secondLens
 
 instance Coords (PreRenderable a) where
-    transformCoords f _pr = _pr { pr_coords0 = f . pr_coords0 _pr }
+    transformCoords f =
+            modL pr_coords0L (f .)
+        .   modL pr_edgeInfoL (fmap (transformCoords f) .)
+        .   modL (pr_triangleInfoL >>> secondLens) (fmap (transformCoords f) .)
 
 instance 
     (   DisjointUnionable s1 s2 s inj1 inj2 ei
@@ -267,7 +301,7 @@ pr_edgeEmbedding
      -> EdgeEmbedding
 pr_edgeEmbedding pr tcec e =
             case findJust (\(triangle,i) -> do 
-                        emb <- pr_mbGeneralTriangleEmbedding pr triangle
+                        emb <- getL pr_mbGeneralTriangleEmbeddingL pr triangle
                         return (triangle,i,emb))
                  . lookupTrianglesContainingEdge tcec
                  $ e of 
@@ -286,8 +320,13 @@ pr_edgeEmbedding pr tcec e =
 
                   where
                     pretransform = 
-                        let (v0,v1) = faces10 Unit2Simplex (face21 Unit2Simplex Unit2Simplex i)
-                        in \x -> interpolate x v1 v0
+                        let (v0,v1) = 
+                                case i of
+                                     I3_0 -> (vec2X,vec2Y)
+                                     I3_1 -> (zero,vec2Y)
+                                     I3_2 -> (zero,vec2X)
+
+                        in \x -> interpolate x v0 v1
 
 flatFace pr ctor mapN verticesAscending face =    
                                 ctor
@@ -298,7 +337,7 @@ flatFace pr ctor mapN verticesAscending face =
 
 pr_triangleEmbedding :: DeltaSet2 s => PreRenderable s -> Tri s -> TriangleEmbedding
 pr_triangleEmbedding pr t = 
-    case pr_mbGeneralTriangleEmbedding pr t of
+    case getL pr_mbGeneralTriangleEmbeddingL pr t of
          Nothing -> flatFace pr (uncurry3 FlatTriangle) map3 faces20Ascending t
 
          Just emb -> GeneralTriangle emb
@@ -320,7 +359,9 @@ pr_coords pr tcec ecvc v =
                     case pr_edgeEmbedding pr tcec e of
                          FlatEdge {} -> Nothing
                          GeneralEdge (GEE _ emb) ->
-                            Just (emb (face10 UnitInterval UnitInterval i)))
+                            Just (emb (case i of
+                                            I2_0 -> 1
+                                            I2_1 -> 0)))
 
                  . lookupEdgesContainingVertex ecvc
                  $ v 
@@ -425,3 +466,18 @@ instance Num Visibility where
 
 
 isRegardedAsSimplexByDisjointUnionDeriving [t| (Bool,Bool) |]
+
+-- | Doesn't work on edges yet
+pr_makeEmbeddingsGeneral
+  :: DeltaSet2 s =>
+     (Tri s -> Resolution) -> PreRenderable s -> PreRenderable s
+pr_makeEmbeddingsGeneral triRes pr_ =
+    setL pr_mbGeneralTriangleEmbeddingL
+        (\t -> Just $ case pr_triangleEmbedding pr_ t of
+                    GeneralTriangle emb -> emb
+                    FlatTriangle a au av ->
+                        GTE 
+                            (triRes t)
+                            (\(Vec2 u v) -> (1-u-v) *& a &+ u *& au &+ v *& av))
+
+ $       pr_

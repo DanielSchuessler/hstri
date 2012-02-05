@@ -82,7 +82,7 @@ dotGraph tr =
 
 
     equivalenceEdges = 
-        tOriginalGluings tr >>=
+        tGluingsIrredundant tr >>=
             (\gl -> 
                 equivalenceEdge (fst gl) (snd gl) 
                 :

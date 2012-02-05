@@ -13,7 +13,7 @@ import Data.Function
 import Data.List as L
 import Data.Maybe as May
 import HomogenousTuples
-import INormalDisc
+import Tetrahedron.INormalDisc
 import MathUtil
 import PrettyUtil
 import QuadCoordinates.Class

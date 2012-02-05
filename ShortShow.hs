@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module ShortShow where
-import TypeLevel.TF.List
 import Element
 import Data.List
 import Math.Groups.S2
@@ -41,8 +40,8 @@ instance (ShortShow a, ShortShow b, ShortShow c, ShortShow d) => ShortShow (a,b,
                         . showChar ',' . shortShows d
                         . showChar ')'
 
-instance ShortShow v => ShortShow (List v n) where
-    shortShow = error "ShortShow (List v n): not implemented"
+-- instance ShortShow v => ShortShow (List v n) where
+--     shortShow = error "ShortShow (List v n): not implemented"
 
 
 shortShowAsSet :: (AsList a, ShortShow (Element a)) => a -> [Char]
