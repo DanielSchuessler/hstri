@@ -174,9 +174,9 @@ abstractTet = fromTets [allVertices']
 
 
 
-instance (Vert e ~ v, SimplicialEdge e) => DeltaSet1 (SC1' v e) where faces10 _ = simplicialFaces10'
-instance (Vert e ~ v, SimplicialEdge e) => DeltaSet1 (SC2' v e t) where faces10 _ = simplicialFaces10'
-instance (Vert e ~ v, SimplicialEdge e) => DeltaSet1 (SC3' v e t tet) where faces10 _ = simplicialFaces10'
+instance (Vert e ~ v, SimplicialEdge e) => DeltaSet1 (SC1' v e) where
+instance (Vert e ~ v, SimplicialEdge e) => DeltaSet1 (SC2' v e t) where
+instance (Vert e ~ v, SimplicialEdge e) => DeltaSet1 (SC3' v e t tet) where
 
 {-
 simplicialFaces21'
@@ -202,7 +202,7 @@ instance
       v ~ Vert t,
       v ~ Vert e) => 
       
-      DeltaSet2 (SC2' v e t) where faces21 _ = simplicialFaces21'
+      DeltaSet2 (SC2' v e t) where
 
 instance     
      (Show v,
@@ -211,7 +211,7 @@ instance
       v ~ Vert t,
       v ~ Vert e) => 
       
-      DeltaSet2 (SC3' v e t tet) where faces21 _ = simplicialFaces21'
+      DeltaSet2 (SC3' v e t tet) where
 
 instance (Show v,
       SimplicialTet tet,
@@ -220,7 +220,7 @@ instance (Show v,
       Vert tet ~ v,
       Vert t ~ v,
       Vert e ~ v
-      ) => DeltaSet3 (SC3' v e t tet) where faces32 _ = simplicialFaces32'
+      ) => DeltaSet3 (SC3' v e t tet) where
 
 
 

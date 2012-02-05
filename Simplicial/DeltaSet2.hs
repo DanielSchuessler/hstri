@@ -3,12 +3,12 @@
 {-# OPTIONS -Wall #-}
 module Simplicial.DeltaSet2(
     module Simplicial.DeltaSet1,
-    DeltaSet2(..),
+    SatisfiesSimplicialIdentities2,
+    DeltaSet2,
     face21,
     AnySimplex2,
     AnySimplex2Of,
-    faces20,
-    faces20Ascending,
+    verticesOfTriDefault,
     foldAnySimplex2,
     vertToAnySimplex2,
     edToAnySimplex2,
@@ -20,16 +20,12 @@ module Simplicial.DeltaSet2(
     TrianglesContainingEdge_Cache,
     lookupTrianglesContainingEdge,
     mkTCEC,
-    Unit2Simplex(..),
+--     Unit2Simplex(..),
     Unit2SimplexPoint,
 
-    -- * Testing
-    polyprop_faces21
     ) where
 
 import Simplicial.DeltaSet1
-import QuickCheckUtil
-import Test.QuickCheck
 import Control.Arrow
 import qualified Data.Map as M
 import Control.Applicative
@@ -37,17 +33,18 @@ import PrettyUtil
 import Language.Haskell.TH.Lift
 import ShortShow
 import MathUtil
-import Data.Tuple.OneTuple
-import Data.Vect.Double.Base
 import FileLocation
 
-class (DeltaSet1 s, Triangles s) => 
-    DeltaSet2 s where
+-- | LAW: @forall i j. i >= j ==> 'edgeGetVertexAt' i . 'triangleGetEdgeAt' j == 'edgeGetVertexAt' j . 'triangleGetEdgeAt' (i+1)@  
+--
+-- (modulo index type conversions)
+class (Edges t, Eds t ~ Triple (Ed t), Vertices (Ed t), Verts (Ed t) ~ Pair (Vert (Ed t))) => SatisfiesSimplicialIdentities2 t
 
-    faces21 :: s -> Tri s -> Triple (Ed s)
+class (DeltaSet1 s, Triangles s, Ed s ~ Ed (Tri s), SatisfiesSimplicialIdentities2 (Tri s)) => DeltaSet2 s where
 
-face21 :: DeltaSet2 a => a -> Tri a -> Index3 -> Ed a
-face21 = (.) tupleToFun3 . faces21
+
+face21 :: (Triangles t, Tris t ~ (e, e, e)) => t -> Index3 -> e
+face21 = tupleToFun3 . triangles
 
 newtype AnySimplex2 v e t = AnySimplex2 (Either (AnySimplex1 v e) t) 
     deriving(Show,SubSumTy,SuperSumTy,Eq,Ord)
@@ -82,47 +79,18 @@ edToAnySimplex2 = anySimplex1To2 . edToAnySimplex1
 triToAnySimplex2 :: t -> AnySimplex2 v e t
 triToAnySimplex2 = right'
 
-polyprop_faces21
-  :: (Eq (Element (Verts s)),
-      Show tris,
-      Show (Element (Verts s)),
-      DeltaSet2 s,
-      Tris s ~ [tris]) =>
-     s -> Property
-polyprop_faces21 s = 
-    forAllElements (triangles s)
-        (\t -> case faces21 s t of
-                    es ->
-                        case map3 (faces10 s) es of
-                             ( (v0_0,v1_0)
-                              ,(v0_1,v1_1)
-                              ,(v0_2,v1_2)
-                              ) ->
 
-                                 v1_1 .=. v1_2 -- 0
-                                 .&.
-                                 v1_0 .=. v0_2 -- 1
-                                 .&.
-                                 v0_0 .=. v0_1 -- 2
-                                 )
-                                 
-                                    
+verticesOfTriDefault
+  :: (SatisfiesSimplicialIdentities2 t) =>
 
+     t -> Triple (Vert (Ed t))
 
-
-faces20
-  :: DeltaSet2 s =>
-     s -> Tri s -> (Vert s, Vert s, Vert s)
-faces20 t tr = (v2,v1,v0)
+verticesOfTriDefault t = (v2,v1,v0)
     where
-        (e12,e02,_) = faces21 t tr
-        (v2,v1) = faces10 t e12
-        (_,v0) = faces10 t e02
+        (e01,e02,_) = edges t
+        (v0,v1) = vertices e01
+        (_,v2) = vertices e02
 
-faces20Ascending
-  :: DeltaSet2 s =>
-     s -> Tri s -> (Vert s, Vert s, Vert s)
-faces20Ascending t = reverse3 . faces20 t 
 
 
 
@@ -137,9 +105,9 @@ mkTCEC s = TCEC (flip $(indx) m)
     where
         m = M.fromListWith (++)
                     . concatMap (\t -> 
-                        asList 
+                        toList3 
                             (zipTuple3 
-                                (faces21 s t) 
+                                (edges t) 
                                 (map3 ((:[]) . (t,)) allIndex3')))
                     $ triangleList s
                 
@@ -171,30 +139,30 @@ instance (Lift v, Lift e, Lift t) => Lift (AnySimplex2 v e t) where
 instance (ShortShow v, ShortShow e, ShortShow t) => ShortShow (AnySimplex2 v e t) where
     shortShow = foldAnySimplex2' shortShow shortShow 
 
-data Unit2Simplex = Unit2Simplex
-    deriving Show
-
-instance Vertices Unit2Simplex where
-    type Verts Unit2Simplex = Triple Unit2SimplexPoint
-    vertices Unit2Simplex = faces20 Unit2Simplex Unit2Simplex
-
-instance Edges Unit2Simplex where
-    type Eds Unit2Simplex = Triple (Unit2SimplexPoint,Unit2SimplexPoint)
-    edges Unit2Simplex = faces21 Unit2Simplex Unit2Simplex
-
-instance Triangles Unit2Simplex where
-    type Tris Unit2Simplex = OneTuple Unit2Simplex
-    triangles Unit2Simplex = OneTuple Unit2Simplex
-
-instance DeltaSet1 Unit2Simplex where
-    faces10 _ = reverse2
-
-instance DeltaSet2 Unit2Simplex where
-    faces21 _ _ = ((b,c),(a,c),(a,b))
-        where
-            a = Vec2 0 0
-            b = Vec2 0 1
-            c = Vec2 1 0
+-- data Unit2Simplex = Unit2Simplex
+--     deriving Show
+-- 
+-- instance Vertices Unit2Simplex where
+--     type Verts Unit2Simplex = Triple Unit2SimplexPoint
+--     vertices Unit2Simplex = faces20 Unit2Simplex Unit2Simplex
+-- 
+-- instance Edges Unit2Simplex where
+--     type Eds Unit2Simplex = Triple (Unit2SimplexPoint,Unit2SimplexPoint)
+--     edges Unit2Simplex = faces21 Unit2Simplex Unit2Simplex
+-- 
+-- instance Triangles Unit2Simplex where
+--     type Tris Unit2Simplex = OneTuple Unit2Simplex
+--     triangles Unit2Simplex = OneTuple Unit2Simplex
+-- 
+-- instance DeltaSet1 Unit2Simplex where
+--     faces10 _ = reverse2
+-- 
+-- instance DeltaSet2 Unit2Simplex where
+--     faces21 _ _ = ((b,c),(a,c),(a,b))
+--         where
+--             a = Vec2 0 0
+--             b = Vec2 0 1
+--             c = Vec2 1 0
 
 data LayeringEdge = LayeringEdge
     deriving Show

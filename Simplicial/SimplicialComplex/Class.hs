@@ -53,25 +53,18 @@ sTet = sTetAsc . asc4
 -- sTetVertsAsc = asc4 . vertices
 
 
-simplicialFaces10 :: Asc2 v -> Pair v
-simplicialFaces10 x = map2 (flip deleteAt2 $ unAsc2 x) ((0,1) :: Pair Int)
-
-simplicialFaces21 :: (Ord v, Show v) => Asc3 v -> Triple (Asc2 v)
-simplicialFaces21 x = map3 (unsafeAsc . (flip deleteAt3 $ unAsc3 x)) ((0,1,2) :: Triple Int)
-
-simplicialFaces32
-  :: (Ord v, Show v) => Asc4 v -> Quadruple (Asc3 v)
-simplicialFaces32 x = map4 (unsafeAsc . (flip deleteAt4 $ unAsc4 x)) ((0,1,2,3) :: Quadruple Int)
 
 simplicialFaces10' :: SimplicialEdge a => a -> Pair (Vert a)
-simplicialFaces10' = simplicialFaces10 . sEdgeVerts
+simplicialFaces10' = vertices . sEdgeVerts
+
 simplicialFaces21'
   :: (Show (Vert t),
       SimplicialTriangle t,
       SimplicialEdge e,
       Vert e ~ Vert t) =>
      t -> Triple e
-simplicialFaces21' = map3 sEdgeAsc . simplicialFaces21 . sTriangleVerts
+simplicialFaces21' = map3 sEdgeAsc . edges . sTriangleVerts
+
 simplicialFaces32'
   :: (Show (Vert tet),
       SimplicialTet tet,
@@ -79,7 +72,7 @@ simplicialFaces32'
       Vert tet ~ Vert t)
      =>
      tet -> Quadruple t
-simplicialFaces32' = map4 sTriangleAsc . simplicialFaces32 . sTetVerts
+simplicialFaces32' = map4 sTriangleAsc . triangles . sTetVerts
 
 instance (SimplicialEdge a, SimplicialEdge b) => SimplicialEdge (DJSimp a b) where
     sEdgeAscMay (unAsc2 -> (u,v)) =

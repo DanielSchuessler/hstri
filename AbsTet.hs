@@ -1,12 +1,14 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses #-}
 -- | The tetrahedron
 module AbsTet where
+
 import TIndex
 import Tetrahedron.Vertex
 import HomogenousTuples
 import Tetrahedron.Edge
 import Tetrahedron.Triangle
 import Data.Tuple.OneTuple
+import Simplicial.DeltaSet3
 
 instance HasTIndex TIndex AbsTet where
     viewI = flip I AbsTet 
@@ -28,6 +30,8 @@ instance Edges AbsTet where
 instance Triangles AbsTet where
     type Tris AbsTet = Quadruple Triangle 
     triangles = const allTriangles'
+
+instance SatisfiesSimplicialIdentities3 AbsTet
 
 instance Tetrahedra AbsTet where
     type Tets AbsTet = OneTuple AbsTet

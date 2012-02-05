@@ -1,10 +1,9 @@
-{-# LANGUAGE TemplateHaskell, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE FlexibleContexts, TemplateHaskell, TypeFamilies, FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Simplicial.DeltaSet3(
     module Simplicial.DeltaSet2,
-    DeltaSet3(..),
-    faces31,
-    faces30,
+    SatisfiesSimplicialIdentities3,
+    DeltaSet3,
     AnySimplex3,
     foldAnySimplex3,
     anySimplex2To3
@@ -15,10 +14,14 @@ import Simplicial.DeltaSet2
 import Control.Arrow
 import Language.Haskell.TH.Lift
 
-class (DeltaSet2 s, Tetrahedra s) =>
-    DeltaSet3 s where
+ -- | LAW: @forall i j. i >= j ==> 'triangleGetEdgeAt' i . 'tetrahedronGetTriangleAt' j == 'triangleGetEdgeAt' j . 'tetrahedronGetTriangleAt' (i+1)@  
+--
+-- (modulo index type conversions)
+class (Triangles tet, Tris tet ~ Quadruple (Tri tet), Edges (Tri tet), Eds (Tri tet) ~ Triple (Ed (Tri tet)), SatisfiesSimplicialIdentities2 (Tri tet)) => SatisfiesSimplicialIdentities3 tet
 
-    faces32 :: s -> Tet s -> Quadruple (Tri s)
+
+class (DeltaSet2 s, Tetrahedra s, Tri (Tet s) ~ Tri s, SatisfiesSimplicialIdentities3 (Tet s)) => DeltaSet3 s where
+
 
 newtype AnySimplex3 v e t tet = AnySimplex3 (Either (AnySimplex2 v e t) tet)
    deriving(SuperSumTy,SubSumTy)
@@ -38,26 +41,6 @@ tetToAnySimplex3 :: tet -> AnySimplex3 v e t tet
 tetToAnySimplex3 = right'
 
 foldAnySimplex3' k2 ktet (AnySimplex3 x) = either k2 ktet x
-
-faces31
-  :: DeltaSet3 s
-     => s
-     -> Tet s
-     -> (Sextuple (Ed s))
-faces31 t tet = (e23,e13,e12,e03,e02,e01)
-    where
-        (tr123,tr023,tr013,_) = faces32 t tet
-        (e23,e13,e12) = faces21 t tr123
-        ( _ ,e03,e02) = faces21 t tr023
-        ( _ , _ ,e01) = faces21 t tr013
-
-faces30
-  :: DeltaSet3 s => s -> Tet s -> (Quadruple (Vert s))
-faces30 t tet = (v3,v2,v1,v0)
-    where
-        (tr123,tr023,_,_) = faces32 t tet
-        (v3,v2,v1) = faces20 t tr123
-        ( _, _,v0) = faces20 t tr023 
 
 
   

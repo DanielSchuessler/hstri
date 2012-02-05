@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
 module Tetrahedron.Tests where
 
 import Tetrahedron
@@ -12,6 +12,8 @@ import HomogenousTuples
 import Control.Monad
 import Tetrahedron.NormalDisc
 import Data.Ix
+import Simplicial.DeltaSet3
+import Data.AscTuples
 
 
 qc_Tetrahedron = $quickCheckAll
@@ -221,7 +223,8 @@ prop_Ix_NormalDisc (l :: NormalDisc) u =
     (rangeSize (l,u) == length (range (l,u)))
 
 
-polyprop_faceMapConsistency2 t =
+polyprop_SatisfiesSimplicialIdentities2 :: (Eq (Vert (Ed t)), Show (Vert (Ed t)), Show (Ed t), SatisfiesSimplicialIdentities2 t) => t -> Property
+polyprop_SatisfiesSimplicialIdentities2 t =
     case edges t of
          dits ->
 
@@ -248,17 +251,14 @@ polyprop_faceMapConsistency2 t =
                             (d1d1 .=. d1d2)
 
 
+polyprop_DeltaSet2 s = 
+    forAllElements (triangles s) (polyprop_SatisfiesSimplicialIdentities2)
 
-polyprop_faceMapConsistency3
-  :: (Eq e,
-      Show tri,
-      Show e,
-      Triangles tet,
-      Edges tri,
-      Tris tet ~ (tri, tri, tri, tri),
-      Eds tri ~ (e, e, e)) =>
+
+polyprop_SatisfiesSimplicialIdentities3
+  :: (Eq (Ed (Tri tet)), Show (Ed (Tri tet)), Show (Tri tet), SatisfiesSimplicialIdentities3 tet) =>
      tet -> Property
-polyprop_faceMapConsistency3 t =
+polyprop_SatisfiesSimplicialIdentities3 t =
     case triangles t of
          dits ->
 
@@ -301,3 +301,21 @@ polyprop_faceMapConsistency3 t =
                           printTestCase ("Checking d2 . d2 = d2 . d3")
                             (d2d2 .=. d2d3)
 
+
+prop_Asc3_Simpidents :: Asc3 Int -> Property
+prop_Asc3_Simpidents = polyprop_SatisfiesSimplicialIdentities2
+
+prop_Asc4_Simpidents :: Asc4 Int -> Property
+prop_Asc4_Simpidents = polyprop_SatisfiesSimplicialIdentities3
+
+prop_Triangle_Simpidents :: Triangle -> Property
+prop_Triangle_Simpidents = polyprop_SatisfiesSimplicialIdentities2
+
+prop_ITriangle_Simpidents :: ITriangle -> Property
+prop_ITriangle_Simpidents = polyprop_SatisfiesSimplicialIdentities2
+
+prop_AbsTet_Simpidents :: Property
+prop_AbsTet_Simpidents = polyprop_SatisfiesSimplicialIdentities3 AbsTet
+
+prop_TIndex_Simpidents :: TIndex -> Property
+prop_TIndex_Simpidents = polyprop_SatisfiesSimplicialIdentities3

@@ -9,7 +9,7 @@ module Simplicial.DeltaSet1(
     module Data.SumType,
     module Data.Tuple.Index,
 
-    DeltaSet1(..),
+    DeltaSet1,
     face10,
     AnySimplex1,
     OneSkeletonable(..),
@@ -18,11 +18,10 @@ module Simplicial.DeltaSet1(
     vertToAnySimplex1,
     edToAnySimplex1,
     anySimplex1s,
-    faces10Ascending,
     EdgesContainingVertex_Cache,
     lookupEdgesContainingVertex,
     mkECVC,
-    UnitInterval(..),
+--     UnitInterval(..),
     UnitIntervalPoint
     ) where
 
@@ -37,17 +36,14 @@ import Language.Haskell.TH.Lift
 import ShortShow
 import Data.Tuple.Index
 import MathUtil
-import Data.Tuple.OneTuple
 import FileLocation
 
 
-class (Vertices s, Edges s) => 
-    DeltaSet1 s where
+class (Vertices s, Edges s, Vertices (Ed s), Vert s ~ Vert (Ed s), Verts (Ed s) ~ Pair (Vert (Ed s))) => DeltaSet1 s where
 
-    faces10 :: s -> Ed s -> Pair (Vert s)
 
-face10 :: DeltaSet1 a => a -> Ed a -> Index2 -> Vert a
-face10 = (.) tupleToFun2 . faces10
+face10 :: (Vertices e, Verts e ~ (v, v)) => e -> Index2 -> v
+face10 = tupleToFun2 . vertices
 
 vertToAnySimplex1 :: v -> AnySimplex1 v e
 vertToAnySimplex1 = left'
@@ -71,10 +67,6 @@ foldAnySimplex1 = either'
 class OneSkeletonable a where
     oneSkeleton :: a -> a
 
-faces10Ascending
-  :: DeltaSet1 s =>
-     s -> Ed s -> (Pair (Vert s))
-faces10Ascending = fmap reverse2 . faces10
 
 newtype EdgesContainingVertex_Cache vert ed = 
     ECVC { lookupEdgesContainingVertex :: vert -> [(ed,Index2)] } 
@@ -87,7 +79,7 @@ mkECVC s = ECVC (flip $(indx) m)
                     . concatMap (\e -> 
                         asList 
                             (zipTuple2 
-                                (faces10 s e) 
+                                (vertices e) 
                                 (map2 ((:[]) . (e,)) allIndex2' )))
                     $ edgeList s
                 
@@ -111,15 +103,14 @@ instance (ShortShow v, ShortShow e) => ShortShow (AnySimplex1 v e) where
 
 deriveLiftMany [''AnySimplex1]
 
-data UnitInterval = UnitInterval
-
-instance Vertices UnitInterval where
-    type Verts UnitInterval = Pair UnitIntervalPoint
-    vertices UnitInterval = (1,0)
-
-instance Edges UnitInterval where
-    type Eds UnitInterval = OneTuple UnitInterval
-    edges UnitInterval = OneTuple UnitInterval
-
-instance DeltaSet1 UnitInterval where
-    faces10 _ _ = vertices UnitInterval 
+-- data UnitInterval = UnitInterval
+-- 
+-- instance Vertices UnitInterval where
+--     type Verts UnitInterval = Pair UnitIntervalPoint
+--     vertices UnitInterval = (0,1)
+-- 
+-- instance Edges UnitInterval where
+--     type Eds UnitInterval = OneTuple UnitInterval
+--     edges UnitInterval = OneTuple UnitInterval
+-- 
+-- instance DeltaSet1 UnitInterval where

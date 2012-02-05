@@ -61,6 +61,12 @@ tupleFromFun3 f = (f I3_0, f I3_1, f I3_2)
 tupleFromFun4 :: (Index4 -> t) -> (t, t, t, t)
 tupleFromFun4 f = (f I4_0, f I4_1, f I4_2, f I4_3)
 
+indexOf2' :: Eq a => a -> a -> a -> Maybe Index2
+indexOf2' a b x
+    | a == x = Just I2_0
+    | b == x = Just I2_1
+    | otherwise = Nothing
+
 indexOf3' :: Eq a => a -> a -> a -> a -> Maybe Index3
 indexOf3' a b c x
     | a == x = Just I3_0
@@ -75,6 +81,9 @@ indexOf4' a b c d x
     | c == x = Just I4_2
     | d == x = Just I4_3
     | otherwise = Nothing
+
+indexOf2 :: Eq a => (a, a) -> a -> Maybe Index2
+indexOf2 (a,b) = indexOf2' a b
 
 indexOf3 :: Eq a => (a, a, a) -> a -> Maybe Index3
 indexOf3 (a,b,c) = indexOf3' a b c

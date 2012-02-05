@@ -1,6 +1,7 @@
 {-# LANGUAGE FunctionalDependencies, DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, BangPatterns, TypeFamilies, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.Edge (
+    module Data.Tuple.Index,
     module Tetrahedron.Vertex,
 
     -- * Plain
@@ -51,6 +52,7 @@ import Data.Binary.Derive
 import Data.Function
 import Data.List as List
 import Data.Maybe
+import Data.Tuple.Index
 import Element
 import GHC.Generics(Generic)
 import HomogenousTuples

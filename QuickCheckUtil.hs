@@ -109,7 +109,8 @@ elementsV v = do
     i <- choose (0,VG.maxIndex v)
     return (v VG.! i)
 
-generateUntilRight :: Show a => Gen (Either a b) -> Gen b
+generateUntilRight
+  :: (Show (L a), SubSumTy a) => Gen a -> Gen (R a)
 generateUntilRight g = fromRight <$> (g `suchThat` isRight)
 
 generateUntilJust :: Gen (Maybe b) -> Gen b

@@ -28,12 +28,6 @@ module Tetrahedron.Triangle(
     isEdgeOfTriangle,
     triangleMemo,
 
-    -- ** Vertex indices
-    Index3(..),
-    triangleGetVertexAt,
-    triangleGetEdgeAt,
-    triangleGetIndexOf,
-
     -- * Ordered
     OTriangle,
     -- ** Properties
@@ -98,9 +92,9 @@ import Test.QuickCheck
 import Tetrahedron.Edge
 import Util
 import Data.Numbering
-import Data.Tuple.Index
 import Control.DeepSeq
 import Control.DeepSeq.TH
+import Simplicial.DeltaSet3
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
@@ -311,7 +305,7 @@ gedgesOfTriangle f t = map3 f ((v0,v1),(v1,v2),(v2,v0))
 
 gedgesOfTriangle_lex
   :: (Vertices t, Verts t ~ Triple v) => ((v, v) -> e) -> t -> Triple e
-gedgesOfTriangle_lex f t = map3 f ((v0,v1),(v2,v0),(v1,v2)) 
+gedgesOfTriangle_lex f t = map3 f ((v0,v1),(v0,v2),(v1,v2)) 
         where
             (v0,v1,v2) = vertices t 
 
@@ -329,6 +323,8 @@ oEdgesOfTriangle = gedgesOfTriangle verticesToOEdge
 instance Edges Triangle where
     type Eds Triangle = Triple Edge
     edges = edgesOfTriangle 
+
+instance SatisfiesSimplicialIdentities2 Triangle
 
 -- | = 'verticesOfTriangle'
 instance Vertices Triangle where
@@ -386,6 +382,7 @@ instance Edges ITriangle where
     type Eds ITriangle = Triple IEdge
     edges (viewI -> I i t) = map3 (i ./) (edges t)
 
+instance SatisfiesSimplicialIdentities2 ITriangle
 
 -- | Triangles containing a given vertex
 trianglesContainingVertex
@@ -436,22 +433,13 @@ instance Triangles TIndex where
     type Tris TIndex = Quadruple ITriangle
     triangles z = map4 (z ./) allTriangles'
 
+instance SatisfiesSimplicialIdentities3 TIndex
 
 instance OEdges OTriangle where
     type OEds OTriangle = Triple OEdge
     oedges (vertices -> (v0,v1,v2)) = (oedge (v0,v1), oedge (v1,v2), oedge(v2,v0)) 
 
 
-triangleGetEdgeAt :: Triangle -> Index3 -> Edge
-triangleGetEdgeAt t vi = edgeByOppositeVertexAndTriangle (triangleGetVertexAt t vi) t
-
-triangleGetVertexAt
-  :: (Vertices t, Verts t ~ Triple v) => t -> Index3 -> v
-triangleGetVertexAt = tupleToFun3 . vertices 
-
-triangleGetIndexOf
-  :: (Eq v, Vertices t, Verts t ~ Triple v) => t -> v -> Maybe Index3
-triangleGetIndexOf = indexOf3 . vertices
 
 -- | 'getTIndex's must be equal
 oiTriangleByVertices

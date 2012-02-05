@@ -162,3 +162,5 @@ prop_partialCanonicalPart_commute (TriangulationWithUnrestrictedStandardCoords t
 
 
 --prop_quad_admissible_no_change 
+
+

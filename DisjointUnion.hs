@@ -227,15 +227,23 @@ instance (AsList as, AsList bs) => AsList (DJSimpsH as bs) where
 -- 
 -- #undef F
 
-instance (Vertices a, Vertices b) => Vertices (DJSimp a b) where
-    type Verts (DJSimp a b) = DJSimpsH (Verts a) (Verts b) 
+instance (EdgeLike a, EdgeLike b) => Vertices (DJSimp a b) where
+    type Verts (DJSimp a b) = Pair (DJSimp (Vert a) (Vert b))
 
-    vertices = vertices ++++ vertices
--- 
--- instance (Edges a, Edges b) => Edges (DJSimp a b) where
---     type Eds (DJSimp a b) = DJSimpsH (Eds a) (Eds b) 
--- 
---     edges = edges ++++ edges
+    vertices =   (map2 left' . vertices) |||| 
+                 (map2 right' . vertices)
+
+instance (TriangleLike a, TriangleLike b) => Edges (DJSimp a b) where
+    type Eds (DJSimp a b) = Triple (DJSimp (Ed a) (Ed b))
+
+    edges = (map3 left' . edges) |||| 
+            (map3 right' . edges)
+
+instance (TetrahedronLike a, TetrahedronLike b) => Triangles (DJSimp a b) where
+    type Tris (DJSimp a b) = Quadruple (DJSimp (Tri a) (Tri b))
+
+    triangles = (map4 left' . triangles) |||| 
+                (map4 right' . triangles)
 
 
 
