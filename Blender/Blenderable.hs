@@ -1,6 +1,6 @@
-{-# LANGUAGE TemplateHaskell, FunctionalDependencies, StandaloneDeriving, FlexibleContexts, FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns, RecordWildCards #-}
+{-# LANGUAGE CPP, TemplateHaskell, FunctionalDependencies, StandaloneDeriving, FlexibleContexts, FlexibleInstances, DeriveGeneric, ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, TypeOperators, MultiParamTypeClasses, GADTs, TypeFamilies, NamedFieldPuns, RecordWildCards #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module Blender.Blenderable where
 
 import ConcreteNormal.PreRenderable
@@ -10,42 +10,42 @@ import Data.Lens.Common
 import Data.Lens.Template
 import Data.List
 import GHC.Generics
-import Language.Haskell.TH.Lift
-import Prelude hiding(catch,mapM_,sequence_) 
+import Prelude hiding(catch)
 import PrettyUtil
 import THUtil
 import ToPython
 import Util
+import Language.Haskell.TH.Lift
+import qualified Data.Foldable as Fold
+import Data.Foldable(Foldable)
+import Blender.Types
+import Data.Maybe
 
-type MatName = String
+bpy_ops ::  String -> Python ()
+bpy_ops x = py "ops" <.> x
+bpy_dat ::  String -> Python ()
+bpy_dat x = py "data" <.> x
 
-type MatProp = (String,Python ())
-type Props = [MatProp]
+bpy_props ::  Python ()
+bpy_props = py "props"
+bpy_types ::  String -> Python ()
+bpy_types x = py "types" <.> x
 
-data TransparencySettings = Trans {
-    _alpha :: Double,
-    _spec_alpha :: Double,
-    _fresnel :: Double
-}
-    deriving Show
 
-data Material = Material {
-    ma_name :: MatName,
-    ma_props :: Props,
-    ma_transparency :: Maybe TransparencySettings
-}
-    deriving Show
 
-nameMakeLens ''Material (Just . (++"L"))
 
-type BlenderGroupName = String
-
+triangleUVLayerName :: UVLayerName
+triangleUVLayerName = "Triangle UV from hs"
+                                           
 data BaFaceInfo = BaFaceInfo {
     faceMat :: Material,
-    bfi_groups :: [BlenderGroupName]
+    bfi_groups :: [BlenderGroup],
+    bfi_labelMat :: Maybe Material,
+    bfi_helpLineMat :: Maybe Material
 }
 
 nameMakeLens ''BaFaceInfo (Just . (++"L"))
+
 
 
 data Blenderable s = Blenderable { 
@@ -81,18 +81,6 @@ instance Coords (Blenderable s) where
 
 
 
-type EulerAnglesXYZ = Vec3
-
-eulerAnglesXYZ :: Double -> Double -> Double -> EulerAnglesXYZ
-eulerAnglesXYZ = Vec3
-
-data Cam = Cam {
-    cam_pos :: Vec3,
-    -- | XYZ eulers
-    cam_eulers :: EulerAnglesXYZ,
-    cam_FOV :: Double
-}
-    deriving(Show)
 
 data Scene s = Scene {
     scene_blenderable :: Blenderable s,
@@ -105,45 +93,11 @@ data Scene s = Scene {
 nameMakeLens ''Scene (Just . (++"L"))
 
 
-
-defaultFOV :: Double
-defaultFOV = 0.8575560591178853
-
-setCams :: [Cam] -> Scene s -> Scene s
-setCams = setL scene_camsL
-
-setCam :: Cam -> Scene s -> Scene s
-setCam = setCams . return
                         
 setInitialSelection :: AnySimplex2Of s -> Scene s -> Scene s
 setInitialSelection = setL scene_initialSelectionL . Just
 
-diffuseColor :: Triple Double -> MatProp
-diffuseColor rgb = "diffuse_color" & rgb
 
-
-
-
-specular :: 
-       Int -- ^ [1,511]
-    -> Double -- ^ [0,1]
-    -> Props
-specular hardness intensity = ["specular_hardness" & hardness,
-                               "specular_intensity" & intensity]
-
-transparency :: TransparencySettings -> [([Char], Python ())]
-transparency Trans{..} =
-                [
-                "use_transparency" & True,
-                "transparency_method" & str "RAYTRACE",
-                -- "transparency_method" & "'Z_TRANSPARENCY'",
-                "alpha" & (_alpha),
-                "specular_alpha" & (_spec_alpha),
-                "translucency" & (1-_alpha),
-                "raytrace_transparency.fresnel_factor" & (1::Int),
-                "raytrace_transparency.fresnel" & (_fresnel),
-                "raytrace_transparency.depth" & (15::Int)
-                ]
 
 
 
@@ -175,8 +129,6 @@ defaultScene0 s = Scene {
 defaultCam :: Cam
 defaultCam = Cam (Vec3 0.66 (-2.3) 0.52) (eulerAnglesXYZ (pi/2) 0 0) defaultFOV
 
-(&) :: ToPython s => t -> s -> (t, Python ())
-x & y = (x, toPython y)
 
 defaultWorldProps :: Props
 defaultWorldProps = ["use_sky_blend" & False,
@@ -186,12 +138,6 @@ defaultWorldProps = ["use_sky_blend" & False,
 
 
 
-instance DisjointUnionable [Material] [Material] [Material] () () () where
-    disjointUnionWithInjs ma ma' =
-
-        DisjointUnion 
-            (nubBy ((==) `on` ma_name) (ma++ma'))
-            () () ()
 
 
 instance 
@@ -237,6 +183,13 @@ instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
 
 deriving instance (Show (AnySimplex2Of s), Show (Blenderable s)) => Show (Scene s)
 
+setCams :: [Cam] -> Scene s -> Scene s
+setCams = setL scene_camsL
+
+setCam :: Cam -> Scene s -> Scene s
+setCam = setCams . return
+
+
 
 
 -- | = @uncurry 'fromSpqwcAndIntegerNormalSurface'@
@@ -248,13 +201,14 @@ deriving instance (Show (AnySimplex2Of s), Show (Blenderable s)) => Show (Scene 
 ba_triangleLabel :: Blenderable s -> Tri s -> Maybe TriangleLabel
 ba_triangleLabel = fmap fst . ba_pr_triangleInfo 
 
-ba_triangleEmbedding :: DeltaSet2 s => Blenderable s -> Tri s -> TriangleEmbedding
+ba_triangleEmbedding :: PreDeltaSet2 s => Blenderable s -> Tri s -> TriangleEmbedding
 ba_triangleEmbedding = pr_triangleEmbedding . ba_pr
 
 ba_edgeEmbedding
-  :: (Pretty (Element (Eds s)),
-      Pretty (Element (Tris s)),
-      DeltaSet2 s) =>
+  :: (Show (Element (Eds s)),
+      Show (Element (Tris s)),
+      Show (Vert s),
+      PreDeltaSet2 s) =>
      Blenderable s
      -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
      -> Ed s
@@ -262,9 +216,10 @@ ba_edgeEmbedding
 ba_edgeEmbedding = pr_edgeEmbedding . ba_pr
 
 ba_coords
-  :: (Pretty (Element (Eds s)),
-      Pretty (Element (Tris s)),
-      DeltaSet2 s) =>
+  :: (Show (Element (Eds s)),
+      Show (Element (Tris s)),
+      Show (Vert s),
+      PreDeltaSet2 s) =>
      Blenderable s
      -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
      -> EdgesContainingVertex_Cache (Vert s) (Ed s)
@@ -281,17 +236,12 @@ ba_visibility = pr_visibility . ba_pr
 ba_faceMat :: Blenderable s -> AnySimplex2Of s -> Material
 ba_faceMat = fmap faceMat . ba_faceInfo
 
--- | Read the result of printing @(cam.location,cam.rotation_euler,cam.data.angle)@ in Blender-python
-readCam :: String -> Cam
-readCam s = 
-    case parseFloatLiterals s of
-         [a,b,c,d,e,f,g] -> Cam (Vec3 a b c) (Vec3 d e f) g 
-         r -> error ("readCam: no parse "++ $(showExps ['s,'r]))
 
 
+#ifdef DERIVE_LIFT
 deriveLiftMany [''TransparencySettings,''Material,''BaFaceInfo]
 
-instance (DeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
+instance (PreDeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
             , Lift (Vert s), Lift (Ed s), Lift (Tri s)) => 
 
             Lift (Blenderable s) where
@@ -306,6 +256,7 @@ instance (DeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
 
 
         where ds = pr_ds ba_pr
+#endif
 
 ba_ds :: Blenderable s -> s
 ba_ds = pr_ds . ba_pr
@@ -316,11 +267,6 @@ ba_allFaceInfos
      Blenderable s -> [BaFaceInfo]
 ba_allFaceInfos ba = map (ba_faceInfo ba) (anySimplex2s (ba_ds ba))
 
-ba_uniqueGroups :: (Vertices s, Triangles s, Edges s) =>
-     Blenderable s -> [BlenderGroupName]
-ba_uniqueGroups = nub' . concatMap bfi_groups . ba_allFaceInfos 
 
-ba_uniqueMaterials
-  :: (Vertices s, Triangles s, Edges s) =>
-     Blenderable s -> [Material]
-ba_uniqueMaterials = nubOn ma_name . map faceMat . ba_allFaceInfos
+
+

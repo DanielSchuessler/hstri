@@ -125,7 +125,7 @@ instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
     gluingMap glu (Corn i n v1 v2) = (corn i n `on` gluingMap glu) v1 v2
 
 
-isRegardedAsSimplexByDisjointUnionDeriving (conT ''Corn `appT` varT (mkName "v"))
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 (conT ''Corn `appT` varT (mkName "v"))
 
 instance Lift v => Lift (Corn v) where 
     lift (Corn a b c d) =

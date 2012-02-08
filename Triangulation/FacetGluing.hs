@@ -21,6 +21,9 @@ type Gluing = (ITriangle,OITriangle)
 gluing :: ITriangle -> OITriangle -> Gluing
 gluing = (,)
 
+gluing' :: ITriangle -> ITriangle -> Gluing
+gluing' t = gluing t . toOrderedFace
+
 -- class GluingSpec a where
 --     type TetIndex a
 --     toGluing :: (TetIndex a -> TIndex) -> a -> Gluing

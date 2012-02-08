@@ -1,39 +1,52 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, CPP, NoMonomorphismRestriction, FlexibleInstances, FunctionalDependencies, DeriveDataTypeable, TypeFamilies, TemplateHaskell, DeriveGeneric, DeriveFoldable #-}
+{-# LANGUAGE TupleSections, ScopedTypeVariables, GeneralizedNewtypeDeriving, CPP, NoMonomorphismRestriction, FlexibleInstances, FunctionalDependencies, DeriveDataTypeable, TypeFamilies, TemplateHaskell, DeriveGeneric, DeriveFoldable #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 -- | Description:  Strictly ascending tuples
 module Data.AscTuples where
 
-import Control.Arrow
+import Control.Applicative
 import Control.Monad
+import Data.Maybe
+import Data.Tuple.Index
 import Data.Typeable
+import DisjointUnion
+import EitherC
 import Element
+import FaceClasses
 import HomogenousTuples
 import Language.Haskell.TH
-import PrettyUtil
+import Language.Haskell.TH.Lift
 import Math.Groups.S3
+import PrettyUtil
+import QuickCheckUtil
 import ShortShow
+import Simplicial.DeltaSet3
+import THUtil
+import Test.QuickCheck
 import TupleTH
 import Util
 import qualified Data.Foldable as Fold
-import DisjointUnion
-import FaceClasses
-import Language.Haskell.TH.Lift
-import Data.Tuple.Index
-import Data.Maybe
-import Simplicial.DeltaSet3
-import EitherC
-import Control.Exception
-import Test.QuickCheck
-import QuickCheckUtil
-import Control.Applicative
 
 #define DEBUG
 
-class (AsList asc, AsList tup, Element asc ~ Element tup) => 
-    AscTuple tup asc | tup -> asc, asc -> tup where
+class AscTuple1 asc where
+    mapAscTotal :: Ord b => (a -> b) -> asc a -> EitherC LErrorCall (asc b)
 
-    asc :: tup -> asc
-    unAsc :: asc -> tup
+    mapAscMonotonicTotal :: Ord b => (a -> b) -> asc a -> EitherC LErrorCall (asc b)
+    mapAscMonotonicTotal = mapAscTotal
+
+
+mapAsc :: (AscTuple1 asc, Ord b) => (a -> b) -> asc a -> asc b
+mapAsc f = $unEitherC . mapAscTotal f
+
+mapAscMonotonic :: (AscTuple1 asc, Ord b) => (a -> b) -> asc a -> asc b
+mapAscMonotonic f = $unEitherC . mapAscMonotonicTotal f 
+
+class (AscTuple1 asc, AsList (asc a), AsList tup, Element (asc a) ~ a, Element tup ~ a) => 
+    AscTuple tup asc a | tup -> asc a, asc a -> tup where
+
+    asc :: tup -> asc a
+    ascTotal :: tup -> EitherC LErrorCall (asc a)
+    unAsc :: asc a -> tup
 
     -- | Does not check orderedness
     unsafeAsc :: 
@@ -41,7 +54,9 @@ class (AsList asc, AsList tup, Element asc ~ Element tup) =>
         (Show tup) => 
 #endif
     
-        tup -> asc
+        tup -> asc a
+
+
 
 $(flip concatMapM [2,3,4] (\i -> do
 
@@ -49,9 +64,19 @@ $(flip concatMapM [2,3,4] (\i -> do
         ctorName = mkName ("UnsafeAsc"++show i)
         asciTy = conT asciName
         asciTy_a = asciTy `appT` aTy 
+        tupTy_a = htuple i aTy
 
         aName = mkName "a"
         aTy = varT aName
+
+        unAsciName = mkName ("unAsc"++show i)
+
+        smartCtorTotalName = mkName ("asc"++show i++"total")
+        smartCtorName = mkName ("asc"++show i)
+
+        forall_a = forallT [PlainTV aName]
+        ord_a = classP ''Ord [aTy]
+
 
     sequence 
      [
@@ -59,25 +84,54 @@ $(flip concatMapM [2,3,4] (\i -> do
             (cxt [])
             asciName
             [PlainTV aName]
-            (normalC ctorName [(strictType notStrict 
-                                    (htuple i aTy))])
+            (normalC ctorName [strictType notStrict tupTy_a])
             [''Show,''Eq,''Ord,''Typeable,''Fold.Foldable,''ShortShow,''Pretty]
+
+     , sigD  unAsciName (forall_a (cxt[]) [t| $asciTy_a -> $tupTy_a |]) 
+     , svalD unAsciName (getFieldE ctorName 1 0)
+
+     , sigD  smartCtorTotalName (forall_a (cxt[ord_a]) [t| $tupTy_a -> EitherC LErrorCall $asciTy_a |]) 
+     , svalD smartCtorTotalName [|
+            \as -> let as' = $(sortTuple i) as
+                   in
+                            case $(findSuccessiveElementsSatisfying i) (>=) as' of
+                                 Nothing -> return ($(conE ctorName) as')
+                                 Just _ -> $failureStr 
+                                                (  $(lift (nameBase smartCtorTotalName))
+                                                    ++": Elements not distinct")
+
+         |]
+
+     , sigD  smartCtorName (forall_a (cxt[ord_a]) [t| $tupTy_a -> $asciTy_a |]) 
+     , svalD smartCtorName [| $unEitherC . $(varE smartCtorTotalName) |]
 
      , tySynInstD ''Element [asciTy_a] aTy 
 
      , instanceD (cxt[]) 
-            (conT ''AsList `appT` asciTy_a)
-            [valD (varP 'asList) (normalB (varE 'Fold.toList)) []]
+            (''AsList `sappT` asciTy_a)
+            [ svalD 'asList 'Fold.toList]
+
+     , instanceD (cxt [])
+            (''AscTuple1 `sappT` asciTy)
+            [ svalD 'mapAscTotal 
+                [| \f -> 
+                        $(varE smartCtorTotalName) 
+                        . $(mapTuple' i (varE 'f)) 
+                        . $(varE unAsciName) 
+                |]
+            ]
 
      , instanceD 
             (cxt [classP ''Ord [aTy]]) 
-            (conT ''AscTuple `appT` (htuple i aTy) `appT` asciTy_a)
+            (''AscTuple `sappT` tupTy_a `appT` asciTy `appT` aTy)
 
-            [valD (varP 'asc) (normalB (varE . mkName $ "asc"++show i)) []
+            [svalD 'asc ((varE . mkName $ "asc"++show i))
 
-            ,valD (varP 'unAsc) (normalB (varE . mkName $ "unAsc"++show i)) []
+            ,svalD 'ascTotal smartCtorTotalName
 
-            ,valD (varP 'unsafeAsc) (normalB 
+            ,svalD 'unAsc unAsciName
+
+            ,svalD 'unsafeAsc (
                 
                 [| \xs ->
                         let 
@@ -92,7 +146,7 @@ $(flip concatMapM [2,3,4] (\i -> do
                                 |]
                 
                 
-                ) []
+                )
             ] 
 
      ])
@@ -102,60 +156,33 @@ $(flip concatMapM [2,3,4] (\i -> do
     )
 
 
-asc2total :: Ord a => (Pair a) -> EitherC (Located ErrorCall) (Asc2 a)
-asc2total as = case sort2 as of
-                as'@(a',b') | a' < b' -> return $ UnsafeAsc2 as'
-                            | otherwise -> $failureStr ("asc2: arguments equal")
-
-
-asc3total :: Ord a => (Triple a) -> EitherC (Located ErrorCall) (Asc3 a)
-asc3total as = case sort3 as of
-                as'@(a',b',c') 
-                    | a' >= b' -> $failureStr ("asc3: smallest two arguments equal")
-                    | b' >= c' -> $failureStr ("asc3: largest two arguments equal")
-                    | otherwise -> return $ UnsafeAsc3 as'
-
-asc4total :: Ord a => (Quadruple a) -> EitherC (Located ErrorCall) (Asc4 a)
-asc4total as = case sort4 as of
-                as'@(a',b',c',d') 
-                    | a' >= b' -> $failureStr ("asc4: smallest two arguments equal")
-                    | b' >= c' -> $failureStr ("asc4: arguments not pairwise distinct")
-                    | c' >= d' -> $failureStr ("asc4: largest two arguments equal")
-                    | otherwise -> return $ UnsafeAsc4 as'
-
-asc2 :: Ord a => (Pair a) -> Asc2 a
-asc2 = $unEitherC . asc2total
-asc3 :: Ord a => (Triple a) -> Asc3 a
-asc3 = $unEitherC . asc3total
-asc4 :: Ord a => (Quadruple a) -> Asc4 a
-asc4 = $unEitherC . asc4total
-
-
-unAsc2 :: Asc2 t -> Pair t
-unAsc3 :: Asc3 t -> Triple t
-unAsc4 :: Asc4 t -> Quadruple t
-
-unAsc2 (UnsafeAsc2 as) = as
-unAsc3 (UnsafeAsc3 as) = as
-unAsc4 (UnsafeAsc4 as) = as
 
 -- | Lexicographical order
 subtuplesAsc3_2 :: (Ord t1, Show t1) => Asc3 t1 -> Asc3 (Asc2 t1)
-subtuplesAsc3_2 = unsafeAsc . map3 unsafeAsc . $(subtuples 3 2) . unAsc
+subtuplesAsc3_2 = unsafeAsc . map3 unsafeAsc . subtuples3_2 . unAsc
 
 -- | Lexicographical order
 subtuplesAsc4_3 :: (Ord t, Show t) => Asc4 t -> Asc4 (Asc3 t)
-subtuplesAsc4_3 = unsafeAsc . map4 unsafeAsc . $(subtuples 4 3) . unAsc
+subtuplesAsc4_3 = unsafeAsc . map4 unsafeAsc . subtuples4_3 . unAsc
 
 
 sort3WithPermutation'
-  :: (Ord t, Show t) => (t, t, t) -> (Asc3 t, S3)
-sort3WithPermutation' = first unsafeAsc . sort3WithPermutation
+  :: (Ord a, Show a) => (a, a, a) -> EitherC LErrorCall (Asc3 a,S3)
+sort3WithPermutation' xs = 
+    let (xs',g) = sort3WithPermutation xs 
+    in
+        (,g) <$>
+
+        $(wrapFailureStr) 
+            ("sort3WithPermutation': Args not distinct: "++show xs) 
+            (asc3total xs')
 
 
-isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc2 `appT` varT (mkName "v"))
-isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc3 `appT` varT (mkName "v"))
-isRegardedAsSimplexByDisjointUnionDeriving (conT ''Asc4 `appT` varT (mkName "v"))
+$(flip concatMapM [2,3,4] (\i ->
+    isRegardedAsSimplexByDisjointUnionDeriving 
+        (dimTName (i-1)) 
+        (("Asc"++show i) `sappT` "v")
+    ))
 
 instance Vertices (Asc2 v) where
     type Verts (Asc2 v) = Pair v
@@ -172,6 +199,10 @@ instance Vertices (Asc4 v) where
 instance Edges (Asc3 v) where
     type Eds (Asc3 v) = Triple (Asc2 v)
     edges = map3 UnsafeAsc2 . $(subtuples 3 2) . unAsc3
+
+instance Edges (Asc4 v) where
+    type Eds (Asc4 v) = Sextuple (Asc2 v)
+    edges = map6 UnsafeAsc2 . $(subtuples 4 2) . unAsc4
 
 instance Triangles (Asc4 v) where
     type Tris (Asc4 v) = Quadruple (Asc3 v)

@@ -6,10 +6,10 @@ import Data.Monoid
 import Data.Proxy
 import QuickCheckUtil
 import Test.QuickCheck
-import Data.Semigroup
+import Data.Semigroup as Semi
 
 (.*.) ::  Semigroup a => a -> a -> a
-(.*.) = (<>)
+(.*.) = (Semi.<>)
 infixr 7 .*.
 
 polyprop_idl :: (Eq a, Show a, Monoid a, Semigroup a) => a -> Property
@@ -79,6 +79,20 @@ polyprop_lact_id p x = (mempty `asProxyTypeOf` p) .* x .=. x
 polyprop_lact_mult :: (Eq a, Show a, Semigroup g, LeftAction g a) =>g -> g -> a -> Property
 polyprop_lact_mult g2 g1 x = (g2 .*. g1) .* x .=. g2 .* g1 .* x
 
+polyprop_lact
+  :: (Eq a,
+      Show g,
+      Show a,
+      Monoid g,
+      Semigroup g,
+      Arbitrary g,
+      Arbitrary a,
+      LeftAction g a) =>
+     Proxy (g, a) -> Property
+polyprop_lact (p :: Proxy (g,a)) = 
+    (\(a::a) -> polyprop_lact_id (fmap fst p) a) .&.
+    (\(g2::g) g1 (a::a) -> polyprop_lact_mult g2 g1 a)
+
 -- We need a type-level tag here because the monoid isn't inferrable from the acted-upon type
 polyprop_ract_id
   :: (Eq a, Show a, Semigroup g, Monoid g, RightAction g a) =>
@@ -90,6 +104,19 @@ polyprop_ract_mult :: (Eq a, Show a, Semigroup g, RightAction g a) =>g -> g -> a
 polyprop_ract_mult g1 g2 x = x *. (g1 .*. g2) .=. x *. g1 *. g2
 
 
+polyprop_ract
+  :: (Eq a,
+      Show g,
+      Show a,
+      Monoid g,
+      Semigroup g,
+      Arbitrary g,
+      Arbitrary a,
+      RightAction g a) =>
+     Proxy (a, g) -> Property
+polyprop_ract (p :: Proxy (a,g)) = 
+    (\(a::a) -> polyprop_ract_id (fmap snd p) a) .&.
+    (\(g2::g) g1 (a::a) -> polyprop_ract_mult g2 g1 a)
 
 
 isMonoidHomo :: (Eq a1,Show a,Show a1,Monoid a,Monoid a1,Arbitrary a,Semigroup a,Semigroup a1) =>(a -> a1) -> Property

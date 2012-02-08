@@ -19,7 +19,7 @@ import Control.Arrow(first)
 import Data.Function
 import Data.List(intercalate,sort,sortBy,groupBy)
 import Data.Maybe(mapMaybe)
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import Data.Ord
 import Data.Ratio
 import Data.Semigroup
@@ -219,7 +219,7 @@ briefDiscType =
         (toLatex . fst . iNormalQuadGetDisjointEdges)
     . iNormalDisc
 
-zeroAsBlank :: (Num a, Latexable a) => a -> Latex
+zeroAsBlank :: (Eq a, Num a, Latexable a) => a -> Latex
 zeroAsBlank x = if x == 0
                           then mempty
                           else mathmode (toLatex x)
@@ -328,13 +328,12 @@ runPdfLatexSilent texfile = do
 
 
 quad_latex
-  :: (Num a, Latexable a) =>
+  :: (Eq a, Num a, Latexable a) =>
      Triangulation -> QuadCoordinates a -> Latex
 quad_latex tr qc = 
     case quad_toDenseList tr qc of
          lst -> latexEnv "pmatrix" (amps . fmap toLatex $ lst)
 
 
-runOkularAsync pdffile =
-                 rawSystemS "zsh" ["-c", "okular $1 &", "arg0", pdffile]
+runOkularAsync pdffile = rawSystemAsyncS "okular" [pdffile]
 

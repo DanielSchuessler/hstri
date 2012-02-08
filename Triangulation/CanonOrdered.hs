@@ -22,11 +22,12 @@ import Triangulation.FacetGluing
 import QuickCheckUtil
 import Data.Proxy
 import Triangulation
+import ShortShow
 
 
 
 newtype CanonOrdered a = UnsafeCanonOrdered { unCanonOrdered :: a }
-    deriving(Show,Eq,Ord,TriangulationDSnakeItem,Pretty )
+    deriving(Show,Eq,Ord,TriangulationDSnakeItem,Pretty,ShortShow)
 
 type COITriangle = CanonOrdered OITriangle
 type COIEdge = CanonOrdered OIEdge

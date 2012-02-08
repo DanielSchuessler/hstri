@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections, BangPatterns, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, MagicHash, Rank2Types, TypeSynonymInstances, ExistentialQuantification, NamedFieldPuns, RecordWildCards, ScopedTypeVariables, ViewPatterns, CPP, EmptyDataDecls, DeriveFunctor #-}
 -- {-# OPTIONS -ddump-splices #-}
-{-# OPTIONS -Wall -fno-warn-orphans #-}
+{-# OPTIONS -Wall -fno-warn-orphans -fno-warn-missing-signatures #-}
 module TriangulationCxtObject(
     module Element,
     module Triangulation,
@@ -96,12 +96,13 @@ import Data.Maybe
 import Element
 import Equivalence
 import HomogenousTuples
-import Tetrahedron.INormalDisc
 import Prelude hiding(catch)
 import PrettyUtil
 import Quote
 import ShortShow
+import Simplicial.DeltaSet3
 import Tetrahedron
+import Tetrahedron.INormalDisc
 import Tetrahedron.NormalDisc
 import Triangulation
 import Triangulation.CanonOrdered
@@ -330,12 +331,16 @@ instance Show TNormalDisc where showsPrec = prettyShowsPrec
 
 instance ShortShow TVertex where 
     shortShow = shortShowAsSet
+instance ShortShow TEdge where 
+    shortShow = shortShowAsSet
+instance ShortShow TTriangle where 
+    shortShow = shortShowAsSet
 
 instance  Pretty TVertex where
     pretty = prettyListAsSet . preimageList
 
 instance  Pretty TEdge where
-    pretty = prettyListAsSet . preimageList
+    pretty x = prettyListAsSet (eqvEquivalents (iEdgeEqv (getTriangulation x)) (unT x))
 
 instance  Pretty TTriangle where
     pretty = prettyListAsSet . preimageList
@@ -399,6 +404,11 @@ isSubface_VE x y = any2 (\x' -> x == p x') (vertices y)
     where
         p = pMap (getTriangulation x)
 
+isSubface_VT :: TVertex -> ITriangle -> Bool
+isSubface_VT x y = any3 (\x' -> x == p x') (vertices y)
+    where
+        p = pMap (getTriangulation x)
+
 isSubface_ET ::  TEdge -> ITriangle -> Bool
 isSubface_ET x y = any3 (\x' -> x == p x') (edges y)
     where
@@ -410,8 +420,12 @@ isSubface_TTet t x i  = any (`isSubface` i) (eqvTriangles t x :: [ITriangle])
 instance  IsSubface TVertex TEdge where
     isSubface x y = isSubface_VE x (unT y)
 
+instance  IsSubface TVertex TTriangle where
+    isSubface x y = isSubface_VT x (unT y)
+
 instance  IsSubface TEdge TTriangle where
     isSubface x y = isSubface_ET x (unT y)
+
 
 instance IsSubface TTriangle TIndex where
     isSubface x i = isSubface_TTet (getTriangulation x) (unT x) i
@@ -436,21 +450,31 @@ eqvTriangles t x = x : case M.lookup x (tGlueMap_ t) of
 -- instance CanonicalRep TIndex TIndex where canonicalRep = getTIndex
 
 
+mbsort2 = id
+mbsort3 = id
+mbsort4 = id
 
 tVerticesOfIEdge :: Triangulation -> IEdge -> Pair TVertex
-tVerticesOfIEdge t rep = map2 (pMap t) (vertices rep)
+tVerticesOfIEdge t rep = mbsort2 $ map2 (pMap t) (vertices rep)
 
 instance Vertices TEdge where 
     type Verts TEdge = Pair TVertex
     vertices e = tVerticesOfIEdge (getTriangulation e) (unT e)
 
+instance Vertices TTriangle where
+    type Verts TTriangle = Triple TVertex
+    vertices t = mbsort3 . map3 (pMap (getTriangulation t)) . vertices . unT $ t 
+--     vertices = defaultVerticesOfTri
+
+-- instance SatisfiesSimplicialIdentities2 TTriangle
+
 instance Edges TTriangle  where 
     type Eds TTriangle = Triple (TEdge)
-    edges (UnsafeMakeT t rep) = map3 (pMap t) (edges rep)
+    edges (UnsafeMakeT t rep) = mbsort3 $ map3 (pMap t) (edges rep)
 
 instance Triangles (Triangulation, TIndex)  where
     type Tris (Triangulation,TIndex) = Quadruple (TTriangle)
-    triangles (t,i) = map4 (pMap t) (triangles i)
+    triangles (t,i) = mbsort4 $ map4 (pMap t) (triangles i)
 
 
 
@@ -609,3 +633,12 @@ instance Pretty Triangulation where
 instance Show Triangulation where
     showsPrec = prettyShowsPrec 
 
+
+instance DeltaSet1 Triangulation
+-- instance DeltaSet2 Triangulation
+
+instance (TriangulationDSnakeItem a, Quote a) => Quote (T a) where
+    quotePrec prec x = 
+        quoteParen (prec >= 10)
+            ("pMap "++quotePrec 11 (getTriangulation x)++" "
+                    ++quotePrec 11 (unT x))

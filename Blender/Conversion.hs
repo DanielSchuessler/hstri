@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, RecordWildCards, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, FlexibleContexts, TypeFamilies, NoMonomorphismRestriction #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-unused-binds #-}
 module Blender.Conversion(
     module ConcreteNormal.PreRenderable,
 
@@ -24,22 +24,24 @@ module Blender.Conversion(
     ) where
 
 import Blender.Blenderable
+import Blender.Types
 import ConcreteNormal.PreRenderable
+import Control.Category((>>>))
 import Data.Function
+import Data.Lens.Common
 import Data.List
 import NormalEverything
 import Prelude hiding(catch,mapM_,sequence_) 
 import PrettyUtil
 import ShortShow
 import StandardCoordinates.MatchingEquations
-import Data.Lens.Common
-import Control.Category((>>>))
 
 data Style = Style {
-    mat0, mat1, mat2 :: Material,
-    vertexThickness :: Double,
+    mat0, mat1, mat2, mat2curved :: Material,
+    style_vertexThickness :: Double,
     -- | Blender groups to which all objects having this style should be added
-    style_groups :: [BlenderGroupName]
+    style_groups :: [BlenderGroup],
+    style_helpLineMat :: Material
 }
 
 mkBlenderable
@@ -52,26 +54,66 @@ mkBlenderable Style{..} pr_ = Blenderable {
 
     ba_faceInfo = \asi ->
         BaFaceInfo {
-            faceMat = foldAnySimplex2 (const mat0) (const mat1) (const mat2) asi,
-            bfi_groups = style_groups 
+            faceMat = 
+                foldAnySimplex2 
+                    (const mat0) 
+                    (const mat1) 
+                    (\t -> case getL pr_generalTriangleEmbeddingL pr_ t of
+                                Nothing -> mat2
+                                _ -> mat2curved) 
+                    asi,
+            bfi_groups = style_groups,
+            bfi_labelMat = Just triLabelMat,
+            bfi_helpLineMat = Just style_helpLineMat
         },
 
-    ba_vertexThickness = const vertexThickness,
-    ba_edgeThickness = const (edgeThicknessFactor*vertexThickness)
+    ba_vertexThickness = const style_vertexThickness,
+    ba_edgeThickness = const (edgeThicknessFactor*style_vertexThickness)
 
 }
 
 
 
+triTriTexture :: Texture
+triTriTexture = ImgTex {
+    tex_name = "TriTri20",
+    imgtex_img = BImg {
+        bimg_name = "TriTri20",
+        bimg_filepath = "/h/dev/hstri/textures/TriTri20.png"
+    }
+}
+
+triTriTextureSlot :: MaterialTextureSlot
+triTriTextureSlot = MTS {
+    mts_uv_layer = triangleUVLayerName,
+    mts_tex = triTriTexture,
+    mts_props = []
+}
+
+
+threeMFGroup :: BlenderGroup
+threeMFGroup = BlenderGroup "ThreeMF"
 
 pseudomanifoldStyle :: Style
-pseudomanifoldStyle = Style 
-    (Material "pmMat0" (let r=0.3 in diffuseColor (r, r, r):[]) Nothing)
-    (Material "pmMat1" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8) Nothing)
-    (Material "pmMat2" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8) 
-        (Just (Trans 0.25 0.3 1)))
-    pmVertThickness  
-    ["ThreeMF"]
+pseudomanifoldStyle = Style {
+    mat0 = (basicMaterial "pmMat0" (let r=0.3 in diffuseColor (r, r, r):[])),
+    mat1 = mat1,
+    mat2 = mat2,
+    mat2curved = mat2,
+    --(mat2 { ma_name = "pmMat2curved",  ma_textureSlots = [ triTriTextureSlot ] }) 
+    style_vertexThickness = pmVertThickness,
+    style_groups = [threeMFGroup],
+    style_helpLineMat = mat1 { ma_name = "pmHelpLine" }
+ }
+
+
+  where
+    mat1 = basicMaterial "pmMat1" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8)
+    mat2 = Material 
+                "pmMat2" 
+                (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8) 
+                (Just (Trans 0.25 0.3 1))
+                []
 
 
 pmVertThickness ::  Double
@@ -81,17 +123,29 @@ edgeThicknessFactor = 0.4
 nsurfVertThickness ::  Double
 nsurfVertThickness = 0.03
 
+normalGroup :: BlenderGroup
+normalGroup = BlenderGroup "Normal"
 
 mkNormalSurfaceStyle
   :: [Char]
      -> Triple Double -> Triple Double -> Triple Double -> Style
 mkNormalSurfaceStyle suf col0 col1 col2 = Style 
-    (Material ("nsurfMat0"++suf) (diffuseColor col0 :[]) Nothing)
-    (Material ("nsurfMat1"++suf) (diffuseColor col1:specular 100 0.8) Nothing)
-    (Material ("nsurfMat2"++suf) (diffuseColor col2:specular 100 0.8)
-        (Just (Trans 0.55 0.7 1)))
+    (basicMaterial ("nsurfMat0"++suf) (diffuseColor col0 :[]))
+    mat1
+    mat2
+    mat2
     nsurfVertThickness
-    ["Normal"]
+    [normalGroup]
+    mat1 { ma_name = "nsurfHelpLine" }
+
+  where
+    mat1 = basicMaterial ("nsurfMat1"++suf) (diffuseColor col1:specular 100 0.8)
+    mat2 =
+                Material 
+                    ("nsurfMat2"++suf) 
+                    (diffuseColor col2:specular 100 0.8)
+                    (Just (Trans 0.55 0.7 1))
+                    []
 
 normalSurfaceStyle :: Style
 normalSurfaceStyle = mkNormalSurfaceStyle ""
@@ -145,10 +199,12 @@ fromSpqwcAndIntegerNormalSurface
      SPQWithCoords v
      -> Admissible s
      -> Blenderable
-          (DJSCons
-             (Asc3 v)
-             (Asc3 (Corn v))
-             (DJSCons (Asc2 v) (Asc2 (Corn v)) (DJSCons v (Corn v) SCMinus1)))
+          (DJSC2
+             v (Corn v)
+             (Asc2 v) (Asc2 (Corn v))
+             (Asc3 v) (Asc3 (Corn v))
+             )
+
 fromSpqwcAndIntegerNormalSurface spqwc s = 
     makeTrisAlmostInvisible
         (fromSpqwc spqwc) 
@@ -168,3 +224,9 @@ makeTrisAlmostInvisible =
 
 defaultScene :: ToBlenderable a s => a -> Scene s
 defaultScene = defaultScene0 . toBlenderable
+
+triLabelMat ::  Material
+triLabelMat = basicMaterial "triLbl" [ let r = 0.015 in diffuseColor (r,r,r) ]
+
+
+

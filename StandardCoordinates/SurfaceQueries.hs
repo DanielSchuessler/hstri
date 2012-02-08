@@ -30,12 +30,15 @@ eulerC_core adm = sum (f <$> discAssocs adm)
         
         recipDeg = recip . fromIntegral . degreeOfEdge . pMap tr . iNormalCornerGetContainingEdge
 
-        (triArcCorrection,quadArcCorrection) = 
+        triArcCorrection =
             if isClosedTriangulation tr
-               then (const 0,const 0)
-               else ( sum3 . map3 oneHalfIfBoundaryNormalArc . normalArcs
-                    , sum4 . map4 oneHalfIfBoundaryNormalArc . normalArcs
-                    )
+               then const 0
+               else ( sum3 . map3 oneHalfIfBoundaryNormalArc . normalArcs)
+
+        quadArcCorrection = 
+            if isClosedTriangulation tr
+               then const 0
+               else ( sum4 . map4 oneHalfIfBoundaryNormalArc . normalArcs )
 
         oneHalfIfBoundaryNormalArc na =
             if isBoundaryNormalArc . pMap tr $ na
@@ -44,7 +47,7 @@ eulerC_core adm = sum (f <$> discAssocs adm)
 
 
 eulerC
-  :: forall q i. (Integral i, Show q, StandardCoords q i) =>
+  :: forall q i. (Show i, Integral i, Show q, StandardCoords q i) =>
      Admissible q -> i
 eulerC s = case ratioToIntegral (eulerC_core s :: Ratio i) of
                 Just i -> i
@@ -54,7 +57,7 @@ eulerC s = case ratioToIntegral (eulerC_core s :: Ratio i) of
 
 
 
-is2Sphere :: (Integral r, Show q, StandardCoords q r) => Admissible q -> Bool
+is2Sphere :: (Show r, Integral r, Show q, StandardCoords q r) => Admissible q -> Bool
 is2Sphere s = eulerC s == 2 && isClosedSurface s
 
 is2SphereOrDisk

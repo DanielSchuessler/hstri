@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, GADTs, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
+{-# LANGUAGE MultiParamTypeClasses, TemplateHaskell, GADTs, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
 {-# OPTIONS -Wall #-}
 module SimplicialPartialQuotient where
 
@@ -59,15 +59,20 @@ fromMap
 fromMap t m tets = SimplicialPartialQuotient t (flip $(indx) m) tets
 
 
-mapEdge
+spq_mapEd
   :: (Vertices a, Verts a ~ Pair IVertex) =>
      SimplicialPartialQuotient b -> a -> Pair b
-mapEdge (spq_map -> m) e = map2 m (vertices e)
+spq_mapEd (spq_map -> m) e = map2 m (vertices e)
 
-mapTri
+spq_mapTri
   :: (Vertices a, Verts a ~ Triple IVertex) =>
      SimplicialPartialQuotient b -> a -> Triple b
-mapTri (spq_map -> m) tri = map3 m (vertices tri)
+spq_mapTri (spq_map -> m) tri = map3 m (vertices tri)
+
+instance Ord v => DeltaSetMorphism2 ITriangle (Asc3 v) (SimplicialPartialQuotient v) where
+    mapVert = spq_map 
+    mapEd spq = $unEitherC . mapSimpEdTotal (spq_map spq)
+    mapTri spq = $unEitherC . mapSimpTriTotal (spq_map spq)
 
 
 type GluingLabeller = NormalizedGluing -> String
@@ -83,8 +88,8 @@ makeTriangleLabelling spq gluingLabeller = triangleLabelsForSimplicial stlas
 
             let lbl = gluingLabeller (normalizeGluing gl)
 
-                (l ,r ,t ) = mapTri spq tri
-                (l',r',t') = mapTri spq otri
+                (l ,r ,t ) = spq_mapTri spq tri
+                (l',r',t') = spq_mapTri spq otri
 
             [sTriangleLabelAssoc lbl l  r  t  ,
              sTriangleLabelAssoc lbl l' r' t' ]
@@ -99,8 +104,8 @@ defaultGluingLabeller =
 --             g <- allS3
 -- 
 --             let theLabel = TriangleLabel lbl (inv g) 0.1 
---                 g_im_tri = g .* (mapTri spq tri)
---                 g_im_otri = g .* (mapTri spq otri)
+--                 g_im_tri = g .* (spq_mapTri spq tri)
+--                 g_im_otri = g .* (spq_mapTri spq otri)
 -- 
 --             (++)
 --                 (guard (isOrdered3 g_im_tri)  >> [(g_im_tri ,theLabel)]) 
@@ -124,7 +129,7 @@ implementedGluings spq =
 
 isGluingImplemented
   :: (Eq v) => SimplicialPartialQuotient v -> Gluing -> Bool
-isGluingImplemented spq (tri,otri) = mapTri spq tri == mapTri spq otri 
+isGluingImplemented spq (tri,otri) = spq_mapTri spq tri == spq_mapTri spq otri 
 
 
 
@@ -137,9 +142,9 @@ notTooManyGluings m =
         forAll (elements oitris)
         (\otri1 ->
             let
-                im_otri1 = mapTri m otri1
+                im_otri1 = spq_mapTri m otri1
 
-                mglueds = L.filter (\otri2 -> otri2 /= otri1 && mapTri m otri2 == im_otri1) oitris
+                mglueds = L.filter (\otri2 -> otri2 /= otri1 && spq_mapTri m otri2 == im_otri1) oitris
             in
                 if L.null mglueds
                 then property True
@@ -159,8 +164,8 @@ notTooManyGluings m =
 --             (\(tri,otri) ->
 -- 
 --                 let
---                     im1 = mapTri spq tri 
---                     im2 = mapTri spq otri
+--                     im1 = spq_mapTri spq tri 
+--                     im2 = spq_mapTri spq otri
 --                     
 --                     lbl1 = _triangleLabel im1
 --                     lbl2 = _triangleLabel im2
@@ -216,9 +221,9 @@ spq_INormalCornerEquivalence = spq_Equivalence_helper normalCornerList tINormalC
 
 
 
-
-identitySPQ :: Triangulation -> SimplicialPartialQuotient IVertex
-identitySPQ tr =
+-- | Doesn't identify anything
+spq_identity :: Triangulation -> SimplicialPartialQuotient IVertex
+spq_identity tr =
 
             SimplicialPartialQuotient
                 tr
@@ -363,13 +368,15 @@ instance Coords (SPQWithCoords v) where
 
 
 
-spq_layerOn tr e spq = do
-    (tr',e') <- pt_layerOn
 
 
 
 
 
+spq_fullQuotient
+  :: Triangulation -> SimplicialPartialQuotient TVertex
+spq_fullQuotient tr = 
+    SimplicialPartialQuotient tr (pMap tr)
+        (map (map4 (pMap tr) . vertices) (tTetrahedra_ tr))
 
-
-
+        

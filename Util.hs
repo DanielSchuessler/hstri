@@ -12,7 +12,7 @@ import Test.QuickCheck hiding((.&.))
 import Test.QuickCheck.All
 import Control.Exception
 import QuickCheckUtil
-import Data.Set as S
+import qualified Data.Set as S
 import Data.Functor
 import Data.Char
 import System.Process
@@ -357,4 +357,9 @@ firstLens = Lens (\f -> store (\f1 -> f1 &&& (snd . f)) (fst . f))
 secondLens :: Lens (a -> (b1,b2)) (a -> b2)
 secondLens = Lens (\f -> store (\f2 -> (fst . f) &&& f2) (snd . f))
 
+argLens :: Eq a => a -> Lens (a -> b) b
+argLens x = Lens (\f -> store (\y -> \x' -> if x' == x then y else f x') (f x))
+
+rawSystemAsyncS :: String -> [String] -> IO ()
+rawSystemAsyncS prog args = rawSystemS "zsh" (["-c", "$0 \"$@\" &", prog]++args)
 

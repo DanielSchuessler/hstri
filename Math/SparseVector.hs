@@ -4,7 +4,8 @@ module Math.SparseVector where
 
 import Control.Applicative
 import Data.Foldable(Foldable)
-import Data.Map as M
+import qualified Data.Map as M
+import Data.Map(Map)
 import Data.Maybe
 import Data.Monoid
 import Data.VectorSpace
@@ -19,7 +20,7 @@ import OrphanInstances() -- NFData Map
 import Control.DeepSeq
 
 
-isZero :: Num a => a -> Bool
+isZero :: (Eq a, Num a) => a -> Bool
 isZero = (==0)
 
 zero :: Num a => a
@@ -51,14 +52,14 @@ sparse_under2 f (SparseV m) (SparseV m') = SparseV (f m m')
 --
 -- Property: @sparse_normalize m == m@
 sparse_normalize
-  :: (Num r, Ord k) => SparseVector k r -> SparseVector k r
+  :: (Num r, Ord k, Eq r) => SparseVector k r -> SparseVector k r
 sparse_normalize = sparse_under (M.filter (not . isZero))
 
 mapNonZeroing
   :: (t1 -> r) -> SparseVector k t1 -> SparseVector k r
 mapNonZeroing = sparse_under . M.map
 
-sparse_get :: (Num r, Ord k) => SparseVector k r -> k -> r
+sparse_get :: (Num r, Ord k, Eq r) => SparseVector k r -> k -> r
 sparse_get (SparseV m) k = fromMaybe zero (M.lookup k m) 
 
 sparse_zero :: Ord k => SparseVector k r
@@ -71,7 +72,7 @@ sparse_empty = sparse_zero
 -- | The given function must have zero as a neutral element, or else this won't be independent of the representation
 sparse_addWith :: Ord k => (r -> r -> r)
      -> SparseVector k r -> SparseVector k r -> SparseVector k r
-sparse_addWith f = sparse_under2 (unionWith f)
+sparse_addWith f = sparse_under2 (M.unionWith f)
 
 instance (Ord k, Num r) => AdditiveGroup (SparseVector k r) where
     zeroV = sparse_zero
@@ -79,22 +80,22 @@ instance (Ord k, Num r) => AdditiveGroup (SparseVector k r) where
 
     negateV = mapNonZeroing negate
 
-instance (Ord k, Num r) => VectorSpace (SparseVector k r) where
+instance (Ord k, Num r, Eq r) => VectorSpace (SparseVector k r) where
     type Scalar (SparseVector k r) = r
     0 *^ _ = zeroV
     r *^ x = mapNonZeroing (r*) x 
 
-instance (Ord k, Num r) => InnerSpace (SparseVector k r) where
-    SparseV x <.> SparseV y = Fold.foldl' (+) 0 (intersectionWith (*) x y)
+instance (Ord k, Num r, Eq r) => InnerSpace (SparseVector k r) where
+    SparseV x <.> SparseV y = Fold.foldl' (+) 0 (M.intersectionWith (*) x y)
 
 
-sparse_singleton :: (Num r, Ord k) => k -> r -> SparseVector k r
+sparse_singleton :: (Num r, Ord k, Eq r) => k -> r -> SparseVector k r
 sparse_singleton k r 
     | isZero r = zeroV
     | otherwise = SparseV (M.singleton k r)
 
 sparse_fromAssocs
-  :: (Functor f, Num r, Ord k, Foldable f) =>
+  :: (Functor f, Num r, Ord k, Foldable f, Eq r) =>
      f (k, r) -> SparseVector k r
 sparse_fromAssocs = sumV . fmap (uncurry sparse_singleton)
 
@@ -106,17 +107,17 @@ sparse_toAscList :: SparseVector k a -> [(k, a)]
 sparse_toAscList = M.toAscList . illdefinedSparseToMap
 
 sparse_fromDistinctAscList
-  :: (Num r, Ord k) => [(k, r)] -> SparseVector k r
+  :: (Num r, Ord k, Eq r) => [(k, r)] -> SparseVector k r
 sparse_fromDistinctAscList = sparse_fromMap . M.fromDistinctAscList
 
 sparse_map
-  :: (Num r', Ord k) =>
+  :: (Num r', Ord k, Eq r') =>
      (r -> r') -> SparseVector k r -> SparseVector k r'
 sparse_map f = sparse_mapWithKey (const f)
 
 
 sparse_mapWithKey
-  :: (Num r', Ord k) =>
+  :: (Num r', Ord k, Eq r') =>
      (k -> r -> r') -> SparseVector k r -> SparseVector k r'
 sparse_mapWithKey f (SparseV m) = 
     SparseV $
@@ -129,14 +130,14 @@ sparse_mapWithKey f (SparseV m) =
 
 --sparse_bindWithKey f m =
 
-sparse_fromMap :: (Num r, Ord k) => Map k r -> SparseVector k r
+sparse_fromMap :: (Num r, Ord k, Eq r) => Map k r -> SparseVector k r
 sparse_fromMap = SparseV
 
-sparse_isZero :: (Num r, Ord k) => SparseVector k r -> k -> Bool
+sparse_isZero :: (Num r, Ord k, Eq r) => SparseVector k r -> k -> Bool
 sparse_isZero (SparseV m) k = maybe True isZero (M.lookup k m)
 
 sparse_set
-  :: (Num a, Ord k) => k -> a -> SparseVector k a -> SparseVector k a
+  :: (Num a, Ord k, Eq a) => k -> a -> SparseVector k a -> SparseVector k a
 sparse_set k r (SparseV m) = 
   SparseV $ case () of
     _ | isZero r  -> M.delete k m
@@ -150,7 +151,7 @@ sparse_adjust k f (SparseV m) =
 
 
 sparse_gen
-  :: (Num r, Ord k, Arbitrary r) => [k] -> Gen (SparseVector k r)
+  :: (Num r, Ord k, Arbitrary r, Eq r) => [k] -> Gen (SparseVector k r)
 sparse_gen keys_ = sparse_fromAssocs <$> listOf ((,) <$> elements keys_ <*> arbitrary)
 
 sparse_toNonzeroAssocs :: (Eq b, Num b) => SparseVector a b -> [(a, b)]

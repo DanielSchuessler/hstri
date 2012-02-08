@@ -1,12 +1,13 @@
 {-# LANGUAGE BangPatterns, ScopedTypeVariables, TemplateHaskell, NoMonomorphismRestriction #-}
 module Data.Numbering where
 
-import Data.Map as M
 import THUtil
 import PrettyUtil
 import Data.Maybe
 import qualified Data.Vector as V
 import Util
+import qualified Data.Map as M
+import Data.Map(Map)
 
 data Numbering a = Numbering {
     toInt :: a -> Int,
@@ -97,11 +98,11 @@ checkNu nu r =
 nuFromSet :: Map Int ignored -> Numbering Int
 nuFromSet m = 
     Numbering
-        (\i -> fst (elemAt i m))
+        (\i -> fst (M.elemAt i m))
         (\a -> fromMaybe
                     (error ("nuFromSet: Element not in Numbering: "++show a))
-                    (lookupIndex a m)) 
-        (size m)
+                    (M.lookupIndex a m)) 
+        (M.size m)
 
 nuFromDistinctVector :: forall a. (Show a, Ord a) => V.Vector a -> Numbering a
 nuFromDistinctVector v =

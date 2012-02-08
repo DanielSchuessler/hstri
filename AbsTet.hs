@@ -1,4 +1,6 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE ViewPatterns, TemplateHaskell, TypeFamilies, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 -- | The tetrahedron
 module AbsTet where
 
@@ -9,6 +11,8 @@ import Tetrahedron.Edge
 import Tetrahedron.Triangle
 import Data.Tuple.OneTuple
 import Simplicial.DeltaSet3
+import TupleTH
+import Control.Exception
 
 instance HasTIndex TIndex AbsTet where
     viewI = flip I AbsTet 
@@ -17,6 +21,7 @@ instance HasTIndex TIndex AbsTet where
 data AbsTet = AbsTet
     deriving(Eq,Ord,Show)
 
+absTet :: AbsTet
 absTet = AbsTet
 
 instance Vertices AbsTet where
@@ -81,4 +86,39 @@ instance Link Vertex AbsTet Triangle where
 -- = 'itriangleByDualVertex'
 instance Link IVertex AbsTet ITriangle where 
     link v _ = iTriangleByDualVertex v
+
+
+
+
+-- | Morphism that embeds the abstract tetrahedron into an arbitrary tetrahedron-like thing
+data MapAbsTet tet = MapAbsTet tet
+
+instance (t ~ Tri tet, SatisfiesSimplicialIdentities3 tet) => 
+    DeltaSetMorphism2 Triangle t (MapAbsTet tet) where
+
+    mapVert (MapAbsTet tet) = tetrahedronGetVertexAt tet . toEnum . fromEnum 
+
+    mapEd (MapAbsTet tet) = tetrahedronGetEdgeAt tet . toEnum . fromEnum 
+
+    mapTri (MapAbsTet tet) = tetrahedronGetTriangleAt tet . toEnum . fromEnum  
+
+    
+instance (SatisfiesSimplicialIdentities3 tet) =>
+    DeltaSetMorphism3 AbsTet tet (MapAbsTet tet) where
+
+    mapTet (MapAbsTet tet) _  = tet
+
+
+instance SimplicialTet AbsTet where
+    sTetAscTotal = const . return $ AbsTet
+    sTetVerts = asc4 . vertices -- could skip check
+
+instance SimplicialTet TIndex where
+    sTetAscTotal (unAsc4 -> xs) = 
+        let x = $(proj 4 1) xs
+        in 
+            assert (all3 ((== (getTIndex x)) . getTIndex) ($(dropTuple 4 1) xs)) $
+            return (getTIndex x)
+
+    sTetVerts = asc4 . vertices -- could skip check
 

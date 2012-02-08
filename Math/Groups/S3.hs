@@ -81,6 +81,10 @@ s3ToFun g = case g of
         mkFun _ imB _ I3_1 = imB
         mkFun _ _ imC _ = imC
 
+-- | = 's3ToFun'
+instance LeftAction S3 Index3 where
+    (.*) = s3ToFun
+
 s3FromFunMay ::  (Index3 -> Index3) -> Maybe S3
 s3FromFunMay f = case tupleFromFun3 f of
                  (I3_0,I3_1,I3_2) -> Just S3abc
@@ -151,7 +155,7 @@ instance Semigroup S3 where
     (<>) = s3mult'
 
 instance Monoid S3 where
-    mappend = (<>)
+    mappend = s3mult'
     mempty = S3abc
 
 instance Group S3 where

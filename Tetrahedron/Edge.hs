@@ -3,6 +3,8 @@
 module Tetrahedron.Edge (
     module Data.Tuple.Index,
     module Tetrahedron.Vertex,
+    module Simplicial.SimplicialComplex.Class,
+    module Data.AscTuples,
 
     -- * Plain
     Edge, 
@@ -45,36 +47,37 @@ module Tetrahedron.Edge (
     where
 
 import Control.Applicative
+import Control.DeepSeq
+import Control.DeepSeq.TH
 import Control.Exception
 import Control.Monad
 import Data.Binary
 import Data.Binary.Derive
+import Data.Bits
+import Data.Foldable(foldMap)
 import Data.Function
 import Data.List as List
 import Data.Maybe
+import Data.Monoid
+import Data.Numbering
 import Data.Tuple.Index
 import Element
 import GHC.Generics(Generic)
 import HomogenousTuples
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Lift
+import Math.Groups.S2
 import OrderableFace
+import OrphanInstances()
 import PrettyUtil
 import Quote
-import Math.Groups.S2
 import ShortShow
+import Simplicial.SimplicialComplex.Class
 import THUtil() -- Lift BitSet
 import Test.QuickCheck(Arbitrary(..),elements)
+import Tetrahedron.Vertex
 import TupleTH
 import Util
-import Tetrahedron.Vertex
-import Data.Numbering
-import OrphanInstances()
-import Control.DeepSeq.TH
-import Control.DeepSeq
-import Data.Bits
-import Data.Monoid
-import Data.Foldable(foldMap)
-import Language.Haskell.TH.Lift
+import Data.AscTuples
 
 
 -- | Edge of an abstract tetrahedron (unoriented)
@@ -94,11 +97,18 @@ bitSetToEdge b =
                
 
 
+-- | Must remain in @allEdges'@-compatible order!!
 instance Enum Edge where
     toEnum n = allEdges !! n
     fromEnum e@(Edge x) = fromMaybe (error ("Invalid edge: "++show x)) (findIndex (==e) allEdges)
 
+-- | Must remain in @Enum Edge@-compatible order!!
+allEdges' ::  (Sextuple Edge)
+allEdges' = ( eAB , eAC , eAD , eBC , eBD , eCD  ) 
 
+-- | Must remain in @Enum Edge@-compatible order!!
+allEdges ::  [Edge]
+allEdges = asList allEdges'
 
 instance Show Edge where
     show (edgeVertices -> (v0,v1)) = show v0 ++ show v1
@@ -118,20 +128,19 @@ eCD = edge (vC,vD)
 class MakeEdge a where
     edge :: a -> Edge
 
-allEdges ::  [Edge]
-allEdges = asList allEdges'
 
-allEdges' ::  (Sextuple Edge)
-allEdges' = ( eAB , eAC , eAD , eBC , eBD , eCD  ) 
 
 isVertexOfEdge :: Vertex -> Edge -> Bool
 isVertexOfEdge v (Edge x) = testBit x (fromEnum v)
 
-edgeVertices :: Edge -> (Pair Vertex)
-edgeVertices e = 
+edgeVertices :: Edge -> (Vertex, Vertex)
+edgeVertices = unAsc2 . edgeVerticesAsc
+
+edgeVerticesAsc :: Edge -> Asc2 Vertex
+edgeVerticesAsc e = 
     --    fromList2 ( filter4 (`isVertexOfEdge` e) allVertices' ) 
 
-    case edgeToBitSet e of
+    UnsafeAsc2 $ case edgeToBitSet e of
         3 -> (A,B)
         5 -> (A,C)
         9 -> (A,D)
@@ -385,3 +394,12 @@ instance TetrahedronEdge IVertex IEdge where
 -- TH
 mapTIndicesFromHasTIndex [t|IEdge|]
 deriveNFData ''IEdge
+
+
+instance SimplicialEdge Edge where
+    sEdgeAscTotal = return . edgeByVertices . unAsc2 
+    sEdgeVerts = edgeVerticesAsc
+
+instance SimplicialEdge IEdge where
+    sEdgeAscTotal = return . iEdgeByVertices . unAsc2 
+    sEdgeVerts = unsafeAsc . vertices

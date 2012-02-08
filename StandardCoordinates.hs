@@ -77,16 +77,16 @@ stc_fromZDM = id
 stc_toMap :: StandardCoordinates r -> Map INormalDisc r
 stc_toMap = illdefinedSparseToMap . stc_toZDM
 
-stc_fromMap :: Num r => Map INormalDisc r -> StandardCoordinates r
+stc_fromMap :: (Num r, Eq r) => Map INormalDisc r -> StandardCoordinates r
 stc_fromMap = stc_fromZDM . sparse_fromMap
 
--- instance Num r => VectorSpace (StandardCoordinates r) where 
+-- instance (Num r, Eq r) => VectorSpace (StandardCoordinates r) where 
 --     type Scalar (StandardCoordinates r) = r
 --     r *^ (stc_toZDM -> x) = stc_fromZDM (r *^ x)
 
 
 stc_map
-  :: Num r' =>
+  :: (Num r', Eq r') =>
      (r -> r') -> StandardCoordinates r -> StandardCoordinates r'
 stc_map f = stc_fromZDM . sparse_map f . stc_toZDM
 
@@ -122,7 +122,7 @@ krBasis t = (mkTetrahedralSolution <$> tTetrahedra_ t) ++ (mkEdgeSolution <$> (e
 
 
 stc_coefficient
-  :: (Num r, MakeINormalDisc a) => StandardCoordinates r -> a -> r
+  :: (Num r, Eq r, MakeINormalDisc a) => StandardCoordinates r -> a -> r
 stc_coefficient (stc_toZDM -> sc) = sparse_get sc . iNormalDisc
 
 
@@ -135,7 +135,7 @@ stc_coefficient (stc_toZDM -> sc) = sparse_get sc . iNormalDisc
 --     discAssocs = stc_toAssocs
 
 stc_coefficientIsZero
-  :: (Num r, MakeINormalDisc a) =>
+  :: (Num r, Eq r, MakeINormalDisc a) =>
      StandardCoordinates r -> a -> Bool
 stc_coefficientIsZero (stc_toZDM -> sc) = sparse_isZero sc . iNormalDisc
 
@@ -154,7 +154,7 @@ stc_coefficientIsZero (stc_toZDM -> sc) = sparse_isZero sc . iNormalDisc
 
 
 
-getVertexSolutions :: forall s. PmScalar s => Triangulation -> IO [[s]]
+getVertexSolutions :: forall s. (Show s, PmScalar s) => Triangulation -> IO [[s]]
 getVertexSolutions t = do 
     let k = tNumberOfTetrahedra t
         matchingEquations_ = fmap ( (0 :) . fmap fromInteger . ns_toDenseList t ) (matchingEquations t)
@@ -174,11 +174,11 @@ getVertexSolutions t = do
 
 
 stc_fromDenseList
-  :: Num r => Triangulation -> [r] -> StandardCoordinates r
+  :: (Num r, Eq r) => Triangulation -> [r] -> StandardCoordinates r
 stc_fromDenseList tr = sparse_fromAssocs . zip (tINormalDiscs tr)
 
 
-getVertexSolutions' :: PmScalar s => Triangulation -> IO [StandardCoordinates s]
+getVertexSolutions' :: (Show s, PmScalar s) => Triangulation -> IO [StandardCoordinates s]
 getVertexSolutions' t = do
     s0 <- getVertexSolutions t
 
@@ -200,7 +200,7 @@ getFundamentalEdgeSurfaces tr =
 stc_toAssocs :: StandardCoordinates r -> [(INormalDisc, r)]
 stc_toAssocs = sparse_toAssocs . stc_toZDM
 
-stc_fromAssocs :: Num r => [(INormalDisc, r)] -> StandardCoordinates r
+stc_fromAssocs :: (Num r, Eq r) => [(INormalDisc, r)] -> StandardCoordinates r
 stc_fromAssocs = stc_fromZDM . sparse_fromAssocs
 
 
@@ -224,7 +224,7 @@ normalArcCounts (stc_toZDM -> m) =
 
 
 
-instance (Num r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
+instance (Num r, Eq r, Arbitrary r) => Arbitrary (StandardCoordinates r) where
     arbitrary = stc_fromAssocs <$> arbitrary 
 
 
@@ -251,7 +251,7 @@ instance Quote r => Quote (StandardCoordinates r) where
 
 
 stc_set
-  :: (Num r, MakeINormalDisc a) =>
+  :: (Num r, Eq r, MakeINormalDisc a) =>
      a -> r -> StandardCoordinates r -> StandardCoordinates r
 stc_set d r (stc_toZDM -> m) = stc_fromZDM (sparse_set (iNormalDisc d) r m)
 
@@ -261,15 +261,15 @@ type StandardCoordinateFunctional r = StandardCoordinates r
 
 
 matchingEquationReasonToVector
-  :: Num r => MatchingEquationReason -> StandardCoordinateFunctional r
+  :: (Num r, Eq r) => MatchingEquationReason -> StandardCoordinateFunctional r
 matchingEquationReasonToVector me =
     sparse_fromAssocs (fmap (id &&& (fromInteger . evalMatchingEquation me))
                             (asList (matchingEquationSupportDiscs me)))
 
-matchingEquations ::  Num r => Triangulation -> [StandardCoordinateFunctional r]
+matchingEquations ::  (Num r, Eq r) => Triangulation -> [StandardCoordinateFunctional r]
 matchingEquations = liftM (fmap matchingEquationReasonToVector) matchingEquationReasons
 
-matchingEquationsWithReasons :: Num r => Triangulation -> 
+matchingEquationsWithReasons :: (Num r, Eq r) => Triangulation -> 
     [(StandardCoordinates r, MatchingEquationReason)]
 matchingEquationsWithReasons =
     fmap (matchingEquationReasonToVector &&& id) . matchingEquationReasons

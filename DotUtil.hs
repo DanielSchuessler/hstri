@@ -55,7 +55,6 @@ import TriangulationCxtObject
 import Util
 import qualified Data.Map as M
 import qualified Data.Text.Lazy as Text
-import FileLocation
 
 testDot :: PrintDot a => (Triangulation -> a) -> IO ExitCode
 testDot mkdotGraph_ = do

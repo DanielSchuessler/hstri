@@ -1,5 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Triangulation.Random
     (
@@ -36,6 +35,8 @@ import QuickCheckUtil
 import Triangulation.Class
 import Triangulation.VertexLink
 import Data.SumType
+import Triangulation.PreTriangulation
+import TriangulationCxtObject
 
 arbitraryTriangulation :: Gen Triangulation
 arbitraryTriangulation = arbitraryTriangulationG (\nTets -> choose (0,2*nTets)) 
@@ -146,3 +147,20 @@ arbitraryManifoldTriangulation = arbitrary `suchThat` isManifoldTriangulation
 randomManifoldT :: Int -> Int -> Int -> Gen Triangulation
 randomManifoldT n minGl maxGl =
      (randT n =<< choose (minGl,maxGl)) `suchThat` isManifoldTriangulation
+
+genTTriangle
+  :: (PreTriangulation tr, ToTriangulation tr) =>
+     tr -> Maybe (Gen (T ITriangle))
+genTTriangle tr 
+    | numberOfTetrahedra_ tr == 0 = Nothing
+    | otherwise = Just (pMap tr <$> elements (tITriangles tr))  
+
+
+
+instance Arbitrary TTriangle where
+    arbitrary = generateUntilJust $ do
+        (tr :: Triangulation) <- arbitrary
+        promote (genTTriangle tr)
+
+
+

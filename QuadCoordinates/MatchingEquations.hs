@@ -26,7 +26,7 @@ import Control.Applicative
 
 
 satisfiesQuadrilateralConstraints
-  :: QuadCoords s r => Triangulation -> s -> Either [Char] ()
+  :: (Num r, QuadCoords s r) => Triangulation -> s -> Either [Char] ()
 satisfiesQuadrilateralConstraints tr stc = 
         mapM_ p tets
     where
@@ -43,7 +43,7 @@ satisfiesQuadrilateralConstraints tr stc =
 
 
 quad_admissible
-  :: (ToTriangulation tr, QuadCoords q r) =>
+  :: (Show r, ToTriangulation tr, QuadCoords q r) =>
      tr -> q -> Either [Char] (QAdmissible q)
 quad_admissible (toTriangulation -> tr) qc = do
     mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient"))) (quadAssocs qc) 
@@ -60,7 +60,7 @@ evalQMatchingEquation (me :: QMatchingEquation) qc =
 
 
 satisfiesQMatchingEquations
-  :: QuadCoords q r => Triangulation -> q -> Either [Char] ()
+  :: (Show r, QuadCoords q r) => Triangulation -> q -> Either [Char] ()
 satisfiesQMatchingEquations tr qc =
         mapM_ p (qMatchingEquations0 tr)
     where

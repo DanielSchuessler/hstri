@@ -5,12 +5,14 @@ module Math.Groups.S2 where
 import Data.Binary
 import Data.Hashable
 import Data.Monoid
+import Data.Tuple.Index
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Math.Group
 import PrettyUtil
 import Test.QuickCheck
 import Util
+import Data.Semigroup as Semi
 
 
 data S2 = NoFlip | Flip deriving(Show,Enum,Bounded,Eq,Ord)
@@ -22,7 +24,7 @@ instance Semigroup S2 where
 
 instance Monoid S2 where
     mempty = NoFlip
-    mappend = (<>)
+    mappend = (Semi.<>)
 
 instance Group S2 where
     inv = id
@@ -63,4 +65,8 @@ class Signum a where
     sgn :: a -> S2
 
 instance Signum S2 where sgn = id
+
+instance LeftAction S2 Index2 where
+    (.*) NoFlip = id
+    (.*) Flip = i2_other
 

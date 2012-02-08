@@ -63,6 +63,7 @@ import qualified Data.Set as S
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
+import Text.Groom
 --import GHC.Generics hiding(prec)
 
 (<>) ::  Doc -> Doc -> Doc
@@ -72,16 +73,17 @@ spacedEncloseSep ::  Doc -> Doc -> Doc -> [Doc] -> Doc
 spacedEncloseSep l r separator = encloseSep (l <> space) (space <> r) (separator <> space)
 
 
-prettyListAsSet ::  Pretty a => [a] -> Doc
-prettyListAsSet [] = char '∅' 
-prettyListAsSet (x:xs) = 
-    align (
-        fillCat 
-            ((lbrace<>space<>pretty x)
-            :
-            map (((comma<>space)<>) . pretty) xs)
-            </> rbrace
-         )
+prettyListAsSet :: (AsList xs, Pretty (Element xs)) => xs -> Doc
+prettyListAsSet xs0 = case asList xs0 of
+                          [] ->  char '∅' 
+                          (x:xs) ->
+                                align (
+                                    fillCat 
+                                        ((lbrace<>space<>pretty x)
+                                        :
+                                        map (((comma<>space)<>) . pretty) xs)
+                                        </> rbrace
+                                    )
 
 
 
@@ -119,13 +121,13 @@ class PrettyScalar a where
 
 data ZeroPrinting = ShowZeros | BlankZeros
 
-showRational :: Integral a => ZeroPrinting -> Ratio a -> [Char]
+showRational :: (Show a, Integral a) => ZeroPrinting -> Ratio a -> [Char]
 showRational ShowZeros 0 = "0"
 showRational BlankZeros 0 = ""
 showRational _ x = if x < 0 then "-"++showPositiveRational (-x) else showPositiveRational x
 
 
-showPositiveRational :: Integral a => Ratio a -> String
+showPositiveRational :: (Show a, Integral a) => Ratio a -> String
 showPositiveRational x =
                 case (numerator x,denominator x) of
                      (1,2) -> "½"
@@ -371,6 +373,6 @@ htupled :: [Doc] -> Doc
 htupled = hencloseSep lbrace rbrace (text ", ")
 
 prettyPrecFromShow :: Show a => Int -> a -> Doc
-prettyPrecFromShow = (fmap . fmap) (string . ($"")) showsPrec
+prettyPrecFromShow prec x = string . groomString $ showsPrec prec x ""
 
 instance Pretty Word8 where pretty = text . show

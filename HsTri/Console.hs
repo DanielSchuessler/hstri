@@ -17,10 +17,13 @@ viewFundEdgeSolutionsInBlender
      -> (Admissible StandardDenseI
          -> Maybe
               (AnySimplex2Of
-                 (DJSCons
+                 (DJSC2
+                    v
+                    (Corn v)
+                    (Asc2 v)
+                    (Asc2 (Corn v))
                     (Asc3 v)
-                    (Asc3 (Corn v))
-                    (DJSCons (Asc2 v) (Asc2 (Corn v)) (DJSCons v (Corn v) SCMinus1)))))
+                    (Asc3 (Corn v)))))
      -> IO ()
 viewFundEdgeSolutionsInBlender spqwc initialSelection = do
   hSetBuffering stdin NoBuffering

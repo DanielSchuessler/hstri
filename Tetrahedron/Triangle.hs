@@ -73,12 +73,16 @@ module Tetrahedron.Triangle(
 
 
 import Control.Applicative
+import Control.DeepSeq
+import Control.DeepSeq.TH
 import Control.Exception
 import Control.Monad
 import Data.Binary
 import Data.Binary.Derive
 import Data.List as List
 import Data.Maybe
+import Data.Numbering
+import EitherC
 import Element
 import GHC.Generics(Generic)
 import HomogenousTuples
@@ -88,13 +92,10 @@ import OrderableFace
 import PrettyUtil
 import Quote
 import ShortShow
+import Simplicial.DeltaSet3
 import Test.QuickCheck
 import Tetrahedron.Edge
 import Util
-import Data.Numbering
-import Control.DeepSeq
-import Control.DeepSeq.TH
-import Simplicial.DeltaSet3
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
@@ -110,9 +111,14 @@ instance Show Triangle where
 -- | By 'triangleDualVertex' (= descending lexicographic by 'verticesOfTriangle')
 deriving instance Ord Triangle 
 
+-- | Must remain in @allTriangles'@-compatible order!!
 instance Enum Triangle where
     toEnum n = triangleByDualVertex (toEnum (3-n) :: Vertex)
     fromEnum t = 3 - fromEnum (triangleDualVertex t) 
+
+-- | Must remain in @Enum Triangle@-compatible order!!
+allTriangles' ::  (Triangle, Triangle, Triangle, Triangle)
+allTriangles' =  ( tABC , tABD , tACD , tBCD )
 
 instance Bounded Triangle where
     minBound = tABC
@@ -136,8 +142,6 @@ tABD = triangleByDualVertex vC
 tACD = triangleByDualVertex vB
 tBCD = triangleByDualVertex vA
 
-allTriangles' ::  (Triangle, Triangle, Triangle, Triangle)
-allTriangles' =  ( tABC , tABD , tACD , tBCD )
 
 allTriangles ::  [Triangle]
 allTriangles =  asList allTriangles'
@@ -151,9 +155,9 @@ class MakeTriangle a where
     triangle :: a -> Triangle
 
 -- | The vertices must be strictly ascending
-ascVerticesToTriangle :: Triple Vertex -> Triangle
+ascVerticesToTriangle :: Asc3 Vertex -> Triangle
 ascVerticesToTriangle vs = triangleByDualVertex . unviewVertex $
-        case map3 viewVertex vs of
+        case unAsc3 vs of
              (B,C,D) -> A
              (A,C,D) -> B
              (A,B,D) -> C
@@ -162,7 +166,7 @@ ascVerticesToTriangle vs = triangleByDualVertex . unviewVertex $
 
 -- | The vertices must be distinct (but needn't be ordered)
 verticesToTriangle :: (Triple Vertex) -> Triangle
-verticesToTriangle = ascVerticesToTriangle . sort3
+verticesToTriangle = ascVerticesToTriangle . $unEitherC . asc3total
 
 -- | = 'verticesToTriangle'
 triangleByVertices :: (Triple Vertex) -> Triangle
@@ -289,7 +293,7 @@ instance MakeOTriangle (Triple Vertex) where
 -- | Inverse function to @vertices :: O (Triangle) -> Triple Vertex@
 oTriangleByVertices ::  (Triple Vertex) -> OTriangle
 oTriangleByVertices vs =
-    case sort3WithPermutation vs of
+    case $(unEitherC) (sort3WithPermutation' vs) of
          (vs',g) -> packOrderedFace (ascVerticesToTriangle vs') g
 
 
@@ -482,6 +486,7 @@ instance Star IVertex (OneSkeleton ITriangle) (Pair IEdge) where
          (map2 (i ./) (star v (OneSkeleton t)))
 
 instance ShortShow Triangle where shortShow = show 
+instance ShortShow OTriangle where shortShow = show 
 
 
 -- | 'getTIndex's must be equal
@@ -580,3 +585,11 @@ mapTIndicesFromHasTIndex [t|ITriangle|]
 
 deriveNFData ''ITriangle
 deriveNFData ''OTriangle
+
+instance SimplicialTriangle Triangle where
+    sTriangleAscTotal = return . ascVerticesToTriangle 
+    sTriangleVerts = asc3 . vertices -- could skip check
+
+instance SimplicialTriangle ITriangle where
+    sTriangleAscTotal = return . iTriangleByVertices . unAsc3 
+    sTriangleVerts = asc3 . vertices -- could skip check

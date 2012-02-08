@@ -51,7 +51,12 @@ instance ToPython (Python ()) where
 instance ToPython ()
 instance ToPython Bool
 instance ToPython Int
-instance ToPython Double
+
+instance ToPython Double where
+    toPython x =
+        if isNaN x || isInfinite x
+           then error ("toPython "++show x)
+           else tell . show $ x
 
 --instance ToPython [Char]
 
@@ -155,6 +160,11 @@ setProp'
   :: (ToPython obj, ToPython val) => obj -> (String, val) -> Python ()
 setProp' obj = uncurry (setProp obj)
 
+setProps
+  :: (ToPython obj, ToPython val) =>
+     obj -> [(String, val)] -> Python ()
+setProps obj = mapM_ (setProp' obj)
+
 -- | Add a line to the blender script
 ln :: String -> Python ()
 ln x = tell (x++"\n")
@@ -199,3 +209,7 @@ instance Monoid (Python ()) where
     mappend = (>>)
 
 none = py "None"
+
+emptyList ::  [()]
+emptyList = [] :: [()]
+

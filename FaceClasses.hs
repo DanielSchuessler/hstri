@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module FaceClasses where
@@ -6,6 +6,26 @@ module FaceClasses where
 import Element
 import HomogenousTuples
 import Data.Tuple.Index
+import PrettyUtil
+import qualified Data.Vector.Generic as VG
+import Language.Haskell.TH
+
+data DIMMINUS1
+data DIM0
+data DIM1
+data DIM2
+data DIM3
+
+type family Succ dim
+type instance Succ DIMMINUS1 = DIM0
+type instance Succ DIM0 = DIM1
+type instance Succ DIM1 = DIM2
+type instance Succ DIM2 = DIM3
+
+dimTName :: Int -> Name
+dimTName (-1) = ''DIMMINUS1
+dimTName i = mkName ("DIM"++show i)
+
 
 -- | Things that have a collection of vertices
 class AsList (Verts a) => Vertices a where
@@ -24,6 +44,9 @@ class AsList (Eds a) => Edges a where
 
 edgeList :: Edges a => a -> [Ed a]
 edgeList = asList . edges
+
+edgeVector :: (VG.Vector v (Ed a), Edges a) => a -> v (Ed a)
+edgeVector = VG.fromList . edgeList
 
 type Ed a = Element (Eds a)
 type Arc a = Ed a
@@ -65,12 +88,12 @@ tetrahedronList :: Tetrahedra a => a -> [Tet a]
 tetrahedronList = asList . tetrahedra
 
 class (Vertices e, Verts e ~ Pair (Vert e)) => EdgeLike e
-class (Edges t, Eds t ~ Triple (Ed t)) => TriangleLike t
-class (Triangles tet, Tris tet ~ Quadruple (Tet tet)) => TetrahedronLike tet
+class (Edges t, Eds t ~ Triple (Ed t), Vertices t, Verts t ~ Triple (Vert t), Vert t ~ Vert (Ed t), EdgeLike (Ed t)) => TriangleLike t
+class (Triangles tet, Tris tet ~ Quadruple (Tri tet), Edges tet, Eds tet ~ Sextuple (Ed tet), Ed tet ~ Ed (Tri tet), Vertices tet, Verts tet ~ Quadruple (Vert tet), Vert tet ~ Vert (Tri tet)) => TetrahedronLike tet
 
 instance (Vertices e, Verts e ~ Pair (Vert e)) => EdgeLike e
-instance (Edges t, Eds t ~ Triple (Ed t)) => TriangleLike t
-instance (Triangles tet, Tris tet ~ Quadruple (Tet tet)) => TetrahedronLike tet
+instance (Edges t, Eds t ~ Triple (Ed t), Vertices t, Verts t ~ Triple (Vert t), Vert t ~ Vert (Ed t), EdgeLike (Ed t)) => TriangleLike t
+instance (Triangles tet, Tris tet ~ Quadruple (Tri tet), Edges tet, Eds tet ~ Sextuple (Ed tet), Ed tet ~ Ed (Tri tet), Vertices tet, Verts tet ~ Quadruple (Vert tet), Vert tet ~ Vert (Tri tet)) => TetrahedronLike tet
 
 verticesOfE :: EdgeLike e => e -> Pair (Vert e)
 verticesOfE = vertices
@@ -105,3 +128,60 @@ triangleGetEdgeAt = tupleToFun3 . edges
 tetrahedronGetTriangleAt
   :: (Triangles tet, Tris tet ~ (t, t, t, t)) => tet -> Index4 -> t
 tetrahedronGetTriangleAt = tupleToFun4 . triangles
+
+tetrahedronGetEdgeAt
+  :: (Edges tet, Eds tet ~ (e, e, e, e, e, e)) => tet -> Index6 -> e
+tetrahedronGetEdgeAt = tupleToFun6 . edges
+
+tetrahedronGetVertexAt
+  :: (Vertices tet, Verts tet ~ (v, v, v, v)) => tet -> Index4 -> v
+tetrahedronGetVertexAt = tupleToFun4 . vertices
+
+
+data EdgeInTriangle t = EdgeInTriangle {
+    eInT_triangle :: t,
+    eInT_ix :: Index3
+}
+    deriving (Show,Eq,Ord)
+
+instance Show t => Pretty (EdgeInTriangle t) where
+    prettyPrec = prettyPrecFromShow
+
+
+eInT_edge :: (Edges t, Eds t ~ (e, e, e)) => EdgeInTriangle t -> e
+eInT_edge (EdgeInTriangle t i) = triangleGetEdgeAt t i
+
+eInT_otherEdges
+  :: (Edges t, Eds t ~ (e, e, e)) => EdgeInTriangle t -> Pair e
+eInT_otherEdges (EdgeInTriangle t i) = map2 (triangleGetEdgeAt t) (i3_others i)
+
+data VertexInTriangle t = VertexInTriangle {
+    vInT_triangle :: t,
+    vInT_ix :: Index3
+}
+
+vInT_vertex
+  :: (Vertices t, Verts t ~ (v, v, v)) => VertexInTriangle t -> v
+vInT_vertex (VertexInTriangle t i) = triangleGetVertexAt t i
+
+instance Vertices (EdgeInTriangle t) where
+    type Verts (EdgeInTriangle t) = Pair (VertexInTriangle t)
+
+    vertices (EdgeInTriangle t i) = 
+        map2 (VertexInTriangle t) (tupleToFun3 (subtuples3_2 allIndex3') i)
+
+
+-- | Note that the returned vertex /may/ lie on the given edge; it is merely the only vertex of the triangle that isn't /forced/ to lie on the given edge
+eInT_dual :: EdgeInTriangle t -> VertexInTriangle t
+eInT_dual (EdgeInTriangle t i) = VertexInTriangle t (i3reverse i) 
+
+-- | Note that the returned vertex /may/ lie on the given edge; it is merely the only vertex of the triangle that isn't /forced/ to lie on the given edge
+eInT_dualVertex
+  :: (TriangleLike t, v ~ Vert t) => EdgeInTriangle t -> v
+eInT_dualVertex = vInT_vertex . eInT_dual
+
+vInT_dual :: VertexInTriangle t -> EdgeInTriangle t
+vInT_dual (VertexInTriangle t i) = EdgeInTriangle t (i3reverse i) 
+
+instance Dual (VertexInTriangle t) (EdgeInTriangle t) where dual = vInT_dual
+instance Dual (EdgeInTriangle t) (VertexInTriangle t) where dual = eInT_dual

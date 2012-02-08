@@ -21,6 +21,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Util
 import Data.Vect.Double.Instances() -- Eq
+import Language.Haskell.TH.Syntax
 
 
 
@@ -85,5 +86,14 @@ instance (Floating a, Ord a, NFData a) => NFData (Colour a) where
     rnf c = case toSRGB c of 
                  SRGB.RGB r g b -> rnf (r,g,b)
 
-deriveNFData ''S.Set
-deriveNFData ''M.Map
+$(
+
+    let Name _ (NameG _ pkg _) = ''S.Set
+    in
+
+        if pkgString pkg >= "containers-0.4.2.1"
+        then return []
+        else concatMapM id
+                    [ deriveNFData ''S.Set
+                    , deriveNFData ''M.Map
+                    ])

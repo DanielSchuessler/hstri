@@ -21,7 +21,10 @@ module THUtil(
     debugIndex,
     -- ** Map-related functions
     fromListNoCollision,
-    insertNoCollision
+    insertNoCollision,
+    -- * Builders
+    ToExpQ(..),ToPatQ(..),ToTypeQ(..),
+    svalD,smatch,slamE,getFieldE,sappT
     ) where
 
 import Language.Haskell.TH
@@ -41,6 +44,7 @@ import Data.Maybe
 import FileLocation
 import qualified Data.Vector.Generic as VG
 import Control.Applicative
+import Data.Char
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
@@ -188,4 +192,69 @@ insertNoCollision :: Q Exp
 insertNoCollision =
     [| M.insertWith (\_ _ -> error ($liftedLocationString ++ ": insertNoCollision: Collision")) |] 
 
+
+isUpperName :: Name -> Bool
+isUpperName = isUpper . head . nameBase
+
+ifUpperThenElse :: (Name -> t) -> (Name -> t) -> Name -> t
+ifUpperThenElse ku kl n = (if isUpperName n then ku else kl) n
+
+class ToExpQ a where
+    expQ :: a -> ExpQ 
+
+instance ToExpQ ExpQ where expQ = id
+instance ToExpQ Name where expQ = ifUpperThenElse conE varE
+instance ToExpQ String where expQ = expQ . name
+
+
+class ToPatQ a where
+    patQ :: a -> PatQ
+
+instance ToPatQ PatQ where patQ = id
+instance ToPatQ Name where patQ = ifUpperThenElse (flip conP []) varP
+instance ToPatQ String where patQ = patQ . name
+
+class ToPatsQ a where
+    patsQ :: a -> [PatQ]
+
+instance ToPatsQ [PatQ] where patsQ = id
+instance ToPatsQ PatQ where patsQ = return
+instance ToPatsQ Name where patsQ = return . patQ
+instance ToPatsQ String where patsQ = return . patQ
+
+class ToTypeQ a where
+    typeQ :: a -> TypeQ
+
+instance ToTypeQ TypeQ where typeQ = id
+instance ToTypeQ Name  where typeQ = ifUpperThenElse conT varT
+instance ToTypeQ String where typeQ = typeQ . name
+
+class ToName a where
+    name :: a -> Name
+
+instance ToName Name where name = id
+instance ToName String where name = mkName
+
+svalD :: (ToPatQ a, ToExpQ a1) => a -> a1 -> DecQ
+svalD p e = valD (patQ p) (normalB (expQ e)) []
+
+smatch :: (ToPatQ a, ToExpQ a1) => a -> a1 -> MatchQ
+smatch p e = match (patQ p) (normalB (expQ e)) []
+
+slamE :: (ToPatsQ a, ToExpQ a1) => a -> a1 -> ExpQ
+slamE p e = lamE (patsQ p) (expQ e)
+
+getFieldE :: (ToName a) => 
+    a       -- ^ Ctor name
+    -> Int  -- ^ Ctor arity
+    -> Int  -- ^ 0-based index of field to get
+    -> Q Exp
+getFieldE ctor n i = do
+    x <- newName "_x"
+    slamE 
+        (conP (name ctor) (map (\j -> if i==j then varP x else wildP) [0..n-1]))     
+        x
+
+sappT :: (ToTypeQ a, ToTypeQ a1) => a -> a1 -> TypeQ
+sappT x y = typeQ x `appT` typeQ y
 

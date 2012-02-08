@@ -1,5 +1,4 @@
-{-# LANGUAGE ViewPatterns, TupleSections, TemplateHaskell #-}
-{-# OPTIONS -Wall #-}
+{-# LANGUAGE ScopedTypeVariables, ViewPatterns, TupleSections, TemplateHaskell #-}
 module Triangulation.Tests where
 
 import Triangulation
@@ -9,6 +8,7 @@ import TriangulationCxtObject
 import Triangulation.Random
 import Test.QuickCheck
 import Control.Applicative
+import Tetrahedron.Tests
 import THUtil
 import Control.Monad.State
 import Test.QuickCheck.All
@@ -20,6 +20,8 @@ import Triangulation.Transformations
 import Equivalence.Tests
 import Data.Function
 import Data.SumType
+import Quote
+import Simplicial.DeltaSet3
 
 
 
@@ -157,8 +159,8 @@ prop_deleteTwoTets tr =
             forAll (choose (i+1,n-1)) (\j ->
 
                 ((.=.) `on` sumTypeToMaybe) 
-                    ((deleteTetSafe i <=< deleteTetSafe j) tr)
-                    ((deleteTetSafe (j-1) <=< deleteTetSafe i) tr)))
+                    ((deleteTet' i <=< deleteTet' j) tr)
+                    ((deleteTet' (j-1) <=< deleteTet' i) tr)))
 
                     
 prop_normalizeGluing :: Property
@@ -180,3 +182,16 @@ prop_closedTriangulationGenGeneratesClosed
   :: ClosedTriangulation -> Bool
 prop_closedTriangulationGenGeneratesClosed (ClosedTriangulation tr) =
     isClosedTriangulation tr
+
+
+-- prop_SatisfiesSimplicialIdentities2_TTriangle
+--   :: TTriangle -> Property
+-- prop_SatisfiesSimplicialIdentities2_TTriangle (t :: TTriangle) =
+--     printTestCase (quote t) $
+--     polyprop_SatisfiesSimplicialIdentities2 t
+--     
+-- tr_ = mkTriangulation 1 [(0 ./ tBCD, 0 ./ oBCA), (0 ./ tACD, 0 ./ oABD)]
+-- t = pMap tr_ (0 ./ tACD)
+-- 
+-- (d0t,d1t,d2t) = edges t
+-- 

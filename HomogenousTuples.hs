@@ -6,6 +6,8 @@ import TupleTH
 import Data.List
 import Prelude hiding((<=))
 import qualified Prelude as P
+import Data.Ord(comparing)
+import Language.Haskell.TH
 
 type Pair a = (a,a)
 type Triple a = (a,a,a)
@@ -124,14 +126,16 @@ sort3By f xs@(x0,x1,x2) =
                 else -- x2 < x1
                     (x2,x1,x0)
 
+
+
 prop_sort3 :: (Int,Int,Int) -> Bool
 prop_sort3 is = sort3 is == sort3' is
     where
         sort3' = $(tupleFromList 3) . sort . $(tupleToList 3)
 
-sort4 :: Ord t => (t, t, t, t) -> (t, t, t, t)
-sort4 = $(tupleFromList 4) . sort . $(tupleToList 4)
 
+sort4 :: Ord t => (t, t, t, t) -> (t, t, t, t)
+sort4 =  $(tupleFromList 4) . sort . $(tupleToList 4)
 
 rotate4_1 :: (t1, t2, t3, t) -> (t, t1, t2, t3)
 rotate4_1 = $(rotateTuple 4 1)
@@ -166,13 +170,13 @@ zipTupleWith3
   :: (t -> t1 -> t2) -> Triple t -> Triple t1 -> Triple t2
 zipTupleWith3 = $(zipTupleWith 3)
 
-deleteAt2 :: Num a => a -> (t, t) -> t
+deleteAt2 :: (Eq i, Num i, Show i) => i -> (a,a) -> a
 deleteAt2 = $(deleteAtTuple 2)
 
-deleteAt3 :: Num a => a -> (t, t, t) -> (t, t)
+deleteAt3 :: (Eq i, Num i, Show i) => i -> (a,a,a) -> (a,a)
 deleteAt3 = $(deleteAtTuple 3)
 
-deleteAt4 :: Num a => a -> (t, t, t, t) -> (t, t, t)
+deleteAt4 :: (Eq i, Num i, Show i) => i -> (a,a,a,a) -> (a,a,a)
 deleteAt4 = $(deleteAtTuple 4)
 
 reverse3 :: (t2, t1, t) -> (t, t1, t2)
@@ -191,6 +195,16 @@ zipTuple3 = $(zipTuple 3)
 subtuples3_2 :: (t, t1, t2) -> ((t, t1), (t, t2), (t1, t2))
 subtuples3_2 = $(subtuples 3 2)
 
+subtuples4_2
+  :: (t, t1, t2, t3)
+     -> ((t, t1), (t, t2), (t, t3), (t1, t2), (t1, t3), (t2, t3))
+subtuples4_2 = $(subtuples 4 2)
+
+subtuples4_3
+  :: (t, t1, t2, t3)
+     -> ((t, t1, t2), (t, t1, t3), (t, t2, t3), (t1, t2, t3))
+subtuples4_3 = $(subtuples 4 3)
+
 foldlTuple4 :: (r -> t -> r) -> r -> (t, t, t, t) -> r
 foldlTuple4 = $(foldlTuple 4) 
 
@@ -198,3 +212,17 @@ foldlTuple4 = $(foldlTuple 4)
 foldlMTuple4
   :: Monad m => (r -> b -> m r) -> m r -> (b, b, b, b) -> m r
 foldlMTuple4 c = foldlTuple4 (\r x -> r >>= flip c x)
+
+sort2On :: Ord a => (t -> a) -> (t, t) -> (t, t)
+sort2On f = sort2By (comparing f)
+sort3On :: Ord a => (t -> a) -> (t, t, t) -> (t, t, t)
+sort3On f = sort3By (comparing f)
+
+sortTuple :: Int -> ExpQ
+sortTuple 0 = [| id |]
+sortTuple 1 = [| id |]
+sortTuple 2 = [| sort2 |]
+sortTuple 3 = [| sort3 |]
+sortTuple 4 = [| sort4 |]
+sortTuple i = [| $(tupleFromList i) . sort . $(tupleToList i) |]
+

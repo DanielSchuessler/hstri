@@ -25,7 +25,16 @@ module Simplicial.SimplicialComplex(
     SC0,SC1,SC2,SC3,
     SC0',SC1',SC2',SC3',
     SimplicialMap,
-    DJSCons,
+    DJSC0,
+    DJSC1,
+    DJSC2,
+    DJSC3,
+
+    djSimplicialComplexes,
+    djSimplicialComplexes0,
+    djSimplicialComplexes1,
+    djSimplicialComplexes2,
+    djSimplicialComplexes3,
 
 
 
@@ -119,7 +128,7 @@ fromOrderedTets
 fromOrderedTets xs = 
     SCCons
         xs
-        (fromOrderedTris . nub' . concatMap (asList . subtuplesAsc4_3) $ xs)
+        (fromOrderedTris . nub' . concatMap triangleList $ xs)
 
 fromTris :: (Ord v, Show v) => [Triple v] -> SC2 v
 fromTris = fromOrderedTris . map asc3 
@@ -128,7 +137,7 @@ fromOrderedTris :: forall v. (Show v, Ord v) => [Asc3 v] -> SC2 v
 fromOrderedTris xs = 
     SCCons
         xs
-        (fromOrderedEdges . nub' . concatMap (asList . subtuplesAsc3_2) $ xs)
+        (fromOrderedEdges . nub' . concatMap edgeList $ xs)
 
 
 -- | Input tuples need *not* be ordered
@@ -200,7 +209,8 @@ instance
       SimplicialTriangle t,
       SimplicialEdge e,
       v ~ Vert t,
-      v ~ Vert e) => 
+      v ~ Vert e,
+      e ~ Ed t) => 
       
       DeltaSet2 (SC2' v e t) where
 
@@ -209,7 +219,8 @@ instance
       SimplicialTriangle t,
       SimplicialEdge e,
       v ~ Vert t,
-      v ~ Vert e) => 
+      v ~ Vert e,
+      e ~ Ed t) => 
       
       DeltaSet2 (SC3' v e t tet) where
 
@@ -219,7 +230,9 @@ instance (Show v,
       SimplicialEdge e,
       Vert tet ~ v,
       Vert t ~ v,
-      Vert e ~ v
+      Vert e ~ v,
+      e ~ Ed t,
+      t ~ Tri tet
       ) => DeltaSet3 (SC3' v e t tet) where
 
 
@@ -233,10 +246,16 @@ instance DisjointUnionable SCMinus1 SCMinus1 SCMinus1 () () () where
 
 type SimplicialMap a b = a -> b
 
--- | Disjoint union simplicial complex
-type DJSCons ts ts' sk'' = SCCons (DJSimp ts ts') sk''
+type family DimOf a 
+type instance DimOf SCMinus1 = DIMMINUS1
+type instance DimOf (SCCons ts sk) = Succ (DimOf sk) 
+
 
 instance (verts ~ Verts (SCCons ts sk), verts' ~ Verts (SCCons ts' sk'),
+          dim0 ~ DimOf sk'',
+          dim0 ~ DimOf sk,
+          dim0 ~ DimOf sk',
+          dim ~ Succ dim0,
           DisjointUnionable sk sk' sk'' inj1 inj2 ei
             
                 ) => 
@@ -244,20 +263,46 @@ instance (verts ~ Verts (SCCons ts sk), verts' ~ Verts (SCCons ts' sk'),
     DisjointUnionable 
     (SCCons ts sk) 
     (SCCons ts' sk') 
-    (DJSCons ts ts' sk'')
-    (SimplicialMap verts (DJSimp verts verts'))
-    (SimplicialMap verts' (DJSimp verts verts'))
+    (SCCons (DJSimp dim ts ts') sk'')
+    (SimplicialMap verts (DJSimp DIM0 verts verts'))
+    (SimplicialMap verts' (DJSimp DIM0 verts verts'))
     ()
 
         where
             disjointUnionWithInjs a b = 
                 DisjointUnion 
-                    (SCCons 
-                        (map left' (sccons_topsimps a) ++ map right' (sccons_topsimps b))
-                        (disjointUnion (sccons_skeleton a) (sccons_skeleton b)))
+                    (djSimplicialComplexes a b)
                     left' 
                     right' 
                     () 
+
+
+djSimplicialComplexes
+  :: (DisjointUnionable sk1 sk2 sk inj1 inj2 djEither, DimOf sk1 ~ DimOf sk2) =>
+     SCCons ts1 sk1 -> SCCons ts2 sk2 -> SCCons (DJSimp (Succ (DimOf sk1)) ts1 ts2) sk
+djSimplicialComplexes a b = 
+    SCCons 
+        (map left' (sccons_topsimps a) ++ map right' (sccons_topsimps b))
+        (disjointUnion (sccons_skeleton a) (sccons_skeleton b)) 
+
+-- | Disjoint union simplicial complex
+type DJSC0 v1 v2 = SCCons (DJSimp DIM0 v1 v2) SCMinus1 
+type DJSC1 v1 v2 e1 e2 = SCCons (DJSimp DIM1 e1 e2) (DJSC0 v1 v2)
+type DJSC2 v1 v2 e1 e2 t1 t2 = SCCons (DJSimp DIM2 t1 t2) (DJSC1 v1 v2 e1 e2)
+type DJSC3 v1 v2 e1 e2 t1 t2 tet1 tet2 = SCCons (DJSimp DIM3 tet1 tet2) (DJSC2 v1 v2 e1 e2 t1 t2)
+
+
+djSimplicialComplexes0 :: SC0' v1 -> SC0' v2 -> DJSC0 v1 v2 
+djSimplicialComplexes0 = djSimplicialComplexes
+
+djSimplicialComplexes1 :: SC1' v1 e1 -> SC1' v2 e2 -> DJSC1 v1 v2 e1 e2 
+djSimplicialComplexes1 = djSimplicialComplexes
+
+djSimplicialComplexes2 :: SC2' v1 e1 t1 -> SC2' v2 e2 t2 -> DJSC2 v1 v2 e1 e2 t1 t2 
+djSimplicialComplexes2 = djSimplicialComplexes
+
+djSimplicialComplexes3 :: SC3' v1 e1 t1 tet1 -> SC3' v2 e2 t2 tet2 -> DJSC3 v1 v2 e1 e2 t1 t2 tet1 tet2 
+djSimplicialComplexes3 = djSimplicialComplexes
 
 instance Pretty SCMinus1 where
     pretty _ = text "SC-1"

@@ -171,6 +171,9 @@ type UnitIntervalPoint = Double
 -- | Convex hull of @(0,0), (1,0), (0,1)@
 type Unit2SimplexPoint = Vec2
 
+-- | Convex hull of standard basis vectors
+type Std2SimplexPoint = Vec3
+
 -- | Convex hull of @(0,0), (1,0), (0,1), (1,1)@
 type UnitSquare = Vec2
 
@@ -178,7 +181,7 @@ toUnitSquareNE :: Unit2SimplexPoint -> UnitSquare
 toUnitSquareNE = (Vec2 1 1 &-)
 
 
--- | Triangulation of the triangle with corners @(0,0),(0,steps),(steps,0)@, using isosceles triangles with scele length 1
+-- | Triangulation of the triangle with corners @(0,0),(0,steps),(steps,0)@, using isosceles triangles with scele length 1. Returns the vertices and the triangles.
 triangulateTriangle
   :: (Enum t, Num t) => t -> ([(t, t)], [((t, t), (t, t), (t, t))])
 triangulateTriangle steps = (verts,ts)
@@ -285,3 +288,16 @@ codegeneracy k i =
     if i <= k
         then i
         else i-1
+
+
+withBaryCoords :: (Std2SimplexPoint -> t) -> Unit2SimplexPoint -> t
+withBaryCoords f (Vec2 u v) = f (Vec3 (1-u-v) u v)
+
+stdToUnit2 :: Std2SimplexPoint -> Unit2SimplexPoint
+stdToUnit2 (Vec3 _ u v) = Vec2 u v
+
+baryCoordsEndo
+  :: (Std2SimplexPoint -> Std2SimplexPoint)
+     -> Unit2SimplexPoint -> Unit2SimplexPoint
+baryCoordsEndo f = 
+    withBaryCoords (stdToUnit2 . f)

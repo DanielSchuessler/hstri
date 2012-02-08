@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DeriveGeneric, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving, TypeFamilies, DeriveGeneric, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.Vertex 
     (
@@ -61,7 +61,11 @@ import Control.DeepSeq.TH
 import Language.Haskell.TH.Lift
 
 data Vertex = A | B | C | D
-    deriving(Eq,Ord,Enum,Bounded,Ix)
+    deriving(Eq,Ord,Bounded,Ix)
+
+-- | Must remain in @allVertices'@-compatible order!!
+deriving instance Enum Vertex
+
 
 type VertexView = Vertex
 
@@ -109,6 +113,7 @@ class MakeVertex a where
 allVertices ::  [Vertex]
 allVertices = asList allVertices' 
 
+-- | Must remain in @Enum Vertex@-compatible order!!
 allVertices' ::  (Vertex, Vertex, Vertex, Vertex)
 allVertices' = (vA,vB,vC,vD)
 
@@ -212,8 +217,8 @@ instance Binary Vertex where
     get = vertexFromWord8 <$> get
 
 
-isRegardedAsSimplexByDisjointUnionDeriving [t|Vertex|]
-isRegardedAsSimplexByDisjointUnionDeriving [t|IVertex|]
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t|Vertex|]
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t|IVertex|]
 
 otherIVerticesInSameTet :: IVertex -> Triple IVertex
 otherIVerticesInSameTet = traverseI map3 otherVertices

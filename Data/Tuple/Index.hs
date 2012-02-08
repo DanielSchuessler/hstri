@@ -1,14 +1,20 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, NoMonomorphismRestriction, TemplateHaskell, FlexibleInstances #-}
 {-# OPTIONS -Wall #-}
 module Data.Tuple.Index where
 import Test.QuickCheck
 import Element
 import Util
 import HomogenousTuples
+import TupleTH
+import FileLocation
+import PrettyUtil
 
-data Index2 = I2_0 | I2_1 deriving(Eq,Show,Enum,Bounded)
-data Index3 = I3_0 | I3_1 | I3_2 deriving(Eq,Show,Enum,Bounded)
-data Index4 = I4_0 | I4_1 | I4_2 | I4_3 deriving(Eq,Show,Enum,Bounded)
+data Index2 = I2_0 | I2_1 deriving(Eq,Show,Enum,Bounded,Ord)
+data Index3 = I3_0 | I3_1 | I3_2 deriving(Eq,Show,Enum,Bounded,Ord)
+data Index4 = I4_0 | I4_1 | I4_2 | I4_3 deriving(Eq,Show,Enum,Bounded,Ord)
+
+newtype Index6 = Index6 Int 
+    deriving(Show,Num,Real,Enum,Integral,Eq,Ord)
 
 allIndex2 :: [Index2]
 allIndex2 = asList allIndex2'
@@ -55,6 +61,9 @@ tupleToFun4 (_,b,_,_) I4_1 = b
 tupleToFun4 (_,_,c,_) I4_2 = c
 tupleToFun4 (_,_,_,d) I4_3 = d
 
+tupleToFun6 :: (a1, a1, a1, a1, a1, a1) -> Index6 -> a1
+tupleToFun6 xs j = $fromJst ($(proj' 6) j xs)
+
 tupleFromFun3 :: (Index3 -> t) -> (t, t, t)
 tupleFromFun3 f = (f I3_0, f I3_1, f I3_2)
 
@@ -95,3 +104,26 @@ indexOf4 (a,b,c,d) = indexOf4' a b c d
 instance Show (Index3 -> Index3) where 
     showsPrec prec f = showParen (prec > 10) 
         (showString "tupleToFun3 " . shows (tupleFromFun3 f))                                
+
+
+
+i2_other :: Index2 -> Index2
+i2_other I2_0 = I2_1
+i2_other I2_1 = I2_0
+
+i3_others :: Index3 -> (Index3, Index3)
+i3_others I3_0 = (I3_1,I3_2)
+i3_others I3_1 = (I3_0,I3_2)
+i3_others I3_2 = (I3_0,I3_1)
+
+i3reverse :: Index3 -> Index3
+i3reverse i = case i of
+                   I3_0 -> I3_2
+                   I3_1 -> I3_1
+                   I3_2 -> I3_0
+
+
+instance Pretty Index2 where pretty = dullyellow . int . fromEnum
+instance Pretty Index3 where pretty = dullyellow . int . fromEnum
+instance Pretty Index4 where pretty = dullyellow . int . fromEnum
+instance Pretty Index6 where pretty = dullyellow . int . fromEnum 

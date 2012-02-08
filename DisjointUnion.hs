@@ -152,28 +152,30 @@ djZapUnits (DisjointUnion o a b c) = DisjointUnion o (zapUnits a) (zapUnits b) (
 
 
 
-type instance L (DJSimp a b) = a
-type instance Data.SumType.R (DJSimp a b) = b
 
 -- | Disjoint union simplex
-newtype DJSimp a b = DJSimp (Either a b)
+newtype DJSimp dim a b = DJSimp (Either a b)
     deriving(Show,Eq,Ord,SubSumTy,SuperSumTy,Pretty)
 
-deriving instance ShortShow (Either a b) => ShortShow (DJSimp a b)
+type instance L (DJSimp dim a b) = a
+type instance Data.SumType.R (DJSimp dim a b) = b
 
-instance CoDisjointUnionable a (DJSimp b b') (DJSimp a (DJSimp b b'))
+deriving instance ShortShow (Either a b) => ShortShow (DJSimp dim a b)
+
+instance CoDisjointUnionable a (DJSimp dim b b') (DJSimp dim a (DJSimp dim b b'))
 
             where
 
                 coDjEither = either'
 
-isRegardedAsSimplexByDisjointUnionDeriving :: TypeQ -> DecsQ
-isRegardedAsSimplexByDisjointUnionDeriving t = 
+isRegardedAsSimplexByDisjointUnionDeriving
+  :: Name -> TypeQ -> Q [Dec]
+isRegardedAsSimplexByDisjointUnionDeriving dim t = 
     let
         a = varT (mkName "a")
         go x y = instanceD 
             (cxt [])
-            (conT ''CoDisjointUnionable `appT` x `appT` y `appT` [t|DJSimp $(x) $(y)|]) 
+            (conT ''CoDisjointUnionable `appT` x `appT` y `appT` [t|DJSimp $(conT dim) $(x) $(y)|]) 
             [valD (varP 'coDjEither) (normalB (varE 'either')) []]
           
     in
@@ -186,24 +188,24 @@ isRegardedAsSimplexByDisjointUnionDeriving t =
 
 
 -- | Mixed collection of simplices from the first and second summand complex
-data DJSimps as bs = DJSimps { leftSimps :: as, rightSimps :: bs } 
+data DJSimps dim as bs = DJSimps { leftSimps :: as, rightSimps :: bs } 
     deriving Show
 
-type instance Element (DJSimps as bs) = DJSimp (Element as) (Element bs) 
+type instance Element (DJSimps dim as bs) = DJSimp dim (Element as) (Element bs) 
 
-instance (AsList as, AsList bs) => AsList (DJSimps as bs) where
+instance (AsList as, AsList bs) => AsList (DJSimps dim as bs) where
     asList (DJSimps as bs) = (map left' . asList) as ++ (map right' . asList) bs
 
-type instance L (DJSimpsH a b) = a
-type instance Data.SumType.R (DJSimpsH a b) = b
+type instance L (DJSimpsH dim a b) = a
+type instance Data.SumType.R (DJSimpsH dim a b) = b
 
 -- | Either a collection of simplices from the first summand complex, or from the second
-newtype DJSimpsH as bs = DJSimpsH (Either as bs)
+newtype DJSimpsH dim as bs = DJSimpsH (Either as bs)
     deriving(SubSumTy,SuperSumTy,Show)
 
-type instance Element (DJSimpsH as bs) = DJSimp (Element as) (Element bs) 
+type instance Element (DJSimpsH dim as bs) = DJSimp dim (Element as) (Element bs) 
 
-instance (AsList as, AsList bs) => AsList (DJSimpsH as bs) where
+instance (AsList as, AsList bs) => AsList (DJSimpsH dim as bs) where
     asList = (map left' . asList) |||| (map right' . asList)
 
 -- #define F(Vertices,Verts,Vert,vertices,Pair,map2)\
@@ -227,24 +229,47 @@ instance (AsList as, AsList bs) => AsList (DJSimpsH as bs) where
 -- 
 -- #undef F
 
-instance (EdgeLike a, EdgeLike b) => Vertices (DJSimp a b) where
-    type Verts (DJSimp a b) = Pair (DJSimp (Vert a) (Vert b))
+
+
+instance (EdgeLike a, EdgeLike b) => Vertices (DJSimp DIM1 a b) where
+    type Verts (DJSimp DIM1 a b) = Pair (DJSimp DIM0 (Vert a) (Vert b))
 
     vertices =   (map2 left' . vertices) |||| 
                  (map2 right' . vertices)
 
-instance (TriangleLike a, TriangleLike b) => Edges (DJSimp a b) where
-    type Eds (DJSimp a b) = Triple (DJSimp (Ed a) (Ed b))
+instance (TriangleLike a, TriangleLike b) => Vertices (DJSimp DIM2 a b) where
+    type Verts (DJSimp DIM2 a b) = Triple (DJSimp DIM0 (Vert a) (Vert b))
+
+    vertices =   (map3 left' . vertices) |||| 
+                 (map3 right' . vertices)
+
+instance (TriangleLike a, TriangleLike b) => Edges (DJSimp DIM2 a b) where
+    type Eds (DJSimp DIM2 a b) = Triple (DJSimp DIM1 (Ed a) (Ed b))
 
     edges = (map3 left' . edges) |||| 
             (map3 right' . edges)
 
-instance (TetrahedronLike a, TetrahedronLike b) => Triangles (DJSimp a b) where
-    type Tris (DJSimp a b) = Quadruple (DJSimp (Tri a) (Tri b))
+instance (SatisfiesSimplicialIdentities2 a, SatisfiesSimplicialIdentities2 b) => SatisfiesSimplicialIdentities2 (DJSimp DIM2 a b)
+
+instance (TetrahedronLike a, TetrahedronLike b) => Vertices (DJSimp DIM3 a b) where
+    type Verts (DJSimp DIM3 a b) = Quadruple (DJSimp DIM0 (Vert a) (Vert b))
+
+    vertices =   (map4 left' . vertices) |||| 
+                 (map4 right' . vertices)
+
+instance (TetrahedronLike a, TetrahedronLike b) => Edges (DJSimp DIM3 a b) where
+    type Eds (DJSimp DIM3 a b) = Sextuple (DJSimp DIM1 (Ed a) (Ed b))
+
+    edges = (map6 left' . edges) |||| 
+            (map6 right' . edges)
+
+instance (TetrahedronLike a, TetrahedronLike b) => Triangles (DJSimp DIM3 a b) where
+    type Tris (DJSimp DIM3 a b) = Quadruple (DJSimp DIM2 (Tri a) (Tri b))
 
     triangles = (map4 left' . triangles) |||| 
                 (map4 right' . triangles)
 
+instance (SatisfiesSimplicialIdentities3 a, SatisfiesSimplicialIdentities3 b) => SatisfiesSimplicialIdentities3 (DJSimp DIM3 a b)
 
 
 deriveLiftMany [''DJSimp]

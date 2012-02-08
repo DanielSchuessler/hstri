@@ -15,7 +15,6 @@ import Prelude hiding(readFile)
 import Text.XML.HXT.Core as HXT
 import Triangulation
 import Util(fi)
-import Data.Tuple.Index
 import Codec.Rga.Util
 
 

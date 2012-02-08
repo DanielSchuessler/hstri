@@ -41,7 +41,7 @@ swapRows :: Int -> Int -> ERT r
 swapRows = SwapRows
 addRowToRow :: Int -> r -> Int -> ERT r
 addRowToRow i_dst r i_src = assert (i_dst /= i_src) $ AddRowToRow i_dst r i_src
-scaleRow :: Num r => r -> Int -> ERT r
+scaleRow :: (Eq r, Num r) => r -> Int -> ERT r
 scaleRow r = assert (r/=0) $ ScaleRow r
 
 instance NFData r => NFData (ERT r) where
@@ -55,7 +55,7 @@ class ApplyERT a r | a -> r where
     addMultiply :: r -> a r -> a r -> a r
     scale :: r -> a r -> a r
 
-instance (Num r) => ApplyERT V.Vector r where
+instance (Eq r, Num r) => ApplyERT V.Vector r where
     addMultiply r xs ys =  VG.zipWith (\x y -> x + r * y) xs ys
     scale = VG.map . (*)
 
@@ -65,12 +65,12 @@ deriving instance VGM.MVector VU.MVector r => VGM.MVector VU.MVector (WrappedSca
 deriving instance VG.Vector VU.Vector r => VG.Vector VU.Vector (WrappedScalar r)
 deriving instance Unbox r => Unbox (WrappedScalar r)
 
-instance Num r => ApplyERT WrappedScalar r where 
+instance (Eq r, Num r) => ApplyERT WrappedScalar r where 
     addMultiply r (WrapScalar x) (WrapScalar y) = WrapScalar (x + r*y)
     scale r = WrapScalar . (r *) . unwrapScalar
 
 applyERT
-  :: (Num r, VG.Vector v (a r), ApplyERT a r) =>
+  :: (Eq r, Num r, VG.Vector v (a r), ApplyERT a r) =>
      ERT r -> v (a r) -> v (a r)
 applyERT (SwapRows i i') !mtx
     | i == i' =        mtx
@@ -92,7 +92,7 @@ applyERT (ScaleRow r i) !mtx
 
 
 applyERTs
-  :: (Num r, VG.Vector v (a r), ApplyERT a r) =>
+  :: (Eq r, Num r, VG.Vector v (a r), ApplyERT a r) =>
      [ERT r] -> v (a r) -> v (a r)
 applyERTs erts mtx = L.foldl' (flip applyERT) mtx erts
 
@@ -123,7 +123,7 @@ type UMatrix r = Vector (VU.Vector r)
 
 -- | @topNonzero mtx i j@ returns the smallest row index >= @i@ in column @j@ which is nonzero, or @Nothing@ if they're all zero.
 topNonzero
-  :: (Num r, VG.Vector v r, PrettyScalar r) =>
+  :: (Eq r, Num r, VG.Vector v r, PrettyScalar r) =>
      Vector (v r) -> Int -> Int -> Maybe Int
 topNonzero mtx i j = L.find (\i' -> (mtx @@> (i',j)) /= 0) [i..rows mtx-1]
 
@@ -133,7 +133,7 @@ topNonzero mtx i j = L.find (\i' -> (mtx @@> (i',j)) /= 0) [i..rows mtx-1]
 --
 -- * The third component of the result is the list of pivot column indices, descending
 toSomeEchelon
-  :: (PrettyScalar r, Fractional r, VG.Vector v r, ApplyERT v r) =>
+  :: (Eq r, PrettyScalar r, Fractional r, VG.Vector v r, ApplyERT v r) =>
      Bool -> Vector (v r) -> (Vector (v r), [ERT r], [Int])
 toSomeEchelon doReduce mtx0 =
     let
@@ -184,11 +184,11 @@ toSomeEchelon doReduce mtx0 =
     
 
 toEchelon
-  :: (Fractional r, VG.Vector v r, PrettyScalar r, ApplyERT v r) =>
+  :: (Eq r, Fractional r, VG.Vector v r, PrettyScalar r, ApplyERT v r) =>
      Vector (v r) -> (Vector (v r), [ERT r], [Int])
 toEchelon = toSomeEchelon False
 toReducedEchelon
-  :: (Fractional r, VG.Vector v r, PrettyScalar r, ApplyERT v r) =>
+  :: (Eq r, Fractional r, VG.Vector v r, PrettyScalar r, ApplyERT v r) =>
      Vector (v r) -> (Vector (v r), [ERT r], [Int])
 toReducedEchelon = toSomeEchelon True
 
@@ -317,7 +317,7 @@ mulMVwith f mtx v =
     V.generate (rows mtx) (\i -> dotprodWith f ($(debugIndex) mtx i) v)
 
 solve
-  :: (Fractional r,
+  :: (Eq r, Fractional r,
       Show (v r),
       PrettyScalar r,
       VG.Vector v (WrappedScalar r),
@@ -335,8 +335,8 @@ solve mtx rhs =
 
 
 applyERTsV
-  :: (Num b, VG.Vector v b, VG.Vector v (WrappedScalar b)) =>
-     [ERT b] -> v b -> v b
+  :: (Eq r, Num r, VG.Vector v r, VG.Vector v (WrappedScalar r)) =>
+     [ERT r] -> v r -> v r
 applyERTsV erts = VG.map unwrapScalar . applyERTs erts . VG.map WrapScalar
 
 prettyVector' :: VG.Vector v a => v a -> PrettyVector [a]
@@ -347,7 +347,7 @@ prettyMatrix' = PrettyMatrix . V.map VG.toList
 
 backsubst
   :: forall m v r. 
-     (Num r,
+     (Eq r, Num r,
       PrettyScalar r,
       VG.Vector v Int,
       VG.Vector v r,

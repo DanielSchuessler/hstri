@@ -162,22 +162,22 @@ orientTriangulation tr = do
 
     where
         sol :: VU.Vector Word8
-        sol = execState mkSol (VU.replicate n undetermined)
+        sol = execState mkSol (VU.replicate n _undetermined)
 
         n :: Int
         n = tNumberOfTetrahedra tr
 
-        undetermined,asc,flipAsc :: PackedMaybeSimplexOrientation
-        undetermined = 0
-        asc = 1
-        flipAsc = 2
+        _undetermined,_asc,_flipAsc :: PackedMaybeSimplexOrientation
+        _undetermined = 0
+        _asc = 1
+        _flipAsc = 2
 
         mkSol :: State (VU.Vector PackedMaybeSimplexOrientation) ()
         mkSol = goComponent 0 
         
         goComponent :: TIndex -> State (VU.Vector Word8) ()
         goComponent tet =
-            goNode asc (dfsFacePairingGraph tr tet)
+            goNode _asc (dfsFacePairingGraph tr tet)
 
         goNode o_cur (Node cur es) = do
             setTetOr cur o_cur
@@ -189,7 +189,7 @@ orientTriangulation tr = do
         setTetOr i' onew = do
             tro <- get
             case tro VU.! fi i' of
-                o | o == undetermined ->
+                o | o == _undetermined ->
                             
                         put (tro VU.// [(fi i',onew)])
 
@@ -201,7 +201,7 @@ orientTriangulation tr = do
                then flipSo' o_dom
                else o_dom
 
-        flipSo' o = if o == asc then flipAsc else E.assert (o==flipAsc) asc 
+        flipSo' o = if o == _asc then _flipAsc else E.assert (o==_flipAsc) _asc 
             
                 
         _check =
@@ -220,9 +220,9 @@ orientTriangulation tr = do
         finish = V.map toSor . VG.convert
 
         toSor :: Word8 -> SimplexOrientation AbsTet
-        toSor x | x == asc = AscOr :: SimplexOrientation AbsTet
-                | x == flipAsc = FlipAscOr
-                | x == undetermined = error "orientTriangulation: disconnected Triangulations not supported yet"
+        toSor x | x == _asc = AscOr :: SimplexOrientation AbsTet
+                | x == _flipAsc = FlipAscOr
+                | x == _undetermined = error "orientTriangulation: disconnected Triangulations not supported yet"
                 | otherwise = 
                         error ("orientTriangulation/toSor: "++
                                 $(showExps 'x))

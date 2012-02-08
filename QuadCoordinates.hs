@@ -25,16 +25,16 @@ type QuadCoordinates r = SparseVector INormalQuad r
 quad_toMap :: QuadCoordinates r -> Map INormalQuad r
 quad_toMap = illdefinedSparseToMap 
 
-quad_fromMap :: Num r => Map INormalQuad r -> QuadCoordinates r
+quad_fromMap :: (Num r, Eq r) => Map INormalQuad r -> QuadCoordinates r
 quad_fromMap = sparse_fromMap 
 
 quad_fromAssocs
-  :: (Functor f, Num r, Foldable f) =>
+  :: (Functor f, Num r, Eq r, Foldable f) =>
      f (INormalQuad, r) -> QuadCoordinates r
 quad_fromAssocs = sparse_fromAssocs
 
 
-quad_coefficient :: Num r => QuadCoordinates r -> INormalQuad -> r
+quad_coefficient :: (Num r, Eq r) => QuadCoordinates r -> INormalQuad -> r
 quad_coefficient = sparse_get 
 
 
@@ -58,7 +58,7 @@ standardToQuad =
         
         
 qMatchingEquation
-  :: Num r => TEdge -> Maybe (QuadCoordinates r)
+  :: (Num r, Eq r) => TEdge -> Maybe (QuadCoordinates r)
 qMatchingEquation = fmap (quad_fromAssocs . 
     concatMap (\(_,(u,d)) -> [(u,1),(d,-1)])) . qMatchingEquation0
 
@@ -66,7 +66,7 @@ qMatchingEquation = fmap (quad_fromAssocs .
         
 type QuadCoordinateFunctional r = QuadCoordinates r
 
-qMatchingEquations :: Num r => Triangulation -> [QuadCoordinateFunctional r]
+qMatchingEquations :: (Num r, Eq r) => Triangulation -> [QuadCoordinateFunctional r]
 qMatchingEquations = mapMaybe qMatchingEquation . edges
 
 qMatchingEquationsInteger :: Triangulation -> [QuadCoordinateFunctional Integer]
@@ -79,7 +79,7 @@ qMatchingEquationsRat = qMatchingEquations
 quad_toAssocs :: QuadCoordinates r -> [(INormalQuad, r)]
 quad_toAssocs = M.assocs . quad_toMap
 
-quad_singleton :: Num r => INormalQuad -> r -> QuadCoordinates r
+quad_singleton :: (Num r, Eq r) => INormalQuad -> r -> QuadCoordinates r
 quad_singleton = sparse_singleton
 
 
@@ -87,30 +87,30 @@ quad_singleton = sparse_singleton
 
 
 quad_toDenseAssocs
-  :: Num r =>
+  :: (Num r, Eq r) =>
      Triangulation -> QuadCoordinates r -> [(INormalQuad, r)]
 quad_toDenseAssocs tr qc = fmap (id &&& quad_coefficient qc) (tINormalQuads tr)
 
 quad_toDenseList
-  :: Num r => Triangulation -> QuadCoordinates r -> [r]
+  :: (Num r, Eq r) => Triangulation -> QuadCoordinates r -> [r]
 quad_toDenseList tr = fmap snd . quad_toDenseAssocs tr
 
 quad_fromDenseList
-  :: Num r => Triangulation -> [r] -> QuadCoordinates r
+  :: (Num r, Eq r) => Triangulation -> [r] -> QuadCoordinates r
 quad_fromDenseList tr = quad_fromAssocs . zip (tINormalQuads tr) 
 
 quad_fromVector
-  :: (Num r, VG.Vector v r) =>
+  :: (Num r, Eq r, VG.Vector v r) =>
      Triangulation -> v r -> QuadCoordinates r
 quad_fromVector tr = quad_fromDenseList tr . VG.toList
 
 unrestrictedQCGen
-  :: (Num r, Arbitrary r) => Triangulation -> Gen (QuadCoordinates r)
+  :: (Num r, Eq r, Arbitrary r) => Triangulation -> Gen (QuadCoordinates r)
 unrestrictedQCGen tr = sparse_gen (tINormalQuads tr) 
 
 
 qMatchingEquationsMatrix
-  :: Num a =>
+  :: (Num a, Eq a) =>
      Triangulation
      -> V.Vector (V.Vector a)
 qMatchingEquationsMatrix tr = 
@@ -136,14 +136,14 @@ qMatchingEquationsMatrixRat = qMatchingEquationsMatrix
 --     putStrLn ""        
 
 quad_toNonzeroAssocs
-  :: Num b => QuadCoordinates b -> [(INormalQuad, b)]
+  :: (Num b, Eq b) => QuadCoordinates b -> [(INormalQuad, b)]
 quad_toNonzeroAssocs = sparse_toNonzeroAssocs 
 
 
 
 
 quad_fromNormalSurface
-  :: (Num r, StandardCoords s r) => s -> QuadCoordinates r
+  :: (Num r, Eq r, StandardCoords s r) => s -> QuadCoordinates r
 quad_fromNormalSurface = quad_fromAssocs . mapMaybe f . discAssocs 
     where
         f (d,r) = eitherIND (const Nothing) (Just . (,r)) d

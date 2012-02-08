@@ -61,7 +61,7 @@ instance (Num r, QuadCoords q r) => StandardCoords (CanonExt q r) r where
     triAssocs = triAssocsDistinct
     triAssocsDistinct = sparse_toAssocs . canonExt_tris 
 
-canonExt :: forall q r tr. (Pretty q, QuadCoords q r, Ord r, Pretty r) => 
+canonExt :: forall q r tr. (Show r, Pretty q, QuadCoords q r, Ord r, Pretty r) => 
     QAdmissible q -> Admissible (CanonExt q r)
 canonExt qc = 
 

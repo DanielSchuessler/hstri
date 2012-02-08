@@ -20,7 +20,7 @@ import Control.Applicative
 
 
 standard_admissible
-  :: (ToTriangulation tr, StandardCoords s r) =>
+  :: (Show r, ToTriangulation tr, StandardCoords s r) =>
      tr -> s -> Either [Char] (Admissible s)
 standard_admissible (toTriangulation -> tr) stc = do
     mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient")))
@@ -30,7 +30,7 @@ standard_admissible (toTriangulation -> tr) stc = do
     return (UnsafeToAdmissible tr stc)
 
 satisfiesMatchingEquations
-  :: StandardCoords s r => Triangulation -> s -> Either [Char] ()
+  :: (Show r, StandardCoords s r) => Triangulation -> s -> Either [Char] ()
 satisfiesMatchingEquations tr stc =
         mapM_ p (matchingEquationReasons tr)
     where

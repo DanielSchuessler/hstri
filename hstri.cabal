@@ -15,7 +15,7 @@ Cabal-version:       >=1.2
 Library
     -- countering the -XHaskell98 passed by cabal
   extensions: PatternGuards, EmptyDataDecls
-  ghc-options: -XMonoPatBinds
+  --ghc-options: -XMonoPatBinds
 
   Exposed-modules:     
     
@@ -29,6 +29,8 @@ Library
     Tetrahedron.Constants
     BarySD
     Blender
+    Blender.ID
+    Blender.Types
     Blender.Blenderable
     Blender.Conversion
     ClosedNorCensus8
@@ -46,6 +48,7 @@ Library
     DotUtil
     EdgeCentered
     Either1
+    EitherC
     Element
     Equivalence
     Equivalence.Class
@@ -62,10 +65,6 @@ Library
     Tetrahedron.INormalDisc
     InnerProductRepresentation
     Triangulation.InnerNormalArc
-    Interactive.Command
-    Interactive.Floor
-    Interactive.ReadInput
-    Interactive.Utils
     Latexable
     Math.Group
     Math.Groups.S2
@@ -96,6 +95,7 @@ Library
     ShortShow
     Simplicial.DeltaSet1
     Simplicial.DeltaSet2
+    Simplicial.DeltaSet2.Layering
     Simplicial.DeltaSet3
     Simplicial.SimplicialComplex
     Simplicial.SimplicialComplex.Class
@@ -129,36 +129,20 @@ Library
     Triangulation.Class
     Triangulation.FacetGluing
     Triangulation.Random
-    Triangulation.Tests
     TriangulationCxtObject
     Util
     VectorUtil
     VerboseDD
     Math.SparseVector
+    ZapUnits
+    Data.BitVector.Adaptive
 
 
   Build-depends: 
+
           comonads-fd
-        , data-lens
-        , data-lens-template
-        , failure
-        , deepseq-th
-        , arithmoi
-        , file-location
---        , yices-painless
-        , syb
-        , th-lift
-        , MemoTrie 
-        , TypeCompose
-        , GLFW-b
-        , Interpolation
-        , MissingH
-        , OneTuple
-        , OpenGL
-        , Printf-TH
-        , QuickCheck
-        , Tensor
         , ansi-wl-pprint
+        , arithmoi
         , base >= 4 && < 5
         , binary
         , binary-derive
@@ -166,43 +150,60 @@ Library
         , bytestring
         , colour
         , containers
-        , criterion
+        , data-lens
+        , data-lens-template
         , deepseq
+        , deepseq-th
         , directory
         , dlist
-        , elerea
         , equivalence
+        , failure
         , fgl
+        , file-location
         , filepath
         , ghc-prim
+        , GLFW-b
         , graphviz
+        , groom 
         , hashable
         , hxt
+        , IfElse 
+        , Interpolation
+        , MemoTrie 
+        , MissingH
         , mtl
+        , OneTuple
         , parallel
         , parsec
+        , Printf-TH
         , process
+        , QuickCheck
         , random
+        , safe
         , semigroups
         , simpleargs
-        , safe
         , split
+        , syb
         , tagged
         , template-haskell
+        , Tensor
         , text
+        , th-lift
         , time
         , transformers
         , transformers-compose
-        , tuple-th >= 0.2.3
+        , tuple-th >= 0.2.4
+        , TypeCompose
         , utf8-string
         , vect
-        , vect-opengl
         , vector
         , vector-space >= 0.8.0
         , xml
         , xml-monad
         , xmlgen
         , zlib
+
+--        , yices-painless
 
   -- Buildable: False
 

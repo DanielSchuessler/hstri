@@ -225,10 +225,15 @@ prop_Ix_NormalDisc (l :: NormalDisc) u =
 
 polyprop_SatisfiesSimplicialIdentities2 :: (Eq (Vert (Ed t)), Show (Vert (Ed t)), Show (Ed t), SatisfiesSimplicialIdentities2 t) => t -> Property
 polyprop_SatisfiesSimplicialIdentities2 t =
+        printTestCase ("Checking that 'vertices' equals 'defaultVerticesOfTri'") 
+            (vertices t .=. defaultVerticesOfTri t) 
+    .&&.
     case edges t of
-         dits ->
+         dits@(d0,d1,d2) ->
 
-             printTestCase (show dits) $
+             printTestCase ("d0 t = "++show d0) $ 
+             printTestCase ("d1 t = "++show d1) $ 
+             printTestCase ("d2 t = "++show d2) $ 
 
                  case map3 vertices dits of
 
@@ -256,9 +261,13 @@ polyprop_DeltaSet2 s =
 
 
 polyprop_SatisfiesSimplicialIdentities3
-  :: (Eq (Ed (Tri tet)), Show (Ed (Tri tet)), Show (Tri tet), SatisfiesSimplicialIdentities3 tet) =>
+  :: (Eq (Vert tet), Show (Vert tet), Eq (Ed (Tri tet)), Show (Ed (Tri tet)), Show (Tri tet), SatisfiesSimplicialIdentities3 tet) =>
      tet -> Property
 polyprop_SatisfiesSimplicialIdentities3 t =
+    vertices t .=. defaultVerticesOfTet t 
+    .&&.
+    edges t .=. defaultEdgesOfTet t 
+    .&&.
     case triangles t of
          dits ->
 
@@ -319,3 +328,15 @@ prop_AbsTet_Simpidents = polyprop_SatisfiesSimplicialIdentities3 AbsTet
 
 prop_TIndex_Simpidents :: TIndex -> Property
 prop_TIndex_Simpidents = polyprop_SatisfiesSimplicialIdentities3
+
+
+prop_MapAbsTet_id :: Property
+prop_MapAbsTet_id = 
+    (\x -> mapVert (MapAbsTet AbsTet) x == x)
+    .&&.
+    (\x -> mapEd (MapAbsTet AbsTet) x == x)
+    .&&.
+    (\x -> mapTri (MapAbsTet AbsTet) x == x)
+    .&&.
+    mapTet (MapAbsTet AbsTet) AbsTet == AbsTet
+

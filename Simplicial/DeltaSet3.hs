@@ -1,23 +1,30 @@
-{-# LANGUAGE FlexibleContexts, TemplateHaskell, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, TemplateHaskell, TypeFamilies, FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Simplicial.DeltaSet3(
     module Simplicial.DeltaSet2,
     SatisfiesSimplicialIdentities3,
     DeltaSet3,
+    DeltaSetMorphism3(..),
     AnySimplex3,
     foldAnySimplex3,
-    anySimplex2To3
+    anySimplex2To3,
+    -- * Superclass defaults
+    DefaultVertsOfTet,
+    defaultVerticesOfTet,
+    DefaultEdsOfTet,
+    defaultEdgesOfTet,
     )
     where
 
 import Simplicial.DeltaSet2
 import Control.Arrow
 import Language.Haskell.TH.Lift
+import Control.Exception
 
- -- | LAW: @forall i j. i >= j ==> 'triangleGetEdgeAt' i . 'tetrahedronGetTriangleAt' j == 'triangleGetEdgeAt' j . 'tetrahedronGetTriangleAt' (i+1)@  
+-- | LAW: @forall i j. i >= j ==> 'triangleGetEdgeAt' i . 'tetrahedronGetTriangleAt' j == 'triangleGetEdgeAt' j . 'tetrahedronGetTriangleAt' (i+1)@  
 --
 -- (modulo index type conversions)
-class (Triangles tet, Tris tet ~ Quadruple (Tri tet), Edges (Tri tet), Eds (Tri tet) ~ Triple (Ed (Tri tet)), SatisfiesSimplicialIdentities2 (Tri tet)) => SatisfiesSimplicialIdentities3 tet
+class (TetrahedronLike tet, SatisfiesSimplicialIdentities2 (Tri tet)) => SatisfiesSimplicialIdentities3 tet
 
 
 class (DeltaSet2 s, Tetrahedra s, Tri (Tet s) ~ Tri s, SatisfiesSimplicialIdentities3 (Tet s)) => DeltaSet3 s where
@@ -45,3 +52,38 @@ foldAnySimplex3' k2 ktet (AnySimplex3 x) = either k2 ktet x
 
   
 deriveLiftMany [''AnySimplex3]
+
+
+class DeltaSetMorphism2 (Tri tet) (Tri tet') f => DeltaSetMorphism3 tet tet' f | f -> tet tet' where
+    mapTet :: f -> tet -> tet'
+
+type DefaultVertsOfTet tet = Quadruple (Vert (Ed (Tri tet)))
+
+-- | Derives a 'vertices' function for a tetrahedron-like type, given that 'triangles' is implemented, 'edges' is implemented for @'Tri' tet@ and 'vertices' is implemented for @'Ed' ('Tri' tet)@.
+defaultVerticesOfTet
+  :: (SatisfiesSimplicialIdentities3 tet) =>
+     tet -> DefaultVertsOfTet tet
+defaultVerticesOfTet tet =
+    let
+        (a,b,c) = defaultVerticesOfTri (tetrahedronGetTriangleAt tet I4_0) 
+        (_,_,d) = defaultVerticesOfTri (tetrahedronGetTriangleAt tet I4_1) 
+    in
+        (a,b,c,d)
+
+
+type DefaultEdsOfTet tet = Sextuple (Ed (Tri tet))
+
+defaultEdgesOfTet
+  :: (SatisfiesSimplicialIdentities3 tet) =>
+     tet -> DefaultEdsOfTet tet
+defaultEdgesOfTet tet =
+    let
+        (ab,ac,bc) = edges (tetrahedronGetTriangleAt tet I4_0) 
+        (ab',ad,bd) = edges (tetrahedronGetTriangleAt tet I4_1) 
+        (bc',bd',cd) = edges (tetrahedronGetTriangleAt tet I4_3) 
+    in
+
+        (ab,ac,ad,bc,bd,cd)
+
+
+

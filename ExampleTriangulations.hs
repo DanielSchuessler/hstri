@@ -2,7 +2,7 @@
 {-# OPTIONS -Wall #-}
 module ExampleTriangulations where
 
-import Blender.Blenderable
+import Blender.Types
 import Control.Exception
 import Data.Vect.Double
 import EdgeCentered

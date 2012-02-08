@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS -Wall #-}
 module PreRenderable.TriangleLabel where
+
 import Math.Groups.S3
 import PrettyUtil
 import THUtil
@@ -8,6 +9,7 @@ import qualified Data.Map as M
 import HomogenousTuples
 import Data.AscTuples
 import Language.Haskell.TH.Lift
+import EitherC
 
 
 data TriangleLabel = TriangleLabel {
@@ -71,7 +73,7 @@ stla2tla :: (Ord v, Show v) =>
 stla2tla a =
             let
                 lrt = map3 ($ a) (stla_left,stla_right,stla_top)
-                (sorted,g) = sort3WithPermutation' lrt 
+                (sorted,g) = $unEitherC $ sort3WithPermutation' lrt 
             in
                 (
                     sorted

@@ -2,7 +2,9 @@
 {-# OPTIONS -Wall #-} 
 module PolymakeInterface where
 
-import Control.Monad.Writer
+import Control.Monad.IO.Class(MonadIO(..))
+import Control.Monad
+import Data.Monoid(Monoid(..))
 import Data.Functor.Identity
 import Data.List(intersperse)
 import Data.Ratio

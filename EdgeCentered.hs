@@ -5,7 +5,7 @@ module EdgeCentered(
     module SimplicialPartialQuotient,
     EdgeNeighborhoodVertex(..),
     makeEdgeNeighborhood,
-    prop_edgeIsGlued,
+    polyprop_edgeIsGlued,
 
     ) where
 
@@ -122,19 +122,19 @@ makeEdgeNeighborhood tr oiEdge gluingLabeller =
             
 
 
-prop_edgeIsGlued
+polyprop_edgeIsGlued
   :: Eq b => SimplicialPartialQuotient b -> OIEdge -> Property
-prop_edgeIsGlued m oiedge = 
+polyprop_edgeIsGlued m oiedge = 
     let
         oEdgeClass = eqv_equivalents (oEdgeEqv . spq_tr $ m) oiedge
-        im_oiedge = mapEdge m oiedge
+        im_oiedge = spq_mapEd m oiedge
     in
         forAll (elements oEdgeClass)
-            (\oiedge2 -> mapEdge m oiedge2 == im_oiedge)
+            (\oiedge2 -> spq_mapEd m oiedge2 == im_oiedge)
         
 
 
         
 --qc_EdgeCentered = $(quickCheckAll)
 
-isRegardedAsSimplexByDisjointUnionDeriving [t|EdgeNeighborhoodVertex|]
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t|EdgeNeighborhoodVertex|]

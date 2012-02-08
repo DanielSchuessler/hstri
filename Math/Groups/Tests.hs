@@ -28,11 +28,13 @@ prop_fromFun_homomorphism
 prop_fromFun_homomorphism f2 f1 =
     s3FromFunMay (f2 . f1) .=. liftM2 (.*.) (s3FromFunMay f2) (s3FromFunMay f1)
 
-prop_act_id :: (Int,Int,Int) -> Property
-prop_act_id = polyprop_ract_id (undefined :: Proxy S3)
 
-prop_permute_mult :: S3 -> S3 -> (Int,Int,Int) -> Property
-prop_permute_mult = polyprop_ract_mult
+prop_Pair_S2_RightAction :: Property
+prop_Pair_S2_RightAction = polyprop_ract (undefined :: Proxy ((Int,Int),S2))
+
+prop_Triple_S3_RightAction :: Property
+prop_Triple_S3_RightAction = polyprop_ract (undefined :: Proxy ((Int,Int,Int),S3))
+
 
 prop_sort3WithPermutation :: (Int, Int, Int) -> Property
 prop_sort3WithPermutation (xs :: (Int,Int,Int)) = 
@@ -45,5 +47,11 @@ prop_sort3WithPermutation (xs :: (Int,Int,Int)) =
 
 prop_s3sgn :: Property
 prop_s3sgn = isGroupHomo s3sgn
+
+prop_S2_Index2_LeftAction :: Property
+prop_S2_Index2_LeftAction = polyprop_lact (undefined :: Proxy (S2,Index2))
+
+prop_S3_Index3_LeftAction :: Property
+prop_S3_Index3_LeftAction = polyprop_lact (undefined :: Proxy (S3,Index3))
 
 qc_Math_Groups_Tests = $quickCheckAll

@@ -482,3 +482,5 @@ triang gluings = mkTriangulation n gluings
 
 instance UpdatablePreTriangulation Triangulation where
     setGlueMap gm _ = glueMapToTriangulation gm
+
+

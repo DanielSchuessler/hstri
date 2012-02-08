@@ -39,7 +39,7 @@ import MathUtil
 import FileLocation
 
 
-class (Vertices s, Edges s, Vertices (Ed s), Vert s ~ Vert (Ed s), Verts (Ed s) ~ Pair (Vert (Ed s))) => DeltaSet1 s where
+class (Vertices s, Edges s, Vert s ~ Vert (Ed s), EdgeLike (Ed s)) => DeltaSet1 s where
 
 
 face10 :: (Vertices e, Verts e ~ (v, v)) => e -> Index2 -> v

@@ -1,14 +1,20 @@
-{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, TupleSections, FlexibleContexts, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances, StandaloneDeriving, CPP, RecordWildCards, TemplateHaskell, NoMonomorphismRestriction, TupleSections, FlexibleContexts, TypeFamilies, FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module Simplicial.DeltaSet2(
     module Simplicial.DeltaSet1,
     SatisfiesSimplicialIdentities2,
+    PreDeltaSet2,
     DeltaSet2,
     face21,
+    DefaultVertsOfTri,
+    defaultVerticesOfTri,
+    DeltaSetMorphism2(..),
+
+    -- * AnySimplex2
     AnySimplex2,
     AnySimplex2Of,
-    verticesOfTriDefault,
     foldAnySimplex2,
     vertToAnySimplex2,
     edToAnySimplex2,
@@ -17,11 +23,16 @@ module Simplicial.DeltaSet2(
     biMapAnySimplex2,
     anySimplex1To2,
     anySimplex2s,
+    -- * Lookups
     TrianglesContainingEdge_Cache,
     lookupTrianglesContainingEdge,
     mkTCEC,
 --     Unit2Simplex(..),
     Unit2SimplexPoint,
+    -- * Generic
+    GenericDeltaSet2(..),
+    gds2_fromTris,
+
 
     ) where
 
@@ -34,13 +45,27 @@ import Language.Haskell.TH.Lift
 import ShortShow
 import MathUtil
 import FileLocation
+import Data.Ord
+import Util
+
 
 -- | LAW: @forall i j. i >= j ==> 'edgeGetVertexAt' i . 'triangleGetEdgeAt' j == 'edgeGetVertexAt' j . 'triangleGetEdgeAt' (i+1)@  
 --
 -- (modulo index type conversions)
-class (Edges t, Eds t ~ Triple (Ed t), Vertices (Ed t), Verts (Ed t) ~ Pair (Vert (Ed t))) => SatisfiesSimplicialIdentities2 t
+class (TriangleLike t) => SatisfiesSimplicialIdentities2 t
 
-class (DeltaSet1 s, Triangles s, Ed s ~ Ed (Tri s), SatisfiesSimplicialIdentities2 (Tri s)) => DeltaSet2 s where
+
+
+class (DeltaSet1 s, Triangles s, Ed s ~ Ed (Tri s), TriangleLike (Tri s)) => PreDeltaSet2 s
+instance (DeltaSet1 s, Triangles s, Ed s ~ Ed (Tri s), TriangleLike (Tri s)) => PreDeltaSet2 s
+
+class (PreDeltaSet2 s, SatisfiesSimplicialIdentities2 (Tri s)) => DeltaSet2 s
+
+class DeltaSetMorphism2 t t' f | f -> t t' where
+    mapVert :: f -> Vert t -> Vert t' 
+    mapEd :: f -> Ed t -> Ed t'
+    mapTri :: f -> t -> t' 
+
 
 
 face21 :: (Triangles t, Tris t ~ (e, e, e)) => t -> Index3 -> e
@@ -80,12 +105,15 @@ triToAnySimplex2 :: t -> AnySimplex2 v e t
 triToAnySimplex2 = right'
 
 
-verticesOfTriDefault
+type DefaultVertsOfTri t = Triple (Vert (Ed t))
+
+defaultVerticesOfTri
   :: (SatisfiesSimplicialIdentities2 t) =>
 
-     t -> Triple (Vert (Ed t))
+     t -> DefaultVertsOfTri t
 
-verticesOfTriDefault t = (v2,v1,v0)
+-- | Derives a 'vertices' function for a triangle-like type, given that 'edges' is implemented and 'vertices' is implemented for @'Ed' t@.
+defaultVerticesOfTri t = (v0,v1,v2)
     where
         (e01,e02,_) = edges t
         (v0,v1) = vertices e01
@@ -100,7 +128,7 @@ newtype TrianglesContainingEdge_Cache ed tri =
 
 
 mkTCEC
-  :: (Ord (Ed s), DeltaSet2 s) => s -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
+  :: (Ord (Ed s), PreDeltaSet2 s) => s -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
 mkTCEC s = TCEC (flip $(indx) m)
     where
         m = M.fromListWith (++)
@@ -139,6 +167,42 @@ instance (Lift v, Lift e, Lift t) => Lift (AnySimplex2 v e t) where
 instance (ShortShow v, ShortShow e, ShortShow t) => ShortShow (AnySimplex2 v e t) where
     shortShow = foldAnySimplex2' shortShow shortShow 
 
+data GenericDeltaSet2 t = GDS2 {
+        gds2_vertices :: [Vert t],
+        gds2_edges :: [Ed t],
+        gds2_triangles :: [t] 
+    }
+
+#define DERIVE(C) deriving instance (C t, C (Ed t), C (Vert t)) => C (GenericDeltaSet2 t)
+DERIVE(Show)
+#undef DERIVE
+
+
+instance Vertices (GenericDeltaSet2 t) where
+    type Verts (GenericDeltaSet2 t) = [Vert t]
+    vertices = gds2_vertices
+
+instance Edges (GenericDeltaSet2 t) where
+    type Eds (GenericDeltaSet2 t) = [Ed t]
+    edges = gds2_edges
+
+instance Triangles (GenericDeltaSet2 t) where
+    type Tris (GenericDeltaSet2 t) = [t]
+    triangles = gds2_triangles
+
+instance (SatisfiesSimplicialIdentities2 t) => DeltaSet1 (GenericDeltaSet2 t) 
+instance (SatisfiesSimplicialIdentities2 t) => DeltaSet2 (GenericDeltaSet2 t) 
+
+
+gds2_fromTris :: (Ord (Vert t), Ord (Ed t), SatisfiesSimplicialIdentities2 t) => 
+    [t] -> GenericDeltaSet2 t
+gds2_fromTris tris = 
+    let
+        eds = nub' . concatMap edgeList $ tris
+        verts = nub' . concatMap vertexList $ eds
+    in
+        GDS2 verts eds tris
+
 -- data Unit2Simplex = Unit2Simplex
 --     deriving Show
 -- 
@@ -163,11 +227,4 @@ instance (ShortShow v, ShortShow e, ShortShow t) => ShortShow (AnySimplex2 v e t
 --             a = Vec2 0 0
 --             b = Vec2 0 1
 --             c = Vec2 1 0
-
-data LayeringEdge = LayeringEdge
-    deriving Show
-
-data LayeringFace = LayeringFace0 | LayeringFace1
-    deriving Show
-
 

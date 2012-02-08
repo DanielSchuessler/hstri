@@ -74,5 +74,25 @@ failureWithLoc l e = failureWithoutLoc (Located l e)
 failure :: Q Exp
 failure = [| failureWithLoc $liftedLocationString |] 
 
+type LErrorCall = Located ErrorCall
+
+idLErrorCall :: EitherC LErrorCall a -> EitherC LErrorCall a
+idLErrorCall = id
+
 failureStr :: Q Exp
-failureStr = [| $failure . ErrorCall |]
+failureStr = [| idLErrorCall . $failure . ErrorCall |]
+
+-- | Catches and rethrows with a message prepended
+--
+-- @$(wrapFailureStr) :: Show e => [Char] -> EitherC e a -> EitherC LErrorCall a@
+wrapFailureStr :: Q Exp
+wrapFailureStr = 
+    [| \_newMsg _x -> 
+            idLErrorCall (
+                runEitherC _x 
+                    (\_err -> $failureStr (_newMsg++"\n\tInner error: "++show _err))
+                    return
+                    )
+                    
+                    |]
+                
