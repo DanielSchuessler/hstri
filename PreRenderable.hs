@@ -291,6 +291,8 @@ pr_setTriangleEmbedding
 pr_setTriangleEmbedding = setL pr_generalTriangleEmbeddingL
 
 
+triResolutionToEdgeResolution = (*10)
+
 pr_edgeEmbedding
   :: (PreDeltaSet2 s,
       Show (Ed s),
@@ -317,7 +319,7 @@ pr_edgeEmbedding pr tcec e =
 
                     GeneralEdge
                         (GEE
-                            res
+                            (triResolutionToEdgeResolution res)
                             (emb . pretransform))
 
                   where

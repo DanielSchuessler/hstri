@@ -323,7 +323,7 @@ dhE = DimensionHandler f
                                     curve_name = "SomeCurvedEdge",
                                     bevel_depth = thickness,
                                     bevel_resolution = 10,
-                                    curve_splines = [nurbsFromFun gee],
+                                    curve_splines = [(nurbsFromFun 2) gee],
                                     curve_resolution_u = 4,
                                     curve_mats = [] -- set in finishSimplexProcessing 
                                 })
@@ -565,13 +565,15 @@ grpLink gr obj = methodCall1 (bgrp_objectsE gr) "link" obj
 
 type StepCount = Int
 
-nurbsFromFun :: GeneralEdgeEmbedding -> BlenderSpline
-nurbsFromFun (GEE steps f) =
+-- note: we usually set spline_resolution_u low (1 or 2) and instead compute subdivisions here by increasing 'steps'
+nurbsFromFun :: Int -> GeneralEdgeEmbedding -> BlenderSpline
+nurbsFromFun spline_resolution_u (GEE steps f) =
     Nurbs {
         use_endpoint_u = True,
         order_u = 3,
         spline_points = ys,
-        use_cyclic_u = normsqr (f 0 - f 1) < 1E-10
+        use_cyclic_u = normsqr (f 0 - f 1) < 1E-10,
+        spline_resolution_u
     }
 
     where
@@ -631,10 +633,10 @@ newTriangularSurfaceObj = memo prepare
                     newCurveObj (py "helpLine") (BlenderCurve {
                         curve_name = "HelpLineCurve",
                         bevel_depth = helpLineThickness,
-                        bevel_resolution = 2,
+                        bevel_resolution = 4,
                         curve_resolution_u = 1,
                         curve_mats = maybeToList helpLineMat,
-                        curve_splines = map nurbsFromFun 
+                        curve_splines = map (nurbsFromFun 1) 
                             ( concat 
                                 [ [ GEE steps' (emb . (\x -> Vec2 (x*p') p)) -- horiz 
                                 , GEE steps' (emb . (\x -> Vec2 p (x*p'))) -- vert

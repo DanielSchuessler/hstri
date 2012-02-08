@@ -94,6 +94,9 @@ triTriTextureSlot = MTS {
 threeMFGroup :: BlenderGroup
 threeMFGroup = BlenderGroup "ThreeMF"
 
+surfaceSpecularHardness :: Int
+surfaceSpecularHardness = 200
+
 pseudomanifoldStyle :: Style
 pseudomanifoldStyle = Style {
     mat0 = (basicMaterial "pmMat0" (let r=0.3 in diffuseColor (r, r, r):[])),
@@ -111,7 +114,7 @@ pseudomanifoldStyle = Style {
     mat1 = basicMaterial "pmMat1" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8)
     mat2 = Material 
                 "pmMat2" 
-                (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8) 
+                (diffuseColor (0.7, 0.7, 0.8):specular surfaceSpecularHardness 0.8) 
                 (Just (Trans 0.25 0.3 1))
                 []
 
@@ -143,7 +146,7 @@ mkNormalSurfaceStyle suf col0 col1 col2 = Style
     mat2 =
                 Material 
                     ("nsurfMat2"++suf) 
-                    (diffuseColor col2:specular 100 0.8)
+                    (diffuseColor col2:specular surfaceSpecularHardness 0.8)
                     (Just (Trans 0.55 0.7 1))
                     []
 

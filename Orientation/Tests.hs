@@ -37,7 +37,7 @@ prop_closedNorCensus8_not_oriented =
                 r = orientTriangulation tr 
             in
                 printTestCase (show r) $
-                collect r $
+--                 collect r $
                 isLeft r)
 
 prop_inducedOrient32_equivariant t = 

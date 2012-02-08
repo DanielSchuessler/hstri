@@ -245,11 +245,11 @@ prettyRealFloat = text . addSpace . ($"") . showFFloat (Just 3)
 class Pretty a where
     prettyPrec :: Int -> a -> Doc
     pretty :: a -> Doc
-    prettyList    :: [a] -> Doc
+    prettyPrecList    :: Int -> [a] -> Doc
 
     pretty = prettyPrec 0
     prettyPrec _ = pretty
-    prettyList    = list . map pretty
+    prettyPrecList _ = list . map pretty
 
 -- | Note: use 'anyPretty' (not 'pretty') if the arg list is heterogenous
 prettyPrecApp :: (Pretty f, Pretty bs) => Int -> f -> [bs] -> Doc
@@ -289,18 +289,18 @@ instance (Ord a, Pretty a, Pretty b) => Pretty (Map a b) where
 instance Pretty Doc where pretty = id
 
 instance Pretty a => Pretty [a] where
-  pretty        = prettyList
+  prettyPrec    = prettyPrecList
 
 instance Pretty Char where
-  pretty c      = char c
-  prettyList s  = string s
+  pretty c            = char c
+  prettyPrecList _ s  = string s
 
 instance Pretty a => Pretty (Maybe a) where
     prettyPrec _ Nothing = text "Nothing" 
     prettyPrec prec (Just a) = prettyPrecApp prec "Just" [a] 
 
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
-    prettyPrec prec (Left a) = prettyPrecApp prec "Left" [a]
+    prettyPrec prec (Left a)  = prettyPrecApp prec "Left" [a]
     prettyPrec prec (Right b) = prettyPrecApp prec "Right" [b]
 
 instance Pretty Double where pretty = prettyRealFloat

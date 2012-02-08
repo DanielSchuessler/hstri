@@ -41,7 +41,6 @@ Library
     Data.AscTuples
     Data.EdgeLabelledTree
     Data.FormalOps
-    Data.Numbering
     Data.SumType
     Data.Tuple.Index
     DisjointUnion
@@ -202,6 +201,7 @@ Library
         , xml-monad
         , xmlgen
         , zlib
+        , numbering
 
 --        , yices-painless
 
