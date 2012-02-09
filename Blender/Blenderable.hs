@@ -87,10 +87,12 @@ data Scene s = Scene {
     scene_worldProps :: Props,
     scene_cams :: [Cam],
     scene_setLongLabelCustomProperties :: Bool,
-    scene_initialSelection :: Maybe (AnySimplex2Of s)
+    scene_initialSelection :: Maybe (AnySimplex2Of s),
+    scene_render :: RenderSettings
 }
 
 nameMakeLens ''Scene (Just . (++"L"))
+
 
 
                         
@@ -123,7 +125,8 @@ defaultScene0 s = Scene {
     scene_worldProps = defaultWorldProps,
     scene_cams = [defaultCam],
     scene_setLongLabelCustomProperties = False,
-    scene_initialSelection = Nothing
+    scene_initialSelection = Nothing,
+    scene_render = defaultRenderSettings
 }
 
 defaultCam :: Cam
@@ -189,7 +192,8 @@ setCams = setL scene_camsL
 setCam :: Cam -> Scene s -> Scene s
 setCam = setCams . return
 
-
+setRS :: RenderSettings -> Scene s -> Scene s
+setRS = setL scene_renderL
 
 
 -- | = @uncurry 'fromSpqwcAndIntegerNormalSurface'@

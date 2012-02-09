@@ -3,6 +3,7 @@
 module SimplicialPartialQuotient where
 
 import Control.Applicative
+import Control.DeepSeq
 import Control.Exception
 import Control.Monad
 import Data.AscTuples
@@ -10,22 +11,22 @@ import Data.Lens.Common
 import Data.Lens.Template
 import Data.Map(Map)
 import Data.Maybe
+import Debug.Trace
+import FileLocation
 import HomogenousTuples
-import Tetrahedron.INormalDisc
+import MathUtil
 import PreRenderable
 import PrettyUtil
 import ShortShow
 import Simplicial.SimplicialComplex
 import Test.QuickCheck
+import Tetrahedron.INormalDisc
 import Tetrahedron.NormalDisc
 import Triangulation
 import TriangulationCxtObject
 import Util
 import qualified Data.List as L
 import qualified Data.Map as M
-import Control.DeepSeq
-import FileLocation
-import Debug.Trace
 
 -- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
@@ -363,7 +364,7 @@ spqwc_coords' :: SPQWithCoords v -> IVertex -> Vec3
 spqwc_coords' spqwc = spqwc_coords spqwc . spqwc_map spqwc
 
 instance Coords (SPQWithCoords v) where
-    transformCoords = modL spqwc_coordsL . (.)
+    transformCoords f = modL spqwc_coordsL ((tup3toVec3 . lowerFF f . vec3toTup3) .)
 
 
 

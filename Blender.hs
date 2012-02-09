@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
+{-# LANGUAGE RankNTypes, ImplicitParams, GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
 {-# OPTIONS -Wall -fno-warn-unused-imports -fwarn-missing-local-sigs #-}
 module Blender(
@@ -42,6 +42,9 @@ import qualified Data.Vector as V
 import Data.Time.Clock
 import Data.Lens.Common
 import Control.Monad.IfElse
+import Numeric.AD.Types
+import Data.VectorSpace((*^))
+import Numeric.AD.Classes(lift)
 
 #define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), Pretty (Vert s), Pretty (Ed s), Pretty (Tri s), PreDeltaSet2 s, Pretty s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
 #define CONSTRAINTS(s) ?scene::Scene s, CONSTRAINTS0(s) 
@@ -169,6 +172,7 @@ toBlender scene@Scene{
 
             -- Make a new scene
             sceneVar .= methodCallExpr1 (bpy_dat "scenes") "new" (str "TheScene")
+            setRenderSettings sceneVar (scene_render scene)
             -- Remove all other scenes
             ln  "for s in data.scenes:"
             indent $ do
@@ -218,6 +222,7 @@ toBlender scene@Scene{
             when (isJust . scene_initialSelection $ scene) $ do
                 deselectAllStmt
                 toBeSelectedVar <.> "select" .= True
+
 
         
 
@@ -572,14 +577,16 @@ nurbsFromFun spline_resolution_u (GEE steps f) =
         use_endpoint_u = True,
         order_u = 3,
         spline_points = ys,
-        use_cyclic_u = normsqr (f 0 - f 1) < 1E-10,
+        use_cyclic_u = normsqr (fv 0 - fv 1) < 1E-10,
         spline_resolution_u
     }
 
     where
             m = steps - 1
 
-            ys = V.generate steps (\i -> f (fi i / fi m))
+            fv = tup3toVec3 . lowerUF f
+
+            ys = V.generate steps (\i -> fv (fi i / fi m))
 
 
 
@@ -590,7 +597,7 @@ nurbsFromFun spline_resolution_u (GEE steps f) =
 newTriangularSurfaceObj :: 
         Int 
     -> PythonVar
-    -> (Unit2SimplexPoint -> Vec3) 
+    -> FF Tup2 Tup3 Double
     -> Maybe Material
     -> Python ()
 newTriangularSurfaceObj = memo prepare
@@ -615,15 +622,17 @@ newTriangularSurfaceObj = memo prepare
 
                 fi_m = fi m
             in
-                \var emb helpLineMat -> do
+                \var (emb :: FF Tup2 Tup3 Double) helpLineMat -> do
                     newMeshObj var
                         (Mesh {
-                            meshVertices = map emb vertices_normalizedUV,
+                            meshVertices = map 
+                                            (tup3toVec3 . lowerFF emb . vec2toTup2)
+                                            vertices_normalizedUV,
 
                             meshFaces = tris,
                             meshSmooth = True,
                             uv_textures = 
-                                [ MeshUVLayer triangleUVLayerName  tris_normalizedUV ] ,
+                                [ MeshUVLayer triangleUVLayerName tris_normalizedUV ] ,
 
                             meshMats = []
 
@@ -638,21 +647,23 @@ newTriangularSurfaceObj = memo prepare
                         curve_mats = maybeToList helpLineMat,
                         curve_splines = map (nurbsFromFun 1) 
                             ( concat 
-                                [ [ GEE steps' (emb . (\x -> Vec2 (x*p') p)) -- horiz 
-                                , GEE steps' (emb . (\x -> Vec2 p (x*p'))) -- vert
-                                , GEE steps' (emb . (\x -> p' *& interpolate x vec2X vec2Y)) -- diag
+                               [ 
+                                [ GEE steps' (emb . (\x -> tup2 (x*lift p') (lift p))) -- horiz 
+                                , GEE steps' (emb . (\x -> tup2 (lift p) (x*lift p'))) -- vert
+                                , GEE steps' (emb . (\x -> lift p' *^ interpol x tup2X tup2Y)) -- diag
                                 ]
 
                                     |  i <- [ 1 .. helpLineN ]
 
                                             -- runs from 1/(n+1) to n/(n+1)
-                                    ,  let p = fi i/fi (helpLineN + 1) :: Double
+                                    ,  let p = fi i/fi (helpLineN + 1) 
                                             -- runs from n/(n+1) to 1/(n+1)
                                     ,  let p' = 1-p  
-                                    ,  let steps' = (max 4 (round (fi helpLineMaxSteps * p'))) :: Int
+--                                     ,  let steps' = (max 4 (round (fi helpLineMaxSteps * p'))) :: Int
+                                    ,  let steps' = helpLineMaxSteps :: Int
                                         
                                         
-                                ] 
+                               ] 
                                 )
                         })
 
@@ -669,3 +680,7 @@ deselectAllStmt = foreachStmt "o" (py "context.selected_objects")
 
 
 
+setRenderSettings :: ToPython a => a -> RenderSettings -> Python ()
+setRenderSettings _sceneVar RS{..} = do
+    _sceneVar <.> "render.resolution_x" .= render_resolution_x
+    _sceneVar <.> "render.resolution_y" .= render_resolution_y

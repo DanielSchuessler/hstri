@@ -104,6 +104,7 @@ Library
     StandardCoordinates.MatchingEquations
     StandardCoordinates.Class
     THUtil
+    THBuild
     TIndex
     Tetrahedron.Edge
     Tetrahedron.NormalArc
@@ -137,7 +138,7 @@ Library
     Data.BitVector.Adaptive
 
 
-  Build-depends: 
+  Build-depends: ad, 
 
           comonads-fd
         , ansi-wl-pprint

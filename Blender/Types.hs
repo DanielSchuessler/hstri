@@ -184,3 +184,15 @@ data TextCurve = TextCurve {
     -- | Thickness
     textCurve_extrude :: Double
 }
+
+data RenderSettings = RS {
+    render_resolution_x :: Int, 
+    render_resolution_y :: Int
+}
+   deriving Show
+    
+defaultRenderSettings :: RenderSettings
+defaultRenderSettings = RS {
+    render_resolution_x = 1920,
+    render_resolution_y = 1080
+}                         

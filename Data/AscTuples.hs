@@ -20,7 +20,7 @@ import PrettyUtil
 import QuickCheckUtil
 import ShortShow
 import Simplicial.DeltaSet3
-import THUtil
+import THBuild
 import Test.QuickCheck
 import TupleTH
 import Util

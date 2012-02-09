@@ -17,6 +17,8 @@ import Data.Vect.Double.Util.Dim2
 import Debug.Trace
 import Control.Exception
 import THUtil
+import Data.AdditiveGroup
+import Data.VectorSpace
 
 main = edge20
 
@@ -58,7 +60,7 @@ collapseEdge =
                 . pr_makeEmbeddingsGeneral (const 25)
                 . toPreRenderable $ before
 
-        f0 (Vec3 x y z) = Vec3 x y (z * (norm (Vec2 x y)))
+        f0 (Tup3 (x, y, z)) = tup3 x y (z * (twoNorm (tup2 x y)))
 
     in do
         testBlender (setCam cam . defaultScene $ step0)
@@ -90,26 +92,28 @@ vertex20 =
         gtes = flip M.lookup
                 (M.fromList $ 
                     [
-                        (p (0./tBCD), GTE res (dome vec3Z))
-                      , (p (1./tBCD), GTE res (dome (negate vec3Z)))
+                        (p (0./tBCD), GTE res (dome tup3Z))
+                      , (p (1./tBCD), GTE res (dome (negateV tup3Z)))
 
                     ])
 
         res = 100
 
+        tup3Z = tup3 0 0 1
 
-        dome dir = 
-            withBaryCoords (\tuv@(Vec3 t u v) -> 
+
+        dome dir (Tup2 (u,v)) = 
                 let
-                    f x = x^2 / normsqr tuv
+                    t = 1-u-v
+                    f x = x^2 / twoNormSqr (tup3 t u v)
                 in
-                    f t *& coords (p (0./vB))
-                    &+
-                    f u *& coords (p (0./vC))
-                    &+
-                    f v *& coords (p (0./vD))
-                    &+
-                    (10*t*u*v) *& dir)
+                    f t *^ (liftVec3 . coords) (p (0./vB))
+                    ^+^
+                    f u *^ (liftVec3 . coords) (p (0./vC))
+                    ^+^
+                    f v *^ (liftVec3 . coords) (p (0./vD))
+                    ^+^
+                    (10*t*u*v) *^ dir
 
 
 
@@ -183,7 +187,7 @@ edge20 =
         res = 20
 
 
-        sphericalTriangle ydir zdir (Vec2 u v) = 
+        sphericalTriangle ydir zdir (Tup2 (u, v)) = 
             let
                 -- latitude. runs from 0 (zdir*vec3Y) to 1 (equator, z = 0)
                 s = u+v     
@@ -197,11 +201,11 @@ edge20 =
                 s' = s*pi/2
                 d' = d*pi/2
             in
-                Vec3 (sin s' * sin d') (ythickness * ydir * sin s' * cos d') (zdir * cos s') 
+                tup3 (sin s' * sin d') (ythickness * ydir * sin s' * cos d') (zdir * cos s') 
 
         ythickness = 0.5 -- 1 = sphere 
 
-        semidisk xdir (Vec2 bness cness {- cness is representative for cness or dness #-}) = 
+        semidisk xdir (Tup2 (bness, cness {- cness is representative for cness or dness #-})) = 
             let
                 aness = 1-bness-cness 
 
@@ -221,8 +225,9 @@ edge20 =
                 xz_0 = -- if we're close to c (low abness), draw circular arcs
                                 (let 
                                     phimax = acos (abnessDistorted/2) 
-                                    Vec2 foo bar = sinCosRadius (a_vs_b*phimax) abnessDistorted
-                                 in  Vec2 (1-foo) bar)
+                                    foo = cos (a_vs_b*phimax) * abnessDistorted
+                                    bar = sin (a_vs_b*phimax) * abnessDistorted
+                                 in  tup2 (1-foo) bar)
 
                 xz_1 = -- if we're close to ab, draw lines
                                 (let x = 1-abnessDistorted 
@@ -230,13 +235,13 @@ edge20 =
                                      -- x^2 + zbounds^2 = 1
                                      z = zbounds*a_vs_b 
                                  in
-                                    Vec2 x z)
+                                    tup2 x z)
 
-                xz@(Vec2 x z) = interpolate abness xz_0 xz_1
+                xz@(Tup2 (x, z)) = slerpG abness xz_0 xz_1
                                 
             in
-                $(assrt [| norm xz < 1+1E-10 |] ['xz,'xz_0,'xz_1]) $
-                Vec3 (xdir * x) 0 z
+--                 $(assrt [| twoNormSqr xz < 1+1E-10 |] ['xz,'xz_0,'xz_1]) $
+                tup3 (xdir * x) 0 z
 
 
 
@@ -266,12 +271,20 @@ edge20 =
 
                     $ before
                 
-        cam_edge20 = readCam "(Vector((4.056652069091797, -1.6806788444519043, 1.085201621055603)), Euler((1.3310924768447876, 1.799694018700393e-06, 1.1548134088516235), 'XYZ'), 0.8575560591178853)"
+        cam_edge20 = readCam "(Vector((2.3236193656921387, -0.9150908589363098, 0.6221537590026855)), Euler((1.331398844718933, 4.063907454110449e-06, 1.168649673461914), 'XYZ'), 0.8575560591178853)"
+--         cam_edge20 = readCam "(Vector((4.056652069091797, -1.6806788444519043, 1.085201621055603)), Euler((1.3310924768447876, 1.799694018700393e-06, 1.1548134088516235), 'XYZ'), 0.8575560591178853)"
+
+
+        go pr = testBlender (setCam cam_edge20 
+                                . setRS (RS 1200 1200)
+                                . defaultScene 
+                                . mkBlenderable pseudomanifoldStyle 
+                                $ pr) 
 
 
     in do
---         testBlender (setCam cam_edge20 . defaultScene . mkBlenderable pseudomanifoldStyle $ before) 
-        testBlender (setCam cam_edge20 . defaultScene . mkBlenderable pseudomanifoldStyle $ after) 
+        go before
+        go after
 
 
 -- floating-point-retardant sqrt

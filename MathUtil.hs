@@ -19,7 +19,6 @@ import Data.Vect.Double hiding(Vector)
 import qualified Data.Vect.Double as Vect
 import System.Random
 import Test.QuickCheck
-import qualified Data.Foldable as Fold
 import qualified Data.List as L
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
@@ -30,6 +29,11 @@ import HomogenousTuples
 import Control.Arrow((&&&))
 import Util
 import OrphanInstances()
+import qualified Numeric.AD.Internal.Classes as AD
+import Data.Monoid(Sum(..))
+import qualified Data.Foldable as Fold
+import Data.Foldable(Foldable)
+import Data.VectorSpace hiding(Sum(..))
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 0 y z) = Vec3 0 (-z) y
@@ -301,3 +305,88 @@ baryCoordsEndo
      -> Unit2SimplexPoint -> Unit2SimplexPoint
 baryCoordsEndo f = 
     withBaryCoords (stdToUnit2 . f)
+
+
+
+tup2toVec2 ::  Tup2 Double -> Vec2
+tup2toVec2 = foldT2 Vec2
+tup3toVec3 ::  Tup3 Double -> Vec3
+tup3toVec3 = foldT3 Vec3
+
+vec2toTup2 ::  Vec2 -> Tup2 Double
+vec2toTup2 (Vec2 a b) = Tup2 (a, b)
+vec3toTup3 ::  Vec3 -> Tup3 Double
+vec3toTup3 (Vec3 a b c) = Tup3 (a, b, c)
+
+liftVec3 :: AD.Mode t => Vec3 -> Tup3 (t Double)
+liftVec3 = fmap AD.lift . vec3toTup3 
+
+{-# SPECIALIZE twoNormSqr :: Tup2 Double -> Double #-}
+{-# SPECIALIZE twoNormSqr :: Tup3 Double -> Double #-}
+twoNormSqr :: (Num c, Foldable t) => t c -> c
+twoNormSqr = getSum . Fold.foldMap (\x-> Sum (x*x))
+
+{-# SPECIALIZE twoNorm :: Tup2 Double -> Double #-}
+{-# SPECIALIZE twoNorm :: Tup3 Double -> Double #-}
+twoNorm :: (Floating c, Foldable t) => t c -> c
+twoNorm = sqrt . twoNormSqr
+
+-- -- Stolen from the 'vect' package
+-- rotMatrix3normal :: Normal3 -> Flt -> Mat3
+-- rotMatrix3normal (Tup3 x y z) a = 
+--   let v = fromNormal u
+--       c = cos a
+--       s = sin a
+--       m1 = scalarMul (1-c) (outer v v)
+--       m2 = Mat3 (Vec3   c    ( s*z) (-s*y))
+--                 (Vec3 (-s*z)   c    ( s*x))
+--                 (Vec3 ( s*y) (-s*x)   c   )
+--   in (m1 &+ m2)
+-- 
+--
+
+
+-- | ARGS MUST BE OF LENGTH 1
+slerpNormal
+  :: (Floating (Scalar v), InnerSpace v) => Scalar v -> v -> v -> v
+slerpNormal t p0 p1 =
+
+    if s==0 then p0 else v
+
+
+  where
+    -- Stolen from the 'vect' package
+  v = (p0 ^* y0) ^+^ (p1 ^* y1) 
+  omega = acos (p0 <.> p1)
+  s = sin omega
+  y0 = sin (omega*(1-t)) / s 
+  y1 = sin (omega*   t ) / s
+
+
+-- | scale to unit sphere, slerp, then scale back (to the norm of the *first* arg)
+slerpG
+  :: (Floating uf,
+      Ord uf,
+      Foldable t,
+      InnerSpace (t uf),
+      Scalar (t uf) ~ uf,
+      RealFloat uf,
+      Show uf, Show (t uf) 
+      ) =>
+     uf -> t uf -> t uf -> t uf
+slerpG 0 v0 _ = v0
+slerpG 1 _ v1 = v1
+slerpG t v0 v1 =
+    let
+        n0 = twoNorm v0
+        n1 = twoNorm v1
+
+        res = (slerpNormal t (v0 ^/ n0) (v1 ^/ n1)) ^* n0
+    in
+        if Fold.any (liftM2 (||) isNaN isInfinite) res
+        then error ("slerpG "++ sp11 t ++" " ++sp11 v0++" "++sp11 v1++" = "++show res)
+        else res
+
+
+sp11 :: Show a => a -> String
+sp11 x = showsPrec 11 x ""

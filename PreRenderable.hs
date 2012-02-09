@@ -1,10 +1,11 @@
-{-# LANGUAGE NoMonomorphismRestriction, ViewPatterns, RecordWildCards, TemplateHaskell, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
+{-# LANGUAGE ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, ViewPatterns, RecordWildCards, TemplateHaskell, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-orphans #-}
 module PreRenderable(
     -- * Reex
     module Math.Groups.S3,
+    module Numeric.AD,
     Vec2(..),Vec3(..),(&+),(&-),(&*),(*&),
 
     -- * Main
@@ -18,7 +19,7 @@ module PreRenderable(
     GeneralEdgeEmbedding(..),
     PreRenderable(..),
     Coords(..),
-    rotateAngleAxis,
+--     rotateAngleAxis,
     mkPreRenderable,
     mkPreRenderableWithTriangleLabels,
     tet3d,
@@ -55,7 +56,6 @@ import Control.Monad
 import Data.AscTuples
 import Data.String
 import Data.Vect.Double.Base hiding((*.),(.*),(.*.))
-import Data.Vect.Double.Interpolate
 import DisjointUnion
 import GHC.Generics
 import Language.Haskell.TH.Lift
@@ -72,8 +72,10 @@ import Tetrahedron.Vertex
 import Util
 import Data.Lens.Template
 import Data.Lens.Common
-import Data.Vect.Double.Util.Dim3(rotate3)
-import Data.Vect.Double.Util.Dim2
+import Numeric.AD(FF,UF,lowerFF,lowerUF,AD)
+import Control.Applicative
+import Data.AdditiveGroup
+import Data.VectorSpace
 
 type Resolution = Int
 
@@ -87,7 +89,7 @@ data GeneralTriangleEmbedding =
     -- The arc from zero to vec2Y corresponds to e1 
     --
     -- The arc from vec2X to vec2Y corresponds to e2 
-    GTE Resolution (Unit2SimplexPoint -> Vec3)
+    GTE Resolution (FF Tup2 Tup3 Double)
 
 instance Coords GeneralTriangleEmbedding where
     transformCoords f (GTE res g) = GTE res (f . g)
@@ -105,7 +107,7 @@ data GeneralEdgeEmbedding =
     --
     -- 1 corresponds to v1
     --
-    GEE Resolution (UnitIntervalPoint -> Vec3)
+    GEE Resolution (UF Tup3 Double)
 
 instance Coords GeneralEdgeEmbedding where
     transformCoords f (GEE res g) = GEE res (f . g)
@@ -116,10 +118,10 @@ data EdgeEmbedding =
 
 
 class Coords t where
-    transformCoords :: (Vec3 -> Vec3) -> t -> t
+    transformCoords :: (FF Tup3 Tup3 Double) -> t -> t
 
-rotateAngleAxis :: Coords t => Double -> Vec3 -> t -> t
-rotateAngleAxis = (.) transformCoords  . rotate3
+-- rotateAngleAxis :: Coords t => Double -> Vec3 -> t -> t
+-- rotateAngleAxis = (.) transformCoords  . rotate3
 
 
 data Visibility = Visible | Invisible
@@ -146,9 +148,9 @@ data PreRenderable s = PreRenderable {
 nameMakeLens ''PreRenderable (Just . (++"L"))
 
 
-pr_quad
-  :: Resolution -> (UnitSquare -> Vec3) -> PreRenderable (SC2 (Bool, Bool))
-pr_quad reso f = 
+-- pr_quad
+--   :: Resolution -> (UnitSquare -> Vec3) -> PreRenderable (SC2 (Bool, Bool))
+pr_quad reso (f :: FF Tup2 Tup3 Double) = 
     PreRenderable {
         pr_ds = ds,
         pr_coords0 = const (assert False undefined),
@@ -159,10 +161,11 @@ pr_quad reso f =
             \t -> 
                 (Nothing,
                  
-                    let pretransform =
+                    let pretransform :: FF Tup2 Tup2 Double 
+                        pretransform =
                             if elemAsc3 ff t 
                                 then id
-                                else \(Vec2 u v) -> Vec2 (u+v) (1-v)
+                                else \(Tup2 (u, v)) -> Tup2 (u+v, 1-v)
 
                     in (Just . GTE reso) (f . pretransform)
                     )
@@ -188,7 +191,7 @@ pr_quad reso f =
 
 instance Coords (PreRenderable a) where
     transformCoords f =
-            modL pr_coords0L (f .)
+            modL pr_coords0L (\coords0 -> tup3toVec3 . lowerFF f . vec3toTup3 . coords0)
         .   modL pr_edgeInfoL (fmap (transformCoords f) .)
         .   modL (pr_triangleInfoL >>> secondLens) (fmap (transformCoords f) .)
 
@@ -323,14 +326,15 @@ pr_edgeEmbedding pr tcec e =
                             (emb . pretransform))
 
                   where
+                    pretransform :: UF Tup2 Double
                     pretransform = 
                         let (v0,v1) = 
                                 case i of
-                                     I3_0 -> (zero,vec2X)
-                                     I3_1 -> (zero,vec2Y)
-                                     I3_2 -> (vec2X,vec2Y)
+                                     I3_0 -> (pure 0,tup2X)
+                                     I3_1 -> (pure 0,tup2Y)
+                                     I3_2 -> (tup2X,tup2Y)
 
-                        in \x -> interpolate x v0 v1
+                        in \x -> interpol x v0 v1
 
 flatFace pr ctor mapN verticesAscending face =    
                                 ctor
@@ -365,7 +369,7 @@ pr_coords pr tcec ecvc v =
                          FlatEdge {} -> Nothing
                          GeneralEdge (GEE _ emb) ->
 --                             trace ("Vertex "++show v++" has index "++show i++" in "++show e) $
-                            Just (emb (case i of
+                            Just (tup3toVec3 $ lowerUF emb (case i of
                                             I2_0 -> 0
                                             I2_1 -> 1)))
 
@@ -484,6 +488,14 @@ pr_makeEmbeddingsGeneral triRes pr_ =
                     FlatTriangle a au av ->
                         GTE 
                             (triRes t)
-                            (\(Vec2 u v) -> (1-u-v) *& a &+ u *& au &+ v *& av))
+                            (\(Tup2 (u, v) :: Tup2 (AD s Double)) -> 
+                                ((1-u-v) *^ liftVec3 a) 
+                                ^+^ 
+                                (u *^ liftVec3 au) 
+                                ^+^ 
+                                (v *^ liftVec3 av)
+
+                                :: Tup3 (AD s Double)
+                                ))
 
  $       pr_

@@ -1,5 +1,5 @@
-{-# LANGUAGE NoMonomorphismRestriction, DeriveFoldable, DeriveFunctor, GeneralizedNewtypeDeriving, TemplateHaskell, TypeFamilies #-}
-{-# OPTIONS -Wall #-}
+{-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, DeriveFoldable, DeriveFunctor, DeriveTraversable, GeneralizedNewtypeDeriving, TemplateHaskell, TypeFamilies #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures #-}
 module HomogenousTuples where
 
 import TupleTH
@@ -8,6 +8,14 @@ import Prelude hiding((<=))
 import qualified Prelude as P
 import Data.Ord(comparing)
 import Language.Haskell.TH
+import Data.Foldable(Foldable,foldMap)
+import Data.Traversable(Traversable)
+import Control.Monad
+import Control.Applicative
+import THBuild
+import Data.AdditiveGroup(AdditiveGroup(..))
+import Data.VectorSpace(VectorSpace(..),InnerSpace(..))
+import Data.Monoid(Sum(..))
 
 type Pair a = (a,a)
 type Triple a = (a,a,a)
@@ -226,3 +234,71 @@ sortTuple 3 = [| sort3 |]
 sortTuple 4 = [| sort4 |]
 sortTuple i = [| $(tupleFromList i) . sort . $(tupleToList i) |]
 
+interpol :: (Num c, Applicative f) => c -> f c -> f c -> f c
+interpol p = liftA2 (\x y -> (1-p) * x + p * y)
+
+innerProductForFoldableApplicative x y = getSum . foldMap Sum $ (liftA2 (*) x y) 
+
+
+$(liftM concat $ forM [2,3] (\n ->
+    let
+        na = mkName ("Tup"++show n)
+        ctorname = na
+        thetype = conT na
+        a = mkName "a"
+
+        n_vars stem = [ mkName ("_"++stem++show i) | i <- [0..n-1] ]
+    in
+        sequence
+        [ snewtypeD (cxt[]) na (a&[]) (snormalC ctorname (htuple n (varT a))) 
+            [''Functor,''Foldable,''Traversable,''Show,''Eq,''Ord ]
+
+        , instanceD (cxt []) (''Applicative `sappT` thetype) 
+            [
+                svalD 'pure 
+                    ("_x" \-> (ctorname `sappE` (stupE (replicate n "_x"))))
+            ,   svalD '(<*>)
+                    (sconP ctorname (stupP (n_vars "f")) \->
+                     sconP ctorname (stupP (n_vars "x")) \->
+                     sappE ctorname (tupE (zipWith sappE (n_vars "f") (n_vars "x"))))
+            ]
+
+
+        , svalD ("tup"++show n) (n_vars "x" \-> ctorname `sappE` (stupE (n_vars "x")))
+        , svalD ("foldT"++show n) 
+            (   "_k" \-> 
+                sconP ctorname (stupP (n_vars "x")) \-> 
+                foldl sappE (expQ "_k") (n_vars "x"))
+
+
+        , instanceD 
+            (cxt [sclassP ''Num "a"])
+            (''AdditiveGroup `sappT` (thetype `sappT` "a"))
+            [ svalD 'zeroV ('pure `sappE` integerL 0)
+            , svalD '(^+^) ('liftA2 `sappE` '(+)) 
+            , svalD 'negateV ('fmap `sappE` 'negate)
+            ]
+
+        , instanceD 
+            (cxt [sclassP ''Num "a"])
+            (''VectorSpace `sappT` (thetype `sappT` "a"))
+            [ 
+              stySynInstD ''Scalar [thetype `sappT` "a"] "a" 
+            , svalD '(*^) ("p" \-> 'fmap `sappE` ("x" \-> '(*) `sappE` "p" `sappE` "x"))
+            ]
+
+        , instanceD 
+            (cxt [sclassP ''Num "a"])
+            (''InnerSpace `sappT` (thetype `sappT` "a"))
+            [ 
+              svalD '(<.>) 'innerProductForFoldableApplicative
+            ]
+
+
+        ]
+
+    ))
+
+
+tup2X = tup2 1 0
+tup2Y = tup2 0 1

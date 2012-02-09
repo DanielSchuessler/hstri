@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving, TypeFamilies, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
@@ -376,3 +376,6 @@ prettyPrecFromShow :: Show a => Int -> a -> Doc
 prettyPrecFromShow prec x = string . groomString $ showsPrec prec x ""
 
 instance Pretty Word8 where pretty = text . show
+
+deriving instance Pretty a => Pretty (Tup2 a)
+deriving instance Pretty a => Pretty (Tup3 a)
