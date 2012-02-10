@@ -102,7 +102,8 @@ setInitialSelection :: AnySimplex2Of s -> Scene s -> Scene s
 setInitialSelection = setL scene_initialSelectionL . Just
 
 
-
+setRenderFilepath :: FilePath -> Scene s -> Scene s
+setRenderFilepath = setL (scene_renderL >>> render_filepathL) . Just
 
 
 

@@ -2,7 +2,7 @@ import HsTri
 import ShortShow
 import Triangulation.FacetGluing
 
-tr = snd tr_3
+tr = snd tr_1
 
 spqwc = oneTetWithDefaultCoords tr f
     where

@@ -27,6 +27,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import Numeric.AD.Vector
 import Triangulation.CanonOrdered
+import Data.Ord(comparing)
 
 
 -- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
@@ -191,15 +192,21 @@ toSimplicialComplex = fromTets . spq_tets
 addEdgeDecos
   :: Ord (Element (Eds s)) =>
      Triangulation
-     -> (OIEdge -> Ed s) -> PreRenderable s -> PreRenderable s
+     -> (OIEdge -> (Ed s,S2)) -> PreRenderable s -> PreRenderable s
 addEdgeDecos (tr :: Triangulation) _mapEd = setL pr_edgeDecoL _edgeDeco
     where
         _edgeDeco = flip M.lookup (M.fromList edgeDecoAssocs)
 
+        -- Let high-degree edges get the simpler decos to clutter the picture less
+        edges' = L.sortBy (flip (comparing ecSize))
+                     .  filter (\e -> ecSize e > 1) 
+                     $   (edges tr) 
+
         edgeDecoAssocs = do
-            (e,i) <- filter (\e -> ecSize e > 1) (edges tr) `zip` [1..]
+            (e,i) <- edges' `zip` [1..]
             preimage <- preimageList e
-            return (_mapEd (unCanonOrdered preimage), EdgeDeco i)
+            let (ed,dir) = _mapEd (unCanonOrdered preimage)
+            return (ed, EdgeDeco i dir)
 
             
 
@@ -210,7 +217,10 @@ toPreRenderable
      SPQWithCoords v -> PreRenderable (SC3 v)
 toPreRenderable (SPQWithCoords spq coords gluingLabeller) = 
 
-        addEdgeDecos tr (asc2 . spq_mapEd spq) resultWithoutEdgeDecos
+        addEdgeDecos tr 
+            ($unEitherC . sort2WithPermutation' . spq_mapEd spq) 
+            
+            resultWithoutEdgeDecos
 
 
     where

@@ -71,7 +71,6 @@ Library
     MathUtil
     NormalEverything
     Normalizable
-    Tetrahedron.ONormal
     OrderableFace
     Orientation
     OrphanInstances

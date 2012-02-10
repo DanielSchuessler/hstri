@@ -26,7 +26,6 @@ import Simplicial.DeltaSet2
 import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
 import StandardCoordinates.MatchingEquations
-import TriangulationCxtObject
 import Util
 
 type CornerPosition' = Int
@@ -105,10 +104,18 @@ normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =
         isVisible = 
                             foldAnySimplex2
                                 (const Visible)
-                                (\e -> if Set.member e quadDiagonals
-                                         then Invisible
-                                         else Visible)
+                                (\e -> visibleIf (not $ Set.member e quadDiagonals))
                                 (const Visible)
+
+        tr = spq_tr spq
+
+        arcDecos = do
+            arc <- concreteArcs ns
+            let arc' = canonicalize tr arc
+            guard (arc' /= arc)
+
+            
+
 
         
     in
@@ -120,9 +127,11 @@ normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =
                     sc)
 
 
+-- normalSurfaceToPreRenderable2 tr pr ns = mkPreRenderable cornerCoords
 
-instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
-    gluingMap glu (Corn i n v1 v2) = (corn i n `on` gluingMap glu) v1 v2
+
+-- instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
+--     gluingMap glu (Corn i n v1 v2) = (corn i n `on` gluingMap glu) v1 v2
 
 
 isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 (conT ''Corn `appT` varT (mkName "v"))

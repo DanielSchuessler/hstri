@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, ImplicitParams, GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
-{-# OPTIONS -Wall -fwarn-missing-local-sigs #-}
+{-# OPTIONS -Wall -fwarn-missing-local-sigs -fno-warn-unused-imports #-}
 module Blender(
     module Blender.Types,
     module Blender.ID,
@@ -41,6 +41,9 @@ import Numeric.AD.Mode.Mixed(diffF)
 import Data.Cross(cross3)
 import Data.AdditiveGroup((^+^))
 import Data.VectorSpace((^*))
+import PrettyUtil(docToString)
+import PrettyUtil(prettyEqs)
+import PrettyUtil(pretty)
 
 #define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), Pretty (Vert s), Pretty (Ed s), Pretty (Tri s), PreDeltaSet2 s, Pretty s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
 #define CONSTRAINTS(s) ?scene::Scene s, CONSTRAINTS0(s) 
@@ -54,6 +57,14 @@ helpLineN = 19 :: Int
 helpLineMaxSteps :: Int
 helpLineMaxSteps = 100 :: Int
 
+decoStretchFraction :: Fractional a => a
+decoStretchFraction = 0.25
+
+decoConeLengthFraction :: Fractional a => a
+decoConeLengthFraction = 0.11 
+
+decoConeWidth :: Fractional a => a
+decoConeWidth = 0.04
                 
 
 
@@ -305,8 +316,11 @@ dhE    ba tcec _ e =
 
                 name = unFaceName . ba_faceName ba . edToAnySimplex2 $ e
 
+                bfi = ba_faceInfo ba . edToAnySimplex2 $ e
+
                 mkObjDataAndObj = do 
-                    awhen (getL ba_edgeDecoL ba e) (\d -> mkEdgeDecos ee d name)
+                    awhen (getL ba_edgeDecoL ba e) 
+                        (\d -> mkEdgeDecos ee d name (bfi_labelMat bfi))
 
                     case ee of 
 
@@ -327,23 +341,15 @@ dhE    ba tcec _ e =
                                 })
                             
 
-decoStretchFraction :: Fractional a => a
-decoStretchFraction = 0.25
-
-decoConeLengthFraction :: Fractional a => a
-decoConeLengthFraction = 0.11 
-
-decoConeWidth :: Fractional a => a
-decoConeWidth = 0.2
                             
-mkEdgeDecos :: EdgeEmbedding -> EdgeDeco -> String -> Python ()
-mkEdgeDecos ee (EdgeDeco n) edgeName = do
+mkEdgeDecos :: EdgeEmbedding -> EdgeDeco -> String -> Maybe Material -> Python ()
+mkEdgeDecos ee (EdgeDeco n dir) edgeName mat = do
     forM_ (case n of
                 1 -> [0.5]
                 _ -> equidistantPoints Closed Closed 
                         (0.5-decoStretchFraction/2) (0.5+decoStretchFraction/2) (n-1))
 
-          $ \u_center ->
+          $ \(u_center :: Double) ->
 
         let
             u_min = u_center - decoConeLengthFraction/2
@@ -351,50 +357,85 @@ mkEdgeDecos ee (EdgeDeco n) edgeName = do
 
         in
             coneAlongCurve 
-                (\(t :: AD s Double) -> 
+                ((\(t :: AD s Double) -> 
                     let
                         t_ = interpolU t (lift u_min) (lift u_max)
                     in
                         $(assrt [| not (isNaN t_ || isInfinite t_) |] ['n,'u_center,'u_min,'u_max,'t,'t_]) $
                             evalEdgeEmbedding ee t_) 
+
+                    . case dir of
+                           NoFlip -> id
+                           Flip -> (\x -> 1-x))
+
+
                 decoConeWidth 
                 ("DecoCone"++show n++"Of "++edgeName) 
+                mat
 
 
 
-coneAlongCurve :: UF Tup3 Double -> Double -> String -> Python ()
-coneAlongCurve (c :: UF Tup3 Double) width name = do
-    newTriangularSurfaceObj 20 (py "decoCone")
-        (\(Tup2 (u,v) :: Tup2 (AD s Double)) -> 
+coneAlongCurve :: UF Tup3 Double -> Double -> String -> Maybe Material -> Python ()
+coneAlongCurve (c :: UF Tup3 Double) width name mat = 
+
+    $(assrt [| isKindaUnitLength tangent && isKindaUnitLength other0 && isKindaUnitLength other1 |] ['tangent,'other0,'other1]) $ 
+    $(assrt [| areKindaOrthogonal other0 other1 |] ['tangent,'other0,'other1]) $ 
+    $(assrt [| areKindaOrthogonal tangent other0 |] ['tangent,'other0,'other1]) $ 
+    $(assrt [| areKindaOrthogonal tangent other1 |] ['tangent,'other0,'other1]) $ 
+
+--     trace 
+--         (docToString $ 
+--             prettyEqs [("dist", pretty $ norm (baseVertex 0 &- baseVertex (div n 2)))
+--                       ,("tangent",pretty $ tangent)
+--                       ,("other0",pretty $ other0)
+--                       ,("other1",pretty $ other1)
+--                       ]) $
+
+        do
+            newMeshObj (py "decoCone") 
+                Mesh {
+                    meshName = name,
+                    meshSmooth = True,
+                    meshMats = maybeToList mat,
+                    uv_textures = [],
+                    meshVertices = apex : map baseVertex [0..n-1],
+                    meshFaces = [ (0,i,j)
+                                    
+                                  | let is = n:[1..n], 
+                                    (i,j) <- zip is (drop 1 is) ]
+                }
+
+
+
+
+
+
+  where
+        tangent,other0,other1,valueAt0 :: Tup3 Double
+        tangent = twoNormalize (diffF c 0)
+        other0 = twoNormalize (anyOrthT3 tangent) -- low-priority fixme: will lead to ugly results if we move over a discontinuity of anyOrthT3 as 'u' varies 
+        other1 = cross3 tangent other0  
+
+        valueAt0 = lowerUF c 0
+        apex = tup3toVec3 $ lowerUF c 1
+
+        n = 20
+
+        baseVertex i = tup3toVec3 $
             let
-                r,long :: AD s Double
-
-                r = u+v
-                long = if r==0 then 0 else pi*(u-v)/r
-
-                value,tangent,other0,other1 :: Tup3 (AD s Double)
-
-                value = c (1-r)
-
-                tangent = fmap lift $ twoNormalize (diffF c (realToFrac (1-r)))
-                other0 = anyOrthT3 tangent -- low-priority fixme: will lead to ugly results if we move over a discontinuity of anyOrthT3 as 'u' varies 
-                other1 = cross3 tangent other0  
+                long = 2 * pi * fi i / fi n
 
                 d = 
                         
                             (other0 ^* cos long) 
                         ^+^
                             (other1 ^* sin long)
-                        
             in
-                $(assrt [| isKindaUnitLength other0 && isKindaUnitLength other1 |] 
-                    ['r,'long,'value,'tangent,'other0,'other1]) $ 
-                
-                (value ^+^
-                    (d ^* (r * lift width)))
 
-        )
-        name
+                
+                (valueAt0 ^+^
+                    (d ^* width))
+
 
 
 
@@ -601,18 +642,20 @@ meshVar = py "me"
 newMeshObj :: PythonVar -> Mesh -> Python ()
 newMeshObj var m =
     do 
-        mesh_init meshVar m
-        newObj var (meshName m) meshVar 
+        let _meshVar = py "decoConeMesh"
+
+        mesh_init _meshVar m
+        newObj var (meshName m) _meshVar 
         
-        setActiveObject sceneVar var
-        -- don't know how to determine whether we are in editmode already (seems to be determined at random for new objects...), so try/catch
-        ln "try:"
-        indent $ do
-            normals_make_consistent
-        ln "except RuntimeError:" 
-        indent $ do
-            editmode_toggle
-            normals_make_consistent
+--         setActiveObject sceneVar var
+--         -- don't know how to determine whether we are in editmode already (seems to be determined at random for new objects...), so try/catch
+--         ln "try:"
+--         indent $ do
+--             normals_make_consistent
+--         ln "except RuntimeError:" 
+--         indent $ do
+--             editmode_toggle
+--             normals_make_consistent
 
 normals_make_consistent :: Python ()
 normals_make_consistent = methodCall (bpy_ops "mesh") "normals_make_consistent" ()
@@ -788,3 +831,4 @@ setRenderSettings :: ToPython a => a -> RenderSettings -> Python ()
 setRenderSettings _sceneVar RS{..} = do
     _sceneVar <.> "render.resolution_x" .= render_resolution_x
     _sceneVar <.> "render.resolution_y" .= render_resolution_y
+    awhen render_filepath (\fp -> _sceneVar <.> "render.filepath" .= str fp)

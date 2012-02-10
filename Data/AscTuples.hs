@@ -177,6 +177,15 @@ sort3WithPermutation' xs =
             ("sort3WithPermutation': Args not distinct: "++show xs) 
             (asc3total xs')
 
+sort2WithPermutation'
+  :: (Ord a, Show a) => (a, a) -> EitherC LErrorCall (Asc2 a, S2)
+sort2WithPermutation' (x0,x1) =
+    case compare x0 x1 of
+         LT -> return (unsafeAsc (x0, x1),NoFlip)
+         GT -> return (unsafeAsc (x1, x0),  Flip)
+
+         _ -> $failureStr ("sort2WithPermutation': Args not distinct: "++show (x0,x1)) 
+
 
 $(flip concatMapM [2,3,4] (\i ->
     isRegardedAsSimplexByDisjointUnionDeriving 

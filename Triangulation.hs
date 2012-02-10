@@ -40,6 +40,7 @@ module Triangulation(
     tetGetGluings,
     dfsFacePairingGraph,
     isClosedTriangulation,
+    tGetThingOnOtherSide,
     -- ** Equivalences
     oEdgeEqv,vertexEqv,
     iEdgeEqv,
@@ -56,6 +57,8 @@ module Triangulation(
     addGluings,
     -- * Canonical representatives for things that are glued
     TriangulationDSnakeItem(..),
+    canonicalizeINormalArc,
+    canonicalizeOINormalArc,
     -- * Examples
     tr_l31,
     -- * Labelled
@@ -312,18 +315,39 @@ instance TriangulationDSnakeItem ITriangle where
 
 
 gluedNormalArc :: Triangulation -> INormalArc -> Maybe INormalArc
-gluedNormalArc tr ina = 
+gluedNormalArc = tGetThingOnOtherSide iNormalArcGetTriangle 
+
+tGetThingOnOtherSide
+  :: GluingMappable a =>
+     (a -> ITriangle) -> Triangulation -> a -> Maybe a
+tGetThingOnOtherSide triangleContainingThing tr thing = 
         let
-            tri = iNormalArcGetTriangle ina
+            tri = triangleContainingThing thing
         in
             case M.lookup tri (tGlueMap_ tr) of
-                                Just otri -> Just (gluingMap (tri,otri) ina)
+                                Just otri -> Just (gluingMap (tri,otri) thing)
                                 _ -> Nothing
 
+-- | = 'canonicalizeINormalArc'
 instance TriangulationDSnakeItem INormalArc where
-    canonicalize t ina = case gluedNormalArc t ina of
-                              Nothing -> ina
-                              Just ina' -> min ina ina'
+    canonicalize = canonicalizeINormalArc 
+    
+    
+canonicalizeINormalArc :: Triangulation -> INormalArc -> INormalArc
+canonicalizeINormalArc t ina = 
+    case gluedNormalArc t ina of
+         Nothing -> ina
+         Just ina' -> min ina ina'
+
+instance TriangulationDSnakeItem OINormalArc where
+    canonicalize = canonicalizeOINormalArc
+
+canonicalizeOINormalArc
+  :: Triangulation -> OINormalArc -> OINormalArc
+canonicalizeOINormalArc t ina = 
+    case tGetThingOnOtherSide oiNormalArcGetTriangle t ina of
+         Nothing -> ina
+         Just ina' -> min ina ina'
 
 instance TriangulationDSnakeItem INormalCorner where
     canonicalize t (viewI -> I i (edge -> e)) = 

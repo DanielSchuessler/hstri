@@ -1,11 +1,13 @@
-{-# LANGUAGE ViewPatterns, TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies, ViewPatterns, TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances  #-}
 {-# OPTIONS -Wall #-}
 module Tetrahedron.NormalArc(
         module Tetrahedron.NormalCorner,
 
+        -- * Plain
         NormalArc, 
-        -- * Construction
+        -- ** Construction
         allNormalArcs,
+        normalArcByCorners,
         normalArcsAroundVertex,
         normalArcByTriangleAndVertex,
         normalArcByTriangleAndVertexIndex,
@@ -14,12 +16,19 @@ module Tetrahedron.NormalArc(
         NormalArcs(..),
         normalArcList,
 
-        -- * Properties
+        -- ** Properties
         normalArcGetTriangle,
         normalArcGetVertex,
         normalArcGetParallelEdge,
         normalArcGetVertexIndex,
         normalArcGetAngle,
+        normalTriCorners,
+        normalTriCornersAsc,
+
+        -- * Ordered
+        ONormalArc,
+        MakeONormalArc(..),
+        oNormalArcGetTriangle
 
     )
 
@@ -38,6 +47,7 @@ import Quote
 import Test.QuickCheck
 import Util
 import Control.DeepSeq.TH
+import FileLocation(err')
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
     deriving (Eq,Ord)
@@ -47,8 +57,13 @@ deriveNFData ''NormalArc
 instance Show NormalArc where
     showsPrec = prettyShowsPrec 
 
+-- | = 'normalTriCorners'
 instance NormalCorners NormalArc (Pair NormalCorner) where
-    normalCorners (NormalArc t v) =  
+    normalCorners = normalTriCorners 
+    
+    
+normalTriCorners :: NormalArc -> (NormalCorner, NormalCorner)
+normalTriCorners (NormalArc t v) =  
             fromList2
           . fmap normalCorner
           . filter3 (v `isSubface`)
@@ -56,7 +71,8 @@ instance NormalCorners NormalArc (Pair NormalCorner) where
           $ t
 
 
-
+normalTriCornersAsc :: NormalArc -> Asc2 NormalCorner
+normalTriCornersAsc = asc2 . normalTriCorners 
 
 
 class MakeNormalArc a where
@@ -81,7 +97,10 @@ instance MakeNormalArc (Edge,Edge) where
 
 -- | Construct a normal arc by its normal corners
 instance MakeNormalArc (NormalCorner,NormalCorner) where
-    normalArc = normalArc . map2 normalCornerGetContainingEdge 
+    normalArc = normalArcByCorners
+    
+normalArcByCorners :: Pair NormalCorner -> NormalArc
+normalArcByCorners = normalArc . map2 normalCornerGetContainingEdge 
 
 normalArcList ::  NormalArcs a normalArcTuple => a -> [Element normalArcTuple]
 normalArcList = asList . normalArcs
@@ -205,3 +224,54 @@ normalArcsAroundVertex v =
 
 
 instance Finite NormalArc
+
+instance Vertices NormalArc where
+    type Verts NormalArc = Pair NormalCorner
+    vertices = normalCorners
+
+
+-- | Ordered 'NormalArc'
+newtype ONormalArc = ONormalArc (Pair NormalCorner) 
+    deriving(RightAction S2, MakeNormalArc, Eq, Ord, Pretty, Show)
+
+class MakeONormalArc a where
+    oNormalArc :: a -> ONormalArc 
+
+class AsList oNormalArcTuple => ONormalArcs a oNormalArcTuple | a -> oNormalArcTuple where
+    oNormalArcs :: a -> oNormalArcTuple
+
+instance MakeONormalArc (Pair NormalCorner) where
+    oNormalArc = ONormalArc
+
+instance MakeONormalArc (Pair Edge) where
+    oNormalArc = oNormalArc . map2 normalCorner 
+
+instance NormalCorners ONormalArc (Pair NormalCorner) where
+    normalCorners (ONormalArc x) = x
+
+instance Vertices ONormalArc where
+    type Verts ONormalArc = Pair NormalCorner 
+    vertices = normalCorners
+
+instance ONormalArcs Triangle (Triple NormalArc) where
+    oNormalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
+
+instance ONormalArcs OTriangle (Triple NormalArc) where
+    oNormalArcs (normalCorners -> (x0,x1,x2)) = (normalArc (x2,x0), normalArc (x0,x1), normalArc (x1,x2))
+
+instance OrderableFace NormalArc ONormalArc where
+    type VertexSymGroup NormalArc = S2
+
+    packOrderedFace na g = ONormalArc (unAsc2 (normalTriCornersAsc na) *. g)
+
+    unpackOrderedFace (ONormalArc ncs) = 
+        (normalArcByCorners ncs,
+         case uncurry compare ncs of
+              LT -> NoFlip
+              GT -> Flip
+              EQ -> $err' ("Invalid ordered normal arc: "++show ncs))
+
+        
+oNormalArcGetTriangle :: ONormalArc -> Triangle
+oNormalArcGetTriangle = normalArcGetTriangle . forgetVertexOrder
+

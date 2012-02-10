@@ -18,6 +18,7 @@ import HomogenousTuples
 import Language.Haskell.TH.Syntax
 import Quote
 import Control.DeepSeq
+import ShortShow
 
 
 class AsList normalCornerTuple => NormalCorners a normalCornerTuple | a -> normalCornerTuple where
@@ -80,4 +81,7 @@ instance Lift NormalCorner where
 
 instance Quote NormalCorner where
     quote (NormalCorner (vertices -> (v0,v1))) = "nc"++show v0++show v1
+
+instance ShortShow NormalCorner where
+    shortShow (NormalCorner (vertices -> (v0,v1))) = shortShow v0++shortShow v1
 

@@ -220,4 +220,15 @@ twoNormalize a =
 
 isKindaUnitLength
   :: (Fractional a, Ord a, Foldable t) => t a -> Bool
-isKindaUnitLength v = abs (twoNormSqr v - 1) < 1E6 
+isKindaUnitLength v = abs (twoNormSqr v - 1) < 1E-13
+
+isKindaZero :: (Fractional a, Ord a, Foldable t) => t a -> Bool
+isKindaZero v = oneNorm v < 1E-10
+
+areKindaOrthogonal
+  :: (Fractional (Scalar v), Ord (Scalar v), InnerSpace v) =>
+     v -> v -> Bool
+areKindaOrthogonal v0 v1 = abs (v0 <.> v1) < 1E-10 
+
+oneNorm :: (Num c, Foldable t) => t c -> c
+oneNorm = getSum . foldMap (Sum . abs)

@@ -230,12 +230,17 @@ type SplinePoint = Vec3
 
 data RenderSettings = RS {
     render_resolution_x :: Int, 
-    render_resolution_y :: Int
+    render_resolution_y :: Int,
+    render_filepath :: Maybe FilePath
 }
    deriving Show
     
+nameMakeLens ''RenderSettings (Just . (++"L"))
+
 defaultRenderSettings :: RenderSettings
 defaultRenderSettings = RS {
     render_resolution_x = 1920,
-    render_resolution_y = 1080
+    render_resolution_y = 1080,
+    render_filepath = Nothing
 }                         
+

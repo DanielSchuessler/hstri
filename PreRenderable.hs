@@ -53,6 +53,7 @@ module PreRenderable(
     pr_edgeDecoL,
 
     -- ** Visibility
+    visibleIf,
     pr_setVisibility,
     pr_setEdVisibility,
     pr_setTriVisibility,
@@ -91,7 +92,7 @@ import THUtil
 import Tetrahedron.Vertex
 import Util
 
-newtype EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int } 
+data EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int, edgeDecoDir :: S2 } 
     deriving (Show)
 
 type Resolution = Int

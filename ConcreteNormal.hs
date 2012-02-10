@@ -104,6 +104,9 @@ instance Pretty a => Pretty (Concrete a) where
     prettyPrec prec x = 
         prettyPrecApp prec "Concrete" [anyPretty (c_pos x), anyPretty (c_type x)] 
 
+instance ShortShow v => ShortShow (Concrete v) where
+    shortShow c = shortShow (c_type c) ++ shortShow (c_pos c)
+
 
 
 
@@ -292,7 +295,7 @@ instance TriangulationDSnakeItem (Concrete INormalArc) where
         let
             ina = c_type x
         in
-            case canonicalize tr ina of
+            case canonicalizeINormalArc tr ina of
                 ina' | ina == ina' -> x -- redundant; for efficiency(?)
                      | otherwise -> Concrete (c_surf x) (c_pos x) ina' 
 
@@ -340,6 +343,22 @@ toConcrete s =
 instance Vertices (Concrete INormalArc) where
     type Verts (Concrete INormalArc) = Pair (Concrete INormalCorner)
     vertices = concreteCornersOfArc
+
+instance Vertices (Concrete INormalTri) where
+    type Verts (Concrete INormalTri) = Triple (Concrete INormalCorner)
+    vertices = concreteCornersOfTri
+
+instance Vertices (Concrete INormalQuad) where
+    type Verts (Concrete INormalQuad) = Quadruple (Concrete INormalCorner)
+    vertices = concreteCornersOfQuad
+
+instance Edges (Concrete INormalTri) where
+    type Eds (Concrete INormalTri) = Triple (Concrete INormalArc)
+    edges = concreteArcsOfTri
+
+instance Edges (Concrete INormalQuad) where
+    type Eds (Concrete INormalQuad) = Quadruple (Concrete INormalArc)
+    edges = concreteArcsOfQuad
 
 instance Vertices (TConcrete INormalArc) where
     type Verts (TConcrete INormalArc) = Pair (TConcrete INormalCorner)

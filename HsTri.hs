@@ -5,6 +5,7 @@ module HsTri(
     module Blender,
     module ClosedOrCensus6,
     module Codec.Rga.Writer,
+    module ConcreteNormal,
     module ConcreteNormal.PreRenderable,
     module Data.AscTuples,
     module Data.FormalOps,
@@ -90,3 +91,4 @@ import VerboseDD
 import HsTri.Console
 import EdgeCentered
 import Triangulation.FacetGluing
+import ConcreteNormal

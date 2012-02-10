@@ -203,7 +203,7 @@ extendVec34 = extendWith 1
 
 mesh_init :: PythonVar -> Mesh -> Python ()
 mesh_init meshVar m = do
-        meshVar .= (methodCallExpr1 (bpy_dat "meshes") "new" (str "M"))
+        meshVar .= (methodCallExpr1 (bpy_dat "meshes") "new" (str (meshName m)))
 
         methodCall meshVar "from_pydata" (meshVertices m,emptyList,meshFaces m)
 

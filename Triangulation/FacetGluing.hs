@@ -7,6 +7,7 @@ import Tetrahedron
 import Control.Applicative
 import HomogenousTuples
 import Tetrahedron.INormalDisc
+import Tetrahedron.NormalArc
 import Control.Exception
 import Test.QuickCheck
 import THUtil
@@ -74,19 +75,34 @@ instance GluingMappable OEdge where
 instance GluingMappable Edge where
     gluingMap gl = forgetVertexOrder . gluingMap gl . toOrderedFace
 
+-- | See comment for the @GluingMappable Vertex@ instance
+instance GluingMappable NormalCorner where
+    gluingMap gl = normalCorner . gluingMap gl . edge
+
+-- | See comment for the @GluingMappable Vertex@ instance
+instance GluingMappable ONormalArc where
+    gluingMap gl (normalCorners -> (v0,v1)) = oNormalArc (gluingMap gl v0, gluingMap gl v1) 
+
+gluingMapI
+  :: (HasTIndex a a1, GluingMappable a1) =>
+     Gluing -> a -> a
+gluingMapI gl (viewI -> I i oe) =
+
+        assert (i==glDomTet gl) $ 
+
+        glCodTet gl ./ gluingMap gl oe
+
 instance GluingMappable OIEdge where
-    gluingMap gl@(t,ot) (viewI -> I i oe) =
+    gluingMap = gluingMapI  
 
-        assert (i==getTIndex t) $ 
-
-        getTIndex ot ./ gluingMap gl oe 
-
+instance GluingMappable OINormalArc where
+    gluingMap = gluingMapI 
 
 instance GluingMappable IEdge where
-    gluingMap gl = forgetVertexOrder . gluingMap gl . toOrderedFace
+    gluingMap = gluingMapI
 
 instance GluingMappable INormalCorner where
-    gluingMap gl = iNormalCorner . gluingMap gl . iNormalCornerGetContainingEdge
+    gluingMap = gluingMapI
 
 instance GluingMappable INormalArc where
     gluingMap gl@(tri,otri) arc =

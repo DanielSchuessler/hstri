@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, ImplicitParams, CPP, TupleSections, ExtendedDefaultRules #-}
+{-# LANGUAGE NoMonomorphismRestriction, TemplateHaskell, ImplicitParams, CPP, TupleSections, ExtendedDefaultRules #-}
 import HsTri
 import qualified Data.Map as M
 import Data.Map(Map)
@@ -18,22 +18,23 @@ smes = putStr (latexifyStandardMatchingEquations tr)
 
 qmes = putStr (latexifyQMatchingEquations tr)
 
-go ba = (testBlender . setCams [twoTetCam])
+go fp ba = (testBlender . setCams [twoTetCam] . setRenderFilepath fp)
         (defaultScene $ ba)
 
 
 main = do
-    evaluate (rnf spqwc)
-    go baVertexLinkA0
-    go baVertexLinkD0
+    go "/h/dipl/pictures/L31.png" (fromSpqwc spqwc)
+--     go baVertexLinkA0
+--     go baVertexLinkD0
     
 
+p = pMap tr
 
 (baVertexLinkA0,baVertexLinkD0) = 
     map2 (\v ->
                 fromSpqwcAndIntegerNormalSurface 
                     spqwc
-                    (vertexLinkingSurface (pMap tr (0./ v))))
+                    (vertexLinkingSurface (p (0./ v))))
 
          (vA,vD)
 
@@ -52,7 +53,7 @@ writeFileOrPreview = const previewTikz
 
 vl_A0 way =  
     let 
-        v = pMap tr_l31 (head triOrder)
+        v = p (head triOrder)
         triOrder = flip (./) <$> [vA,vC,vB] <*> [0,1] 
 
         nodePerm = flip $(indx) . M.fromList . zip triOrder $
@@ -80,7 +81,7 @@ vl_A0 way =
 vl_D0 way =
 
     let 
-        v = pMap tr_l31 (head triOrder)
+        v = p (head triOrder)
         triOrder = flip (./) <$> [vD] <*> [1,0] 
 
         nodePerm = flip $(indx) . M.fromList . zip triOrder $

@@ -1,11 +1,10 @@
-{-# LANGUAGE ScopedTypeVariables, ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.INormalDisc where
 
 import Tetrahedron.NormalDisc
 import HomogenousTuples
-import Tetrahedron.ONormal
 import Control.Exception
 import Tetrahedron()
 import Control.Applicative
@@ -141,6 +140,10 @@ iNormalArcGetVertexIndex = normalArcGetVertexIndex . unI
 iNormalArcGetTriangle :: INormalArc -> ITriangle
 iNormalArcGetTriangle = mapI normalArcGetTriangle 
 
+-- | Get the triangle containing representatives of this normal arc type
+oiNormalArcGetTriangle :: OINormalArc -> ITriangle
+oiNormalArcGetTriangle = mapI oNormalArcGetTriangle 
+
 -- | = 'iNormalArcGetTriangle'
 instance MakeITriangle INormalArc where
     iTriangle = iNormalArcGetTriangle
@@ -224,3 +227,18 @@ iNormalTriToINormalDisc (x :: INormalTri) = mapI normalDisc x
 iNormalQuadByVertexAndITriangle
   :: Vertex -> ITriangle -> INormalQuad
 iNormalQuadByVertexAndITriangle = mapI . normalQuadByVertexAndTriangle
+
+instance Vertices INormalArc where
+    type Verts INormalArc = Pair INormalCorner
+    vertices = traverseI map2 vertices
+
+instance Vertices OINormalArc where
+    type Verts OINormalArc = Pair INormalCorner
+    vertices = traverseI map2 vertices
+
+instance RightAction S2 OINormalArc where x *. g = mapI (*. g) x
+
+instance OrderableFace INormalArc OINormalArc where
+    type VertexSymGroup INormalArc = S2
+    packOrderedFace = defaultPackOrderedFaceI 
+    unpackOrderedFace = defaultUnpackOrderedFaceI

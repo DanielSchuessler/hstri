@@ -36,6 +36,7 @@ import PrettyUtil
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 x y z) = anyOrthG Vec3 x y z
 
+-- | ATTENTION!!!!!! Does not turn unit vectors into unit vectors 
 anyOrthG
   :: (Eq a, Num a) => (a -> a -> a -> t) -> a -> a -> a -> t
 anyOrthG k 0 y z = k 0 (-z) y
