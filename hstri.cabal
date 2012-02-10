@@ -15,7 +15,7 @@ Cabal-version:       >=1.2
 Library
     -- countering the -XHaskell98 passed by cabal
   extensions: PatternGuards, EmptyDataDecls
-  --ghc-options: -XMonoPatBinds
+  ghc-options: -fno-warn-unused-imports
 
   Exposed-modules:     
     
@@ -115,6 +115,7 @@ Library
     Tetrahedron.Vertex
     Tikz.Base
     Tikz.Gen
+    Numeric.AD.Vector
     Tikz.Preview
     Tikz.StructureGraph
     Tikz.StructureGraphLayout
@@ -203,6 +204,8 @@ Library
         , xmlgen
         , zlib
         , numbering
+        , blaze-builder
+        , blaze-textual
 
 --        , yices-painless
 

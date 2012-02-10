@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, ImplicitParams, GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
-{-# OPTIONS -Wall -fno-warn-unused-imports -fwarn-missing-local-sigs #-}
+{-# OPTIONS -Wall -fwarn-missing-local-sigs #-}
 module Blender(
     module Blender.Types,
     module Blender.ID,
@@ -14,37 +14,33 @@ import Blender.Blenderable
 import Blender.Conversion
 import Blender.ID
 import Blender.Types
-import Control.Applicative
 import Control.Exception
 import Control.Monad
-import Data.Foldable(Foldable)
 import Data.Function
 import Data.Maybe
 import Data.MemoTrie
 import Data.Monoid
 import Data.Numbering
 import Data.Vect.Double hiding((*.),(.*.))
-import FaceClasses
-import HomogenousTuples
 import MathUtil
-import PreRenderable
 import Prelude hiding(catch,mapM_,sequence_) 
-import PrettyUtil(Pretty)
-import Simplicial.DeltaSet2
 import System.Environment
 import System.Exit
 import System.Process
 import THUtil
 import ToPython
 import Util
-import qualified Data.Foldable as Fold
 import qualified Data.Vector as V
 import Data.Time.Clock
 import Data.Lens.Common
 import Control.Monad.IfElse
-import Numeric.AD.Types
 import Data.VectorSpace((*^))
 import Numeric.AD.Classes(lift)
+import Numeric.AD.Vector
+import Numeric.AD.Mode.Mixed(diffF)
+import Data.Cross(cross3)
+import Data.AdditiveGroup((^+^))
+import Data.VectorSpace((^*))
 
 #define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), Pretty (Vert s), Pretty (Ed s), Pretty (Tri s), PreDeltaSet2 s, Pretty s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
 #define CONSTRAINTS(s) ?scene::Scene s, CONSTRAINTS0(s) 
@@ -62,7 +58,7 @@ helpLineMaxSteps = 100 :: Int
 
 
 
-toBeSelectedVar,sceneVar,worldVar,camVar,objVar,lightVar,curveVar,splineVar,meshTextureFaceLayerVar :: Python ()
+toBeSelectedVar,sceneVar,worldVar,camVar,objVar,lightVar,curveVar :: Python ()
 
 sceneVar = py "scene"
 worldVar = py "world"
@@ -70,8 +66,6 @@ camVar = py "cam"
 objVar = py "obj"
 lightVar = py "light"
 curveVar = py "curve"
-splineVar = py "spline"
-meshTextureFaceLayerVar = py "meshTextureFaceLayer"
 toBeSelectedVar = py "toBeSelected"
 
 
@@ -176,7 +170,9 @@ toBlender scene@Scene{
             -- Remove all other scenes
             ln  "for s in data.scenes:"
             indent $ do
-                ln ("if (s != "++(renderPython sceneVar)++"):" )
+                py "if (s != "
+                sceneVar
+                py "):"
                 indent $ do
                     ln  "data.scenes.remove(s)" 
 
@@ -263,8 +259,7 @@ finishSimplexProcessing SemiProcessedSimplex{..} ba si =
       BaFaceInfo {faceMat,bfi_groups} = ba_faceInfo ba asi 
 
 -- | For factoring out the logic specific to a dimension
-newtype DimensionHandler s a = DimensionHandler { 
-    runDimensionHandler ::
+type DimensionHandler s a =
         (CONSTRAINTS(s)) => 
 
                Blenderable s
@@ -272,7 +267,6 @@ newtype DimensionHandler s a = DimensionHandler {
             -> EdgesContainingVertex_Cache (Vert s) (Ed s) 
             -> a 
             -> SemiProcessedSimplex (Vert s) (Ed s) (Tri s) a 
-} 
 
 handleSimplex
   :: (CONSTRAINTS(s)) =>
@@ -284,15 +278,11 @@ handleSimplex
      -> a
      -> Python ()
 handleSimplex dh ba tcec ecvc si = 
-    finishSimplexProcessing (runDimensionHandler dh ba tcec ecvc si) ba si 
+    finishSimplexProcessing (dh ba tcec ecvc si) ba si 
 
 -- | Logic specific for vertices
-dhV :: forall s. (CONSTRAINTS(s)) => DimensionHandler s (Vert s)
-dhV = DimensionHandler f
-    where
-        f :: forall v e t. (Pretty (Element (Eds s)), Pretty (Element (Tris s)), PreDeltaSet2 s, Verts (Element (Eds s)) ~ (Element (Verts s), Element (Verts s)), Verts (Element (Tris s)) ~ (Element (Verts s), Element (Verts s), Element (Verts s)), Eds (Element (Tris s)) ~ (Element (Eds s), Element (Eds s), Element (Eds s))) => Blenderable s -> TrianglesContainingEdge_Cache (Ed s) (Tri s) -> EdgesContainingVertex_Cache (Vert s) (Ed s) -> Vert s -> SemiProcessedSimplex v e t v
-
-        f ba tcec ecvc v = 
+dhV :: DimensionHandler s (Vert s)
+dhV   ba tcec ecvc v = 
             SemiProcessedSimplex 
                 vertToAnySimplex2 
                 vertexGrp 
@@ -300,49 +290,120 @@ dhV = DimensionHandler f
                 mempty
 
 -- | Logic specific for edges
-dhE :: forall s. (CONSTRAINTS(s)) => DimensionHandler s (Ed s)
-dhE = DimensionHandler f
-    where
-        f :: forall t v e t1. (Pretty s, Pretty (Element (Verts s)), Pretty (Element (Tris s)), Pretty (Element (Eds s)), PreDeltaSet2 s, Verts (Element (Eds s)) ~ (Element (Verts s), Element (Verts s)), Verts (Element (Tris s)) ~ (Element (Verts s), Element (Verts s), Element (Verts s)), Eds (Element (Tris s)) ~ (Element (Eds s), Element (Eds s), Element (Eds s))) => Blenderable s -> TrianglesContainingEdge_Cache (Ed s) (Tri s) -> t -> Arc s -> SemiProcessedSimplex v e t1 e
-        f ba tcec grp e =
+dhE :: DimensionHandler s (Ed s)
+dhE    ba tcec _ e =
             SemiProcessedSimplex
                 edToAnySimplex2
                 edgeGrp 
-                (either handleErr id $ mkObjDataAndObj)
+                mkObjDataAndObj
                 mempty
 
             where
-                handleErr err_ = error (err_++"\n"++"In handleE\n"++ $(showExps ['ba,'e]))
                 thickness = ba_edgeThickness ba e
 
-                mkObjDataAndObj = 
-                    case ba_edgeEmbedding ba tcec e of 
+                ee = ba_edgeEmbedding ba tcec e
+
+                name = unFaceName . ba_faceName ba . edToAnySimplex2 $ e
+
+                mkObjDataAndObj = do 
+                    awhen (getL ba_edgeDecoL ba e) (\d -> mkEdgeDecos ee d name)
+
+                    case ee of 
 
                         FlatEdge cv0 cv1 -> newCylinderObj objVar cv0 cv1 thickness
 
                         -- curved triangle
                         GeneralEdge gee -> 
-                            return $ 
                             
                                 newCurveObj objVar (BlenderCurve {
-                                    curve_name = "SomeCurvedEdge",
+                                    curve_base = BlenderCurveBase {
+                                        curve_name = "SomeCurvedEdge",
+                                        curve_mats = [], -- set in finishSimplexProcessing 
+                                        curve_resolution_u = 4
+                                    },
                                     bevel_depth = thickness,
                                     bevel_resolution = 10,
-                                    curve_splines = [(nurbsFromFun 2) gee],
-                                    curve_resolution_u = 4,
-                                    curve_mats = [] -- set in finishSimplexProcessing 
+                                    curve_splines = [(nurbsFromFun 2) gee]
                                 })
                             
+
+decoStretchFraction :: Fractional a => a
+decoStretchFraction = 0.25
+
+decoConeLengthFraction :: Fractional a => a
+decoConeLengthFraction = 0.11 
+
+decoConeWidth :: Fractional a => a
+decoConeWidth = 0.2
                             
+mkEdgeDecos :: EdgeEmbedding -> EdgeDeco -> String -> Python ()
+mkEdgeDecos ee (EdgeDeco n) edgeName = do
+    forM_ (case n of
+                1 -> [0.5]
+                _ -> equidistantPoints Closed Closed 
+                        (0.5-decoStretchFraction/2) (0.5+decoStretchFraction/2) (n-1))
+
+          $ \u_center ->
+
+        let
+            u_min = u_center - decoConeLengthFraction/2
+            u_max = u_center + decoConeLengthFraction/2
+
+        in
+            coneAlongCurve 
+                (\(t :: AD s Double) -> 
+                    let
+                        t_ = interpolU t (lift u_min) (lift u_max)
+                    in
+                        $(assrt [| not (isNaN t_ || isInfinite t_) |] ['n,'u_center,'u_min,'u_max,'t,'t_]) $
+                            evalEdgeEmbedding ee t_) 
+                decoConeWidth 
+                ("DecoCone"++show n++"Of "++edgeName) 
+
+
+
+coneAlongCurve :: UF Tup3 Double -> Double -> String -> Python ()
+coneAlongCurve (c :: UF Tup3 Double) width name = do
+    newTriangularSurfaceObj 20 (py "decoCone")
+        (\(Tup2 (u,v) :: Tup2 (AD s Double)) -> 
+            let
+                r,long :: AD s Double
+
+                r = u+v
+                long = if r==0 then 0 else pi*(u-v)/r
+
+                value,tangent,other0,other1 :: Tup3 (AD s Double)
+
+                value = c (1-r)
+
+                tangent = fmap lift $ twoNormalize (diffF c (realToFrac (1-r)))
+                other0 = anyOrthT3 tangent -- low-priority fixme: will lead to ugly results if we move over a discontinuity of anyOrthT3 as 'u' varies 
+                other1 = cross3 tangent other0  
+
+                d = 
+                        
+                            (other0 ^* cos long) 
+                        ^+^
+                            (other1 ^* sin long)
+                        
+            in
+                $(assrt [| isKindaUnitLength other0 && isKindaUnitLength other1 |] 
+                    ['r,'long,'value,'tangent,'other0,'other1]) $ 
+                
+                (value ^+^
+                    (d ^* (r * lift width)))
+
+        )
+        name
+
+
+
+
                         
 
 -- | Logic specific for triangles
-dhT :: forall s. (CONSTRAINTS(s)) => DimensionHandler s (Tri s)
-dhT = DimensionHandler f
-    where
-        f :: forall v e t. (?scene::Scene s, Ord (Element (Eds s)), Ord (Element (Verts s)), Ord (Element (Tris s)), Pretty (Element (Verts s)), Pretty (Element (Eds s)), Pretty (Element (Tris s)), Pretty s, PreDeltaSet2 s, Verts (Element (Eds s)) ~ (Element (Verts s), Element (Verts s)), Verts (Element (Tris s)) ~ (Element (Verts s), Element (Verts s), Element (Verts s)), Eds (Element (Tris s)) ~ (Element (Eds s), Element (Eds s), Element (Eds s))) => Blenderable s -> TrianglesContainingEdge_Cache (Ed s) (Tri s) -> EdgesContainingVertex_Cache (Vert s) (Ed s) -> Tri s -> SemiProcessedSimplex v e t t   
-
-        f ba tcec ecvc t = 
+dhT :: DimensionHandler s (Tri s)
+dhT  ba tcec ecvc t = 
             SemiProcessedSimplex
                 triToAnySimplex2
                 triGrp
@@ -353,14 +414,20 @@ dhT = DimensionHandler f
                 stmts1 = do
                     case ba_triangleEmbedding ba t of
                         FlatTriangle cv0 cv1 cv2 -> 
-                            newFlatTriangleObj objVar cv0 cv1 cv2 
-                        GeneralTriangle (GTE res g) -> 
-                            newTriangularSurfaceObj res objVar g
-                                (bfi_helpLineMat . getL ba_triangleInfoL ba $ t)
+                            newFlatTriangleObj objVar cv0 cv1 cv2 name
+                        GeneralTriangle (GTE res g) -> do 
+                            newTriangularSurfaceObj res objVar g name
+                            mkHelpLines g helpLineMat 
+
 
                     objVar <.> "show_transparent" .= True
 
                 stmts2 = handleTriLabel ba tcec ecvc triLblGrp t
+
+
+                bfi = getL ba_triangleInfoL ba $ t
+                helpLineMat = bfi_helpLineMat bfi 
+                name = unFaceName $ ba_faceName ba (triToAnySimplex2 t)
 
 
         
@@ -432,14 +499,19 @@ handleTriLabel ba tcec ecvc grpTriLabels t =
                                     : (bfi_groups . ba_faceInfo ba . triToAnySimplex2 $ t)
 
 
+                        mat = bfi_labelMat . getL ba_triangleInfoL ba $ t
+
+
                     in do
                         newTextObj objVar
                             (TextCurve {
-                                textCurve_name = "SomeTextCurve",
+                                textCurve_base = BlenderCurveBase {
+                                    curve_name = "SomeTextCurve",
+                                    curve_mats = maybeToList mat,
+                                    curve_resolution_u = 12
+                                },
                                 textCurve_text = text,
-                                textCurve_extrude = textThickness,
-                                textCurve_mats = 
-                                    maybeToList . bfi_labelMat . getL ba_triangleInfoL ba $ t 
+                                textCurve_extrude = textThickness
                             })
                         objVar <.> matrix_basis .= m
                         objCommon 
@@ -464,11 +536,11 @@ newSphereObj var loc radius = do
 
 
 
-newCylinderObj :: PythonVar -> Vec3 -> Vec3 -> Double -> Either String (Python ())
+newCylinderObj :: PythonVar -> Vec3 -> Vec3 -> Double -> Python ()
 newCylinderObj var from to radius = 
     if normsqr (from &- to) <= 1E-14
-       then Right (newEmptyObj var "Crushed newCylinderObj")
-       else Right $
+       then newEmptyObj var "Crushed newCylinderObj"
+       else 
 
     
         do
@@ -495,9 +567,9 @@ matrix_basis ::  [Char]
 matrix_basis = "matrix_basis"
 
 newFlatTriangleObj
-  :: PythonVar -> MeshVertex -> MeshVertex -> MeshVertex -> Python ()
-newFlatTriangleObj var p0 p1 p2 =
-    newMeshObj var (Mesh [p0,p1,p2] [(0,1,2)] False [] [])
+  :: PythonVar -> MeshVertex -> MeshVertex -> MeshVertex -> String -> Python ()
+newFlatTriangleObj var p0 p1 p2 name =
+    newMeshObj var (Mesh name [p0,p1,p2] [(0,1,2)] False [] [])
 
 
 safeOrthogonal :: Mat3 -> Proj4
@@ -513,7 +585,7 @@ testBlender :: (CONSTRAINTS0(s)) => Scene s -> IO ExitCode
 testBlender s = do
     let fn = "/tmp/testBlender.py"
     starttime <- getCurrentTime
-    writeFile fn (renderPython $ toBlender s)
+    {-# SCC "testBlender/writeFile" #-} renderPythonToFile fn (toBlender s)
     endtime <- getCurrentTime
     putStrLn ("toBlender took "++show (endtime `diffUTCTime` starttime)) 
     putStrLn ("Scene creation script written to " ++ fn++"; launching Blender")
@@ -530,7 +602,32 @@ newMeshObj :: PythonVar -> Mesh -> Python ()
 newMeshObj var m =
     do 
         mesh_init meshVar m
-        newObj var "SomeMesh" meshVar 
+        newObj var (meshName m) meshVar 
+        
+        setActiveObject sceneVar var
+        -- don't know how to determine whether we are in editmode already (seems to be determined at random for new objects...), so try/catch
+        ln "try:"
+        indent $ do
+            normals_make_consistent
+        ln "except RuntimeError:" 
+        indent $ do
+            editmode_toggle
+            normals_make_consistent
+
+normals_make_consistent :: Python ()
+normals_make_consistent = methodCall (bpy_ops "mesh") "normals_make_consistent" ()
+
+originToGeometry :: Python ()
+originToGeometry = do 
+            methodCall (bpy_ops "object") "origin_set" 
+                (SingleArg (namedArg "type" (str "ORIGIN_GEOMETRY")))
+
+setActiveObject :: (ToPython r, ToPython a) => a -> r -> Python ()
+setActiveObject scene obj = do
+    scene <.> "objects.active" .= obj
+
+editmode_toggle :: Python ()
+editmode_toggle = methodCall (bpy_ops "object") "editmode_toggle" ()
 
 txtVar ::  Python ()
 txtVar = py "txt"
@@ -541,14 +638,14 @@ textThickness = 1E-5
 newTextObj :: PythonVar -> TextCurve -> Python ()
 newTextObj var txt = do
     textCurve_init txtVar txt 
-    newObj var "T" txtVar
+    newObj var (id_name txt) txtVar
 
 
 
 newCurveObj :: PythonVar -> BlenderCurve -> Python ()
 newCurveObj var (cu :: BlenderCurve) = do
     curve_init curveVar cu
-    newObj var (curve_name cu) curveVar
+    newObj var (id_name cu) curveVar
 
     
 
@@ -568,17 +665,17 @@ grpLink :: BlenderGroup -> Python () -> Python ()
 grpLink gr obj = methodCall1 (bgrp_objectsE gr) "link" obj
 
 
-type StepCount = Int
-
 -- note: we usually set spline_resolution_u low (1 or 2) and instead compute subdivisions here by increasing 'steps'
 nurbsFromFun :: Int -> GeneralEdgeEmbedding -> BlenderSpline
-nurbsFromFun spline_resolution_u (GEE steps f) =
+nurbsFromFun spline_resolution (GEE steps f) =
     Nurbs {
-        use_endpoint_u = True,
-        order_u = 3,
-        spline_points = ys,
-        use_cyclic_u = normsqr (fv 0 - fv 1) < 1E-10,
-        spline_resolution_u
+        spline_dimOpts = SplineDimOpts {
+            use_endpoint = True,
+            order = 3,
+            spline_resolution,
+            use_cyclic = normsqr (fv 0 - fv 1) < 1E-10
+        },
+        spline_points = ys
     }
 
     where
@@ -598,7 +695,7 @@ newTriangularSurfaceObj ::
         Int 
     -> PythonVar
     -> FF Tup2 Tup3 Double
-    -> Maybe Material
+    -> String
     -> Python ()
 newTriangularSurfaceObj = memo prepare
     where
@@ -622,9 +719,10 @@ newTriangularSurfaceObj = memo prepare
 
                 fi_m = fi m
             in
-                \var (emb :: FF Tup2 Tup3 Double) helpLineMat -> do
+                \var (emb :: FF Tup2 Tup3 Double) name -> do
                     newMeshObj var
                         (Mesh {
+                            meshName = name,
                             meshVertices = map 
                                             (tup3toVec3 . lowerFF emb . vec2toTup2)
                                             vertices_normalizedUV,
@@ -639,40 +737,46 @@ newTriangularSurfaceObj = memo prepare
                           })
 
 
-                    newCurveObj (py "helpLine") (BlenderCurve {
-                        curve_name = "HelpLineCurve",
-                        bevel_depth = helpLineThickness,
-                        bevel_resolution = 4,
-                        curve_resolution_u = 1,
-                        curve_mats = maybeToList helpLineMat,
-                        curve_splines = map (nurbsFromFun 1) 
-                            ( concat 
-                               [ 
-                                [ GEE steps' (emb . (\x -> tup2 (x*lift p') (lift p))) -- horiz 
-                                , GEE steps' (emb . (\x -> tup2 (lift p) (x*lift p'))) -- vert
-                                , GEE steps' (emb . (\x -> lift p' *^ interpol x tup2X tup2Y)) -- diag
-                                ]
 
-                                    |  i <- [ 1 .. helpLineN ]
 
-                                            -- runs from 1/(n+1) to n/(n+1)
-                                    ,  let p = fi i/fi (helpLineN + 1) 
-                                            -- runs from n/(n+1) to 1/(n+1)
-                                    ,  let p' = 1-p  
+mkHelpLines :: FF Tup2 Tup3 Double -> Maybe Material -> Python ()
+mkHelpLines (emb :: FF Tup2 Tup3 Double) helpLineMat = do
+    newCurveObj (py "helpLine") (BlenderCurve {
+        curve_base = BlenderCurveBase {
+            curve_name = "HelpLineCurve",
+            curve_resolution_u = 1,
+            curve_mats = maybeToList helpLineMat
+        },
+        bevel_depth = helpLineThickness,
+        bevel_resolution = 4,
+        curve_splines = map (nurbsFromFun 1) 
+            ( concat 
+                [ 
+                [ GEE steps' (emb . (\x -> tup2 (x*lift p') (lift p))) -- horiz 
+                , GEE steps' (emb . (\x -> tup2 (lift p) (x*lift p'))) -- vert
+                , GEE steps' (emb . (\x -> lift p' *^ interpol x tup2X tup2Y)) -- diag
+                ]
+
+                    |  i <- [ 1 .. helpLineN ]
+
+                            -- runs from 1/(n+1) to n/(n+1)
+                    ,  let p = fi i/fi (helpLineN + 1) 
+                            -- runs from n/(n+1) to 1/(n+1)
+                    ,  let p' = 1-p  
 --                                     ,  let steps' = (max 4 (round (fi helpLineMaxSteps * p'))) :: Int
-                                    ,  let steps' = helpLineMaxSteps :: Int
-                                        
-                                        
-                               ] 
-                                )
-                        })
+                    ,  let steps' = helpLineMaxSteps :: Int
+                        
+                        
+                ] 
+                )
+        })
 
 
 
 
 
-viewSelectedStmt :: Python ()
-viewSelectedStmt = methodCall (bpy_ops "view3d") "view_selected" ()
+-- viewSelectedStmt :: Python ()
+-- viewSelectedStmt = methodCall (bpy_ops "view3d") "view_selected" ()
 
 deselectAllStmt :: Python ()
 deselectAllStmt = foreachStmt "o" (py "context.selected_objects") 

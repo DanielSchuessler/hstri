@@ -1,11 +1,10 @@
-{-# LANGUAGE MultiParamTypeClasses, TemplateHaskell, GADTs, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses, TemplateHaskell, GADTs, NoMonomorphismRestriction, FlexibleContexts, ViewPatterns, RecordWildCards #-}
 {-# OPTIONS -Wall #-}
 module SimplicialPartialQuotient where
 
 import Control.Applicative
 import Control.DeepSeq
 import Control.Exception
-import Control.Monad
 import Data.AscTuples
 import Data.Lens.Common
 import Data.Lens.Template
@@ -14,7 +13,6 @@ import Data.Maybe
 import Debug.Trace
 import FileLocation
 import HomogenousTuples
-import MathUtil
 import PreRenderable
 import PrettyUtil
 import ShortShow
@@ -27,6 +25,9 @@ import TriangulationCxtObject
 import Util
 import qualified Data.List as L
 import qualified Data.Map as M
+import Numeric.AD.Vector
+import Triangulation.CanonOrdered
+
 
 -- | A simplicial map from the disjoint union of tetrahedra of a 'Triangulation' to some simplicial complex, identifying as most as many things as the gluings of the 'Triangulation'.
 data SimplicialPartialQuotient v = SimplicialPartialQuotient {
@@ -186,14 +187,41 @@ toSimplicialComplex
   :: (Pretty v, Ord v, Show v) => SimplicialPartialQuotient v -> SC3 v
 toSimplicialComplex = fromTets . spq_tets   
 
+
+addEdgeDecos
+  :: Ord (Element (Eds s)) =>
+     Triangulation
+     -> (OIEdge -> Ed s) -> PreRenderable s -> PreRenderable s
+addEdgeDecos (tr :: Triangulation) _mapEd = setL pr_edgeDecoL _edgeDeco
+    where
+        _edgeDeco = flip M.lookup (M.fromList edgeDecoAssocs)
+
+        edgeDecoAssocs = do
+            (e,i) <- filter (\e -> ecSize e > 1) (edges tr) `zip` [1..]
+            preimage <- preimageList e
+            return (_mapEd (unCanonOrdered preimage), EdgeDeco i)
+
+            
+
+
+
 toPreRenderable
   :: (Ord v, ShortShow v, Pretty v, Show v) =>
      SPQWithCoords v -> PreRenderable (SC3 v)
 toPreRenderable (SPQWithCoords spq coords gluingLabeller) = 
+
+        addEdgeDecos tr (asc2 . spq_mapEd spq) resultWithoutEdgeDecos
+
+
+    where
+        resultWithoutEdgeDecos = 
             mkPreRenderableWithTriangleLabels 
                 (makeTriangleLabelling spq gluingLabeller)
                 coords
                 (toSimplicialComplex spq)
+
+        tr = spq_tr spq
+
 
     
 spq_Equivalence_helper
@@ -380,4 +408,6 @@ spq_fullQuotient tr =
     SimplicialPartialQuotient tr (pMap tr)
         (map (map4 (pMap tr) . vertices) (tTetrahedra_ tr))
 
-        
+
+
+

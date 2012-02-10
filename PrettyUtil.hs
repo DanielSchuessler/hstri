@@ -64,6 +64,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
 import Text.Groom
+import Numeric.AD.Types(AD)
 --import GHC.Generics hiding(prec)
 
 (<>) ::  Doc -> Doc -> Doc
@@ -377,5 +378,5 @@ prettyPrecFromShow prec x = string . groomString $ showsPrec prec x ""
 
 instance Pretty Word8 where pretty = text . show
 
-deriving instance Pretty a => Pretty (Tup2 a)
-deriving instance Pretty a => Pretty (Tup3 a)
+instance (Show (AD f a)) => Pretty (AD f a) where
+    prettyPrec = prettyPrecFromShow

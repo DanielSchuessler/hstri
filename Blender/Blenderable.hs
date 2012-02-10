@@ -21,6 +21,7 @@ import Data.Foldable(Foldable)
 import Blender.Types
 import Data.Maybe
 
+
 bpy_ops ::  String -> Python ()
 bpy_ops x = py "ops" <.> x
 bpy_dat ::  String -> Python ()
@@ -40,6 +41,7 @@ triangleUVLayerName = "Triangle UV from hs"
 data BaFaceInfo = BaFaceInfo {
     faceMat :: Material,
     bfi_groups :: [BlenderGroup],
+    -- | For triangle labels or edge decos (Nothing = no material, not no label/deco)
     bfi_labelMat :: Maybe Material,
     bfi_helpLineMat :: Maybe Material
 }
@@ -271,6 +273,7 @@ ba_allFaceInfos
      Blenderable s -> [BaFaceInfo]
 ba_allFaceInfos ba = map (ba_faceInfo ba) (anySimplex2s (ba_ds ba))
 
-
+ba_edgeDecoL :: Lens (Blenderable s) (Ed s -> Maybe EdgeDeco)
+ba_edgeDecoL = ba_prL >>> pr_edgeDecoL
 
 

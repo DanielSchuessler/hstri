@@ -19,6 +19,7 @@ import Control.Exception
 import THUtil
 import Data.AdditiveGroup
 import Data.VectorSpace
+import Numeric.AD.Vector
 
 main = edge20
 
@@ -119,7 +120,7 @@ vertex20 =
 
         before :: PreRenderable Triangulation
         before = 
-                pr_setTriangleEmbedding gtes $
+                pr_setGeneralTriangleEmbedding gtes $
         
                 mkPreRenderable coords tr
 
@@ -136,7 +137,7 @@ vertex20 =
 
                 .
 
-                   pr_setTriangleEmbedding (const Nothing)
+                   pr_setGeneralTriangleEmbedding (const Nothing)
 --                 pr_setTriangleEmbedding (flip lookup [ (t, GTE 2 . dome $ zero) ]) 
 
 
@@ -247,7 +248,7 @@ edge20 =
 
         before :: PreRenderable Triangulation
         before = 
-                pr_setTriangleEmbedding gtes $
+                pr_setGeneralTriangleEmbedding gtes $
         
                 mkPreRenderable coords tr
 
@@ -284,7 +285,7 @@ edge20 =
 
     in do
         go before
-        go after
+--         go after
 
 
 -- floating-point-retardant sqrt

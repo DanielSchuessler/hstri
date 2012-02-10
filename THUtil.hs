@@ -28,7 +28,6 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Util
 import Quote
-import Data.List
 import Debug.Trace
 import PrettyUtil
 import Control.Arrow((&&&))
@@ -41,7 +40,6 @@ import Data.Maybe
 import FileLocation
 import qualified Data.Vector.Generic as VG
 import Control.Applicative
-import Data.Char
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
@@ -97,9 +95,10 @@ toLabelExpressionPairsE = fmap f . toLabelExpressionPairs
 assrt :: Printees a => ExpQ -> a -> Q Exp
 assrt e printees = do
     e' <- e
+    loc <- location
 
     let 
-        msg = "Assertion failed: "++pprint e' 
+        msg = locationToString loc ++ ": Assertion failed: "++ pprint e' 
 
 
     [| if $(return e')

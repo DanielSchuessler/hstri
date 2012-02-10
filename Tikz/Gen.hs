@@ -28,7 +28,6 @@ module Tikz.Gen(
 
     ) where
 
-import Control.Monad
 import Data.List(intercalate)
 import Data.Maybe
 import Data.String.Interpolation
@@ -39,7 +38,6 @@ import Tikz.Base
 import Tikz.Preview
 import TriangulationCxtObject
 import qualified Data.Map as M
-import Data.Ord
 import Triangulation.Class
 import Tikz.StructureGraph
 import Tikz.StructureGraphLayout

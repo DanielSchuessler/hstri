@@ -6,7 +6,6 @@ module Triangulation.FacetGluing where
 import Tetrahedron
 import Control.Applicative
 import HomogenousTuples
-import Data.Maybe
 import Tetrahedron.INormalDisc
 import Control.Exception
 import Test.QuickCheck
@@ -15,6 +14,7 @@ import PrettyUtil
 import Either1
 import PreRenderable.TriangleLabel
 import Control.Arrow
+import ShortShow
 
 type Gluing = (ITriangle,OITriangle)
 
@@ -203,3 +203,11 @@ ngCodTet = getTIndex . ngCod
 symmetrizeGluings :: [Gluing] -> [Gluing]
 symmetrizeGluings gls = gls ++ map flipGluing gls
 
+instance ShortShow NormalizedGluing where
+    shortShow = shortShow . ngToGluing
+
+glDomOrCodIs :: ITriangle -> Gluing -> Bool
+glDomOrCodIs t gl = glDom gl == t || forgetVertexOrder (glCod gl) == t 
+
+ngDomOrCodIs :: ITriangle -> NormalizedGluing -> Bool
+ngDomOrCodIs t = glDomOrCodIs t . ngToGluing

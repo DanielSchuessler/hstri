@@ -9,19 +9,35 @@ import Data.Functor
 import qualified Data.Vector as V
 import Language.Haskell.TH.Syntax
 
+import Blaze.ByteString.Builder
+import Blaze.ByteString.Builder.ByteString
+import Blaze.ByteString.Builder.Char.Utf8
 
-newtype Python a = Python { unPython :: Writer String a }
-    deriving (Functor,Monad,MonadWriter String)
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BLC8
+import qualified Data.ByteString.Lazy.UTF8(toString)
+
+import Blaze.Text
+
+newtype Python a = Python { unPython :: Writer Builder a }
+    deriving (Functor,Monad,MonadWriter Builder)
 
 instance Show (Python ()) where
-    show = execWriter . unPython
+    show = Data.ByteString.Lazy.UTF8.toString . renderPython
 
 indent :: Python a -> Python a
-indent = censor (unlines . fmap (replicate 4 ' ' ++) . lines)
+indent = censor (
+      fromLazyByteString 
+    . BLC8.unlines 
+    . fmap (BLC8.replicate 4 ' ' `mappend`) 
+    . BLC8.lines 
+    . toLazyByteString)
     
 
 
-renderPython = execWriter . unPython
+renderPython = toLazyByteString . execWriter . unPython
+
+renderPythonToFile fn x = BL.writeFile fn (renderPython x)
 
 parens x = "("++x++")"
 showTuple = parens . intercalate ", "
@@ -37,13 +53,13 @@ pyTuple xs = do
     py ")"
 
 py :: String -> Python ()
-py = tell
+py = tell . fromString
 
 class ToPython a where
     toPython :: a -> Python ()
 
     default toPython :: Show a => a -> Python ()
-    toPython = tell . show
+    toPython = tell . fromShow
 
 instance ToPython (Python ()) where
     toPython = id
@@ -53,10 +69,14 @@ instance ToPython Bool
 instance ToPython Int
 
 instance ToPython Double where
+    {-# INLINABLE toPython #-}
     toPython x =
-        if isNaN x || isInfinite x
+        {-# SCC "toPython/Double" #-}
+        if ({-# SCC "toPython/Double/Check" #-} isNaN x || isInfinite x)
            then error ("toPython "++show x)
-           else tell . show $ x
+           else 
+            {-# SCC "toPython/Double/OK" #-}
+            tell . double $ x
 
 --instance ToPython [Char]
 
@@ -77,19 +97,27 @@ instance ToPython Proj4 where
 
 
 instance (ToPython a, ToPython b) => ToPython (a,b) where
-    toPython = pyTuple . $(tupleToList 2) . $(mapTuple' 2 [|toPython|])
+    toPython = 
+        {-# SCC "toPython/2tuple" #-}
+        pyTuple . $(tupleToList 2) . $(mapTuple' 2 [|toPython|])
     
 instance (ToPython a, ToPython b, ToPython c) => ToPython (a,b,c) where
-    toPython = pyTuple . $(tupleToList 3) . $(mapTuple' 3 [|toPython|])
+    toPython = 
+        {-# SCC "toPython/3tuple" #-}
+        pyTuple . $(tupleToList 3) . $(mapTuple' 3 [|toPython|])
 
 instance (ToPython a, ToPython b, ToPython c, ToPython d) => ToPython (a,b,c,d) where
-    toPython = pyTuple . $(tupleToList 4) . $(mapTuple' 4 [|toPython|])
+    toPython = 
+        {-# SCC "toPython/4tuple" #-}
+        pyTuple . $(tupleToList 4) . $(mapTuple' 4 [|toPython|])
 
 instance ToPython a => ToPython [a] where
-    toPython xs = do
-        py "["
-        commatize (toPython <$> xs)
-        py "]"
+    toPython xs = 
+        {-# SCC "toPython/list" #-}
+        do
+            py "["
+            commatize (toPython <$> xs)
+            py "]"
 
 class IsTuple a
 instance IsTuple ()
@@ -167,7 +195,7 @@ setProps obj = mapM_ (setProp' obj)
 
 -- | Add a line to the blender script
 ln :: String -> Python ()
-ln x = tell (x++"\n")
+ln x = py x >> tell (fromChar '\n')
 
 lns :: [String] -> Python ()
 lns = mapM_ ln
@@ -189,7 +217,9 @@ pfd_def pfd = do
             indent $ pfd_defBody pfd
 
 instance ToPython a => ToPython (V.Vector a) where
-    toPython = toPython . V.toList 
+    toPython = 
+        {-# SCC "toPython/Vector" #-}
+        toPython . V.toList 
 
 
 foreachStmt
@@ -201,8 +231,8 @@ foreachStmt varname xs b = do
     indent $ b (py varname)
 
 
-instance Lift (Python ()) where
-    lift (Python (execWriter -> x)) = [| py x |]
+-- instance Lift (Python ()) where
+--     lift (Python (execWriter -> x)) = [| py x |]
 
 instance Monoid (Python ()) where
     mempty = return ()

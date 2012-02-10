@@ -7,16 +7,20 @@ module PreRenderable(
     module Math.Groups.S3,
     module Numeric.AD,
     Vec2(..),Vec3(..),(&+),(&-),(&*),(*&),
-
-    -- * Main
     TriangleLabel(..),
     defaultTriangleLabelUpDisplacement,
-    Visibility(..),
-    FaceName,mkFaceName,unFaceName,
-    TriangleEmbedding(..),
+
+    -- * Edge/triangle embeddings
     GeneralTriangleEmbedding(..),
     EdgeEmbedding(..),
+    TriangleEmbedding(..),
     GeneralEdgeEmbedding(..),
+    evalEdgeEmbedding,
+
+    -- * Main
+    EdgeDeco(..),
+    Visibility(..),
+    FaceName,mkFaceName,unFaceName,
     PreRenderable(..),
     Coords(..),
 --     rotateAngleAxis,
@@ -26,41 +30,57 @@ module PreRenderable(
     SimplicialTriangleLabelAssoc(..),
     sTriangleLabelAssoc,
     triangleLabelsForSimplicial,
+
+
     pr_mapDs,
     pr_popDimension,
     pr_faceName,
-    pr_setVisibility,
-    pr_setEdVisibility,
-    pr_setTriVisibility,
     pr_hide,
     pr_hideEds,
     pr_hideTris,
-    pr_triangleLabel,
-    pr_generalTriangleEmbeddingL,
     pr_coords,
-    pr_edgeEmbedding,
-    pr_setTriangleEmbedding,
     pr_triangleEmbedding,
+    pr_quad,
+    pr_makeEmbeddingsGeneral,
+    pr_triangleLabel,
+    pr_edgeEmbedding,
+
+    -- * Lenses/getters/setters
+    pr_generalTriangleEmbeddingL,
+    pr_generalEdgeEmbeddingL,
+    pr_setTriangleEmbedding,
+    pr_setGeneralTriangleEmbedding,
+    pr_edgeDecoL,
+
+    -- ** Visibility
+    pr_setVisibility,
+    pr_setEdVisibility,
+    pr_setTriVisibility,
     pr_visibility,
     pr_vertVisibility,
     pr_edVisibility,
     pr_triVisibility,
-    pr_quad,
-    pr_makeEmbeddingsGeneral
+
 
     ) where
 
+import Control.Applicative
 import Control.Arrow
 import Control.Exception(assert)
 import Control.Monad
+import Data.AdditiveGroup
 import Data.AscTuples
+import Data.Lens.Common
+import Data.Lens.Template
 import Data.String
 import Data.Vect.Double.Base hiding((*.),(.*),(.*.))
+import Data.VectorSpace
 import DisjointUnion
 import GHC.Generics
 import Language.Haskell.TH.Lift
 import Math.Groups.S3
-import MathUtil
+import Numeric.AD(FF,UF,lowerFF,lowerUF,AD)
+import Numeric.AD.Vector
 import OrphanInstances.Lift()
 import PreRenderable.TriangleLabel
 import PrettyUtil(Pretty(..),prettyRecord,prettyFunction,prettyPrecFromShow)
@@ -70,12 +90,9 @@ import Simplicial.SimplicialComplex
 import THUtil
 import Tetrahedron.Vertex
 import Util
-import Data.Lens.Template
-import Data.Lens.Common
-import Numeric.AD(FF,UF,lowerFF,lowerUF,AD)
-import Control.Applicative
-import Data.AdditiveGroup
-import Data.VectorSpace
+
+newtype EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int } 
+    deriving (Show)
 
 type Resolution = Int
 
@@ -141,7 +158,7 @@ data PreRenderable s = PreRenderable {
     pr_coords0 :: Vert s -> Vec3,
     pr_faceInfo :: AnySimplex2Of s -> (Visibility,FaceName), 
     pr_triangleInfo :: Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleEmbedding),
-    pr_edgeInfo :: Ed s -> Maybe GeneralEdgeEmbedding
+    pr_edgeInfo :: Ed s -> (Maybe EdgeDeco, Maybe GeneralEdgeEmbedding)
 }
     deriving(Generic)
 
@@ -192,7 +209,7 @@ pr_quad reso (f :: FF Tup2 Tup3 Double) =
 instance Coords (PreRenderable a) where
     transformCoords f =
             modL pr_coords0L (\coords0 -> tup3toVec3 . lowerFF f . vec3toTup3 . coords0)
-        .   modL pr_edgeInfoL (fmap (transformCoords f) .)
+        .   modL pr_generalEdgeEmbeddingL (fmap (transformCoords f) .)
         .   modL (pr_triangleInfoL >>> secondLens) (fmap (transformCoords f) .)
 
 instance 
@@ -228,7 +245,7 @@ mkPreRenderableWithTriangleLabels triangleLabels pr_coords_ pr_ds_ =
         pr_coords0 = pr_coords_, 
         pr_triangleInfo = triangleLabels &&& const Nothing,
         pr_faceInfo = const Visible &&& (mkFaceName . shortShow),
-        pr_edgeInfo = const Nothing
+        pr_edgeInfo = const (Nothing,Nothing)
     }
 
 instance OneSkeletonable s => OneSkeletonable (PreRenderable s) where
@@ -288,11 +305,16 @@ pr_generalTriangleEmbeddingL
   :: Lens (PreRenderable s) (Tri s -> Maybe GeneralTriangleEmbedding)
 pr_generalTriangleEmbeddingL = pr_triangleInfoL >>> secondLens
 
+{-# DEPRECATED pr_setTriangleEmbedding "use pr_setGeneralTriangleEmbedding" #-}
 pr_setTriangleEmbedding
   :: (Tri s -> Maybe GeneralTriangleEmbedding)
      -> PreRenderable s -> PreRenderable s
-pr_setTriangleEmbedding = setL pr_generalTriangleEmbeddingL
+pr_setTriangleEmbedding = pr_setGeneralTriangleEmbedding
 
+pr_setGeneralTriangleEmbedding = setL pr_generalTriangleEmbeddingL
+
+pr_edgeDecoL = pr_edgeInfoL >>> firstLens
+pr_generalEdgeEmbeddingL = pr_edgeInfoL >>> secondLens
 
 triResolutionToEdgeResolution = (*10)
 
@@ -312,7 +334,7 @@ pr_edgeEmbedding pr tcec e =
                  $ e of 
 
                  Nothing -> 
-                    case pr_edgeInfo pr e of
+                    case getL pr_generalEdgeEmbeddingL pr e of
                         Just gee -> GeneralEdge gee 
                         Nothing -> flatFace pr (uncurry FlatEdge) map2 vertices e 
 
@@ -418,7 +440,7 @@ instance Lift GeneralEdgeEmbedding where
 instance Lift FaceName where
     lift (unFaceName -> x) = [| mkFaceName x |] 
 
-deriveLiftMany [''Visibility,''TriangleEmbedding,''EdgeEmbedding]
+deriveLiftMany [''Visibility,''TriangleEmbedding,''EdgeEmbedding,''EdgeDeco]
 
 instance (PreDeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
             , Lift (Vert s), Lift (Ed s), Lift (Tri s)) => 
@@ -488,6 +510,14 @@ pr_makeEmbeddingsGeneral triRes pr_ =
                     FlatTriangle a au av ->
                         GTE 
                             (triRes t)
+                            (evalFlatTriangleEmbedding a au av))
+
+ $       pr_
+
+
+evalFlatTriangleEmbedding
+  :: Vec3 -> Vec3 -> Vec3 -> FF Tup2 Tup3 Double
+evalFlatTriangleEmbedding a au av =
                             (\(Tup2 (u, v) :: Tup2 (AD s Double)) -> 
                                 ((1-u-v) *^ liftVec3 a) 
                                 ^+^ 
@@ -496,6 +526,15 @@ pr_makeEmbeddingsGeneral triRes pr_ =
                                 (v *^ liftVec3 av)
 
                                 :: Tup3 (AD s Double)
-                                ))
+                                )
 
- $       pr_
+evalEdgeEmbedding :: EdgeEmbedding -> UF Tup3 Double
+evalEdgeEmbedding (FlatEdge a0 a1) = 
+    \u -> 
+        let 
+            res = interpol u (liftVec3 a0) (liftVec3 a1) 
+        in $(assrt [| allReal res |] ['u, 'a0, 'a1]) res
+
+evalEdgeEmbedding (GeneralEdge (GEE _ f)) = f
+
+

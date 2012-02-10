@@ -4,9 +4,7 @@ module QuadCoordinates where
 
 import Tetrahedron
 import Control.Arrow((&&&))
-import Control.Monad.State
 import Data.Foldable(Foldable)
-import Data.Function
 import Data.Map as M hiding(mapMaybe)
 import Data.Maybe as May
 import Tetrahedron.INormalDisc
@@ -16,7 +14,6 @@ import TriangulationCxtObject
 import Math.SparseVector
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
-import Data.List as L
 import QuadCoordinates.MatchingEquations
 
 type QuadCoordinates r = SparseVector INormalQuad r

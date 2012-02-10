@@ -12,6 +12,7 @@ import THUtil
 import ToPython
 import Util
 import qualified Data.Vector as V
+import Data.Numbering
 
 (&) :: ToPython s => t -> s -> (t, Python ())
 x & y = (x, toPython y)
@@ -132,6 +133,7 @@ readCam s =
 
 
 data Mesh = Mesh {
+        meshName :: String,
         meshVertices :: [MeshVertex],
         meshFaces :: [Triple MeshVertexIndex],
         meshSmooth :: Bool,
@@ -147,24 +149,72 @@ data MeshUVLayer = MeshUVLayer UVLayerName [Triple UV]
 type MeshVertexIndex = Int
 type MeshVertex = Vec3
 
-data BlenderCurve = BlenderCurve {
+mesh :: Numbering v -> (v -> MeshVertex) -> [Triple v] -> Mesh
+mesh vertNu vertCoords faces = Mesh {
+        meshName = "Anonymous mesh",
+        meshVertices = map vertCoords (nuElements vertNu),
+        meshFaces = map (map3 (toInt vertNu)) faces,
+        meshSmooth = True,
+        uv_textures = [],
+        meshMats = []
+    }
+
+data BlenderCurveBase = BlenderCurveBase {
     curve_name :: String,
-    bevel_depth :: Double,
-    -- | 0 to 32
-    bevel_resolution :: Int,
-    curve_splines :: [BlenderSpline],
     -- | At least 1. Apparently this is just for the preview, not for rendering.
     curve_resolution_u :: Int,
     curve_mats :: [Material]
 }
 
+data BlenderCurve = BlenderCurve {
+    curve_base :: BlenderCurveBase,
+    bevel_depth :: Double,
+    -- | 0 to 32
+    bevel_resolution :: Int,
+    curve_splines :: [BlenderSpline]
+}
+
+data TextCurve = TextCurve {
+    textCurve_base :: BlenderCurveBase,
+    textCurve_text :: String,
+    -- | Thickness
+    textCurve_extrude :: Double
+}
+
+data BlenderSurface = BlenderSurface {
+    surface_base :: BlenderCurveBase,
+    surface_spline :: BlenderSpline2D
+}
+
+-- | Options applicable to each dimension of a spline
+data SplineDimOpts = SplineDimOpts {
+    use_endpoint :: Bool,
+    -- | \"Nurbs order [...] (For splines and surfaces), Higher values let points influence a greater area\"
+    order :: Int,
+    use_cyclic :: Bool,
+    spline_resolution :: Int
+}
+
+defaultSplineDimOpts :: SplineDimOpts
+defaultSplineDimOpts = SplineDimOpts {
+    use_endpoint = False,
+    use_cyclic = False,
+    order = 4,
+    spline_resolution = 12
+}
+
+
 data BlenderSpline = Nurbs {
     spline_points :: V.Vector SplinePoint,
-    use_endpoint_u :: Bool,
-    -- | \"Nurbs order in the U direction (For splines and surfaces), Higher values let points influence a greater area\"
-    order_u :: Int,
-    use_cyclic_u :: Bool,
-    spline_resolution_u :: Int
+    spline_dimOpts :: SplineDimOpts
+}
+
+data BlenderSpline2D = Nurbs2D {
+    -- | v-major
+    spline2d_points :: V.Vector SplinePoint,
+    spline2d_u :: SplineDimOpts,
+    spline2d_v :: SplineDimOpts,
+    spline2d_point_count_u :: Int
 }
 
 type SplinePoint = Vec3
@@ -177,13 +227,6 @@ type SplinePoint = Vec3
 -- 
 -- 
 
-data TextCurve = TextCurve {
-    textCurve_name :: String,
-    textCurve_text :: String,
-    textCurve_mats :: [Material],
-    -- | Thickness
-    textCurve_extrude :: Double
-}
 
 data RenderSettings = RS {
     render_resolution_x :: Int, 

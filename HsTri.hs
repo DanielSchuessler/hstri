@@ -42,7 +42,8 @@ module HsTri(
     module TriangulationCxtObject,
     module VerboseDD,
     module HsTri.Console,
-    module EdgeCentered
+    module EdgeCentered,
+    module Triangulation.FacetGluing
 
     ) where
 
@@ -88,3 +89,4 @@ import TriangulationCxtObject
 import VerboseDD
 import HsTri.Console
 import EdgeCentered
+import Triangulation.FacetGluing

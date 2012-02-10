@@ -16,7 +16,6 @@ import Data.List as L
 import HomogenousTuples
 import Test.QuickCheck
 import Data.Vect.Double hiding((.*))
-import Data.Maybe
 import SimplicialPartialQuotient
 import PrettyUtil
 import ShortShow

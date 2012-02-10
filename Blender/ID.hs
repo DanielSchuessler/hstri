@@ -131,55 +131,71 @@ id_initGlobalVar x = id_init (id_globalVar x) x
 
 
 instance BlenderID BlenderCurve where
-    id_name = curve_name
-
-    id_globalVarName = ("group_"++) . id_name
-
+    id_name = curve_name . curve_base
+    id_globalVarName = ("curve_"++) . id_name
     id_collectUniqueThings = $undef
-
     id_init = curve_init
+
+instance BlenderID TextCurve where
+    id_name = curve_name . textCurve_base
+    id_globalVarName = ("textCurve_"++) . id_name
+    id_collectUniqueThings = $undef
+    id_init = textCurve_init
+
+instance BlenderID BlenderSurface where
+    id_name = curve_name . surface_base
+    id_globalVarName = ("surface_"++) . id_name
+    id_collectUniqueThings = $undef
+    id_init = surface_init
     
 
 appendMaterialsStmt
   :: PythonVar -> [Material] -> Python ()
 appendMaterialsStmt var mats = 
     forM_ mats (\m -> methodCall1 (var <.> "materials") "append" (id_globalVar m))
-    
-curve_init :: PythonVar -> BlenderCurve -> Python ()
-curve_init curveVar BlenderCurve{..} = do
-        curveVar .= methodCallExpr (bpy_dat "curves") "new" (str curve_name, str "CURVE")
-        curveVar <.> "dimensions" .= str "3D" 
-        curveVar <.> "bevel_depth" .= bevel_depth
-        curveVar <.> "bevel_resolution" .= bevel_resolution
-        curveVar <.> "use_fill_front" .= False
-        curveVar <.> "use_fill_back" .= False
-        curveVar <.> "resolution_u" .= curve_resolution_u
-        appendMaterialsStmt curveVar curve_mats 
-        --    curveVar <.> "fill_mode" .= str "half"
-        
-        let splineVar = py "spline"
-        mapM_ (spline_init curveVar splineVar) curve_splines
 
+
+
+setSplineDimOpts
+  :: ToPython a => a -> [Char] -> SplineDimOpts -> Python ()
+setSplineDimOpts splineVar u_or_v SplineDimOpts{..} = do
+    splineVar <.> ("order_" ++ u_or_v) .= order
+    splineVar <.> ("use_endpoint_" ++ u_or_v) .= use_endpoint
+    splineVar <.> ("use_cyclic_" ++ u_or_v) .= use_cyclic
+    splineVar <.> ("resolution_" ++ u_or_v) .= spline_resolution
+
+
+commonSplineInit
+  :: 
+     PythonVar -> PythonVar -> V.Vector Vec3 -> Python ()
+commonSplineInit curveVar splineVar points = do
+    splineVar .= methodCallExpr1 (curveVar <.> "splines") "new" (str "NURBS")
+    methodCall (splineVar <.> "points") "add" 
+        (SingleArg (V.length points-1))
+        -- -1 because the new spline already has one point
+    methodCall (splineVar <.> "points") "foreach_set" (str "co",
+        concatMap (asList . extendVec34) (V.toList points))
+    splineVar <.> "use_smooth" .= True
 
 spline_init
   :: PythonVar -> PythonVar -> BlenderSpline -> Python ()
 spline_init curveVar splineVar s =
         case s of
             Nurbs{..} -> do
-
-
-                splineVar .= methodCallExpr1 (curveVar <.> "splines") "new" (str "NURBS")
-                methodCall (splineVar <.> "points") "add" 
-                    (SingleArg (V.length spline_points-1))
-                    -- -1 because the new spline already has one point
-                methodCall (splineVar <.> "points") "foreach_set" (str "co",
-                    concatMap (asList . extendVec34) (V.toList spline_points))
-                splineVar <.> "order_u" .= order_u
-                splineVar <.> "use_endpoint_u" .= use_endpoint_u
-                splineVar <.> "use_cyclic_u" .= use_cyclic_u
-                splineVar <.> "use_smooth" .= True
-                splineVar <.> "resolution_u" .= spline_resolution_u
+                commonSplineInit curveVar splineVar spline_points 
+                setSplineDimOpts splineVar "u" spline_dimOpts
         
+spline2d_init
+  :: PythonVar -> PythonVar -> BlenderSpline2D -> Python ()
+spline2d_init curveVar splineVar s =
+        case s of
+            Nurbs2D{..} -> do
+                commonSplineInit curveVar splineVar spline2d_points 
+                splineVar <.> "point_count_u" .= spline2d_point_count_u 
+                setSplineDimOpts splineVar "u" spline2d_u
+                setSplineDimOpts splineVar "v" spline2d_v
+                error ("spline2d: not implemented (can't figure out how to set the dimensions of the control point array, might be impossible via python)")
+
 
 extendVec34 :: Vec3 -> Vec4
 extendVec34 = extendWith 1
@@ -211,7 +227,7 @@ mesh_init meshVar m = do
 --             "for x in me.vertices:",
 --             "   pprint(x.co)",
 
-        methodCall meshVar "update" ()
+        methodCall meshVar "update" (SingleArg True)
 
 
 
@@ -227,11 +243,38 @@ mesh_init meshVar m = do
 -- 
 
 
+
+
+
+-- * Curves
+
+curveBase_init :: PythonVar -> BlenderCurveBase -> String -> Python ()
+curveBase_init curveVar BlenderCurveBase{..} subclass = do
+        curveVar .= methodCallExpr (bpy_dat "curves") "new" (str curve_name, str subclass)
+        curveVar <.> "resolution_u" .= curve_resolution_u
+        appendMaterialsStmt curveVar curve_mats 
+    
+curve_init :: PythonVar -> BlenderCurve -> Python ()
+curve_init curveVar BlenderCurve{..} = do
+        curveBase_init curveVar curve_base "CURVE"
+        curveVar <.> "dimensions" .= str "3D" 
+        curveVar <.> "bevel_depth" .= bevel_depth
+        curveVar <.> "bevel_resolution" .= bevel_resolution
+        curveVar <.> "use_fill_front" .= False
+        curveVar <.> "use_fill_back" .= False
+        --    curveVar <.> "fill_mode" .= str "half"
+        
+        let splineVar = py "spline"
+        mapM_ (spline_init curveVar splineVar) curve_splines
+
 textCurve_init :: PythonVar -> TextCurve -> Python ()
 textCurve_init txtVar TextCurve{..} = do
-    txtVar .= methodCallExpr (bpy_dat "curves") "new" (str textCurve_name, str "FONT")
+    curveBase_init txtVar textCurve_base "FONT"
     txtVar <.> "body" .= str textCurve_text
     txtVar <.> "extrude" .= textCurve_extrude
     txtVar <.> "align" .= str "CENTER"
-    appendMaterialsStmt txtVar textCurve_mats 
 
+
+surface_init :: PythonVar -> BlenderSurface -> Python ()
+surface_init var BlenderSurface{..} = do
+    curveBase_init var surface_base "SURFACE"
