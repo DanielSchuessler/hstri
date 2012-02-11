@@ -40,11 +40,11 @@ pachner32 =
         
             --mkPreRenderableWithTriangleLabels (const Nothing)
                 
+        go ba = testBlender (setCam cam . setLamps [oldDefaultLamp] . defaultScene $ ba) 
             
     in do
-
-        testBlender (setCam cam . defaultScene $ before) 
-        testBlender (setCam cam . defaultScene $ after) 
+        go before
+        go after
 
 cam :: Cam
 cam = readCam "(Vector((1.6595690250396729, -5.473565101623535, 0.8606469035148621)), Euler((1.4290757179260254, 3.992030087829335e-06, 0.2902868092060089), 'XYZ'), 0.8575560591178853)"
@@ -64,7 +64,7 @@ collapseEdge =
         f0 (Tup3 (x, y, z)) = tup3 x y (z * (twoNorm (tup2 x y)))
 
     in do
-        testBlender (setCam cam . defaultScene $ step0)
+        testBlender (setCam cam . setLamps [oldDefaultLamp] . defaultScene $ step0)
 
 
 tr_vertex20 = mkTriangulation 2 
@@ -143,6 +143,12 @@ vertex20 =
 
                     $ before
                 
+
+        go ba = testBlender (
+                      setCam cam20 
+                    . setLamps [oldDefaultLamp]
+                    . defaultScene 
+                    . mkBlenderable pseudomanifoldStyle $ ba) 
 
 
     in do
@@ -276,16 +282,17 @@ edge20 =
 --         cam_edge20 = readCam "(Vector((4.056652069091797, -1.6806788444519043, 1.085201621055603)), Euler((1.3310924768447876, 1.799694018700393e-06, 1.1548134088516235), 'XYZ'), 0.8575560591178853)"
 
 
-        go pr = testBlender (setCam cam_edge20 
-                                . setRS (RS 1200 1200)
+        go fp pr = testBlender (setCam cam_edge20 
+                                . setRS (RS 1200 1200 (Just fp))
+                                . setLamps [oldDefaultLamp]
                                 . defaultScene 
                                 . mkBlenderable pseudomanifoldStyle 
                                 $ pr) 
 
 
     in do
-        go before
---         go after
+        go "/h/dipl/pictures/edge20Before.png" before
+        go "/h/dipl/pictures/edge20After.png" after
 
 
 -- floating-point-retardant sqrt

@@ -1,16 +1,21 @@
 {-# LANGUAGE RankNTypes, ImplicitParams, GADTs, NamedFieldPuns, FlexibleContexts, TemplateHaskell, ScopedTypeVariables, PolymorphicComponents, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, NoMonomorphismRestriction, CPP, GeneralizedNewtypeDeriving, TypeFamilies, DefaultSignatures, ExtendedDefaultRules, StandaloneDeriving #-} 
-{-# OPTIONS -Wall -fwarn-missing-local-sigs -fno-warn-unused-imports #-}
+{-# OPTIONS -Wall -fwarn-missing-local-sigs -fno-warn-unused-imports -fno-warn-missing-signatures #-}
 module Blender(
     module Blender.Types,
     module Blender.ID,
     module Blender.Conversion,
     module Blender.Blenderable,
+    module Blender.Mesh,
     module MathUtil,
     testBlender,
-    toBlender) where
+    toBlender,
+    renderBlender,
+    blenderMain,
+    BCommand(..)) where
 
 import Blender.Blenderable
+import Blender.Mesh
 import Blender.Conversion
 import Blender.ID
 import Blender.Types
@@ -44,12 +49,15 @@ import Data.VectorSpace((^*))
 import PrettyUtil(docToString)
 import PrettyUtil(prettyEqs)
 import PrettyUtil(pretty)
+import Data.AdditiveGroup((^-^))
+import Blender.Build
 
 #define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), Pretty (Vert s), Pretty (Ed s), Pretty (Tri s), PreDeltaSet2 s, Pretty s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
-#define CONSTRAINTS(s) ?scene::Scene s, CONSTRAINTS0(s) 
+#define CONSTRAINTS(s) ?sceneE::Python(),?scene::Scene s, CONSTRAINTS0(s) 
 
-helpLineThickness :: Double
-helpLineThickness = 0.001 :: Double
+
+helpLineThickness :: BlenderUnits
+helpLineThickness = 0.001
 
 helpLineN :: Int
 helpLineN = 19 :: Int
@@ -57,34 +65,41 @@ helpLineN = 19 :: Int
 helpLineMaxSteps :: Int
 helpLineMaxSteps = 100 :: Int
 
-decoStretchFraction :: Fractional a => a
-decoStretchFraction = 0.25
 
-decoConeLengthFraction :: Fractional a => a
-decoConeLengthFraction = 0.11 
+-- * Edge-deco-related constants
 
-decoConeWidth :: Fractional a => a
-decoConeWidth = 0.04
+-- Absolute units
+decoConeLength :: BlenderUnits
+decoConeLength = 0.07 
+
+conegap :: BlenderUnits
+conegap = 0.07
+
+cylLength :: BlenderUnits
+cylLength = 0.15*decoConeLength
+
+-- | Gap between the last cone and the first cyl
+ccgap :: BlenderUnits
+ccgap = 0.08
+
+cylgap :: BlenderUnits
+cylgap = 0.025
+
+
+-- | Deco cone width at the base, as a multiple of edge width
+decoConeWidthFactor :: Double
+decoConeWidthFactor = 2.5
                 
+-- End of Edge-deco-related constants
 
 
 
-toBeSelectedVar,sceneVar,worldVar,camVar,objVar,lightVar,curveVar :: Python ()
 
-sceneVar = py "scene"
-worldVar = py "world"
-camVar = py "cam"
-objVar = py "obj"
-lightVar = py "light"
-curveVar = py "curve"
+
+
+
+toBeSelectedVar :: Python ()
 toBeSelectedVar = py "toBeSelected"
-
-
-objSetName ::  String -> Python ()
-objSetName x = objVar <.> "name" .= str x
-
-objSetMaterial ::  ToPython r => r -> Python ()
-objSetMaterial x = objVar <.> "active_material" .= x 
 
 
 ma_var ::  Material -> Python ()
@@ -96,14 +111,14 @@ ma_var = id_globalVar
 longLabelPropertyName :: [Char]
 longLabelPropertyName = "longlabel"
 
-objCommon :: (?scene::Scene s) => [BlenderGroup] -> String -> Maybe Material -> Python ()
-objCommon grps faceName faceMatMay = do
-                objSetName faceName
-                awhen faceMatMay (objSetMaterial . ma_var)
-                mapM_ (flip grpLink objVar) grps
+objCommon :: (?scene::Scene s) => PythonVar -> [BlenderGroup] -> String -> Maybe Material -> Python ()
+objCommon _objVar grps faceName faceMatMay = do
+                setName faceName _objVar
+                awhen faceMatMay (flip setMaterial _objVar . ma_var)
+                mapM_ (flip grpLink _objVar) grps
 
                 when (scene_setLongLabelCustomProperties ?scene)
-                    (objVar <.> longLabelPropertyName .= str faceName)
+                    (_objVar <.> longLabelPropertyName .= str faceName)
 
 -- toBlender :: forall a. (BlenderLabel s, 
 --                         VertexInfoClass (Vertex s),
@@ -117,27 +132,8 @@ objCommon grps faceName faceMatMay = do
 returnContextStmt :: Python ()
 returnContextStmt = py "return context.object"
 
-makeSphereFunDef :: PythonFunDef
-makeSphereFunDef = PythonFunDef {
-    pfd_name = "makeSphere",
-    pfd_argList = ["loc"],
-    pfd_defBody =
-        do
-                methodCall1 (bpy_ops "surface") "primitive_nurbs_surface_sphere_add" 
-                    (namedArg "location" (py "loc"))
-                returnContextStmt
-}
 
 
-makeCylinderFunDef :: PythonFunDef
-makeCylinderFunDef = PythonFunDef {
-    pfd_name = "makeCylinder",
-    pfd_argList = [],
-    pfd_defBody = do
-            methodCall (bpy_ops "surface") "primitive_nurbs_surface_cylinder_add" ()
-            returnContextStmt
-
-}
 
 vertexGrp ::  BlenderGroup
 vertexGrp = BlenderGroup "Vertices"
@@ -156,11 +152,15 @@ extraGrps = [
             , triLblGrp 
             ]
 
-toBlender :: (CONSTRAINTS0(s)) => Scene s -> Python ()
+
+data BCommand = DoRender | JustLook
+    deriving Show
+
+toBlender :: (CONSTRAINTS0(s)) => Scene s -> BCommand -> Python ()
 toBlender scene@Scene{
         scene_worldProps,
         scene_blenderable = ba@Blenderable{..},
-        scene_cams} = do
+        scene_cams} bcmd = do
 
             ln "from time import time"
             ln "starttime = time()"
@@ -172,42 +172,40 @@ toBlender scene@Scene{
             ln "from bpy import *"
             ln "from pprint import pprint"
 
-            mapM_ pfd_def [makeSphereFunDef,makeCylinderFunDef]
-
-
             -- Make a new scene
-            sceneVar .= methodCallExpr1 (bpy_dat "scenes") "new" (str "TheScene")
-            setRenderSettings sceneVar (scene_render scene)
+            let ?sceneE = pyv "scene"
+            ?sceneE .= methodCallExpr1 (bpy_dat "scenes") "new" (str "TheScene")
+
+            assignRenderSettingsProperties ?sceneE (scene_render scene)
             -- Remove all other scenes
             ln  "for s in data.scenes:"
             indent $ do
                 py "if (s != "
-                sceneVar
+                ?sceneE
                 py "):"
                 indent $ do
                     ln  "data.scenes.remove(s)" 
 
             -- Make a new world, assign it to the scene, set world properties
-            worldVar .= methodCallExpr1 (bpy_dat "worlds") "new" (str "TheWorld")
-            mapM_ (setProp' worldVar) scene_worldProps
-            setProp sceneVar "world" worldVar
+            let worldVar = pyv "world" in do
+                worldVar .= methodCallExpr1 (bpy_dat "worlds") "new" (str "TheWorld")
+                mapM_ (setProp' worldVar) scene_worldProps
+                ?sceneE <.> "world" .= worldVar
 
             -- cameras
             forM_ (zip [0::Integer ..] scene_cams) (\(i, (Cam pos eulers fov)) -> do
+                let objVar = pyv "camObj"
+                let camVar = pyv "cam"
                 let nam = "cam"++show i
                 camVar .= methodCallExpr1 (bpy_dat "cameras") "new" (str nam)
                 camVar <.> "angle" .= fov
                 newObj objVar nam camVar
                 objVar <.> "location" .= pos
                 objVar <.> "rotation_euler" .= eulers
-                when (i==0) (setProp sceneVar "camera" objVar))
+                when (i==0) (?sceneE <.> "camera" .= objVar))
 
-            -- light
-            lightVar .= methodCallExpr (bpy_dat "lamps") "new" (str "TheLamp", str "SUN") 
-            lightVar <.> "shadow_method" .= str "RAY_SHADOW"
-            newObj objVar "TheLamp" lightVar
-            objVar <.> "rotation_euler" .= Vec3 (5*pi/12) 0 (-pi/6)
-            objVar <.> "location" .= Vec3 (-5) (-10) 8
+            let objVar = pyv "lightObj" in 
+                forM_ (scene_lamps scene) (newLampObj objVar) 
 
             idDefs
 
@@ -231,6 +229,14 @@ toBlender scene@Scene{
                 toBeSelectedVar <.> "select" .= True
 
 
+            case bcmd of
+                 JustLook -> return ()
+                 DoRender -> do
+                     ?sceneE <.> "render.resolution_percentage" .= (100::Int)
+                     methodCall (bpy_ops "render") "render" (namedArg1 "write_still" True)
+                     quit_blender
+
+
         
 
         idDefs = do
@@ -242,32 +248,18 @@ toBlender scene@Scene{
 
 
 
-data SemiProcessedSimplex v e t a = SemiProcessedSimplex {
-    sps_mkAsi :: a -> AnySimplex2 v e t,
-    sps_group :: BlenderGroup,
-    sps_objVarSettingStmts :: Python (),
-    sps_trailingStmts :: Python ()
-}
 
-finishSimplexProcessing :: (CONSTRAINTS(s)) => SemiProcessedSimplex (Vert s) (Ed s) (Tri s) a -> Blenderable s -> a -> Python ()
-finishSimplexProcessing SemiProcessedSimplex{..} ba si =
-  case ba_visibility ba asi of
-
-    Invisible -> return ()
-    Visible -> do
-            sps_objVarSettingStmts
-            objCommon 
-                (sps_group:bfi_groups) 
+asiCommon
+  :: (CONSTRAINTS(s)) => Blenderable s -> AnySimplex2Of s -> BlenderGroup -> PythonVar -> Python ()
+asiCommon ba asi group objE = do
+            objCommon objE 
+                (group:bfi_groups) 
                 (unFaceName (ba_faceName ba asi)) 
                 (Just faceMat)
             when (Just asi == scene_initialSelection ?scene)
-                (toBeSelectedVar .= objVar)
-            sps_trailingStmts
-        
-
-  where
-      asi = sps_mkAsi si
-      BaFaceInfo {faceMat,bfi_groups} = ba_faceInfo ba asi 
+                (toBeSelectedVar .= objE)
+    where
+        BaFaceInfo {faceMat,bfi_groups} = ba_faceInfo ba asi 
 
 -- | For factoring out the logic specific to a dimension
 type DimensionHandler s a =
@@ -277,7 +269,7 @@ type DimensionHandler s a =
             -> TrianglesContainingEdge_Cache (Ed s) (Tri s) 
             -> EdgesContainingVertex_Cache (Vert s) (Ed s) 
             -> a 
-            -> SemiProcessedSimplex (Vert s) (Ed s) (Tri s) a 
+            -> Python ()
 
 handleSimplex
   :: (CONSTRAINTS(s)) =>
@@ -288,98 +280,141 @@ handleSimplex
      -> EdgesContainingVertex_Cache (Vert s) (Ed s)
      -> a
      -> Python ()
-handleSimplex dh ba tcec ecvc si = 
-    finishSimplexProcessing (dh ba tcec ecvc si) ba si 
+handleSimplex dh ba tcec ecvc si = do
+    ln ""
+    dh ba tcec ecvc si
 
 -- | Logic specific for vertices
 dhV :: DimensionHandler s (Vert s)
 dhV   ba tcec ecvc v = 
-            SemiProcessedSimplex 
-                vertToAnySimplex2 
-                vertexGrp 
-                (newSphereObj objVar (ba_coords ba tcec ecvc v) (ba_vertexThickness ba v)) 
-                mempty
+    when (ba_visibility ba v' == Visible) $ do
+            let _objVar = pyv "sphereObj"
+            (newSphereObj _objVar (ba_coords ba tcec ecvc v) (ba_vertexThickness ba v)) 
+            asiCommon ba v' vertexGrp _objVar
+
+  where
+    v' = vertToAnySimplex2 v
 
 -- | Logic specific for edges
 dhE :: DimensionHandler s (Ed s)
 dhE    ba tcec _ e =
-            SemiProcessedSimplex
-                edToAnySimplex2
-                edgeGrp 
-                mkObjDataAndObj
-                mempty
+    when (ba_visibility ba e' == Visible) $ do 
+        awhen (getL ba_edgeDecoL ba e) 
+            (\d -> mkEdgeDecos ee d name (bfi_labelMat bfi) thickness)
+
+        let _objVar = pyv "cylObj"
+
+        case ee of 
+
+            FlatEdge cv0 cv1 -> newCylinderObj _objVar cv0 cv1 thickness
+
+            -- curved triangle
+            GeneralEdge gee -> 
+                
+                    newCurveObj _objVar (BlenderCurve {
+                        curve_base = BlenderCurveBase {
+                            curve_name = "SomeCurvedEdge",
+                            curve_mats = [], -- set in finishSimplexProcessing 
+                            curve_resolution_u = 4
+                        },
+                        bevel_depth = thickness,
+                        bevel_resolution = 10,
+                        curve_splines = [(nurbsFromFun 2) gee]
+                    })
+
+        asiCommon ba e' edgeGrp _objVar
 
             where
+                e' = edToAnySimplex2 e
+                
                 thickness = ba_edgeThickness ba e
 
                 ee = ba_edgeEmbedding ba tcec e
 
-                name = unFaceName . ba_faceName ba . edToAnySimplex2 $ e
+                name = unFaceName . ba_faceName ba $ e' 
 
-                bfi = ba_faceInfo ba . edToAnySimplex2 $ e
+                bfi = ba_faceInfo ba $ e'
 
-                mkObjDataAndObj = do 
-                    awhen (getL ba_edgeDecoL ba e) 
-                        (\d -> mkEdgeDecos ee d name (bfi_labelMat bfi))
-
-                    case ee of 
-
-                        FlatEdge cv0 cv1 -> newCylinderObj objVar cv0 cv1 thickness
-
-                        -- curved triangle
-                        GeneralEdge gee -> 
-                            
-                                newCurveObj objVar (BlenderCurve {
-                                    curve_base = BlenderCurveBase {
-                                        curve_name = "SomeCurvedEdge",
-                                        curve_mats = [], -- set in finishSimplexProcessing 
-                                        curve_resolution_u = 4
-                                    },
-                                    bevel_depth = thickness,
-                                    bevel_resolution = 10,
-                                    curve_splines = [(nurbsFromFun 2) gee]
-                                })
                             
 
                             
-mkEdgeDecos :: EdgeEmbedding -> EdgeDeco -> String -> Maybe Material -> Python ()
-mkEdgeDecos ee (EdgeDeco n dir) edgeName mat = do
-    forM_ (case n of
-                1 -> [0.5]
-                _ -> equidistantPoints Closed Closed 
-                        (0.5-decoStretchFraction/2) (0.5+decoStretchFraction/2) (n-1))
+mkEdgeDecos :: (?scene::Scene s,?sceneE::Python ()) => EdgeEmbedding -> EdgeDeco -> String -> Maybe Material -> BlenderUnits -> Python ()
+mkEdgeDecos ee (EdgeDeco n dir) edgeName mat edgeThickness = do
 
-          $ \(u_center :: Double) ->
+    let 
+        width = decoConeWidthFactor * edgeThickness 
 
+        ee' :: UF Tup3 Double
+        ee' = evalEdgeEmbedding ee
+
+    
+        -- in absolute distance on the edge, from the midpoint of the edge
+        (cone_positions, cyl_positions) = 
+            let
+                
+                (ncyls,ncones) = 
+                    let (d,m) = divMod n 3 in if m==0 then (d-1,3) else (d,m)
+
+                _len = conegap * fi (ncones-1) 
+                      + if ncyls == 0 then 0 else ccgap + cylgap * fi (ncyls-1) 
+
+                cone_u i = - _len/2 + fi i * conegap
+                cyl_u i = cone_u (ncones-1) + ccgap + fi i * cylgap
+            in
+                ( map cone_u [0..ncones-1]
+                , map cyl_u [0..ncyls-1] )
+
+        speed_midpoint = twoNorm (diffF ee' 0.5)
+        -- linear approx
+
+        absPosToU x = 0.5 + x/speed_midpoint 
+
+        cone_us = map absPosToU cone_positions 
+        cyl_us  = map absPosToU cyl_positions
+
+    forM_ cone_us $ \(u_center :: Double) ->
         let
-            u_min = u_center - decoConeLengthFraction/2
-            u_max = u_center + decoConeLengthFraction/2
-
+            speed_u_center = twoNorm (diffF ee' u_center)  
+            u_min = u_center - (decoConeLength/(2*speed_u_center))
+            u_max = u_center + (decoConeLength/(2*speed_u_center))
         in
             coneAlongCurve 
                 ((\(t :: AD s Double) -> 
-                    let
-                        t_ = interpolU t (lift u_min) (lift u_max)
-                    in
-                        $(assrt [| not (isNaN t_ || isInfinite t_) |] ['n,'u_center,'u_min,'u_max,'t,'t_]) $
-                            evalEdgeEmbedding ee t_) 
+                        ee' (interpolU t (lift u_min) (lift u_max)))
 
                     . case dir of
                            NoFlip -> id
                            Flip -> (\x -> 1-x))
 
-
-                decoConeWidth 
-                ("DecoCone"++show n++"Of "++edgeName) 
+                width
+                ("DecoConeOf "++edgeName) 
                 mat
 
 
 
-coneAlongCurve :: UF Tup3 Double -> Double -> String -> Maybe Material -> Python ()
+    forM_ cyl_us $ \u_center -> 
+
+        let
+            value = lowerUF ee' u_center
+            unitTangent = twoNormalize (diffF ee' u_center)  
+            var = py "decoCyl"
+        in do
+            newCylinderMeshObj var 
+                (tup3toVec3 (value ^-^ unitTangent ^* (cylLength/2)))
+                (tup3toVec3 (value ^+^ unitTangent ^* (cylLength/2)))
+                width
+                128
+                False
+
+            objCommon var [] ("DecoCylOf "++edgeName) mat
+
+
+
+coneAlongCurve :: (?sceneE::Python()) => UF Tup3 Double -> Double -> String -> Maybe Material -> Python ()
 coneAlongCurve (c :: UF Tup3 Double) width name mat = 
 
     $(assrt [| isKindaUnitLength tangent && isKindaUnitLength other0 && isKindaUnitLength other1 |] ['tangent,'other0,'other1]) $ 
-    $(assrt [| areKindaOrthogonal other0 other1 |] ['tangent,'other0,'other1]) $ 
+    $(assrt [| areKindaOrthogonal other0 other1  |] ['tangent,'other0,'other1]) $ 
     $(assrt [| areKindaOrthogonal tangent other0 |] ['tangent,'other0,'other1]) $ 
     $(assrt [| areKindaOrthogonal tangent other1 |] ['tangent,'other0,'other1]) $ 
 
@@ -439,36 +474,38 @@ coneAlongCurve (c :: UF Tup3 Double) width name mat =
 
 
 
-
-                        
-
 -- | Logic specific for triangles
 dhT :: DimensionHandler s (Tri s)
-dhT  ba tcec ecvc t = 
-            SemiProcessedSimplex
-                triToAnySimplex2
-                triGrp
-                stmts1
-                stmts2
+dhT  ba tcec ecvc t = do 
+    when (vis==Visible) $ do
+        stmts1
+        asiCommon ba t' triGrp _objVar
+    when (vis/=Invisible) $ do
+        handleTriLabel ba tcec ecvc triLblGrp t
 
             where
+                _objVar = pyv "triObj"
+
+                t' = triToAnySimplex2 t
+
+                vis = ba_visibility ba t'
+
                 stmts1 = do
                     case ba_triangleEmbedding ba t of
                         FlatTriangle cv0 cv1 cv2 -> 
-                            newFlatTriangleObj objVar cv0 cv1 cv2 name
+                            newFlatTriangleObj _objVar cv0 cv1 cv2 name
                         GeneralTriangle (GTE res g) -> do 
-                            newTriangularSurfaceObj res objVar g name
+                            newTriangularSurfaceObj res _objVar g name
                             mkHelpLines g helpLineMat 
 
 
-                    objVar <.> "show_transparent" .= True
+                    _objVar <.> "show_transparent" .= True
 
-                stmts2 = handleTriLabel ba tcec ecvc triLblGrp t
 
 
                 bfi = getL ba_triangleInfoL ba $ t
                 helpLineMat = bfi_helpLineMat bfi 
-                name = unFaceName $ ba_faceName ba (triToAnySimplex2 t)
+                name = unFaceName $ ba_faceName ba t'
 
 
         
@@ -544,6 +581,7 @@ handleTriLabel ba tcec ecvc grpTriLabels t =
 
 
                     in do
+                        let objVar = pyv "textObj"
                         newTextObj objVar
                             (TextCurve {
                                 textCurve_base = BlenderCurveBase {
@@ -555,7 +593,7 @@ handleTriLabel ba tcec ecvc grpTriLabels t =
                                 textCurve_extrude = textThickness
                             })
                         objVar <.> matrix_basis .= m
-                        objCommon 
+                        objCommon objVar
                             groups 
                             (text ++ " on "++show perm++" "++unFaceName (ba_faceName ba asi))
                             Nothing
@@ -569,64 +607,22 @@ handleTriLabel ba tcec ecvc grpTriLabels t =
 
 
         
-newSphereObj :: PythonVar -> Vec3 -> Double -> Python ()
-newSphereObj var loc radius = do
-            var .= pfd_call1 makeSphereFunDef loc
-            var <.> "scale" .= (Vec3 radius radius radius)
-
-
-
-
-newCylinderObj :: PythonVar -> Vec3 -> Vec3 -> Double -> Python ()
-newCylinderObj var from to radius = 
-    if normsqr (from &- to) <= 1E-14
-       then newEmptyObj var "Crushed newCylinderObj"
-       else 
-
-    
-        do
-            var .= pfd_call makeCylinderFunDef ()
-
-            var <.> matrix_basis .= m
-
-            where
-                m :: Proj4
-                m = 
-                    
-                    scaling (Vec3 radius radius (1/2)) .*. 
-                    translation ((1/2) *& vec3Z) .*.
-                    linear (pointZTo (to &- from)) .*.
-                    translation from
-
-
-
-
-
-
-        
-matrix_basis ::  [Char]
-matrix_basis = "matrix_basis"
-
-newFlatTriangleObj
-  :: PythonVar -> MeshVertex -> MeshVertex -> MeshVertex -> String -> Python ()
-newFlatTriangleObj var p0 p1 p2 name =
-    newMeshObj var (Mesh name [p0,p1,p2] [(0,1,2)] False [] [])
-
-
-safeOrthogonal :: Mat3 -> Proj4
-safeOrthogonal m = 
-    assert (matrixApproxEq (m .*. transpose m) idmtx) $
-    assert (matrixApproxEq (transpose m .*. m) idmtx) $
-    linear m
 
 
 
 
 testBlender :: (CONSTRAINTS0(s)) => Scene s -> IO ExitCode
-testBlender s = do
+testBlender = blenderMain JustLook
+
+renderBlender = blenderMain DoRender
+
+
+
+blenderMain doRender s = do
     let fn = "/tmp/testBlender.py"
     starttime <- getCurrentTime
-    {-# SCC "testBlender/writeFile" #-} renderPythonToFile fn (toBlender s)
+
+    {-# SCC "testBlender/writeFile" #-} renderPythonToFile fn (toBlender s doRender)
     endtime <- getCurrentTime
     putStrLn ("toBlender took "++show (endtime `diffUTCTime` starttime)) 
     putStrLn ("Scene creation script written to " ++ fn++"; launching Blender")
@@ -639,13 +635,6 @@ meshVar = py "me"
 
 
 
-newMeshObj :: PythonVar -> Mesh -> Python ()
-newMeshObj var m =
-    do 
-        let _meshVar = py "decoConeMesh"
-
-        mesh_init _meshVar m
-        newObj var (meshName m) _meshVar 
         
 --         setActiveObject sceneVar var
 --         -- don't know how to determine whether we are in editmode already (seems to be determined at random for new objects...), so try/catch
@@ -657,20 +646,6 @@ newMeshObj var m =
 --             editmode_toggle
 --             normals_make_consistent
 
-normals_make_consistent :: Python ()
-normals_make_consistent = methodCall (bpy_ops "mesh") "normals_make_consistent" ()
-
-originToGeometry :: Python ()
-originToGeometry = do 
-            methodCall (bpy_ops "object") "origin_set" 
-                (SingleArg (namedArg "type" (str "ORIGIN_GEOMETRY")))
-
-setActiveObject :: (ToPython r, ToPython a) => a -> r -> Python ()
-setActiveObject scene obj = do
-    scene <.> "objects.active" .= obj
-
-editmode_toggle :: Python ()
-editmode_toggle = methodCall (bpy_ops "object") "editmode_toggle" ()
 
 txtVar ::  Python ()
 txtVar = py "txt"
@@ -678,34 +653,6 @@ txtVar = py "txt"
 textThickness :: Double
 textThickness = 1E-5
 
-newTextObj :: PythonVar -> TextCurve -> Python ()
-newTextObj var txt = do
-    textCurve_init txtVar txt 
-    newObj var (id_name txt) txtVar
-
-
-
-newCurveObj :: PythonVar -> BlenderCurve -> Python ()
-newCurveObj var (cu :: BlenderCurve) = do
-    curve_init curveVar cu
-    newObj var (id_name cu) curveVar
-
-    
-
--- | Creates a new object with the given name and data, links it to the scene, assigns it to the given var
-
-newObj :: ToPython t => PythonVar -> String -> t -> Python ()
-newObj (var :: PythonVar) name objData = do
-            var .= (methodCallExpr (bpy_dat "objects") "new" (str name,objData))
-            methodCall1 (sceneVar <.> "objects") "link" var
-
-newEmptyObj :: PythonVar -> String -> Python ()
-newEmptyObj var name = newObj var name none
-
---linkObjToScene =
-
-grpLink :: BlenderGroup -> Python () -> Python ()
-grpLink gr obj = methodCall1 (bgrp_objectsE gr) "link" obj
 
 
 -- note: we usually set spline_resolution_u low (1 or 2) and instead compute subdivisions here by increasing 'steps'
@@ -734,7 +681,7 @@ nurbsFromFun spline_resolution (GEE steps f) =
         --sequence_ <$> zipWithM (\x y -> newCylinderObj x y thickness) ys (tail ys)
             
 
-newTriangularSurfaceObj :: 
+newTriangularSurfaceObj :: (?sceneE::Python ()) => 
         Int 
     -> PythonVar
     -> FF Tup2 Tup3 Double
@@ -782,7 +729,7 @@ newTriangularSurfaceObj = memo prepare
 
 
 
-mkHelpLines :: FF Tup2 Tup3 Double -> Maybe Material -> Python ()
+mkHelpLines :: (?sceneE::Python ()) => FF Tup2 Tup3 Double -> Maybe Material -> Python ()
 mkHelpLines (emb :: FF Tup2 Tup3 Double) helpLineMat = do
     newCurveObj (py "helpLine") (BlenderCurve {
         curve_base = BlenderCurveBase {
@@ -821,14 +768,3 @@ mkHelpLines (emb :: FF Tup2 Tup3 Double) helpLineMat = do
 -- viewSelectedStmt :: Python ()
 -- viewSelectedStmt = methodCall (bpy_ops "view3d") "view_selected" ()
 
-deselectAllStmt :: Python ()
-deselectAllStmt = foreachStmt "o" (py "context.selected_objects") 
-    (\o -> o <.> "select" .= False)
-
-
-
-setRenderSettings :: ToPython a => a -> RenderSettings -> Python ()
-setRenderSettings _sceneVar RS{..} = do
-    _sceneVar <.> "render.resolution_x" .= render_resolution_x
-    _sceneVar <.> "render.resolution_y" .= render_resolution_y
-    awhen render_filepath (\fp -> _sceneVar <.> "render.filepath" .= str fp)

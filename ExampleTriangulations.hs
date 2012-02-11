@@ -69,11 +69,15 @@ spqwc_l31 = spqwc_twoTetBipyramid tr_l31 (0./tABC)
                                | tri == tBCD -> "J"
                                | otherwise -> assert False undefined)
     
-twoTetCam :: Cam
-twoTetCam = 
+twoTetCam' :: Cam
+twoTetCam' = 
  Cam (uncurry3 Vec3 (-0.23205919563770294, -3.6175613403320312, 0.15333208441734314))
      (uncurry3 Vec3 (1.4570116996765137, -8.902474064598209e-07, -0.0009973797714337707))
      defaultFOV
+
+twoTetCam :: Cam
+twoTetCam =
+ readCam "(Vector((0.42211657762527466, -1.9336755275726318, 0.5852480530738831)), Euler((1.1714677810668945, 1.1168522178195417e-06, 0.3451415002346039), 'XYZ'), 0.8575560591178853)"
 
 
 oneTetCam :: Cam

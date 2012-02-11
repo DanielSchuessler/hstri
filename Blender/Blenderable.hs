@@ -53,8 +53,8 @@ nameMakeLens ''BaFaceInfo (Just . (++"L"))
 data Blenderable s = Blenderable { 
     ba_pr :: PreRenderable s,
     ba_faceInfo :: AnySimplex2Of s -> BaFaceInfo,
-    ba_vertexThickness :: Vert s -> Double,
-    ba_edgeThickness :: Arc s -> Double
+    ba_vertexThickness :: Vert s -> BlenderUnits,
+    ba_edgeThickness :: Arc s -> BlenderUnits
 }
     deriving (Generic)
 
@@ -90,7 +90,8 @@ data Scene s = Scene {
     scene_cams :: [Cam],
     scene_setLongLabelCustomProperties :: Bool,
     scene_initialSelection :: Maybe (AnySimplex2Of s),
-    scene_render :: RenderSettings
+    scene_render :: RenderSettings,
+    scene_lamps :: [LampObj]
 }
 
 nameMakeLens ''Scene (Just . (++"L"))
@@ -106,7 +107,11 @@ setRenderFilepath :: FilePath -> Scene s -> Scene s
 setRenderFilepath = setL (scene_renderL >>> render_filepathL) . Just
 
 
-
+setRenderRes :: Int -> Int -> Scene s -> Scene s
+setRenderRes x y = 
+    setL (scene_renderL >>> render_resolution_xL) x
+    .
+    setL (scene_renderL >>> render_resolution_yL) y
 
 
 
@@ -129,7 +134,8 @@ defaultScene0 s = Scene {
     scene_cams = [defaultCam],
     scene_setLongLabelCustomProperties = False,
     scene_initialSelection = Nothing,
-    scene_render = defaultRenderSettings
+    scene_render = defaultRenderSettings,
+    scene_lamps = [defaultLamp]
 }
 
 defaultCam :: Cam
@@ -277,4 +283,7 @@ ba_allFaceInfos ba = map (ba_faceInfo ba) (anySimplex2s (ba_ds ba))
 ba_edgeDecoL :: Lens (Blenderable s) (Ed s -> Maybe EdgeDeco)
 ba_edgeDecoL = ba_prL >>> pr_edgeDecoL
 
+
+setLamps :: [LampObj] -> Scene s -> Scene s
+setLamps = setL scene_lampsL
 

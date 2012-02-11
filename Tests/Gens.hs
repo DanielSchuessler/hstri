@@ -4,7 +4,7 @@
 module Tests.Gens where
 
 --import QuadCoordinates.Class
-import AbstractNeighborhood
+import Triangulation.AbstractNeighborhood
 import ClosedNorCensus8
 import ClosedOrCensus6
 import ConcreteNormal

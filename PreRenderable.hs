@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, Rank2Types, NoMonomorphismRestriction, ViewPatterns, RecordWildCards, TemplateHaskell, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-orphans #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 module PreRenderable(
     -- * Reex
     module Math.Groups.S3,
@@ -51,6 +51,7 @@ module PreRenderable(
     pr_setTriangleEmbedding,
     pr_setGeneralTriangleEmbedding,
     pr_edgeDecoL,
+    pr_setEdgeDecoAssocs,
 
     -- ** Visibility
     visibleIf,
@@ -91,6 +92,7 @@ import Simplicial.SimplicialComplex
 import THUtil
 import Tetrahedron.Vertex
 import Util
+import qualified Data.Map as M
 
 data EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int, edgeDecoDir :: S2 } 
     deriving (Show)
@@ -142,7 +144,7 @@ class Coords t where
 -- rotateAngleAxis = (.) transformCoords  . rotate3
 
 
-data Visibility = Visible | Invisible
+data Visibility = Invisible | OnlyLabels | Visible
     deriving (Eq,Ord,Show)
 
 instance Pretty Visibility where prettyPrec = prettyPrecFromShow
@@ -166,8 +168,7 @@ data PreRenderable s = PreRenderable {
 nameMakeLens ''PreRenderable (Just . (++"L"))
 
 
--- pr_quad
---   :: Resolution -> (UnitSquare -> Vec3) -> PreRenderable (SC2 (Bool, Bool))
+pr_quad :: Resolution-> FF Tup2 Tup3 Double -> PreRenderable (SC2 (Bool, Bool))
 pr_quad reso (f :: FF Tup2 Tup3 Double) = 
     PreRenderable {
         pr_ds = ds,
@@ -279,21 +280,27 @@ pr_visibilityL = pr_faceInfoL >>> firstLens
 pr_setVisibility :: (AnySimplex2Of s -> Visibility) -> PreRenderable s -> PreRenderable s
 pr_setVisibility = setL pr_visibilityL
 
+pr_triVisibilityL :: Lens (PreRenderable s) (Element (Tris s) -> Visibility)
 pr_triVisibilityL = pr_visibilityL >>> rightLens
 
 pr_edVisibilityL :: Lens (PreRenderable s) (Ed s -> Visibility)
 pr_edVisibilityL = pr_visibilityL >>> leftLens >>> rightLens
 
+pr_vertVisibilityL :: Lens (PreRenderable s) (Element (Verts s) -> Visibility)
 pr_vertVisibilityL = pr_visibilityL >>> leftLens >>> leftLens
 
 pr_setEdVisibility
   :: (Ed s -> Visibility) -> PreRenderable s -> PreRenderable s
 pr_setEdVisibility = setL pr_edVisibilityL
 
+pr_setTriVisibility :: (Element (Tris s) -> Visibility)-> PreRenderable s -> PreRenderable s
 pr_setTriVisibility = setL pr_triVisibilityL
 
+pr_vertVisibility :: PreRenderable s -> Element (Verts s) -> Visibility
 pr_vertVisibility = getL pr_vertVisibilityL 
+pr_edVisibility ::  PreRenderable s -> Ed s -> Visibility
 pr_edVisibility = getL pr_edVisibilityL
+pr_triVisibility :: PreRenderable s -> Element (Tris s) -> Visibility
 pr_triVisibility = getL pr_triVisibilityL
 
 
@@ -312,11 +319,18 @@ pr_setTriangleEmbedding
      -> PreRenderable s -> PreRenderable s
 pr_setTriangleEmbedding = pr_setGeneralTriangleEmbedding
 
+pr_setGeneralTriangleEmbedding :: (Tri s -> Maybe GeneralTriangleEmbedding)-> PreRenderable s -> PreRenderable s
 pr_setGeneralTriangleEmbedding = setL pr_generalTriangleEmbeddingL
 
+pr_edgeDecoL ::  Lens (PreRenderable s) (Ed s -> Maybe EdgeDeco)
 pr_edgeDecoL = pr_edgeInfoL >>> firstLens
+pr_generalEdgeEmbeddingL :: Lens (PreRenderable s) (Ed s -> Maybe GeneralEdgeEmbedding)
 pr_generalEdgeEmbeddingL = pr_edgeInfoL >>> secondLens
 
+pr_setEdgeDecoAssocs :: Ord (Element (Eds s)) =>[(Ed s, EdgeDeco)] -> PreRenderable s -> PreRenderable s
+pr_setEdgeDecoAssocs = setL pr_edgeDecoL . flip M.lookup . M.fromList 
+
+triResolutionToEdgeResolution ::  Num a => a -> a
 triResolutionToEdgeResolution = (*10)
 
 pr_edgeEmbedding
@@ -359,6 +373,7 @@ pr_edgeEmbedding pr tcec e =
 
                         in \x -> interpol x v0 v1
 
+flatFace :: PreRenderable s-> (b -> c) -> ((Vert s -> Vec3) -> b1 -> b) -> (a -> b1) -> a -> c
 flatFace pr ctor mapN verticesAscending face =    
                                 ctor
                             .   mapN (pr_coords0 pr)
@@ -465,7 +480,7 @@ instance (PreDeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
 --     _setVisibility (\asi -> visibleIf (not (p asi)) * pr_visibility pr (f asi)) pr
 
 pr_ghide :: Lens a (t -> Visibility) -> (t -> Bool) -> a -> a
-pr_ghide _lens p = modL _lens (\oldVi -> \x -> visibleIf (not (p x)) * oldVi x) 
+pr_ghide _lens p = modL _lens (\oldVi -> \x -> visibleIf (not (p x)) `min` oldVi x) 
 
 pr_hide
   :: (AnySimplex2Of s -> Bool) -> PreRenderable s -> PreRenderable s
@@ -481,21 +496,9 @@ pr_hideTris
   :: (Tri s -> Bool) -> PreRenderable s -> PreRenderable s
 pr_hideTris = pr_ghide pr_triVisibilityL
 
+visibleIf ::  Bool -> Visibility
 visibleIf b = if b then Visible else Invisible
 
-instance Num Visibility where
-    (*) Visible Visible = Visible
-    (*) _ _ = Invisible
-
-    (+) Invisible Invisible = Invisible
-    (+) _ _ = Visible
-
-    negate Visible = Invisible
-    negate Invisible = Visible
-
-    abs = assert False undefined
-    signum = assert False undefined
-    fromInteger = assert False undefined
 
 
 isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t| (Bool,Bool) |]

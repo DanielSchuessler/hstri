@@ -3,7 +3,7 @@ module Triangulation.Transformations
 
     where
 
-import AbstractNeighborhood
+import Triangulation.AbstractNeighborhood
 import Control.Exception
 import Control.Failure
 import Data.Function

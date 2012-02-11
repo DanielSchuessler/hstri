@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, TemplateHaskell, FlexibleContexts, CPP, RecordWildCards, NoMonomorphismRestriction, FlexibleInstances, StandaloneDeriving, GADTs, ViewPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, TemplateHaskell, FlexibleContexts, CPP, RecordWildCards, NoMonomorphismRestriction, FlexibleInstances, StandaloneDeriving, GADTs, ViewPatterns, ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall -fwarn-missing-local-sigs #-}
 
@@ -91,6 +91,10 @@ c_pos (Concrete _ u _) = u
 
 c_type ::  Concrete t -> t
 c_type (Concrete _ _ a) = a
+
+c_update
+  :: (Pos t -> Pos a) -> (t -> a) -> Concrete t -> Concrete a
+c_update mapPos mapType (Concrete a b c) = Concrete a (mapPos b) (mapType c)
 
 -- | Assumes the operands belong to the same normal surface; does /not/ compare the surfaces.
 instance Eq a => Eq (Concrete a) where
@@ -290,14 +294,23 @@ instance TriangulationDSnakeItem (Concrete INormalCorner) where
 
             Concrete surf pos' (iNormalCorner e')
 
-instance TriangulationDSnakeItem (Concrete INormalArc) where
-    canonicalize tr x = 
+canonicalizeConcreteArc
+  :: (Eq t, TriangulationDSnakeItem t) =>
+     Triangulation -> Concrete t -> Concrete t
+canonicalizeConcreteArc (tr :: Triangulation) x =
         let
             ina = c_type x
         in
-            case canonicalizeINormalArc tr ina of
+            case canonicalize tr ina of
                 ina' | ina == ina' -> x -- redundant; for efficiency(?)
                      | otherwise -> Concrete (c_surf x) (c_pos x) ina' 
+
+instance TriangulationDSnakeItem (Concrete INormalArc) where
+    canonicalize = canonicalizeConcreteArc
+
+instance TriangulationDSnakeItem (Concrete OINormalArc) where
+    canonicalize = canonicalizeConcreteArc
+
 
 -- | Identity
 instance TriangulationDSnakeItem (Concrete INormalTri) where
@@ -344,6 +357,10 @@ instance Vertices (Concrete INormalArc) where
     type Verts (Concrete INormalArc) = Pair (Concrete INormalCorner)
     vertices = concreteCornersOfArc
 
+instance Vertices (Concrete OINormalArc) where
+    type Verts (Concrete OINormalArc) = Pair (Concrete INormalCorner)
+    vertices = defaultVerticesForOrderedFace
+
 instance Vertices (Concrete INormalTri) where
     type Verts (Concrete INormalTri) = Triple (Concrete INormalCorner)
     vertices = concreteCornersOfTri
@@ -371,5 +388,19 @@ $(concatMapM (\x -> [d| instance Show (TConcrete $(conT x)) where
 
 
              [''INormalDisc,''INormalQuad,''INormalArc,''INormalCorner])
+
+instance RightAction S2 (Concrete OINormalArc) where 
+    x *. g = c_update id (*. g) x 
+
+instance OrderableFace (Concrete INormalArc) (Concrete OINormalArc) where
+    type VertexSymGroup (Concrete INormalArc) = S2
+
+    packOrderedFace x g = c_update coercePos (`packOrderedFace` g) x
+    unpackOrderedFace ox =
+        let
+            (y,g) = unpackOrderedFace (c_type ox)
+        in
+            (c_update coercePos (const y) ox, g)
+
 
 

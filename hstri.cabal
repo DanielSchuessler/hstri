@@ -24,11 +24,12 @@ Library
     CheckAdmissibility
     StandardCoordinates.SurfaceQueries
     AbsTet
-    AbstractNeighborhood
+    Triangulation.AbstractNeighborhood
     Tetrahedron
     Tetrahedron.Constants
     BarySD
     Blender
+    Blender.Build
     Blender.ID
     Blender.Types
     Blender.Blenderable
@@ -136,6 +137,7 @@ Library
     Math.SparseVector
     ZapUnits
     Data.BitVector.Adaptive
+    Blender.Mesh
 
 
   Build-depends: ad, 

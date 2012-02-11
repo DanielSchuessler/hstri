@@ -12,7 +12,9 @@ import THUtil
 import ToPython
 import Util
 import qualified Data.Vector as V
-import Data.Numbering
+import Control.Monad
+
+type BlenderUnits = Double
 
 (&) :: ToPython s => t -> s -> (t, Python ())
 x & y = (x, toPython y)
@@ -55,15 +57,33 @@ data MaterialTextureSlot = MTS {
 data Material = Material {
     ma_name :: MatName,
     ma_props :: Props,
+
     ma_transparency :: Maybe TransparencySettings,
-    ma_textureSlots :: [MaterialTextureSlot]
+    ma_textureSlots :: [MaterialTextureSlot],
+
+ -- | [1,511]
+    ma_specular_hardness :: Int, 
+ -- | [0,1]
+    ma_specular_intensity :: Double,
+
+    ma_diffuse_color :: Triple Double
 }
     deriving Show
 
-basicMaterial :: MatName -> Props -> Material
-basicMaterial name props = Material name props Nothing []
-
 nameMakeLens ''Material (Just . (++"L"))
+
+basicMaterial :: MatName -> Triple Double -> Material
+basicMaterial ma_name ma_diffuse_color = Material {
+    ma_name,
+    ma_props = [],
+    ma_specular_hardness = 50,
+    ma_specular_intensity = 0.5,
+    ma_transparency = Nothing,
+    ma_textureSlots = [],
+    ma_diffuse_color
+}
+
+
 
 type BlenderGroupName = String
 
@@ -88,18 +108,9 @@ defaultFOV :: Double
 defaultFOV = 0.8575560591178853
 
 
-diffuseColor :: Triple Double -> BlenderPropAssoc
-diffuseColor rgb = "diffuse_color" & rgb
 
 
 
-
-specular :: 
-       Int -- ^ [1,511]
-    -> Double -- ^ [0,1]
-    -> Props
-specular hardness intensity = ["specular_hardness" & hardness,
-                               "specular_intensity" & intensity]
 
 transparency :: TransparencySettings -> [([Char], Python ())]
 transparency Trans{..} =
@@ -132,32 +143,6 @@ readCam s =
 -- 
 
 
-data Mesh = Mesh {
-        meshName :: String,
-        meshVertices :: [MeshVertex],
-        meshFaces :: [Triple MeshVertexIndex],
-        meshSmooth :: Bool,
-        uv_textures :: [MeshUVLayer],
-        meshMats :: [Material]
-    }
-
-type UV = Vec2
-
--- | Aka @MeshTextureFaceLayer@
-data MeshUVLayer = MeshUVLayer UVLayerName [Triple UV] 
-
-type MeshVertexIndex = Int
-type MeshVertex = Vec3
-
-mesh :: Numbering v -> (v -> MeshVertex) -> [Triple v] -> Mesh
-mesh vertNu vertCoords faces = Mesh {
-        meshName = "Anonymous mesh",
-        meshVertices = map vertCoords (nuElements vertNu),
-        meshFaces = map (map3 (toInt vertNu)) faces,
-        meshSmooth = True,
-        uv_textures = [],
-        meshMats = []
-    }
 
 data BlenderCurveBase = BlenderCurveBase {
     curve_name :: String,
@@ -243,4 +228,51 @@ defaultRenderSettings = RS {
     render_resolution_y = 1080,
     render_filepath = Nothing
 }                         
+
+data BlenderLamp = Sun {
+    lamp_name :: String
+}
+    deriving Show
+
+nameMakeLens ''BlenderLamp (Just . (++"L"))
+
+data LampObj = LampObj {
+    lamp_lamp :: BlenderLamp,
+    lamp_eulers :: EulerAnglesXYZ,
+    lamp_location :: Vec3
+}
+    deriving Show
+
+nameMakeLens ''LampObj (Just . (++"L"))
+
+oldDefaultLamp :: LampObj
+oldDefaultLamp = LampObj {
+    lamp_lamp = Sun { 
+        lamp_name = "TheLamp"
+    },
+    lamp_location = Vec3 (-5) (-10) 8,
+    lamp_eulers = Vec3 (5*pi/12) 0 (-pi/6)
+}              
+
+
+defaultLamp :: LampObj
+defaultLamp = LampObj {
+    lamp_lamp = Sun { 
+        lamp_name = "TheLamp"
+    },
+    lamp_location = Vec3 (-5) (-10) 8,
+    lamp_eulers = eulerAnglesXYZ (0.25*pi) 0 (pi/6)
+}
+
+
+ma_globalVarName :: Material -> [Char]
+ma_globalVarName = ("material_"++) . ma_name
+
+ma_globalVar :: Material -> PythonVar
+ma_globalVar = pyv . ma_globalVarName
+
+appendMaterialsStmt
+  :: PythonVar -> [Material] -> Python ()
+appendMaterialsStmt var mats = 
+    forM_ mats (\m -> methodCall1 (var <.> "materials") "append" (ma_globalVar m))
 

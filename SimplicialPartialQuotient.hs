@@ -210,15 +210,27 @@ addEdgeDecos (tr :: Triangulation) _mapEd = setL pr_edgeDecoL _edgeDeco
 
             
 
+spq_mapOEd :: (Ord v, Show v) => SimplicialPartialQuotient v -> OIEdge -> (Asc2 v, S2)
+spq_mapOEd spq = $unEitherC . sort2WithPermutation' . spq_mapEd spq 
 
+data TriangPreRenderableOpts = TPRO {
+    decorateEdges :: Bool
+}
+
+defaultTPRO :: TriangPreRenderableOpts
+defaultTPRO = TPRO False
 
 toPreRenderable
-  :: (Ord v, ShortShow v, Pretty v, Show v) =>
+  :: (Ord v, Show v, Pretty v, ShortShow v) =>
      SPQWithCoords v -> PreRenderable (SC3 v)
-toPreRenderable (SPQWithCoords spq coords gluingLabeller) = 
+toPreRenderable = toPreRenderableWithOpts defaultTPRO
 
-        addEdgeDecos tr 
-            ($unEitherC . sort2WithPermutation' . spq_mapEd spq) 
+toPreRenderableWithOpts
+  :: (Ord v, ShortShow v, Pretty v, Show v) =>
+     TriangPreRenderableOpts -> SPQWithCoords v -> PreRenderable (SC3 v)
+toPreRenderableWithOpts opts (SPQWithCoords spq coords gluingLabeller) = 
+
+        (if decorateEdges opts then addEdgeDecos tr (spq_mapOEd spq) else id) 
             
             resultWithoutEdgeDecos
 

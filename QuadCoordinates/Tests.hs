@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell #-}
 module QuadCoordinates.Tests where
 
-import AbstractNeighborhood
+import Triangulation.AbstractNeighborhood
 import Tetrahedron
 import Control.Applicative
 import Control.Arrow((&&&))

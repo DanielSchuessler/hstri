@@ -15,9 +15,7 @@ import Blender.Blenderable
 import qualified Data.Vector as V
 import Data.Vect.Double.Base
 import FileLocation
-import Control.Monad
 
-type PythonVar = Python ()
 
 
 -- | Corresponds to the @ID@ class in blender <http://www.blender.org/documentation/blender_python_api_2_59_3/bpy.types.ID.html> (for our purposes, an instance of this class is a thing that has a unique (per scene) name and gets its own python variable)
@@ -71,9 +69,11 @@ instance BlenderID Texture where
                 nubOn tex_name . map mts_tex 
                 . concatMap ma_textureSlots . id_collectUniqueThings
 
+
+
 instance BlenderID Material where
     id_name = ma_name
-    id_globalVarName = ("material_"++) . id_name
+    id_globalVarName = ma_globalVarName
 
     id_init var Material{..} = do
         var .= methodCallExpr1 (bpy_dat "materials") "new" (str ma_name)
@@ -86,8 +86,13 @@ instance BlenderID Material where
 
             ) ma_textureSlots
 
-        let allProps = ("use_transparent_shadows" & True)
-                            : ma_props
+        var <.> "use_transparent_shadows" .= True
+        var <.> "specular_hardness" .= ma_specular_hardness
+        var <.> "specular_intensity" .= ma_specular_intensity
+        var <.> "diffuse_color" .= ma_diffuse_color 
+
+        let allProps =
+                               ma_props
                             ++ Fold.concatMap transparency ma_transparency 
 
         setProps var allProps
@@ -149,10 +154,6 @@ instance BlenderID BlenderSurface where
     id_init = surface_init
     
 
-appendMaterialsStmt
-  :: PythonVar -> [Material] -> Python ()
-appendMaterialsStmt var mats = 
-    forM_ mats (\m -> methodCall1 (var <.> "materials") "append" (id_globalVar m))
 
 
 
@@ -200,34 +201,6 @@ spline2d_init curveVar splineVar s =
 extendVec34 :: Vec3 -> Vec4
 extendVec34 = extendWith 1
 
-
-mesh_init :: PythonVar -> Mesh -> Python ()
-mesh_init meshVar m = do
-        meshVar .= (methodCallExpr1 (bpy_dat "meshes") "new" (str (meshName m)))
-
-        methodCall meshVar "from_pydata" (meshVertices m,emptyList,meshFaces m)
-
-        when (meshSmooth m)
-            (foreachStmt "f" (meshVar <.> "faces") (\f ->
-                f <.> "use_smooth" .= True))
-
-        forM_ (uv_textures m)
-            (\(MeshUVLayer name uvs) -> do
-                let meshTextureFaceLayerVar = py "meshTextureFaceLayer"
-                meshTextureFaceLayerVar .= methodCallExpr1 (meshVar <.> "uv_textures") "new" (str name)
-                methodCall
-                    (meshTextureFaceLayerVar <.> "data") 
-                    "foreach_set"
-                    ( str "uv"
-                    , concatMap ((++[-1,-1]) . concatMap asList . asList) uvs ))
-
-        appendMaterialsStmt meshVar (meshMats m)
-
---             "print('vertices:')",
---             "for x in me.vertices:",
---             "   pprint(x.co)",
-
-        methodCall meshVar "update" (SingleArg True)
 
 
 
@@ -278,3 +251,13 @@ textCurve_init txtVar TextCurve{..} = do
 surface_init :: PythonVar -> BlenderSurface -> Python ()
 surface_init var BlenderSurface{..} = do
     curveBase_init var surface_base "SURFACE"
+
+
+
+lamp_init :: PythonVar -> BlenderLamp -> Python ()
+lamp_init lightVar l =
+    case l of
+         Sun{..} -> do
+
+            lightVar .= methodCallExpr (bpy_dat "lamps") "new" (str lamp_name, str "SUN") 
+            lightVar <.> "shadow_method" .= str "RAY_SHADOW"

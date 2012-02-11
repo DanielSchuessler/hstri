@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections, TypeFamilies, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
-module AbstractNeighborhood(
+module Triangulation.AbstractNeighborhood(
     EdgeNeighborhoodTet,
     IEdgeNeighborhoodTet,
     ent_top,ent_bot,ent_left,ent_right,ent_leftTri,ent_rightTri,ent_upperTri,ent_lowerTri,

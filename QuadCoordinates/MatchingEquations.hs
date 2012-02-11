@@ -4,7 +4,7 @@
 {-# OPTIONS -Wall #-}
 module QuadCoordinates.MatchingEquations where
 
-import AbstractNeighborhood
+import Triangulation.AbstractNeighborhood
 import Control.Arrow((&&&))
 import Control.DeepSeq.TH
 import Control.Exception

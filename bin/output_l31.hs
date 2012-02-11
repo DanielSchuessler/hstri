@@ -6,9 +6,10 @@ import Control.Applicative
 import Control.Exception
 import Control.DeepSeq
 import FileLocation
+import Data.Lens.Common
 
 
-
+bcmd = DoRender
 
 tr = tr_l31
 spqwc = spqwc_l31
@@ -18,25 +19,35 @@ smes = putStr (latexifyStandardMatchingEquations tr)
 
 qmes = putStr (latexifyQMatchingEquations tr)
 
-go fp ba = (testBlender . setCams [twoTetCam] . setRenderFilepath fp)
+go fp ba = (blenderMain bcmd . setCams [twoTetCam] . setRenderFilepath fp . setRenderRes 1200 1200)
         (defaultScene $ ba)
 
 
 main = do
-    go "/h/dipl/pictures/L31.png" (fromSpqwc spqwc)
---     go baVertexLinkA0
---     go baVertexLinkD0
+--     go "/h/dipl/pictures/L31.png" (fromSpqwc spqwc)
+    go "/h/dipl/pictures/L31vertexLinkD0.png" baVertexLinkD0
+    go "/h/dipl/pictures/L31vertexLinkA0.png" baVertexLinkA0
     
 
 p = pMap tr
 
-(baVertexLinkA0,baVertexLinkD0) = 
-    map2 (\v ->
-                fromSpqwcAndIntegerNormalSurface 
-                    spqwc
-                    (vertexLinkingSurface (p (0./ v))))
 
-         (vA,vD)
+baVertexLinkA0 = 
+    (modL ba_prL (pr_setTriVisibility (const Invisible))
+        $ fromSpqwc spqwc)
+
+    `disjointUnion`
+
+    fromIntegerNormalSurface spqwc (vertexLinkingSurface (p (0./ vA)))
+
+
+
+
+baVertexLinkD0 = 
+        fromSpqwcAndIntegerNormalSurface 
+            spqwc
+            (vertexLinkingSurface (p (0./ vD)))
+
 
 
 --             `disjointUnion`

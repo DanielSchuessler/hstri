@@ -13,7 +13,7 @@ module ConcreteNormal.PreRenderable(
 
 import ConcreteNormal
 import Data.Function
-import Data.Set as Set
+import qualified Data.Set as S
 import Data.Vect.Double(interpolate)
 import DisjointUnion
 import HomogenousTuples
@@ -27,6 +27,8 @@ import Simplicial.SimplicialComplex
 import SimplicialPartialQuotient
 import StandardCoordinates.MatchingEquations
 import Util
+import Triangulation
+import Control.Applicative
 
 type CornerPosition' = Int
 type CornerCount = Int
@@ -54,48 +56,58 @@ corn pos n u0 u1 =
                    then Corn pos           n u0 u1
                    else Corn (n - pos - 1) n u1 u0
 
+data NormalSurfacePreRenderableOpts = NSPRO {
+    decorateArcs :: Bool
+}
+
+defaultNSPRO :: NormalSurfacePreRenderableOpts
+defaultNSPRO = NSPRO True 
+
 normalSurfaceToPreRenderable
+  :: (Ord v, Show v, ShortShow v, StandardCoords s Integer) =>
+     SPQWithCoords v -> Admissible s -> PreRenderable (SC2 (Corn v))
+normalSurfaceToPreRenderable = normalSurfaceToPreRenderableWithOpts defaultNSPRO
+
+normalSurfaceToPreRenderableWithOpts
   :: forall s v i. (i ~ Integer, Integral i, Show v, Ord v, Pretty i, ShortShow v, StandardCoords s i) =>
-     SPQWithCoords v
+        NormalSurfacePreRenderableOpts
+     -> SPQWithCoords v
      -> Admissible s
      -> PreRenderable (SC2 (Corn v))
-normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =  
+normalSurfaceToPreRenderableWithOpts opts (SPQWithCoords spq coords _) ns =  
     let
 
         tris :: [Triple (Corn v)]
-        tris = do
-            cx <- concreteTris ns 
-            let (viewI -> I i x) = c_type cx
-
-            let f corner = 
-                    mkCorn 
-                        (unPos $ posOfCornerOfTri cx corner)
-                        (i ./ corner)
-
-            [ map3 f (normalCorners x) ]
+        tris = 
+            map (map3 concreteNormalCornerToCorn . concreteCornersOfTri) 
+                (concreteTris ns)
 
         quads :: [Quadruple (Corn v)]
-        quads = do
-            cx <- concreteQuads ns
-            let (viewI -> I i x) = c_type cx
-            let f corner = 
-                    mkCorn 
-                        (unPos $ posOfCornerOfQuad cx corner)
-                        (i ./ corner)
-
-            [ map4 f (normalCorners x) ]
+        quads = 
+            map (map4 concreteNormalCornerToCorn . concreteCornersOfQuad) 
+                (concreteQuads ns)
 
 
         (sc,quadDiagonals) = fromTrisAndQuads tris quads
 
-        mkCorn :: CornerPosition' -> INormalCorner -> Corn v
-        mkCorn pos nonCanonicalINormalCorner =
+        concreteNormalCornerToCorn :: Concrete INormalCorner -> Corn v
+        concreteNormalCornerToCorn x =
             let
+                pos = unPos $ c_pos x
+                nonCanonicalINormalCorner = c_type x
                 n = numberOfCornersOfType ns nonCanonicalINormalCorner
                 (u0,u1) = map2 (spq_map spq)
                                (vertices (iNormalCornerGetContainingEdge nonCanonicalINormalCorner))
             in
                 corn pos (fromIntegral n) u0 u1
+
+        concreteONormalArcToCorns :: Concrete OINormalArc -> (Asc2 (Corn v), S2)
+        concreteONormalArcToCorns (unpackOrderedFace -> (x,g)) =
+            let 
+                corns = map2 concreteNormalCornerToCorn $ concreteCornersOfArc x 
+                (y,g') = $unEitherC (sort2WithPermutation' corns)
+            in (y,g <> g')
+
 
         cornerCoords (Corn pos n v0 v1) = 
                 interpolate (fi (1+pos) / fi (1+n)) (coords v0) (coords v1)
@@ -104,27 +116,40 @@ normalSurfaceToPreRenderable (SPQWithCoords spq coords _) ns =
         isVisible = 
                             foldAnySimplex2
                                 (const Visible)
-                                (\e -> visibleIf (not $ Set.member e quadDiagonals))
+                                (\e -> visibleIf (not $ S.member e quadDiagonals))
                                 (const Visible)
+
+
 
         tr = spq_tr spq
 
         arcDecos = do
-            arc <- concreteArcs ns
-            let arc' = canonicalize tr arc
-            guard (arc' /= arc)
+            (((corns,g),(corns',g')),i) <- 
+                zip
+                    [(cg,cg') |
+                        arc <- toOrderedFace <$> concreteArcs ns,
+                        let arc' = canonicalize tr arc,
+                        let cg = concreteONormalArcToCorns arc,
+                        let cg' = concreteONormalArcToCorns arc',
+                        cg /= cg' ]
+                    [1..]
 
+
+
+            [    (corns ,EdgeDeco i g)
+             ,   (corns',EdgeDeco i g')
+             ]
             
 
 
         
     in
+              (if decorateArcs opts then pr_setEdgeDecoAssocs arcDecos else id) 
+            . pr_setVisibility isVisible
 
-            pr_setVisibility isVisible
-
-                (mkPreRenderable
+            $   mkPreRenderable
                     cornerCoords
-                    sc)
+                    sc
 
 
 -- normalSurfaceToPreRenderable2 tr pr ns = mkPreRenderable cornerCoords

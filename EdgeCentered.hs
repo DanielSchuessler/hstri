@@ -20,7 +20,7 @@ import SimplicialPartialQuotient
 import PrettyUtil
 import ShortShow
 import DisjointUnion
-import AbstractNeighborhood
+import Triangulation.AbstractNeighborhood
 
 data EdgeNeighborhoodVertex =
     Bottom |

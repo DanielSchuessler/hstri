@@ -35,7 +35,7 @@ orderProblem = canonExt tr (quad_fromNormalSurface  [0./Q_ac, 1./Q_ad, 2./Q_ad, 
 -- orderProblemCam2 =
     -- (Vector((-4.257680416107178, -0.0048864055424928665, 0.33231738209724426)), Euler((1.4978764057159424, -1.8658225826584385e-06, -1.6015570163726807), 'XYZ'))
 
-main = (testBlender . setCams [octahedronCam1])
+main = (testBlender . setCams [octahedronCam1] . setLamps [oldDefaultLamp])
         (defaultScene
             (
                 fromSpqwcAndIntegerNormalSurface spqwc

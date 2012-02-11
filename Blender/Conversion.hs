@@ -38,10 +38,11 @@ import StandardCoordinates.MatchingEquations
 
 data Style = Style {
     mat0, mat1, mat2, mat2curved :: Material,
-    style_vertexThickness :: Double,
+    style_vertexThickness :: BlenderUnits,
     -- | Blender groups to which all objects having this style should be added
     style_groups :: [BlenderGroup],
-    style_helpLineMat :: Material
+    style_helpLineMat :: Material,
+    style_labelMat :: Material
 }
 
 mkBlenderable
@@ -63,7 +64,7 @@ mkBlenderable Style{..} pr_ = Blenderable {
                                 _ -> mat2curved) 
                     asi,
             bfi_groups = style_groups,
-            bfi_labelMat = Just triLabelMat,
+            bfi_labelMat = Just style_labelMat,
             bfi_helpLineMat = Just style_helpLineMat
         },
 
@@ -99,31 +100,50 @@ surfaceSpecularHardness = 200
 
 pseudomanifoldStyle :: Style
 pseudomanifoldStyle = Style {
-    mat0 = (basicMaterial "pmMat0" (let r=0.3 in diffuseColor (r, r, r):[])),
+    mat0 = basicMaterial "pmMat0" (let r=0.3 in (r, r, r)),
     mat1 = mat1,
     mat2 = mat2,
     mat2curved = mat2,
     --(mat2 { ma_name = "pmMat2curved",  ma_textureSlots = [ triTriTextureSlot ] }) 
     style_vertexThickness = pmVertThickness,
     style_groups = [threeMFGroup],
-    style_helpLineMat = mat1 { ma_name = "pmHelpLine" }
+    style_helpLineMat = mat1 { ma_name = "pmHelpLine" },
+    style_labelMat = triLabelMat
  }
 
 
   where
-    mat1 = basicMaterial "pmMat1" (diffuseColor (0.7, 0.7, 0.8):specular 100 0.8)
-    mat2 = Material 
-                "pmMat2" 
-                (diffuseColor (0.7, 0.7, 0.8):specular surfaceSpecularHardness 0.8) 
-                (Just (Trans 0.25 0.3 1))
-                []
+    mat1 = (basicMaterial "pmMat1" (0.7, 0.7, 0.8)) {
+                ma_specular_hardness = 100,
+                ma_specular_intensity = 0.8
+            }
+
+    mat2 = (basicMaterial  "pmMat2" (0.7, 0.7, 0.8)) {
+               ma_specular_hardness = surfaceSpecularHardness ,
+               ma_specular_intensity = 0.8, 
+               ma_transparency = Just (Trans 0.25 0.3 1)
+
+            }
+
+                
+                
+
+    triLabelMat ::  Material
+    triLabelMat = (basicMaterial "triLbl" (let r = 0.015 in (r,r,r))) {
+            ma_specular_hardness = 200,
+            ma_specular_intensity = 0.5
+
+        }
 
 
-pmVertThickness ::  Double
+pmVertThickness ::  BlenderUnits
 pmVertThickness = 0.04
+
+-- | Edge thickness as a fraction of vertex sphere radius
 edgeThicknessFactor ::  Double
 edgeThicknessFactor = 0.4
-nsurfVertThickness ::  Double
+
+nsurfVertThickness ::  BlenderUnits
 nsurfVertThickness = 0.03
 
 normalGroup :: BlenderGroup
@@ -132,23 +152,29 @@ normalGroup = BlenderGroup "Normal"
 mkNormalSurfaceStyle
   :: [Char]
      -> Triple Double -> Triple Double -> Triple Double -> Style
-mkNormalSurfaceStyle suf col0 col1 col2 = Style 
-    (basicMaterial ("nsurfMat0"++suf) (diffuseColor col0 :[]))
-    mat1
-    mat2
-    mat2
-    nsurfVertThickness
-    [normalGroup]
-    mat1 { ma_name = "nsurfHelpLine" }
+mkNormalSurfaceStyle suf col0 col1 col2 = Style {
+    mat0 = mat0,
+    mat1 = mat1,
+    mat2 = mat2,
+    mat2curved = mat2,
+    style_vertexThickness = nsurfVertThickness,
+    style_groups = [normalGroup],
+    style_helpLineMat = mat1 { ma_name = "nsurfHelpLine" },
+    style_labelMat = mat0
+  }
 
   where
-    mat1 = basicMaterial ("nsurfMat1"++suf) (diffuseColor col1:specular 100 0.8)
+    mat0 = basicMaterial ("nsurfMat0"++suf) col0
+    mat1 = (basicMaterial ("nsurfMat1"++suf) col1) {
+                ma_specular_hardness = 100,
+                ma_specular_intensity = 0.8
+            }
     mat2 =
-                Material 
-                    ("nsurfMat2"++suf) 
-                    (diffuseColor col2:specular surfaceSpecularHardness 0.8)
-                    (Just (Trans 0.55 0.7 1))
-                    []
+                (basicMaterial ("nsurfMat2"++suf) col2) {
+                    ma_transparency = Just (Trans 0.55 0.7 1),
+                    ma_specular_hardness = surfaceSpecularHardness, 
+                    ma_specular_intensity = 0.8
+                }
 
 normalSurfaceStyle :: Style
 normalSurfaceStyle = mkNormalSurfaceStyle ""
@@ -209,7 +235,7 @@ fromSpqwcAndIntegerNormalSurface
              )
 
 fromSpqwcAndIntegerNormalSurface spqwc s = 
-    makeTrisAlmostInvisible
+    makeTrisInvisible
         (fromSpqwc spqwc) 
     `disjointUnion`
     fromIntegerNormalSurface spqwc s 
@@ -223,13 +249,13 @@ makeTrisAlmostInvisible =
                 (faceMatL >>> ma_transparencyL) 
                 (Just (Trans 0.05 0.05 1))))
 
+makeTrisInvisible :: Blenderable s -> Blenderable s
+makeTrisInvisible = modL ba_prL (pr_setTriVisibility (const OnlyLabels))  
 
 
 defaultScene :: ToBlenderable a s => a -> Scene s
 defaultScene = defaultScene0 . toBlenderable
 
-triLabelMat ::  Material
-triLabelMat = basicMaterial "triLbl" [ let r = 0.015 in diffuseColor (r,r,r) ]
 
 
 

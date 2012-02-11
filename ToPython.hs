@@ -55,6 +55,12 @@ pyTuple xs = do
 py :: String -> Python ()
 py = tell . fromString
 
+pyv :: String -> PythonVar
+pyv = py
+
+type PythonVar = Python ()
+
+
 class ToPython a where
     toPython :: a -> Python ()
 
@@ -163,6 +169,9 @@ methodCall obj meth argTuple = methodCallExpr obj meth argTuple >> py "\n"
 
 namedArg :: ToPython r => String -> r -> Python ()
 namedArg l r = assignExpr (py l) r
+ 
+namedArg1 :: ToPython r => String -> r -> SingleArg (Python ())
+namedArg1 l r = SingleArg (namedArg l r)
 
 assignExpr :: (ToPython l, ToPython r) => l -> r -> Python ()
 assignExpr l r = do

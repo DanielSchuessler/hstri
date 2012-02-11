@@ -1,5 +1,8 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, DeriveDataTypeable, NoMonomorphismRestriction, ViewPatterns, Arrows #-}    
 {-# OPTIONS -Wall #-}
+-- | Description: Parser for /Regina/ data files.
+--
+-- Parser for /Regina/ data files. Currently, only parsing of triangulations is supported.
 module Codec.Rga.Parser(readRgaFile,readRgaZip,RequiredAttributeNotPresentException(..)) where
 
 import Codec.Compression.GZip(decompress)
