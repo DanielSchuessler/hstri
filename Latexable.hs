@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
--- {-# OPTIONS -Wall #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
     ,latexifyStandardMatchingEquations
@@ -11,11 +11,12 @@ module Latexable(
     ,quad_latex
     
     -- * Program invocation
-    ,runPdfLatex,runPdfLatexSilent,runOkularAsync
+    ,runPdfLatex,runPdfLatexSilent,runPdfLatexSilentS,runOkularAsync
     ) where
 
 import Control.Applicative
 import Control.Arrow(first)
+import Control.Concurrent
 import Data.Function
 import Data.List(intercalate,sort,sortBy,groupBy)
 import Data.Maybe(mapMaybe)
@@ -23,22 +24,24 @@ import Data.Monoid(Monoid(..))
 import Data.Ord
 import Data.Ratio
 import Data.Semigroup
+import Data.String.Interpolation
 import Element
-import Tetrahedron.INormalDisc
+import Math.SparseVector
 import MathUtil
 import QuadCoordinates
+import QuadCoordinates.Class
 import StandardCoordinates
-import Triangulation
-import Triangulation.InnerNormalArc
-import Triangulation.CanonOrdered
-import TriangulationCxtObject
-import Math.SparseVector
-import Util
-import Data.String.Interpolation
-import System.Process
-import qualified Data.ByteString.Lazy as B
 import System.IO as IO
-import Control.Concurrent
+import System.Process(createProcess,proc,std_out,StdStream(CreatePipe),waitForProcess)
+import Triangulation
+import Triangulation.CanonOrdered
+import Triangulation.InnerNormalArc
+import TriangulationCxtObject
+import Util
+import qualified Data.ByteString.Lazy as B
+import Triangulation.PreTriangulation
+import Control.Monad
+import System.Exit
 
 type Latex = String
 
@@ -308,32 +311,49 @@ instance (Latexable k, Latexable r, Num r, Ord r) => Latexable (SparseVector k r
 instance Latexable Variable where toLatex = variableName
 
 
-pdfLatexOptions texfile = ["-interaction","nonstopmode","-file-line-error" 
+pdfLatexOptions :: FilePath -> [[Char]]
+pdfLatexOptions (texfile :: FilePath) = ["-interaction","nonstopmode","-file-line-error" 
                                         ,"-halt-on-error"
                                         ,"-output-directory","/tmp",texfile] 
 
 runPdfLatex :: FilePath -> IO ()
 runPdfLatex texfile = rawSystemS "pdflatex" (pdfLatexOptions texfile) 
 
-runPdfLatexSilent texfile = do 
+pdflatexDrivelFile :: FilePath
+pdflatexDrivelFile = "/tmp/pdflatex-drivel"
+
+runPdfLatexSilent :: FilePath -> IO ExitCode
+runPdfLatexSilent (texfile :: FilePath) = do 
     (Nothing,Just so,Nothing,ph) <- 
         createProcess   
             (proc "pdflatex" (pdfLatexOptions texfile))
                 { std_out = CreatePipe }
 
-    forkIO (B.writeFile "/tmp/pdflatex-drivel" =<< B.hGetContents so)
+    _ <- forkIO (B.writeFile pdflatexDrivelFile =<< B.hGetContents so)
 
     waitForProcess ph
+
+-- | Like 'runPdfLatexSilent, but must succeed.
+runPdfLatexSilentS :: FilePath -> IO ()
+runPdfLatexSilentS texfile = do 
+    ec <- runPdfLatexSilent texfile
+    unless (ec==ExitSuccess) $ do
+        putStrLn ("Proceeding to dump "++pdflatexDrivelFile++" ...") 
+        rawSystemS "cat" [pdflatexDrivelFile]
+        (error ("pdflatex failed with "++show ec))
 
 
 
 quad_latex
-  :: (Eq a, Num a, Latexable a) =>
-     Triangulation -> QuadCoordinates a -> Latex
+  :: (PreTriangulation tr,
+      QuadCoords q a,
+      Latexable a) =>
+     tr -> q -> Latex
 quad_latex tr qc = 
     case quad_toDenseList tr qc of
          lst -> latexEnv "pmatrix" (amps . fmap toLatex $ lst)
 
 
+runOkularAsync :: String -> IO ()
 runOkularAsync pdffile = rawSystemAsyncS "okular" [pdffile]
 

@@ -99,3 +99,15 @@ qd_fromListU = qd_fromVector . VU.fromList
 instance (NFData r, VG.Vector v r) => NFData (WrappedVector tag v r) where
 
     rnf x = rnf (VG.toList (unwrapVector x)) `seq` () 
+
+wv_projectiveImage
+  :: (Eq r, Fractional r, Show (v r), VG.Vector v r) =>
+     WrappedVector t v r -> WrappedVector tag v r
+wv_projectiveImage = wv_under (\v ->
+    let
+        s = VG.sum v
+    in
+        if s == 0
+           then error ("wv_projectiveImage: Coefficients sum to 0: "++show v) 
+           else VG.map (/s) v)
+                                         

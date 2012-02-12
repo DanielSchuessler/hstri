@@ -114,6 +114,7 @@ Library
     Tetrahedron.Triangle
     Tetrahedron.Vertex
     Tikz.Base
+    Tikz.InteractiveLayout
     Tikz.Gen
     Numeric.AD.Vector
     Tikz.Preview
@@ -134,10 +135,13 @@ Library
     Util
     VectorUtil
     VerboseDD
+    VerboseDD.Types
     Math.SparseVector
     ZapUnits
     Data.BitVector.Adaptive
     Blender.Mesh
+    QuadCoordinates.SolSetConversion
+    NormalSurfaceBasic
 
 
   Build-depends: ad, 

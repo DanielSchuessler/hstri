@@ -1,8 +1,7 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, TypeFamilies, GeneralizedNewtypeDeriving, TupleSections, FlexibleContexts, ViewPatterns, QuasiQuotes, ScopedTypeVariables, NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell, ExistentialQuantification, RecordWildCards, TemplateHaskell, TypeFamilies, GeneralizedNewtypeDeriving, TupleSections, FlexibleContexts, ViewPatterns, QuasiQuotes, ScopedTypeVariables, NoMonomorphismRestriction #-}
 {-# LANGUAGE ImplicitParams #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 -- | 
 -- Description : Test
 module Tikz.Gen(
@@ -18,7 +17,7 @@ module Tikz.Gen(
     regularPolygonLocs,
     noExtraEdgeStyles,
     Way(..),
-    tsgAuto,
+    previewAuto,
     StructureGraphLayout(..),
     StructureGraphExtraOptions(..),
     defaultSGEE,
@@ -33,7 +32,6 @@ import Data.Maybe
 import Data.String.Interpolation
 import HomogenousTuples
 import Latexable
-import QuadCoordinates
 import Tikz.Base
 import Tikz.Preview
 import TriangulationCxtObject
@@ -41,22 +39,29 @@ import qualified Data.Map as M
 import Triangulation.Class
 import Tikz.StructureGraph
 import Tikz.StructureGraphLayout
+import QuadCoordinates.Class
+import Triangulation.AbstractNeighborhood
+import FileLocation
+import Control.Monad
+import Util
+import Data.List
+import Data.Monoid(mempty)
 
 
 data Way = NoQuad
-         | QuadGiven (QuadCoordinates Integer) 
+         | forall q. QuadCoords q Integer => QuadGiven q
 
 
 
 noExtraEdgeStyles :: ITriangle -> TikzStyle
-noExtraEdgeStyles = const ""
+noExtraEdgeStyles = const mempty
 
 regularPolygonLocs
   :: (AsList xs, Element xs ~ IVertex) => xs -> IVertex -> TikzLoc
 regularPolygonLocs v =
     let
         eqvs = asList v
-        step = div 360 (length eqvs)
+        step = 360 / genericLength eqvs
         _assocs = 
             [ (x, Polar (i*step) (scopeUnitLength 1))
 
@@ -79,13 +84,13 @@ tikzStructureGraph
   :: (?layout::StructureGraphLayout) =>
      Triangulation -> StructureGraphExtraOptions -> Tikz
 tikzStructureGraph tr = 
-    tikzStructureGraphForVertices tr (tIVertices tr)
+    tikzStructureGraph_restricted tr (tIVertices tr) (edges tr)
 
 tikzStructureGraphForVertexLink
   :: (?layout::StructureGraphLayout) =>
      T IVertex -> StructureGraphExtraOptions -> Tikz
 tikzStructureGraphForVertexLink v = 
-    tikzStructureGraphForVertices (getTriangulation v) (preimageListOfVertex v)
+    tikzStructureGraph_restricted (getTriangulation v) (preimageListOfVertex v) []
 
 
 
@@ -101,14 +106,15 @@ data StructureGraphExtraOptions = SGEE
     }
 
 defaultSGEE :: StructureGraphExtraOptions
-defaultSGEE = SGEE "" noExtraEdgeStyles NoQuad
+defaultSGEE = SGEE mempty noExtraEdgeStyles NoQuad
 
-tikzStructureGraphForVertices
+tikzStructureGraph_restricted
   :: (?layout::StructureGraphLayout) =>
-     Triangulation -> [IVertex] -> StructureGraphExtraOptions -> Tikz
-tikzStructureGraphForVertices 
+     Triangulation -> [IVertex] -> [TEdge] -> StructureGraphExtraOptions -> Tikz
+tikzStructureGraph_restricted 
     (tr :: Triangulation)
     (verts::[IVertex]) 
+    eds
     SGEE{..}
         =
 
@@ -117,6 +123,8 @@ tikzStructureGraphForVertices
         edgeDraws :: [Tikz]
         edgeDraws = do
             SGE port1 port2 kind <- structureGraphEdges tr verts 
+
+            guard (kind /= EdgeEqualityEdge) -- disabled
 
             let
                 ports = (port1, port2)
@@ -129,15 +137,18 @@ tikzStructureGraphForVertices
 
                 (outAngle,inAngle) = map2 sideAngle (side1,side2)
 
-                extraEdgeStyle = ensureComma $    extraEdgeStyles (portTriangle port1) 
-                                               ++ extraEdgeStyles (portTriangle port2)
+                extraEdgeStyle :: TikzStyle
+                extraEdgeStyle = 
+                           extraEdgeStyles (portTriangle port1) 
+                        ++ extraEdgeStyles (portTriangle port2)
+                        ++ do { guard (ivertex1==ivertex2); ["looseness=7"] }
 
                 maybeFlipWarning = 
                     if orientation == NoFlip && kind == GluingEdge 
                                 then Just "draw=red,thick" 
                                 else Nothing
 
-                toOpts = [str|out=$:outAngle$, in=$:inAngle$$extraEdgeStyle$|]
+                toStyle = [str|out=$:outAngle$|] :  [str|in=$:inAngle$|] : extraEdgeStyle
 
                 drawStyle = intercalate "," (catMaybes [kindStyle,maybeFlipWarning,dir]) 
 
@@ -150,7 +161,7 @@ tikzStructureGraphForVertices
                          (QuadGiven qc, GluingEdge) -> 
                             let
                                 (c1,c2) = 
-                                    map2 (      quad_coefficient qc 
+                                    map2 (      quadCount qc 
                                             .   iNormalQuadByDisjointEdge 
                                             )
                                         (ed1, ed2)
@@ -169,7 +180,7 @@ tikzStructureGraphForVertices
                                 
 
             return [str| 
-                    \draw [$drawStyle$] ($nodeName ivertex1$) to[$toOpts$] $lblNode$($nodeName ivertex2$);
+                    \draw [$drawStyle$] ($nodeName ivertex1$) to[$renderTikzStyle toStyle$] $lblNode$($nodeName ivertex2$);
                     |]
 
 
@@ -179,7 +190,7 @@ tikzStructureGraphForVertices
         mainNodeScope = 
            [str|
             % Graph nodes
-            \begin{scope}[$outerScopeStyle$,
+            \begin{scope}[$renderTikzStyle outerScopeStyle$,
                         every node/.style={
                                 draw, regular polygon, regular polygon sides=3, inner sep=$innerSep$
                         }]
@@ -251,6 +262,8 @@ tikzStructureGraphForVertices
 
             $edgeScope$
 
+            $renderEdgeNeighborhoods tr eds$
+
             \end{tikzpicture}|]
 
 nodeName :: IVertex -> TikzNodeName
@@ -258,15 +271,100 @@ nodeName (viewI -> (I i x)) = show x ++ show i
 
 
 
-tsgAuto :: ToTriangulation t => t -> StructureGraphExtraOptions -> IO ()
-tsgAuto (toTriangulation -> tr) opts =
+previewAuto :: ToTriangulation t => t -> StructureGraphExtraOptions -> IO ()
+previewAuto (toTriangulation -> tr) opts =
     let
         verts = tIVertices tr
+        eds = edges tr
     in
-        withAuto tr verts (previewTikz 
-            (tikzStructureGraphForVertices tr verts opts))
+        withAuto tr verts eds (previewTikz 
+            (tikzStructureGraph_restricted tr verts eds opts))
+
+
+renderEdgeNeighborhoods
+  :: (?layout::StructureGraphLayout) =>
+     Triangulation -> [TEdge] -> Tikz
+renderEdgeNeighborhoods tr eds = concatMap f eds
+    where
+        f e = [str|
+                \begin{scope}[shift={$_loc$}]
+                $renderEdgeNeighborhood tr e$
+                \end{scope}
+              |]
+            where
+                _loc = renderTikzLoc $ edgeLoc_ ?layout e
 
 
 
+renderEdgeNeighborhood :: Triangulation -> TEdge -> Tikz
+renderEdgeNeighborhood tr e =
+    case someEdgeNeighborhood tr e of 
+        Left _ -> $err' "renderEdgeNeighborhood: boundary edge not supported"
 
+        Right (ien_toList -> ients) -> 
+            let
+                n = length ients
+                n' = 360/fi n
+                n'' = (180-n')/2
+
+                radius :: Double
+                radius = case n of
+                             3 -> 3.5
+                             _ -> 3
+
+                _main =
+                    flip concatMap (zip ients [0..n-1]) (\(ient,(fi -> i)) ->
+                        let
+                            ccorner = Polar (i * n')       (show radius)
+                            dcorner = Polar ((i+1) * n')   (show radius)
+
+
+                            a = 
+                                simpleNode 
+                                    (Polar ((i+0.5)*n') (dist 0 n'))
+                                    (mathmode (ient_top ient))
+                            b = 
+                                simpleNode
+                                    (Polar ((i+0.5)*n') (dist 3.3 n'))
+                                    (mathmode (ient_bot ient))
+
+                            dist _plus ang = show (250/ang + _plus) ++ "ex"
+
+
+                            c = 
+                                simpleNode
+                                    (DistanceRot ccorner (dist 0 n'') (-n''/2) tikzOrigin)
+                                    (mathmode (ient_left ient))
+
+                            d = 
+                                simpleNode
+                                    (DistanceRot dcorner (dist 0 n'') (n''/2) tikzOrigin)
+                                    (mathmode (ient_right ient))
+
+                        in
+                            [str|
+                                \draw $renderTikzLoc ccorner$ -- $renderTikzLoc dcorner$ -- (0,0); 
+                            |]
+                            ++ concatMap renderNode [a,b,c,d]
+                    )
+
+            in
+                [str|
+                        \begin{scope}
+                        $_main$
+                        \end{scope} |]
+
+
+simpleNode :: TikzLoc -> Tikz -> TikzNode
+simpleNode = TikzNode ""
+
+data TikzNode = TikzNode {
+    n_style :: String,
+    n_loc :: TikzLoc,
+    n_lbl :: Tikz
+}
+            
+renderNode :: TikzNode -> [Char]
+renderNode TikzNode{..} = [str| \node [$n_style$] at $renderTikzLoc n_loc$ {$n_lbl$}; 
+|]
 

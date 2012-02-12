@@ -38,7 +38,33 @@ import Util
 import Control.Applicative
 import Tests.Gens
 import Data.Proxy
+import Data.BitVector.Adaptive
+import VectorUtil
+import Data.Typeable
 
+zeroeyNumbers :: (Num a, Arbitrary a) => Gen a
+zeroeyNumbers = 
+    frequency 
+    [ (1,return 0)
+    , (3,arbitrary)
+    ]
+
+vectorShrinkElt
+  :: (Ord a, VG.Vector v a, Arbitrary a) => v a -> [v a]
+vectorShrinkElt v = concatMap (vectorAdjustAtF v shrink) [0..VG.maxIndex v]
+
+prop_sd_zeroSet :: Property
+prop_sd_zeroSet =
+    let maxn = 40 in 
+    forAllShrink (choose (1,maxn)) (filter (>0) . shrink) (\n ->
+    forAllShrink (V.fromList <$> vectorOf (7*n) (zeroeyNumbers :: Gen Integer)) vectorShrinkElt (\v ->
+    printTestCase ("expected =\n"++reverse [ if v V.! i == 0 then '1' else '0' | i <- [0..7*n-1]]) $
+    withBitVectorType (7*n) (\(p :: Proxy w) ->
+    printTestCase (show (typeOf p)) $
+    let zs = sd_zeroSet (sd_fromVector v) :: w in
+    printTestCase ("actual =\n"++(reverse . take (7*n). reverse . bvShow) zs) $
+    forAllShrink (choose (0,7*n-1)) shrink (\i ->
+    bvUnsafeIndex zs i .=. ((V.!) v i == 0))))) 
 
 
 polyprop_vertexSolutions
@@ -113,8 +139,9 @@ prop_krBasisMatchingEquations t =
 
 
 
-prop_eulerCharViaConcrete 
-    (FundamentalEdgeSolution (ManifoldTriangulation (tr :: Triangulation)) surf) =
+prop_eulerCharViaConcrete :: Property
+prop_eulerCharViaConcrete = mapSize (`div` 2) $
+    \(FundamentalEdgeSolution (ManifoldTriangulation (tr :: Triangulation)) surf) ->
 
         let
             cverts = concreteCorners surf

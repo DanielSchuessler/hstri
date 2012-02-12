@@ -10,11 +10,12 @@ module Triangulation.AbstractNeighborhood(
 
     InnerEdgeNeighborhood,
     ien_toList, ien_toNonEmpty,
-    BoundaryEdgeNeighbordhood,
+    BoundaryEdgeNeighborhood,
     ben_toList, ben_toNonEmpty,
     innerEdgeNeighborhood',
     innerEdgeNeighborhood,
-    edgeNeighborhood
+    edgeNeighborhood,
+    someEdgeNeighborhood
     ) where
 import TriangulationCxtObject
 import Data.Function
@@ -153,12 +154,12 @@ ien_toList = NE.toList . ien_toNonEmpty
 -- 'ient_rightTri' is glued to the next tetrahedron's 'ient_leftTri'.                   
 --
 -- INVARIANT: The first tetrahedron's 'ient_leftTri' and the last tetrahedron's 'ient_rightTri' are boundary tris.
-newtype BoundaryEdgeNeighbordhood = UnsafeBoundaryEdgeNeighborhood {
+newtype BoundaryEdgeNeighborhood = UnsafeBoundaryEdgeNeighborhood {
         ben_toNonEmpty :: NonEmpty IEdgeNeighborhoodTet 
     }
     deriving Show
 
-ben_toList :: BoundaryEdgeNeighbordhood -> [IEdgeNeighborhoodTet]
+ben_toList :: BoundaryEdgeNeighborhood -> [IEdgeNeighborhoodTet]
 ben_toList = NE.toList . ben_toNonEmpty
 
 -- The 'ent_bot' of each result tet will be equivalent to the first vertex of the given 'OIEdge'; the 'ent_top of each result tet will be equivalent to the second vertex of the given 'OIEdge'. 
@@ -175,7 +176,7 @@ innerEdgeNeighborhood x = innerEdgeNeighborhood' (getTriangulation x) (packOrder
 -- The 'ent_bot' of each result tet will be equivalent to the first vertex of the given 'OIEdge'; the 'ent_top of each result tet will be equivalent to the second vertex of the given 'OIEdge'. 
 edgeNeighborhood
   :: Triangulation
-     -> OIEdge -> Either BoundaryEdgeNeighbordhood InnerEdgeNeighborhood
+     -> OIEdge -> Either BoundaryEdgeNeighborhood InnerEdgeNeighborhood
 edgeNeighborhood tr e = 
     let
         x0xs@(x0 :| xs) = edgeNeighborhoodTetStream tr NoFlip e
@@ -194,5 +195,9 @@ edgeNeighborhood tr e =
                          
                         
 
-
-
+-- | Uses arbitrary orders
+someEdgeNeighborhood
+  :: Triangulation
+     -> TEdge
+     -> Either BoundaryEdgeNeighborhood InnerEdgeNeighborhood
+someEdgeNeighborhood tr = edgeNeighborhood tr . toOrderedFace . unT

@@ -41,6 +41,12 @@ satisfiesQuadrilateralConstraints tr stc =
                     else 1
 
 
+areCompatible
+  :: (QuadCoords a r, QuadCoords b r) =>
+     Triangulation -> a -> b -> Either [Char] ()
+areCompatible tr x y =
+    satisfiesQuadrilateralConstraints tr (x :+ y)
+
 
 quad_admissible
   :: (Show r, ToTriangulation tr, QuadCoords q r) =>

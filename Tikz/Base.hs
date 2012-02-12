@@ -4,15 +4,30 @@ module Tikz.Base where
 import Data.String.Interpolation
 import HomogenousTuples
 import Element
+import Data.List(intercalate)
 
 type Tikz = String
 
-data TikzLoc = Polar { tl_degrees :: Int, tl_radius :: TikzLength }
+type Degrees = Double
+
+data TikzLoc = Polar { tl_degrees :: Degrees, tl_radius :: TikzLength }
              | Cartesian (TikzLength, TikzLength)
+             | Distance TikzLoc TikzLength TikzLoc
+             | DistanceRot TikzLoc TikzLength Degrees TikzLoc
+             | UnknownTikzLoc String
+
+
+    deriving Show
+
+tikzOrigin :: TikzLoc
+tikzOrigin = Cartesian ("0", "0")
 
 renderTikzLoc :: TikzLoc -> Tikz
-renderTikzLoc (Polar a r) = [str| ($:a$:$r$) |]
-renderTikzLoc (Cartesian (x, y)) = [str| ($x$,$y$) |]
+renderTikzLoc (Polar a r) = [str|($:a$:$r$)|]
+renderTikzLoc (Cartesian (x, y)) = [str|($x$,$y$)|]
+renderTikzLoc (Distance a p b) = [str|($$$renderTikzLoc a$!$p$!$renderTikzLoc b$$$)|]
+renderTikzLoc (DistanceRot a p ang b) = [str|($$$renderTikzLoc a$!$p$!$:ang$:$renderTikzLoc b$$$)|]
+renderTikzLoc (UnknownTikzLoc s) = s
 
 type TikzLength = String
 
@@ -26,8 +41,10 @@ ptLength x = show x ++ "pt"
 
 type TikzNodeName = String
 
-type TikzStyle = String
+type TikzStyle = [String]
 
+renderTikzStyle :: TikzStyle -> Tikz
+renderTikzStyle = intercalate ", "
 
 data PaperTriangleSide = PTS_NW | PTS_S | PTS_NE 
     deriving Show

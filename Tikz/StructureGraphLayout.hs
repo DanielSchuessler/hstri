@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, OverloadedStrings, ScopedTypeVariables, TupleSections, GeneralizedNewtypeDeriving, ViewPatterns, ImplicitParams, RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell, Rank2Types, OverloadedStrings, ScopedTypeVariables, TupleSections, GeneralizedNewtypeDeriving, ViewPatterns, ImplicitParams, RecordWildCards #-}
 {-# OPTIONS -Wall #-}
 module Tikz.StructureGraphLayout where
 
@@ -26,27 +26,25 @@ import Data.Map(Map)
 import qualified Data.Vector as V
 import Orientation
 import Tikz.StructureGraph
-
-data StructureGraphLayout0 = SGL0 {
-    ptcToVertex0 :: Map IVertex PtcToVertex,
-    loc0 :: Map IVertex TikzLoc
-}
-
-sglToSgl0
-  :: [IVertex] -> StructureGraphLayout -> StructureGraphLayout0
-sglToSgl0 verts SGL{..} = SGL0
-    (M.fromList $ map (id &&& ptcToVertex_) verts)
-    (M.fromList $ map (id &&& loc_) verts)
-
-sgl0ToSgl :: StructureGraphLayout0 -> StructureGraphLayout
-sgl0ToSgl SGL0{..} = SGL 
-    (fromMaybe (assert False undefined) . flip M.lookup ptcToVertex0)
-    (fromMaybe (assert False undefined) . flip M.lookup loc0)
+import FileLocation
+import Util
 
 data StructureGraphLayout = SGL {
-    ptcToVertex_ :: IVertex -> PtcToVertex,
-    loc_ :: IVertex -> TikzLoc
+    ptcToVertex0 :: Map IVertex PtcToVertex,
+    loc0 :: Map IVertex TikzLoc,
+    edgeLoc0 :: Map TEdge TikzLoc
 }
+    deriving Show
+
+
+ptcToVertex_ :: StructureGraphLayout -> IVertex -> PtcToVertex
+ptcToVertex_ = flip $indx . ptcToVertex0
+loc_ :: StructureGraphLayout -> IVertex -> TikzLoc
+loc_ = flip $indx . loc0
+edgeLoc_ :: StructureGraphLayout -> TEdge -> TikzLoc
+edgeLoc_ = flip $indx . edgeLoc0
+
+
 
 
 ptcToVertex
@@ -72,7 +70,7 @@ newtype PtcToVertex = PtcToVertex {
     -- | Images of 'PTC_N','PTC_SW','PTC_SE'
     ptcToVertex_toTriple :: Triple Vertex 
 }
-    deriving(RightAction S3)
+    deriving(Show,RightAction S3)
 
 applyPtcToVertex :: PtcToVertex -> PaperTriangleCorner -> Vertex
 applyPtcToVertex (PtcToVertex (v0,v1,v2)) ptc =
@@ -119,28 +117,45 @@ ptcToIVertex
 ptcToIVertex (ivertex :: IVertex) (ptc :: PaperTriangleCorner) = 
     getTIndex ivertex ./ ptcToVertex ivertex ptc :: IVertex
 
-auto :: Triangulation -> [IVertex] -> IO StructureGraphLayout
-auto tr verts = 
-    let
-        nnu = nuFromDistinctList (concatMap (asList . structureGraphPortsForVertex) verts)
 
-        _edges = [(sge_from e, sge_to e, Just e) | e <- structureGraphEdges tr verts ]
+
+fglGraphForAuto
+  :: Graph gr =>
+     Triangulation
+     -> [IVertex]
+     -> [TEdge]
+     -> gr (Either StructureGraphPort TEdge) (Maybe StructureGraphEdge)
+fglGraphForAuto tr verts eds = mkGraphWithNu' nnu _edges 
+    where
+
+        nnu = nuFromList (concatMap (asList . structureGraphPortsForVertex) verts)
+               `eitherNu`
+              nuFromList eds
+
+              
+
+        _edges = [(Left (sge_from e), Left (sge_to e), Just e) | e <- structureGraphEdges tr verts ]
                  ++
                  (do
                     v <- verts
                     (p1,p2) <- (asList . subtuples3_2 . structureGraphPortsForVertex) v
-                    return (p1,p2,Nothing))
+                    return (Left p1,Left p2,Nothing))
 
                  
+dotGraphParamsForAuto
+  :: GraphvizParams
+       n
+       (Either StructureGraphPort TEdge)
+       (Maybe StructureGraphEdge)
+       ()
+       (Either StructureGraphPort TEdge)
+dotGraphParamsForAuto =
 
-
-        fgl = idGr $ mkGraphWithNu' nnu _edges 
-                
-        params = nonClusteredParams {
+        nonClusteredParams {
                     isDirected = True
                   , globalAttributes = 
                         [GraphAttrs [ Layout "neato" 
-                                    , Mode KK 
+                                    --, Mode KK 
                                     , Splines SplineEdges
                                     --, Overlap RemoveOverlaps
                                     ]
@@ -148,9 +163,6 @@ auto tr verts =
                                    , Dir NoDir
                                    ]
                         ,NodeAttrs [ UnknownAttribute "label" "" 
-                                   , UnknownAttribute "width" "0.06" 
-                                   , UnknownAttribute "height" "0.06" 
-                                   , UnknownAttribute "margin" "0.02" 
                                    , FontSize 8
                                    
                                    ]
@@ -158,7 +170,21 @@ auto tr verts =
                         ]
                   , fmtNode          = 
                      \(_,x) -> 
-                        [ toLabel ((show . (portNode)) x) ]
+                        case x of 
+                             Left sgport -> 
+                                [ toLabel ((show . portNode) sgport) 
+                                , UnknownAttribute "width" "0.06" 
+                                , UnknownAttribute "height" "0.06" 
+                                , UnknownAttribute "margin" "0.02" 
+                                
+                                ]
+                             Right _ -> 
+                                [
+                                  UnknownAttribute "width" "2"
+                                , UnknownAttribute "height" "2"
+                                , Shape Circle
+                                ]
+
 
                   , fmtEdge          = 
                      \(_,_,x) -> 
@@ -183,30 +209,38 @@ auto tr verts =
             }
 
 
+vec2InPointsToTikzLoc :: Vec2 -> TikzLoc
+vec2InPointsToTikzLoc (Vec2 x y) = Cartesian (map2 ptLength (x,y))
+
+auto :: Triangulation -> [IVertex] -> [TEdge] -> IO StructureGraphLayout
+auto tr verts eds = 
+    let
+        fgl = idGr $ fglGraphForAuto tr verts eds
+
     in do
 --         $(traceExps "" ['_edges,'fgl])
 --         viewDot' (graphToDot params fgl)
-            ag <- graphToGraph params fgl
+            ag <- graphToGraph dotGraphParamsForAuto fgl
 
             let 
                 posMap = M.fromList (do
-                            (_,(attrs,port)) <- labNodes ag
-                            let PointPos p = getPosAttr attrs 
-                            [(port,Vec2 (xCoord p) (yCoord p))]
-
-
+                            (_,(attrs,x)) <- labNodes ag
+                            [(x, posToVec2 (getPosAttr attrs))]
                             )
 
-                pos = fromMaybe (assert False undefined) . flip M.lookup posMap
+                pos = flip $indx posMap
 
                 _loc ivertex = 
-                    case bary3 (map3 pos (structureGraphPortsForVertex ivertex)) of
-                         Vec2 x y -> Cartesian (map2 ptLength (x,y))
+                         vec2InPointsToTikzLoc .
+                         bary3 .
+                         map3 (pos . Left) .
+                         structureGraphPortsForVertex $ ivertex 
+                         
 
                 _ptcToVertex ivertex =
                     let
                         -- determine which port is south, northwest and northeast
-                        as = map3 (id &&& pos) (structureGraphPortsForVertex ivertex)
+                        as = map3 (id &&& (pos . Left)) (structureGraphPortsForVertex ivertex)
                         (aS,a1,a2) = sort3By (comparing ((_2) . snd)) as
                         (aNW,aNE) = sort2By (comparing ((_1) . snd)) (a1,a2) 
                     in
@@ -238,33 +272,41 @@ auto tr verts =
                                     case tOrGetTriangleOr tOr tri of
                                          AscOr -> vs
                                          FlipAscOr -> vs *. S3bac
+
+
+                _edgeLoc = vec2InPointsToTikzLoc . pos . Right
                                     
                                     
 
 
             --return (optimize tr verts (SGL _ptcToVertex _loc))
-            return ((SGL _ptcToVertexAlt _loc))
+            return 
+                (SGL {
+                    ptcToVertex0 = funToMap verts _ptcToVertexAlt,
+                    loc0 = funToMap verts _loc,
+                    edgeLoc0 = funToMap eds _edgeLoc
+                })
 
 
 
 
 
-withAuto :: Triangulation -> [IVertex] -> ((?layout :: StructureGraphLayout) => IO r) -> IO r
-withAuto tr verts k = do 
-    layout <- auto tr verts 
+withAuto :: Triangulation -> [IVertex] -> [TEdge] -> ((?layout :: StructureGraphLayout) => IO r) -> IO r
+withAuto tr verts eds k = do 
+    layout <- auto tr verts eds 
     let ?layout = layout 
      in k
 
 adjustPtcToVertex
-  :: StructureGraphLayout0
-     -> IVertex -> (PtcToVertex -> PtcToVertex) -> StructureGraphLayout0
+  :: StructureGraphLayout
+     -> IVertex -> (PtcToVertex -> PtcToVertex) -> StructureGraphLayout
 adjustPtcToVertex l v f = 
     l { ptcToVertex0 =  M.adjust f v (ptcToVertex0 l) } 
 
 optimize
   :: Triangulation
      -> [IVertex] -> StructureGraphLayout -> StructureGraphLayout
-optimize tr (verts :: [IVertex]) = sgl0ToSgl . go . sglToSgl0 verts
+optimize tr (verts :: [IVertex]) = go
     where
         go = hillClimb (successors <=< successors <=< successors <=< successors) badness 
 
@@ -278,7 +320,7 @@ optimize tr (verts :: [IVertex]) = sgl0ToSgl . go . sglToSgl0 verts
 
         badness l = 
             let
-                ?layout = sgl0ToSgl l
+                ?layout = l
             in let 
                 edgeBadness =
                         (\(SGE port1 port2 k) ->

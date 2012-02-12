@@ -10,7 +10,7 @@ import StandardCoordinates
 import Tetrahedron.NormalDisc
 import Numeric.AD.Vector
 import CheckAdmissibility
-import CoordSys
+import NormalSurfaceBasic
 
 spqwc = spqwc_oneTet 
 tr = spqwc_tr spqwc

@@ -4,7 +4,7 @@ import Data.Vect.Double.Interpolate
 import Numeric.AD.Types
 import Numeric.AD.Vector
 import CheckAdmissibility
-import CoordSys
+import NormalSurfaceBasic
 
 spqwc = spqwc_twoTets
 

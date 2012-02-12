@@ -4,16 +4,18 @@
 module QuadCoordinates.Class
     (module Tetrahedron.INormalDisc,
      module Data.FormalOps,
-     module CoordSys,
+     module NormalSurfaceBasic,
 
      QuadCoords(..),
      quadSupport,
      quadDominates,
      quad_toFundEdgeSol,
+     quad_toDenseAssocs,
+     quad_toDenseList,
 
 
      -- * Misc
-     onlyQuadAssocs
+     onlyQuadAssocs,
      )
 
 
@@ -34,7 +36,8 @@ import Util
 import qualified Data.Map as M
 import Data.Ratio
 import Control.Exception
-import CoordSys
+import NormalSurfaceBasic
+import Triangulation.PreTriangulation
 
 
 -- | Minimal implementation:
@@ -130,5 +133,14 @@ quad_toFundEdgeSol q =
         fromMaybe (assert False undefined) .
             ratioToIntegral . scaleNonNeg (lcms denoms % 1) $ q
         
+
+quad_toDenseAssocs
+  :: (PreTriangulation tr, QuadCoords q r) =>
+     tr -> q -> [(INormalQuad, r)]
+quad_toDenseAssocs tr qc = fmap (id &&& quadCount qc) (tINormalQuads tr)
+
+quad_toDenseList
+  :: (PreTriangulation tr, QuadCoords q r) => tr -> q -> [r]
+quad_toDenseList tr = fmap snd . quad_toDenseAssocs tr
 
 

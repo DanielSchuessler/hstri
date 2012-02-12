@@ -2,19 +2,18 @@
 {-# OPTIONS -Wall #-}
 module QuadCoordinates where
 
-import Tetrahedron
-import Control.Arrow((&&&))
 import Data.Foldable(Foldable)
 import Data.Map as M hiding(mapMaybe)
 import Data.Maybe as May
-import Tetrahedron.INormalDisc
+import Math.SparseVector
+import QuadCoordinates.Class
+import QuadCoordinates.MatchingEquations
 import StandardCoordinates.Class
 import Test.QuickCheck
+import Tetrahedron
 import TriangulationCxtObject
-import Math.SparseVector
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
-import QuadCoordinates.MatchingEquations
 
 type QuadCoordinates r = SparseVector INormalQuad r
 
@@ -83,15 +82,6 @@ quad_singleton = sparse_singleton
 
 
 
-quad_toDenseAssocs
-  :: (Num r, Eq r) =>
-     Triangulation -> QuadCoordinates r -> [(INormalQuad, r)]
-quad_toDenseAssocs tr qc = fmap (id &&& quad_coefficient qc) (tINormalQuads tr)
-
-quad_toDenseList
-  :: (Num r, Eq r) => Triangulation -> QuadCoordinates r -> [r]
-quad_toDenseList tr = fmap snd . quad_toDenseAssocs tr
-
 quad_fromDenseList
   :: (Num r, Eq r) => Triangulation -> [r] -> QuadCoordinates r
 quad_fromDenseList tr = quad_fromAssocs . zip (tINormalQuads tr) 
@@ -107,7 +97,7 @@ unrestrictedQCGen tr = sparse_gen (tINormalQuads tr)
 
 
 qMatchingEquationsMatrix
-  :: (Num a, Eq a) =>
+  :: (Num a, Ord a) =>
      Triangulation
      -> V.Vector (V.Vector a)
 qMatchingEquationsMatrix tr = 

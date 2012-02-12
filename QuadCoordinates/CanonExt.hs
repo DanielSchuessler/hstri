@@ -1,5 +1,12 @@
 {-# LANGUAGE ViewPatterns, FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, ScopedTypeVariables #-}
-module QuadCoordinates.CanonExt where
+module QuadCoordinates.CanonExt(
+    module StandardCoordinates.Class,
+    module QuadCoordinates.MatchingEquations,
+    module StandardCoordinates.MatchingEquations,
+    CanonExt(..),
+    canonExtDbg,
+    canonExt,
+) where
 
 import Control.Exception
 import Control.Monad.State.Lazy

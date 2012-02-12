@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GeneralizedNewtypeDeriving, ViewPatterns, NoMonomorphismRestriction #-}
+{-# LANGUAGE MultiParamTypeClasses, CPP, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
 module InnerProductRepresentation where
 
@@ -11,34 +11,28 @@ import PrettyUtil
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import Data.BitVector.Adaptive
+import CoordSys
+import VerboseDD.Types
 
 #define IPR_WITHVALUES
 
-newtype VectorIndex = VectorIndex Int
-    deriving(Eq,Enum,Ord,Real,Num,Integral)
 
-instance Show VectorIndex where
-    show (VectorIndex i) = pad 3 . show $ i
-
-instance Pretty VectorIndex where
-    pretty = dullyellow . text . show
-
-data IPR w = IPR {
+data IPR co w = IPR {
     ipr_index :: {-# UNPACK #-} !VectorIndex,
-    zeroSet :: !w,
+    zeroSet :: !(ZeroSet co w),
     innerProducts :: {-# UNPACK #-} !(V.Vector Rational)
 #ifdef IPR_WITHVALUES
     , ipr_value :: (V.Vector Rational)
 #endif
 }
 
-ipr_head :: IPR w -> Rational
+ipr_head :: IPR co w -> Rational
 ipr_head = V.head . innerProducts
 
-ipr_tail :: IPR w -> IPR w
+ipr_tail :: IPR co w -> IPR co w
 ipr_tail x = x { innerProducts = V.tail (innerProducts x) }
 
-ipr_combine :: BitVector w => IPR w -> IPR w -> VectorIndex -> IPR w
+ipr_combine :: BitVector w => IPR co w -> IPR co w -> VectorIndex -> IPR co w
 ipr_combine x y index = 
     let
         ipsx = innerProducts x
@@ -62,12 +56,12 @@ ipr_combine x y index =
             ((V.zipWith c `on` ipr_value) x y)
 #endif
 
-instance (BitVector w) => Pretty (IPR w) where
+instance (BitVector w) => Pretty (IPR co w) where
     pretty = ipr_pretty ShowZeros 6 
     
     
     
-ipr_pretty :: BitVector w => ZeroPrinting -> Int -> IPR w -> Doc
+ipr_pretty :: BitVector w => ZeroPrinting -> Int -> IPR co w -> Doc
 ipr_pretty zp scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = ips } = 
             hencloseSep lparen rparen (text " , ")
                 [   pretty i
@@ -86,7 +80,7 @@ ipr_pretty zp scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = 
             g (showRational zp -> x) r =
                 text (pad scalarWidth x ++ " ") <> r
 
-ipr_maxScalarWidth :: IPR w -> Int
+ipr_maxScalarWidth :: IPR co w -> Int
 ipr_maxScalarWidth ipr = 
         V.maximum (V.snoc (V.map f (innerProducts ipr)) 0)
 #ifdef IPR_WITHVALUES
@@ -98,11 +92,11 @@ ipr_maxScalarWidth ipr =
         f = length . showRational ShowZeros
 
 
-instance BitVector w => Show (IPR w) where
+instance BitVector w => Show (IPR co w) where
     showsPrec = prettyShowsPrec
 
 
---     showsPrec _ (IPR w i z ips) = showChar '(' . shows i . showString " , " 
+--     showsPrec _ (IPR co w i z ips) = showChar '(' . shows i . showString " , " 
 --                                     . VU.foldr f id z . showString " , " 
 --                                     . shows ips . showChar ')'
 --         where
@@ -110,7 +104,7 @@ instance BitVector w => Show (IPR w) where
 -- 
 --
 
-ipr_makeIntegral :: IPR w -> IPR w
+ipr_makeIntegral :: IPR co w -> IPR co w
 ipr_makeIntegral ipr =
 
     ipr 
@@ -120,3 +114,17 @@ ipr_makeIntegral ipr =
         }
 
 #endif
+
+
+instance BitVector w => Pretty (PairFate (IPR co w)) where
+    pretty (PairFate x y z) = 
+        string "P" <> 
+            (parens $ hsep (punctuate comma 
+                [ pretty (ipr_index x), pretty (ipr_index y), pretty z ]))
+
+instance (BitVector w) => VerboseDDVectorRepresentation (IPR co w) co w where
+
+    ddrep_index = ipr_index
+    ddrep_zeroSet = zeroSet
+
+

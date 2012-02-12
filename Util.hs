@@ -31,6 +31,9 @@ import Data.Proxy
 import Control.Comonad.Store.Lazy
 import Data.Lens.Common
 import Control.Arrow
+import Control.Monad.IO.Class(MonadIO,liftIO)
+import qualified Data.Map as M
+import Element
 
 
 fi :: (Integral a, Num b) => a -> b
@@ -362,4 +365,10 @@ argLens x = Lens (\f -> store (\y -> \x' -> if x' == x then y else f x') (f x))
 
 rawSystemAsyncS :: String -> [String] -> IO ()
 rawSystemAsyncS prog args = rawSystemS "zsh" (["-c", "$0 \"$@\" &", prog]++args)
+
+io :: MonadIO m => IO a -> m a
+io = liftIO
+
+funToMap :: (Ord (Element xs), AsList xs) => xs -> (Element xs -> a) -> M.Map (Element xs) a
+funToMap dom f = M.fromList (map (id &&& f) (asList dom))
 

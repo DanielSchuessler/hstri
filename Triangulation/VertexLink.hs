@@ -45,7 +45,7 @@ instance StandardCoords VertexLink Integer where
 
     triAssocs = triAssocsDistinct
     triAssocsDistinct (VertexLink v) = 
-        map ((,1) . iNormalTri) $ preimageListOfVertexDistinct v
+        map (,1) . vertexLinkingSurfaceTris $ v
 
 
 

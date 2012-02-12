@@ -1,34 +1,62 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, TypeSynonymInstances, EmptyDataDecls, MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, NoMonomorphismRestriction, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, EmptyDataDecls, MultiParamTypeClasses, FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP #-}
 module CoordSys where
+
 import Tetrahedron.INormalDisc
 import Data.FormalOps
 import Math.SparseVector
 import Data.Proxy
+import Data.BitVector.Adaptive
+import Util
+import NormalSurfaceBasic
+import QuadCoordinates.MatchingEquations
+import StandardCoordinates.MatchingEquations
+import Triangulation
+import CheckAdmissibility
+import QuadCoordinates.Dense
+import qualified Data.Vector as V
+import Data.Vector(Vector)
+import MathUtil
+import QuadCoordinates.Class
+import QuadCoordinates
+import StandardCoordinates.Dense()
+import FileLocation
+
+-- | Implementations must not look at the (type proxy) 'c' arg
+class ( CheckAdmissibility c (WrappedVector c Vector Rational) adm Rational
+      , RatioToIntegral 
+            (adm (WrappedVector c Vector Rational))
+            (adm (WrappedVector c Vector Integer))
+      , NonNegScalable Rational (adm (WrappedVector c Vector Rational))
+      ) 
+
+        => CoordSys c adm where
+
+    numberOfVariables :: Proxy c -> Triangulation -> Int
+    hyperplanes :: Proxy c -> Triangulation -> [[Rational]]
+    quadIndexOffsets :: Proxy c -> Triangulation -> [BitVectorPosition]
 
 
-data QuadCoordSys
+instance CoordSys QuadCoordSys QAdmissible where
+    numberOfVariables _ = tNumberOfNormalQuadTypes 
+    hyperplanes _ tr = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr
+    quadIndexOffsets _ tr = map (3*) [0.. tNumberOfTetrahedra tr - 1]
 
-quadCoordSys :: Proxy QuadCoordSys
-quadCoordSys = undefined
+instance CoordSys StdCoordSys Admissible where
+        numberOfVariables _ = tNumberOfNormalDiscTypes
+        hyperplanes _ tr = 
+            [ map (toRational . evalMatchingEquation me) (tINormalDiscs tr)
+                | me <- matchingEquationReasons tr ]
 
-data StdCoordSys
+        quadIndexOffsets _ tr = 
+                        [ (fromEnum . iNormalQuadToINormalDisc) (tindex i ./ minBound)
+                                | i <- [0.. tNumberOfTetrahedra tr - 1] ]
 
-stdCoordSys :: Proxy StdCoordSys
-stdCoordSys = undefined
 
-class (Num r, Ord r) => NormalSurfaceCoefficients s r | s -> r
 
-instance NormalSurfaceCoefficients INormalQuad Integer where {}
-instance NormalSurfaceCoefficients INormalDisc Integer where {}
-instance NormalSurfaceCoefficients INormalTri Integer where {}
-instance (Num n, NormalSurfaceCoefficients q n) => NormalSurfaceCoefficients [q] n where {}
-instance (Num n, NormalSurfaceCoefficients q n) => NormalSurfaceCoefficients (FormalProduct n q) n where {}
-instance (Num n, NormalSurfaceCoefficients q n, NormalSurfaceCoefficients q' n) => NormalSurfaceCoefficients (FormalSum q q') n where {}
 
-instance (Ord i, Num i) => NormalSurfaceCoefficients (SparseVector INormalQuad i) i where
-instance (Ord i, Num i) => NormalSurfaceCoefficients (SparseVector INormalDisc i) i where
 
 
 -- class (Num r, Ord r) => NormalSurfaceCoords coordsys s r | coordsys s -> r
@@ -48,3 +76,29 @@ instance (Ord i, Num i) => NormalSurfaceCoefficients (SparseVector INormalDisc i
 -- 
 -- F(QuadCoordSys)
 -- F(StdCoordSys)
+--
+    
+
+
+
+newtype ZeroSet coords w = ZeroSet { unZeroSet :: w}
+    deriving(Eq,Ord,Show,BitVector,FixedBitVector)
+
+
+zeroSetAdmissible
+  :: (BitVector w, CoordSys coords adm) =>
+     Triangulation -> ZeroSet coords w -> Bool
+zeroSetAdmissible tr (z :: ZeroSet coords w) =
+
+            all (\i ->
+                    atLeastTwo
+                        (bvUnsafeIndex z i)
+                        (bvUnsafeIndex z (i+1))
+                        (bvUnsafeIndex z (i+2))
+                        
+                        
+                        )
+
+                (quadIndexOffsets ($undef :: Proxy coords) tr)
+
+

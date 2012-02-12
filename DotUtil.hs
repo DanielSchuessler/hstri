@@ -21,6 +21,7 @@ module DotUtil(
     seed,
     getPosAttrSafe,
     getPosAttr,
+    posToVec2,
     -- * Backslash issues
     backslashPlaceholder,
     printIt',
@@ -55,6 +56,7 @@ import TriangulationCxtObject
 import Util
 import qualified Data.Map as M
 import qualified Data.Text.Lazy as Text
+import Data.Vect.Double(Vec2(..))
 
 testDot :: PrintDot a => (Triangulation -> a) -> IO ExitCode
 testDot mkdotGraph_ = do
@@ -320,3 +322,9 @@ getPosAttrSafe = findJust (\a -> case a of
 
 getPosAttr :: Attributes -> Pos
 getPosAttr = fromMaybe (assert False undefined) . getPosAttrSafe
+
+
+posToVec2 :: Pos -> Vec2
+posToVec2 (PointPos p) = Vec2 (xCoord p) (yCoord p)
+posToVec2 x = $err' ("posToVec2: Can't deal with Point "++show x) 
+

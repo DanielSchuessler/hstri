@@ -1,3 +1,3 @@
 import HsTri
 
-main = tsgAuto tr_6 defaultSGEE
+main = previewAuto tr_6 defaultSGEE

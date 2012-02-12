@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies,  MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, TypeFamilies,  MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE CPP #-}
@@ -10,12 +10,15 @@ import Data.Vector.Unboxed(Vector,Unbox)
 import Data.Bits
 import Data.Proxy
 import Data.Word
-import Control.Exception
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
 import qualified Data.Vector.Unboxed.Mutable as VUM
 import Debug.Trace
 import Data.Function
+import VectorUtil
+import FileLocation
+import Data.Typeable
+import Control.Arrow
 
 #define BITSIZE(X) (bitSize (undefined :: X))
 #define FBVSIZE(X) (fbvSize (undefined :: Proxy (X)))
@@ -27,6 +30,8 @@ class BitVector w where
     bvIntersection :: w -> w -> w
     bvUnion :: w -> w -> w
     bvComplement :: w -> w
+    bvSetBit :: w -> BitVectorPosition -> w
+    bvClearBit :: w -> BitVectorPosition -> w
 
     -- | Vector of the given length, with all but the given bit set to 1
     bvAllBut :: Int -> BitVectorPosition -> w 
@@ -41,9 +46,13 @@ class BitVector w where
     -- | Initialize a constant-1 bitvector of size /at least/ the given size (no check)
     bvUnsafeFull :: Int -> w
 
-    -- | Must be @Just 'fbvSize'@ if @w@ is an instance of 'FixedBitVector'.
-    -- @Nothing@ indicates that @w@ is arbitrary-width.
-    bvMaxSize :: Proxy w -> Maybe Int
+    -- | Max size supported by the type. Must be @Just 'fbvSize'@ if @w@ is an instance of 'FixedBitVector'.
+    -- @Nothing@ indicates that the type supports arbitrary width.
+    bvMaxBitSize :: Proxy w -> Maybe Int
+
+    -- | Note: This may be larger than the size passed to a constructor function (fixed-size bitvectors don't remember their \"actual\" size)
+    bvBitSize :: w -> Int
+
 
 class BitVector w => FixedBitVector w where
     fbvSize :: Proxy w -> Int
@@ -52,21 +61,25 @@ class BitVector w => FixedBitVector w where
     fbvAllBut :: BitVectorPosition -> w
 
 bvIsLeqMaxSize :: BitVector w => Int -> Proxy w -> Bool
-bvIsLeqMaxSize n = maybe True (>=n) . bvMaxSize
+bvIsLeqMaxSize n = maybe True (>=n) . bvMaxBitSize
 
 -- | Initialize a constant-0 bitvector of size /at least/ the given size
 bvEmpty :: BitVector w => Int -> w
 bvEmpty n = go undefined
     where
         go :: BitVector w => Proxy w -> w
-        go p = assert (bvIsLeqMaxSize n p) (bvUnsafeEmpty n)
+        go p = if bvIsLeqMaxSize n p
+               then bvUnsafeEmpty n
+               else $err' ("bvEmpty" ++ show n) 
 
 -- | Initialize a constant-1 bitvector of size /at least/ the given size
 bvFull :: BitVector w => Int -> w
 bvFull n = go undefined
     where
         go :: BitVector w => Proxy w -> w
-        go p = assert (bvIsLeqMaxSize n p) (bvUnsafeFull n)
+        go p = if bvIsLeqMaxSize n p
+               then bvUnsafeFull n
+               else $err' ("bvFull" ++ show n) 
 
 instance (Unbox w, FixedBitVector w) => BitVector (Vector w) where
     bvUnsafeIndex v (flip divMod FBVSIZE(w) -> (i,j)) 
@@ -91,7 +104,11 @@ instance (Unbox w, FixedBitVector w) => BitVector (Vector w) where
 
     bvUnsafeFull n = VU.replicate n fbvFull 
 
-    bvMaxSize = const Nothing
+    bvMaxBitSize = const Nothing
+
+    bvSetBit v (flip divMod FBVSIZE(w) -> (i,j))   = vectorAdjustAt v (flip bvSetBit j) i
+    bvClearBit v (flip divMod FBVSIZE(w) -> (i,j)) = vectorAdjustAt v (flip bvClearBit j) i 
+    bvBitSize = VU.length
 
 
 deriving instance VG.Vector Vector w => VG.Vector Vector (BitVectorSingle w)
@@ -99,15 +116,23 @@ deriving instance VGM.MVector VUM.MVector w => VGM.MVector VUM.MVector (BitVecto
 deriving instance Unbox w => Unbox (BitVectorSingle w)
 
 newtype BitVectorSingle w = BitVectorSingle w 
-    deriving(Eq,Ord,Show,Num,Bits)
+    deriving(Eq,Ord,Num,Bits,Typeable)
 
 
+bvShow :: BitVector w => w -> String
+bvShow w = map ((\b -> if b then '1' else '0') . bvUnsafeIndex w) [bvBitSize w-1,bvBitSize w-2 .. 0]
+
+
+instance Bits w => Show (BitVectorSingle w) where
+    show = bvShow
 
 instance Bits w => BitVector (BitVectorSingle w) where
     bvUnsafeIndex = testBit
     bvIntersection = (.&.)
     bvUnion = (.|.)
     bvComplement = complement
+    bvSetBit = setBit
+    bvClearBit = clearBit
 
     bvSubset x y = (x .&. y) == x
 
@@ -116,7 +141,8 @@ instance Bits w => BitVector (BitVectorSingle w) where
     bvAllBut = const fbvAllBut
     bvUnsafeEmpty = const fbvEmpty
     bvUnsafeFull = const fbvFull
-    bvMaxSize = Just . fbvSize
+    bvMaxBitSize = Just . fbvSize
+    bvBitSize = const BITSIZE(w)
     
 instance Bits w => FixedBitVector (BitVectorSingle w) where
     fbvSize = const BITSIZE(w)
@@ -125,12 +151,15 @@ instance Bits w => FixedBitVector (BitVectorSingle w) where
     fbvAllBut k = clearBit fbvFull k
 
 
+type Hi w = w
+type Lo w = w
 
 class Doubleable w where
     data Doubled w
 
-    dbl_hi, dbl_lo :: Doubled w -> w
-    dbl_new :: w -> w -> Doubled w
+    dbl_hi :: Doubled w -> Hi w 
+    dbl_lo :: Doubled w -> Lo w
+    dbl_new :: Hi w -> Lo w -> Doubled w
 
 
 dbl_zipWith
@@ -143,21 +172,30 @@ dbl_map
      (w1 -> w) -> Doubled w1 -> Doubled w
 dbl_map f x = dbl_new (f (dbl_hi x)) (f (dbl_lo x))
 
-instance Doubleable (BitVectorSingle Word64) where
-    data Doubled (BitVectorSingle Word64) = BitVector128 {
-        bv128_hi :: {-# UNPACK #-} !(BitVectorSingle Word64),
-        bv128_lo :: {-# UNPACK #-} !(BitVectorSingle Word64) 
-    }
+-- | Returns the most significant, then the least significant part
+dbl_toTuple :: Doubleable c' => Doubled c' -> (Hi c', Lo c')
+dbl_toTuple = dbl_hi &&& dbl_lo
 
-    dbl_hi = bv128_hi
-    dbl_lo = bv128_lo
-    dbl_new = BitVector128
+
+dbl_setOrClearBit :: forall w. (Doubleable w, FixedBitVector w) => 
+    (w -> Int -> w) -> Doubled w -> Int -> Doubled w
+dbl_setOrClearBit what x n =
+        case n - FBVSIZE(w) of
+             n' | n' < 0 ->    dbl_new  (dbl_hi x) (what (dbl_lo x) n)
+                | otherwise -> dbl_new  (what (dbl_hi x) n') (dbl_lo x)
+
+instance (Doubleable w, FixedBitVector w) => Show (Doubled w) where
+    show = bvShow
 
 instance (Doubleable w, FixedBitVector w) => BitVector (Doubled w) where
     bvUnsafeIndex x n = 
         case n - FBVSIZE(w) of
              n' | n' < 0 ->    bvUnsafeIndex (dbl_lo x) n 
                 | otherwise -> bvUnsafeIndex (dbl_hi x) n' 
+
+    bvSetBit = dbl_setOrClearBit bvSetBit
+    bvClearBit = dbl_setOrClearBit bvClearBit
+
 
     bvIntersection = dbl_zipWith bvIntersection
     bvUnion = dbl_zipWith bvUnion
@@ -171,7 +209,8 @@ instance (Doubleable w, FixedBitVector w) => BitVector (Doubled w) where
     bvAllBut = const fbvAllBut
     bvUnsafeEmpty = const fbvEmpty
     bvUnsafeFull = const fbvFull
-    bvMaxSize = Just . fbvSize
+    bvMaxBitSize = Just . fbvSize
+    bvBitSize = const (2*FBVSIZE(w))
     
 instance (Doubleable w, FixedBitVector w) => FixedBitVector (Doubled w) where
     fbvSize = const (2*FBVSIZE(w))
@@ -182,14 +221,31 @@ instance (Doubleable w, FixedBitVector w) => FixedBitVector (Doubled w) where
         case n - FBVSIZE(w) of
              n' | n' < 0 ->    dbl_new fbvFull (fbvAllBut n)
                 | otherwise -> dbl_new (fbvAllBut n') fbvFull
+
+
+instance (Doubleable w, Eq w) => Eq (Doubled w) where
+    (==) = (==) `on` dbl_toTuple
+
+instance (Doubleable w, Ord w) => Ord (Doubled w) where
+    compare = compare `on` dbl_toTuple
     
-    
+instance Doubleable (BitVectorSingle Word64) where
+    data Doubled (BitVectorSingle Word64) = BitVector128 {
+        bv128_hi :: {-# UNPACK #-} !(BitVectorSingle Word64),
+        bv128_lo :: {-# UNPACK #-} !(BitVectorSingle Word64) 
+    }
+        deriving Typeable
+
+    dbl_hi = bv128_hi
+    dbl_lo = bv128_lo
+    dbl_new = BitVector128
+
 type BitVector64 = BitVectorSingle Word64
 type BitVector128 = Doubled (BitVectorSingle Word64)
     
 
-{-# INLINABLE withBitVectorType #-}
-withBitVectorType :: Int -> (forall w. BitVector w => Proxy w -> r) -> r
+{-# INLINE withBitVectorType #-}
+withBitVectorType :: Int -> (forall w. (BitVector w, Show w, Typeable w, Eq w, Ord w) => Proxy w -> r) -> r
 withBitVectorType size_ k
     | size_ <= FBVSIZE(BitVectorSingle Word) = k (undefined :: Proxy (BitVectorSingle Word))
     | size_ <= FBVSIZE(BitVector64)          = k (undefined :: Proxy (BitVector64))

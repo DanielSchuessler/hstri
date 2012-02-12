@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, ScopedTypeVariables, MultiParamTypeClasses #-}
+{-# LANGUAGE NoMonomorphismRestriction, ViewPatterns, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, ScopedTypeVariables, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module StandardCoordinates.Dense(
     module QuadCoordinates.Dense,
@@ -9,7 +9,10 @@ module StandardCoordinates.Dense(
     sd_fromList,
     sd_fromListU,
     sd_toVector,
-    sd_fromStandardCoords
+    sd_fromStandardCoords,
+    sd_zeroSet,
+    sd_projectiveImage,
+    sd_map
     
     ) 
     where
@@ -23,6 +26,8 @@ import qualified Data.Vector.Generic as VG
 import Triangulation
 import Math.SparseVector
 import qualified Data.Vector.Unboxed as VU
+import Data.List
+import Data.BitVector.Adaptive
 
 
 type StandardDense v r = WrappedVector StdCoordSys v r
@@ -86,3 +91,28 @@ instance Show r => Show (StandardDense V.Vector r) where
 instance (VU.Unbox r, Show r) => Show (StandardDense VU.Vector r) where
     showsPrec prec x = showString "sd_fromListU" . showsPrec prec (VU.toList (unwrapVector x))
 
+
+sd_zeroSet
+  :: (Eq a1, Num a1, VG.Vector v a1, BitVector w) => StandardDense v a1 -> w
+sd_zeroSet (sd_toVector -> v) =   
+    foldl'  (\r i -> if VG.unsafeIndex v i == 0
+                       then bvSetBit r i
+                       else r) 
+            (bvEmpty n)
+            [0..n-1] 
+
+    where
+        n = VG.length v
+
+
+
+sd_projectiveImage
+  :: (Eq r, Fractional r, Show (v r), VG.Vector v r) =>
+     StandardDense v r -> StandardDense v r
+sd_projectiveImage = wv_projectiveImage 
+
+
+sd_map
+  :: (VG.Vector v t2, VG.Vector v r) =>
+     (t2 -> r) -> StandardDense v t2 -> StandardDense v r
+sd_map f = wv_under (VG.map f)
