@@ -179,3 +179,6 @@ stySynInstD
       Convertible a2 TypeQ) =>
      a -> a1 -> a2 -> DecQ
 stySynInstD na tys ty = tySynInstD (name na) (typeQs tys) (typeQ ty)
+
+slistE :: Convertible a [ExpQ] => a -> ExpQ
+slistE = listE . expQs

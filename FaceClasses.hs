@@ -40,6 +40,7 @@ type Vert a = Element (Verts a)
 -- | Things that have a collection of edges
 class AsList (Eds a) => Edges a where
     type Eds a
+    -- | If the edges have some sort of natural order, this function should return the edges in the corresponding lexicographical order.
     edges :: a -> Eds a
 
 edgeList :: Edges a => a -> [Ed a]
@@ -51,8 +52,11 @@ edgeVector = VG.fromList . edgeList
 type Ed a = Element (Eds a)
 type Arc a = Ed a
 
+-- | Things that have a collection of triangles
 class AsList (Tris a) => Triangles a where
     type Tris a
+
+    -- | If the vertices have some sort of natural order, this function should return the triangles in the corresponding lexicographical order (e.g. ABC, ABD, ACD, BCD for a tetrahedron with vertices A,B,C,D).
     triangles :: a -> Tris a
 
 triangleList :: Triangles a => a -> [Tri a]

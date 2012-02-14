@@ -31,7 +31,7 @@ innerProductForFoldableApplicative x y = getSum . foldMap Sum $ (liftA2 (*) x y)
 
 
 
-$(liftM concat $ forM [2,3] (\n ->
+$(liftM concat $ forM [2,3,4] (\n ->
     let
         na = mkName ("Tup"++show n)
         ctorname = na
@@ -94,8 +94,26 @@ $(liftM concat $ forM [2,3] (\n ->
     ))
 
 
+tup2X ::  Num a => Tup2 a
 tup2X = tup2 1 0
+tup2Y ::  Num a => Tup2 a
 tup2Y = tup2 0 1
+
+tup3X ::  Num a => Tup3 a
+tup3X = tup3 1 0 0
+tup3Y ::  Num a => Tup3 a
+tup3Y = tup3 0 1 0
+tup3Z ::  Num a => Tup3 a
+tup3Z = tup3 0 0 1
+
+tup4X ::  Num a => Tup4 a
+tup4X = tup4 1 0 0 0
+tup4Y ::  Num a => Tup4 a
+tup4Y = tup4 0 1 0 0
+tup4Z ::  Num a => Tup4 a
+tup4Z = tup4 0 0 1 0
+tup4A ::  Num a => Tup4 a
+tup4A = tup4 0 0 0 1
 
 deriving instance Pretty a => Pretty (Tup2 a)
 deriving instance Pretty a => Pretty (Tup3 a)
@@ -232,3 +250,14 @@ areKindaOrthogonal v0 v1 = abs (v0 <.> v1) < 1E-10
 
 oneNorm :: (Num c, Foldable t) => t c -> c
 oneNorm = getSum . foldMap (Sum . abs)
+
+
+stdToUnit2 ::  Tup3 a -> Tup2 a
+stdToUnit2 (Tup3 (_,x1,x2)) = Tup2 (x1,x2)
+stdToUnit3 ::  Tup4 a -> Tup3 a
+stdToUnit3 (Tup4 (_,x1,x2,x3)) = Tup3 (x1,x2,x3)
+
+unitToStd2 :: Num a => Tup2 a -> Tup3 a
+unitToStd2 (Tup2 (x1,x2)) = Tup3 (1-x1-x2,x1,x2)
+unitToStd3 ::  Num a => Tup3 a -> Tup4 a
+unitToStd3 (Tup3 (x1,x2,x3)) = Tup4 (1-x1-x2-x3,x1,x2,x3)

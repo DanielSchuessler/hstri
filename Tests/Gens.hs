@@ -76,14 +76,15 @@ instance (Num r, Show r, Ord r, Arbitrary r) => Arbitrary (TriangulationWithUnre
                 TriangulationWithUnrestrictedStandardCoords tr <$>                  arbitraryStandardSparse tr ] 
 
 forAllCensusTriangulations
-  :: Testable prop => ((String, Triangulation) -> prop) -> Property
+  :: Testable prop => (LabelledTriangulation -> prop) -> Property
 forAllCensusTriangulations = forAllClosedCensusTriangulations
 
 forAllClosedCensusTriangulations
-  :: Testable prop => ((String, Triangulation) -> prop) -> Property
+  :: Testable prop => (LabelledTriangulation -> prop) -> Property
 forAllClosedCensusTriangulations p = 
-    forAllElements closedOrCensus6 p .&.
-    forAllElements closedNorCensus8 p
+    forAllElementsShrink closedOrCensus6 p .&.
+    forAllElementsShrink closedNorCensus8 p
+
 
 
 eitherFuncToProp

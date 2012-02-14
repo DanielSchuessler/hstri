@@ -4,43 +4,58 @@
 module Tests where
 
 --import QuadCoordinates.Class
-import Triangulation.AbstractNeighborhood
-import ClosedNorCensus8
 import CheckAdmissibility
+import ClosedNorCensus8
 import ClosedOrCensus6
 import ConcreteNormal
+import Control.Applicative
 import Control.Monad.State
+import Data.BitVector.Adaptive
 import Data.Function
 import Data.List as L
 import Data.Maybe
 import Data.Ord
+import Data.Proxy
+import Data.Typeable
 import Math.SparseVector 
+import PrettyUtil
 import QuadCoordinates.CanonExt
 import QuadCoordinates.Class
 import QuadCoordinates.Dense
 import QuadCoordinates.MatchingEquations
+import QuadCoordinates.SolSetConversion
 import QuickCheckUtil
 import StandardCoordinates
 import StandardCoordinates.Dense
 import StandardCoordinates.MatchingEquations
+import StandardCoordinates.SurfaceQueries
 import Test.QuickCheck
 import Test.QuickCheck.All
+import Tests.Gens
+import Triangulation.AbstractNeighborhood
+import Triangulation.Class
 import Triangulation.Random
 import Triangulation.VertexLink
 import TriangulationCxtObject
+import Util
+import VectorUtil
 import VerboseDD
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
-import Triangulation.Class
-import StandardCoordinates.SurfaceQueries
-import Util
-import Control.Applicative
-import Tests.Gens
-import Data.Proxy
-import Data.BitVector.Adaptive
-import VectorUtil
-import Data.Typeable
+
+prop_quadToStandardSolSet :: Property
+prop_quadToStandardSolSet =
+    forAllCensusTriangulations (\(_,tr) ->
+        let
+            qs = qVertexSolutions tr
+            expected = sVertexSolutions tr
+        in
+            case quadToStandardSolSet tr qs of
+                 SolSetConversionResult { sscr_final = actual } -> 
+                    setEq expected actual)
+        
+
 
 zeroeyNumbers :: (Num a, Arbitrary a) => Gen a
 zeroeyNumbers = 
@@ -68,10 +83,10 @@ prop_sd_zeroSet =
 
 
 polyprop_vertexSolutions
-  :: (Show (adm (WrappedVector c V.Vector Rational)),
+  :: (Show (AdmissibleFor c (WrappedVector c V.Vector Rational)),
       CheckAdmissibility
-        c (adm (WrappedVector c V.Vector Rational)) adm Rational,
-      DDableCoordSystem c adm) =>
+        c (AdmissibleFor c (WrappedVector c V.Vector Rational)) Rational,
+      CoordSys c) =>
      Proxy c -> Int -> Property
 polyprop_vertexSolutions c n =
     mapSize (min n) $ 

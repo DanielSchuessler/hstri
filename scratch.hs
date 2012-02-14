@@ -24,7 +24,7 @@ main = testBlender (setCams [oneTetCam] . defaultScene $ pseudomanifoldStyle pre
 
 pren :: PreRenderable (SC2 Vertex)
 pren = 
-    pr_setTriangleEmbedding (const . Just $ GTE 50 f2) $
+    pr_setTriangleImmersion (const . Just $ GTE 50 f2) $
 
     mkPreRenderable coords abstractTri
 

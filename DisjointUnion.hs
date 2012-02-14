@@ -5,11 +5,10 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS -Wall #-}
-module DisjointUnion(module Either1, module Data.SumType, DisjointUnion(..), DisjointUnionable(..), disjointUnion, GDisjointUnionable, defaultDisjointUnion, CoDisjointUnionable(..), isRegardedAsSimplexByDisjointUnionDeriving, djZapUnits, DJSimp(..),DJSimps(..),DJSimpsH(..)) where
+module DisjointUnion(module Data.SumType, DisjointUnion(..), DisjointUnionable(..), disjointUnion, GDisjointUnionable, defaultDisjointUnion, CoDisjointUnionable(..), isRegardedAsSimplexByDisjointUnionDeriving, djZapUnits, DJSimp(..),DJSimps(..),DJSimpsH(..)) where
 
 import Control.Monad
 import Simplicial.DeltaSet3
-import Either1
 import GHC.Generics
 import Language.Haskell.TH
 import ZapUnits
@@ -56,8 +55,6 @@ instance (CoDisjointUnionable a b c) =>
 
     disjointUnionWithInjs fa fb = DisjointUnion (coDjEither fa fb) () () ()
 
--- instance CoDisjointUnionable (a n) (a' n) (Either1 a a' n) where
---     coDjEither = either1
 
 
 

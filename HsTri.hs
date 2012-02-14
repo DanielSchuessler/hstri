@@ -5,6 +5,7 @@ module HsTri(
     module Blender,
     module ClosedOrCensus6,
     module Codec.Rga.Writer,
+    module Codec.Rga.Parser,
     module ConcreteNormal,
     module ConcreteNormal.PreRenderable,
     module Data.AscTuples,
@@ -12,7 +13,6 @@ module HsTri(
     module Data.Vect.Double.Base,
     module DisjointUnion,
     module DotUtil,
-    module Either1,
     module EqvGraphs,
     module ExampleTriangulations,
     module FaceLattice,
@@ -44,7 +44,10 @@ module HsTri(
     module VerboseDD,
     module HsTri.Console,
     module EdgeCentered,
-    module Triangulation.FacetGluing
+    module Triangulation.FacetGluing,
+    module QuadCoordinates.SolSetConversion,
+    module R3Immersions,
+    module Numeric.AD.Vector
 
     ) where
 
@@ -52,13 +55,13 @@ module HsTri(
 import Blender
 import ClosedOrCensus6
 import Codec.Rga.Writer
+import Codec.Rga.Parser
 import ConcreteNormal.PreRenderable
 import Data.AscTuples
 import Data.FormalOps
 import Data.Vect.Double.Base(Vec3)
 import DisjointUnion
 import DotUtil(viewDot)
-import Either1
 import EqvGraphs
 import ExampleTriangulations
 import FaceLattice
@@ -92,3 +95,6 @@ import HsTri.Console
 import EdgeCentered
 import Triangulation.FacetGluing
 import ConcreteNormal
+import QuadCoordinates.SolSetConversion
+import R3Immersions
+import Numeric.AD.Vector

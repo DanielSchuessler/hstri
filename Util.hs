@@ -34,6 +34,8 @@ import Control.Arrow
 import Control.Monad.IO.Class(MonadIO,liftIO)
 import qualified Data.Map as M
 import Element
+import Control.Monad.Writer.Class(tell)
+import Control.Monad.Writer.Class(MonadWriter)
 
 
 fi :: (Integral a, Num b) => a -> b
@@ -372,3 +374,7 @@ io = liftIO
 funToMap :: (Ord (Element xs), AsList xs) => xs -> (Element xs -> a) -> M.Map (Element xs) a
 funToMap dom f = M.fromList (map (id &&& f) (asList dom))
 
+teller
+  :: (Monad m1, MonadWriter (m1 a) m) =>
+     a -> m ()
+teller = tell . return

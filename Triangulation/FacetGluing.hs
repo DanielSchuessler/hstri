@@ -12,10 +12,11 @@ import Control.Exception
 import Test.QuickCheck
 import THUtil
 import PrettyUtil
-import Either1
 import PreRenderable.TriangleLabel
 import Control.Arrow
 import ShortShow
+import Data.SumType
+import DisjointUnion
 
 type Gluing = (ITriangle,OITriangle)
 
@@ -181,9 +182,20 @@ ngToGluing ng = (ngDom ng, ngCod ng)
 ngMap :: GluingMappable a => NormalizedGluing -> a -> a
 ngMap = gluingMap . ngToGluing 
 
-instance (GluingMappable (a n), GluingMappable (b n)) => GluingMappable (Either1 a b n) where
-    gluingMap = bimap1 <$> gluingMap <*> gluingMap
+gluingMapSum
+  :: (SuperSumTy r,
+      SubSumTy ab,
+      GluingMappable (L ab),
+      GluingMappable (R ab),
+      R r ~ R ab,
+      L r ~ L ab) =>
+     Gluing -> ab -> r
+gluingMapSum gl = gluingMap gl ++++ gluingMap gl
 
+instance (GluingMappable a, GluingMappable b) => GluingMappable (Either a b) where
+    gluingMap = gluingMapSum
+
+deriving instance (GluingMappable a, GluingMappable b) => GluingMappable (DJSimp dim a b) 
 
 --deriving instance (GluingMappable (OTuple' v n)) => GluingMappable (OTuple v n)
 

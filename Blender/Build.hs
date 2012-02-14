@@ -136,6 +136,18 @@ newMeshObj var m =
         mesh_init _meshVar m
         newObj var (meshName m) _meshVar 
 
+        setActiveObject ?sceneE var
+        -- don't know how to determine whether we are in editmode already (seems to be determined at random for new objects...), so try/catch
+        ln "try:"
+        indent $ do
+            normals_make_consistent
+        ln "except RuntimeError:" 
+        indent $ do
+            editmode_toggle
+            normals_make_consistent
+
+
+
 normals_make_consistent :: Python ()
 normals_make_consistent = methodCall (bpy_ops "mesh") "normals_make_consistent" ()
 

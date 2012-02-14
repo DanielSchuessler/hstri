@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, FlexibleContexts, ViewPatterns, NoMonomorphismRestriction #-}
+{-# LANGUAGE TypeFamilies, TemplateHaskell, FlexibleContexts, ViewPatterns, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module QuickCheckUtil where
 
@@ -25,6 +25,16 @@ forAllElements (asList -> xs) p =
     if null xs
        then label "Vacuously true (empty domain)" True
        else forAll (elements xs) p
+
+-- | Shrinks the index in the given list
+forAllElementsShrink
+  :: (Show (Element xs), AsList xs, Testable prop) =>
+     xs -> (Element xs -> prop) -> Property
+forAllElementsShrink (asList -> xs) p = 
+    case length xs of
+        0 -> label "Vacuously true (empty domain)" True
+        n -> forAllShrink (choose (0,n-1)) shrink (\i -> let x = xs !! i in
+                                                             printTestCase (show x) (p x))
 
 forAllElements2
   :: (Show (Element xs),
@@ -63,10 +73,16 @@ x .=. y =
 infix 4 .=.
 
 
-setEq :: (Show a, Ord a) => [a] -> [a] -> Property
-setEq x y = 
-    printTestCase (unlines ["setEq:","=== FIRST SET ===",show x,"=== SECOND SET ===",show y])
-    (S.fromList x == S.fromList y)
+setEq
+  :: (Ord (Element xs),
+      Show (Element xs),
+      AsList xs,
+      AsList xs1,
+      Element xs1 ~ Element xs) =>
+     xs -> xs1 -> Property
+setEq (asList -> xs) (asList -> ys) = 
+    printTestCase (unlines ["setEq:","=== FIRST SET ===",show xs,"=== SECOND SET ===",show ys]) $
+    (S.fromList xs == S.fromList ys)
 
 
 isSubset :: (Show a, Ord a) => [a] -> [a] -> Property

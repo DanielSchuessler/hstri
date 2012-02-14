@@ -1,12 +1,11 @@
-{-# LANGUAGE FunctionalDependencies, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE TypeFamilies, FunctionalDependencies, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 module QuadCoordinates.MatchingEquations where
 
 import Triangulation.AbstractNeighborhood
 import Control.Arrow((&&&))
-import Control.DeepSeq.TH
 import Control.Exception
 import Control.Monad.State
 import Data.Function
@@ -21,6 +20,7 @@ import Tetrahedron
 import Triangulation.Class
 import TriangulationCxtObject
 import Control.Applicative
+import Control.DeepSeq
 
 
 
@@ -108,12 +108,20 @@ qMatchingEquations0
 qMatchingEquations0 = mapMaybe qMatchingEquation0 . edges
 
 -- | INVARIANT: @'quad_isAdmissible' ('qadm_Triangulation' x) ('qadm_coords' x) == True@.
-data QAdmissible q = UnsafeToQAdmissible {
+data instance AdmissibleFor QuadCoordSys q = UnsafeToQAdmissible {
     -- | The triangulation with respect to which the 'qadm_coords' are admissible.
     qadm_Triangulation :: Triangulation,
     qadm_coords :: q 
 }
-    deriving(Show)
+
+type QAdmissible = AdmissibleFor QuadCoordSys
+
+instance NFData q => NFData (QAdmissible q) where
+    rnf (UnsafeToQAdmissible a b) = rnf a `seq` rnf b `seq` ()
+
+instance Show q => Show (QAdmissible q) where
+    showsPrec prec = showsPrec prec . qadm_coords
+
 
 instance NormalSurfaceCoefficients q r => NormalSurfaceCoefficients (QAdmissible q) r
 
@@ -138,7 +146,6 @@ instance Pretty q => Pretty (QAdmissible q) where
     prettyPrec prec = prettyPrec prec . qadm_coords
 
 
-deriveNFData ''QAdmissible
 
 
 qadm_unsafeMap :: (q1 -> q) -> QAdmissible q1 -> QAdmissible q

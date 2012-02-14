@@ -1,6 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses, FlexibleInstances, ViewPatterns, TemplateHaskell, NoMonomorphismRestriction #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, FlexibleInstances, ViewPatterns, TemplateHaskell, NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall -fno-warn-missing-signatures #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-orphans #-}
 module StandardCoordinates.MatchingEquations where
 
 import QuadCoordinates.MatchingEquations
@@ -15,6 +15,7 @@ import PrettyUtil
 import MathUtil
 import Control.Exception
 import Control.Applicative
+import Control.DeepSeq
 
 
 
@@ -97,12 +98,23 @@ matchingEquationSupportDiscs =
     $(mapTuple' 4 [|iNormalDisc|]) . matchingEquationSupport
 
 -- | INVARIANT: @'isAdmissible' ('adm_Triangulation' x) ('adm_coords' x) == True@. 
-data Admissible s = UnsafeToAdmissible {
+data instance AdmissibleFor StdCoordSys s = UnsafeToAdmissible {
     -- | The triangulation with respect to which the 'adm_coords' are admissible.
     adm_Triangulation :: Triangulation,
     adm_coords :: s 
 }
-    deriving(Show)
+
+type Admissible = AdmissibleFor StdCoordSys
+
+instance NFData q => NFData (Admissible q) where
+    rnf (UnsafeToAdmissible a b) = rnf a `seq` rnf b `seq` ()
+
+instance AsList s => AsList (Admissible s) where
+    asList = asList . adm_coords
+
+
+instance Show s => Show (Admissible s) where
+    showsPrec prec = showsPrec prec . adm_coords
 
 instance NormalSurfaceCoefficients q r => NormalSurfaceCoefficients (Admissible q) r
 

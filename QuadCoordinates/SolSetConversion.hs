@@ -1,26 +1,61 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ImplicitParams, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
-module QuadToStandard.SolSetConversion where
+{-# LANGUAGE TemplateHaskell, TypeFamilies, ExistentialQuantification, MultiParamTypeClasses, FlexibleInstances, ImplicitParams, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports -fno-warn-missing-signatures #-}
+module QuadCoordinates.SolSetConversion(
+    module CoordSys,
+    module StandardCoordinates.Dense,
+    module QuadCoordinates.Class,
+    quadToStandardSolSet,
+    SolSetConversionVectorRepresentation(..),
+    unSSCVR,
+    SolSetConversionResult(..),
+    VertexStepResult(..),
+    TriStepResult(..),
+    ppSSCRes  
+    ) where
 
-import qualified Data.Vector.Generic as VG
-import Data.Vector(Vector)
-import QuadCoordinates.CanonExt
-import PrettyUtil
-import Data.BitVector.Adaptive
-import Triangulation
-import StandardCoordinates.Dense
-import StandardCoordinates.Class
+import CheckAdmissibility
+import Control.Applicative
+import Control.Monad.Writer.Lazy
+import CoordSys
 import Data.AdditiveGroup
+import Data.BitVector.Adaptive
+import Data.DList(DList)
+import Data.Foldable(foldrM)
+import Data.List(foldl')
+import Data.Proxy
+import Data.Ratio
+import Data.Vector(Vector)
+import Data.VectorSpace
+import MathUtil
+import NormalSurfaceBasic
+import PrettyUtil
+import QuadCoordinates.CanonExt
+import QuadCoordinates.Class
+import StandardCoordinates.Dense
+import Triangulation
+import Triangulation.Class
 import Triangulation.VertexLink
 import TriangulationCxtObject
+import Util
 import VectorUtil
-import Data.Proxy
-import Data.Foldable(foldrM)
 import VerboseDD.Types
-import CoordSys
-import NormalSurfaceBasic
-import Control.Applicative
+import qualified Data.Vector.Generic as VG
+import TupleTH
+import HomogenousTuples
+import qualified Data.DList as DL
+import Data.DList(DList)
 
 data SolSetConversionVectorRepresentation v r w = SSCVR VectorIndex (StandardDense v r) 
+
+unSSCVR (SSCVR _ x) = x
+
+instance MaxColumnWidth (v r) => MaxColumnWidth (SolSetConversionVectorRepresentation v r w) where
+    maxColumnWidth = maxColumnWidth . unSSCVR
+
+deriving instance Show (StandardDense v r) => Show (SolSetConversionVectorRepresentation v r w)
+
+
 
 instance (VG.Vector v r, Eq r, Num r , BitVector w) => 
     VerboseDDVectorRepresentation (SolSetConversionVectorRepresentation v r w) StdCoordSys w where
@@ -32,96 +67,261 @@ instance (VG.Vector v r, Eq r, Num r , BitVector w) =>
 
 
 
+-- deriving instance (Show r, Num r) =>
+--     Show (SolSetConversionResult r)
 
-quadToStandardSolSet tr quadSolSet =
-    let t = tNumberOfTetrahedra tr
-    in 
-        withBitVectorType t (\(_ :: Proxy w) -> 
-            let ?tr = tr
-            in let
-                _L_0 = VG.map (conv . canonExt) quadSolSet 
-
-                _C_0 = bvEmpty (7 * tNumberOfTetrahedra tr) :: ZeroSet StdCoordSys w 
-
-        
-            in do 
-                (_L'_m,_) <- foldrM vertexStep (_L_0, _C_0) (vertices tr) 
-                return (VG.map sd_projectiveImage _L'_m))
 
                 
-                
-
 conv = sd_fromStandardCoords ?tr
 
-vertexStep v (_L_r1, _C_r1) =
-    let
-        _link = sd_map fromIntegral $ conv (vertexLinkingSurface v)
+partialCanonicalPart' v (SSCVR _ x) = do
+    i <- nextIndex
+    return (SSCVR i (partialCanonicalPart v x))
 
-        _L_r_0 = 
-            VG.map (partialCanonicalPart v) _L_r1 
-            `VG.snoc` (negateV _link)
-
-
-    in do
-        (_L_r_n,_C_r_n) <- foldrM (ntriStep v) (_L_r_0,_C_r1)
-                                     (vertexLinkingSurfaceTris v)
-
-        return (_L_r_n `VG.snoc` _link, _C_r_n) 
 
 ntriToIx = fromEnum . iNormalTriToINormalDisc
 
-ntriStep v nt (_L_r_s1, _C_r_s1) =
-    let
-        (_Sneg,_S0,_Spos) = partitionBySign (flip triCount nt) _L_r_s1
+data TriStepResult r w = TriStepResult { 
+    tsr_pbs :: PartitioningBySign Vector (SolSetConversionVectorRepresentation Vector r w), 
+    tsr_pairFates :: Vector (PairFate (SolSetConversionVectorRepresentation Vector r w)),
+    tsr_tri :: INormalTri
+}
+    deriving Show
 
+
+instance MaxColumnWidth r => MaxColumnWidth (TriStepResult r w) where
+    maxColumnWidth TriStepResult{..} = maxColumnWidth tsr_pbs 
+
+
+ntriStep nt (_L_r_s1, _C_r_s1) =
+    let
+        pbs@PartitioningBySign {_Sneg,_S0,_Spos} = partitionBySign (flip triCount nt . unSSCVR) _L_r_s1
+
+        goPair (x, y) =
+            fmap (PairFate x y) $
+                let zeroSetIntersection = intersectZeroSets x y
+                in
+                    if zeroSetAdmissible ?tr zeroSetIntersection
+                    then
+                            case findVectorDifferentThanTheseAndWithZeroSetAtLeast x y
+                                    (bvIntersection zeroSetIntersection _C_r_s1) _L_r_s1 of
+                                Just z -> return (NotAdjacent z)
+                                Nothing -> OK <$> nextIndex
+
+                    else
+                            return Incompatible                
     in do
 
-        pairFates <-
-                        V.sequence 
-                        (V.concatMap 
-                            (\x -> V.map (goPair tr _Vp x) _Sneg)
-                            _Spos)
+        tsr_pairFates <- VG.mapM goPair (vectorCart _Spos _Sneg)
 
         let _L_r_s =
-                 _0 `mappend` _Spos `mappend` pairResults
-                V.map ipr_tail _S0
-                V.++
-                vectorMapMaybe (\pf -> 
+                 _S0 `mappend` _Spos `mappend` 
+                 vectorMapMaybe (\pf -> 
                     case pf of
-                        PairFate x y (OK i_) -> Just (ipr_combine x y i_)
+                        PairFate (SSCVR _ u) (SSCVR _ w) (OK i_) -> 
+                            let
+                                u_nt = triCount u nt
+                                w_nt = triCount w nt
+                                d = u_nt - w_nt
+                            in
+                                Just 
+                                    (SSCVR i_
+                                        ((u_nt/d) *^ w ^-^ (w_nt/d) *^ u))
                         _ -> Nothing)
 
-                    pairFates
+                    tsr_pairFates
 
 
             _C_r_s = bvSetBit _C_r_s1 (ntriToIx nt)
         
-        tell (return DDSR {_Sneg, _S0, _Spos, pairFates})
+        teller (TriStepResult { tsr_pbs = pbs, tsr_pairFates, tsr_tri = nt})
 
 
         
-        return (_C_r_s, _C_r_s) 
+        return (_L_r_s, _C_r_s) 
+
+
+data VertexStepResult r w = VertexStepResult {
+    vsr_vertex :: TVertex,
+    vsr_partials :: Vector (VectorIndex,VectorIndex),
+    vsr_neglink :: VectorIndex,
+    vsr_triStepResults :: DList (TriStepResult r w),
+    vsr_link :: VectorIndex
+}
+
+instance MaxColumnWidth (TriStepResult r w) => MaxColumnWidth (VertexStepResult r w) where
+    maxColumnWidth = maxColumnWidth . vsr_triStepResults
+
+data SolSetConversionResult r =
+    forall w. (Show w, BitVector w) => 
+        SolSetConversionResult {
+            sscr_inputTriangulation :: Triangulation,
+            sscr_canonExtsOfInput :: Vector ( SolSetConversionVectorRepresentation Vector r w ),  
+            sscr_steps :: [VertexStepResult r w],
+            sscr_final :: Vector (Admissible (StandardDense Vector r))
+        }
+
+vertexStep v (_L_r1, _C_r1) =
+    let
+        _link0 = sd_map fromIntegral (conv (vertexLinkingSurface v))
+    in do
+
+
+    partialCanonicalParts <- VG.mapM (partialCanonicalPart' v) _L_r1 
+    neglink <- flip SSCVR (negateV _link0) <$> nextIndex
+
+    let _L_r_0 = partialCanonicalParts `VG.snoc` neglink
+
+    let triStepComputation = foldrM ntriStep (_L_r_0,_C_r1)
+                                    (vertexLinkingSurfaceTris v) 
+
+    ((_L_r_n,_C_r_n),triSteps) <- runVerboseDDSubWriter triStepComputation
+
+    _link <- flip SSCVR _link0 <$> nextIndex
+    teller (VertexStepResult {
+        vsr_vertex = v,
+        vsr_partials = VG.zipWith (\x x' -> (ddrep_index x,ddrep_index x')) _L_r1 partialCanonicalParts, 
+        vsr_neglink = ddrep_index neglink,
+        vsr_triStepResults = triSteps,
+        vsr_link = ddrep_index _link
+     })
+    return (_L_r_n `VG.snoc` _link, _C_r_n) 
+
+
+canonExts =
+    VG.mapM (\q -> do
+        i <- nextIndex
+        return (SSCVR i (conv . canonExt $ q)))
+
+                 
+
+quadToStandardSolSet_core quadSolSet (_ :: Proxy w) =
+    let
+
+        _C_0 = 
+                foldl' bvSetBit
+                    (bvEmpty (7 * tNumberOfTetrahedra ?tr)) 
+                    ((fromEnum . iNormalQuadToINormalDisc) <$> tINormalQuads ?tr)
+                    
+                        :: ZeroSet StdCoordSys w 
+
+
+    in do 
+        _L_0 <- canonExts quadSolSet
+
+        (_L'_m,_) <- foldrM vertexStep (_L_0, _C_0) (vertices ?tr) 
+        return (_L_0, VG.map (sd_projectiveImage . unSSCVR) _L'_m)
+
+
+
+
+quadToStandardSolSet
+  :: (ToTriangulation tr,
+      Fractional r,
+      Pretty r,
+      Pretty q,
+      QuadCoords q r) =>
+     tr -> Vector (QAdmissible q) -> SolSetConversionResult r
+quadToStandardSolSet (toTriangulation -> tr) quadSolSet =
+    let     t = 7*tNumberOfTetrahedra tr
+    in let  ?tr = tr
+    in withBitVectorType t (\p ->
+        let ((canonExtsOfInput, final),steps) = runVerboseDD (quadToStandardSolSet_core quadSolSet p)
+        in SolSetConversionResult {
+                sscr_inputTriangulation = tr,
+                sscr_canonExtsOfInput = canonExtsOfInput,
+                sscr_steps = steps,
+                sscr_final = VG.map (toAdmissible stdCoordSys tr) final
+             })
 
 
 
 
 
-goPair _C tr _Vp x y = 
+ppSSCRes SolSetConversionResult {sscr_canonExtsOfInput,sscr_steps,sscr_final} =
+           line <> text "Canonical extensions of input"
+        <> line <> exts
+        <> line
+        <> vsep (map ppVertexStep sscr_steps)
+        <> line <> text "Result"
+        <> line <> indent 2 (string $ prettyMatrix sscr_final)
+        <> line <> text "IntegerResult"
+        <> line <> indent 2 (string . prettyMatrix 
+                                . VG.map (makeVecIntegral . sd_toVector . adm_coords) 
+                                $ sscr_final)
 
-    fmap (PairFate x y) $
+    where
+        exts = vsep (map (\x -> 
+                 text (prettyString (ddrep_index x) ++ 
+                    " := (" ++ prettyVectorWithColumnWidth columnWidth (unSSCVR x)++")"))
 
 
-        let zeroSetIntersection = intersectZeroSets x y
-        in
-            if zeroSetAdmissible tr zeroSetIntersection
-               then
-                    case findVectorDifferentThanTheseAndWithZeroSetAtLeast x y
-                            (bvIntersection zeroSetIntersection _C) _Vp of
+                        (VG.toList sscr_canonExtsOfInput))
+
+                    <> line
+
+        columnWidth :: Int
+        columnWidth = maxColumnWidth sscr_canonExtsOfInput
 
 
-                        Just z -> return (NotAdjacent z)
-                        Nothing -> OK <$> nextIndex
+ppVertexStep r  =
 
-               else
-                    return Incompatible                
+           text "Outer loop: Vertex" <+> pretty (vsr_vertex r) <> line 
+        <> indent 2 body
 
+    where
+        maxWidth = maxColumnWidth r 
+
+        body =
+               partials
+            <> prettyVI (vsr_neglink r) <> text " := Negative vertex link" <> line
+            <> (vsep (map (ppTriStep maxWidth) (DL.toList (vsr_triStepResults r)))) <> line
+            <> prettyVI (vsr_link r) <> text " := Vertex link" <> line
+            <> line
+
+        partials = vsep (map    (\(i,i') -> 
+                                    prettyVI i' <> text " := Partial canonical part of " 
+                                    <> prettyVI i) 
+                                (VG.toList (vsr_partials r)))  
+
+                    <> line
+
+ppTriStep maxWidth r =
+    let f x vs =
+                            text x <> text " = " <> 
+                            (if VG.null vs 
+                                then text "\8709" -- empty set
+                                else line <>  (ppVecs maxWidth vs))
+                            <> line
+
+        PartitioningBySign{..} = tsr_pbs r
+
+        body = 
+                        f "S0" _S0
+                    <>  f "S+" _Spos
+                    <>  f "S-" _Sneg
+                    <>  line
+                    <>  indent 2 (vsep . VG.toList $ (ppPairFateBrief <$> tsr_pairFates r))
+
+    in
+
+        text "Normal tri" <+> pretty (tsr_tri r) <> line
+        <> indent 2 body
+
+
+
+ppVecs
+  :: (Num t1,
+      AsList (t t1),
+      VG.Vector v (SolSetConversionVectorRepresentation t t1 t2),
+      VG.Vector v Doc,
+      PrettyScalar t1) =>
+     Int -> v (SolSetConversionVectorRepresentation t t1 t2) -> Doc
+ppVecs columnWidth = vcat . VG.toList . VG.map (ppSSCVR columnWidth)
+
+
+ppSSCVR
+  :: (Num t1, AsList (t t1), PrettyScalar t1) =>
+     Int -> SolSetConversionVectorRepresentation t t1 t2 -> Doc
+ppSSCVR columnWidth (SSCVR i x) = 
+    text (prettyString i ++ " = (" ++ prettyVectorWithColumnWidth columnWidth x++")")

@@ -59,7 +59,7 @@ mkBlenderable Style{..} pr_ = Blenderable {
                 foldAnySimplex2 
                     (const mat0) 
                     (const mat1) 
-                    (\t -> case getL pr_generalTriangleEmbeddingL pr_ t of
+                    (\t -> case getL pr_generalTriangleImmersionL pr_ t of
                                 Nothing -> mat2
                                 _ -> mat2curved) 
                     asi,

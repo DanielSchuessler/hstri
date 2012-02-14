@@ -11,7 +11,16 @@ spqwc = oneTetWithDefaultCoords tr f
         f g | ngDomOrCodIs (0 ./ tABC) g = "F"
             | ngDomOrCodIs (0 ./ tACD) g = "G"
 
+
+standardToQuadResults = quadToStandardSolSet tr (qVertexSolutions tr) 
+
+
+main = do
+    pr (ppSSCRes standardToQuadResults)
+
 goblender = do
     testBlender . setCam oneTetCam . defaultScene . fromSpqwc $ spqwc 
+
+cutq_before = readRgaFile "3sphere_cutq_before.xml" 
 
 -- main = 

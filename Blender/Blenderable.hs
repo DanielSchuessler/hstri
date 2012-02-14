@@ -63,7 +63,7 @@ nameMakeLens ''Blenderable (Just . (++"L"))
 
 ba_pr_triangleInfo
   :: Blenderable s
-     -> Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleEmbedding)
+     -> Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleImmersion)
 ba_pr_triangleInfo = pr_triangleInfo . ba_pr
 
 
@@ -214,10 +214,10 @@ setRS = setL scene_renderL
 ba_triangleLabel :: Blenderable s -> Tri s -> Maybe TriangleLabel
 ba_triangleLabel = fmap fst . ba_pr_triangleInfo 
 
-ba_triangleEmbedding :: PreDeltaSet2 s => Blenderable s -> Tri s -> TriangleEmbedding
-ba_triangleEmbedding = pr_triangleEmbedding . ba_pr
+ba_triangleImmersion :: PreDeltaSet2 s => Blenderable s -> Tri s -> TriangleImmersion
+ba_triangleImmersion = pr_triangleImmersion . ba_pr
 
-ba_edgeEmbedding
+ba_edgeImmersion
   :: (Show (Element (Eds s)),
       Show (Element (Tris s)),
       Show (Vert s),
@@ -225,8 +225,8 @@ ba_edgeEmbedding
      Blenderable s
      -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
      -> Ed s
-     -> EdgeEmbedding
-ba_edgeEmbedding = pr_edgeEmbedding . ba_pr
+     -> EdgeImmersion
+ba_edgeImmersion = pr_edgeImmersion . ba_pr
 
 ba_coords
   :: (Show (Element (Eds s)),

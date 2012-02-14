@@ -20,6 +20,7 @@ import THUtil
 import Data.AdditiveGroup
 import Data.VectorSpace
 import Numeric.AD.Vector
+import R3Immersions
 
 main = edge20
 
@@ -89,7 +90,7 @@ vertex20 =
 
                             )
 
-        gtes :: TTriangle -> Maybe GeneralTriangleEmbedding
+        gtes :: TTriangle -> Maybe GeneralTriangleImmersion
         gtes = flip M.lookup
                 (M.fromList $ 
                     [
@@ -120,7 +121,7 @@ vertex20 =
 
         before :: PreRenderable Triangulation
         before = 
-                pr_setGeneralTriangleEmbedding gtes $
+                pr_setGeneralTriangleImmersion gtes $
         
                 mkPreRenderable coords tr
 
@@ -137,8 +138,8 @@ vertex20 =
 
                 .
 
-                   pr_setGeneralTriangleEmbedding (const Nothing)
---                 pr_setTriangleEmbedding (flip lookup [ (t, GTE 2 . dome $ zero) ]) 
+                   pr_setGeneralTriangleImmersion (const Nothing)
+--                 pr_setTriangleImmersion (flip lookup [ (t, GTE 2 . dome $ zero) ]) 
 
 
                     $ before
@@ -177,7 +178,7 @@ edge20 =
 
                             
 
-        gtes :: TTriangle -> Maybe GeneralTriangleEmbedding
+        gtes :: TTriangle -> Maybe GeneralTriangleImmersion
         gtes = flip M.lookup
                 (M.fromList $ 
                     [
@@ -216,35 +217,7 @@ edge20 =
             let
                 aness = 1-bness-cness 
 
-
-                -- runs from 0 to 1
-                abness = aness+bness 
-
-                abnessDistorted = abness
-
-
-                -- runs from -1 to 1
-                a_vs_b = if abness == 0
-                            then 0
-                            else (aness-bness)/abness 
-
-
-                xz_0 = -- if we're close to c (low abness), draw circular arcs
-                                (let 
-                                    phimax = acos (abnessDistorted/2) 
-                                    foo = cos (a_vs_b*phimax) * abnessDistorted
-                                    bar = sin (a_vs_b*phimax) * abnessDistorted
-                                 in  tup2 (1-foo) bar)
-
-                xz_1 = -- if we're close to ab, draw lines
-                                (let x = 1-abnessDistorted 
-                                     zbounds = sqrt' (1 - x^2)
-                                     -- x^2 + zbounds^2 = 1
-                                     z = zbounds*a_vs_b 
-                                 in
-                                    tup2 x z)
-
-                xz@(Tup2 (x, z)) = slerpG abness xz_0 xz_1
+                Tup2 (x, z) = standardSemidisk (Tup2 (aness,bness))
                                 
             in
 --                 $(assrt [| twoNormSqr xz < 1+1E-10 |] ['xz,'xz_0,'xz_1]) $
@@ -254,7 +227,7 @@ edge20 =
 
         before :: PreRenderable Triangulation
         before = 
-                pr_setGeneralTriangleEmbedding gtes $
+                pr_setGeneralTriangleImmersion gtes $
         
                 mkPreRenderable coords tr
 
@@ -272,8 +245,8 @@ edge20 =
 
                 
 
---                 . pr_setTriangleEmbedding (const Nothing)
---                 . pr_setTriangleEmbedding (flip lookup [ (t, GTE 2 . dome $ zero) ]) 
+--                 . pr_setTriangleImmersion (const Nothing)
+--                 . pr_setTriangleImmersion (flip lookup [ (t, GTE 2 . dome $ zero) ]) 
 
 
                     $ before
@@ -295,8 +268,3 @@ edge20 =
         go "/h/dipl/pictures/edge20After.png" after
 
 
--- floating-point-retardant sqrt
-sqrt' x = case compare x 0 of
-               LT -> trace ("sqrt' "++show x) 0 
-               EQ -> 0
-               GT -> sqrt x

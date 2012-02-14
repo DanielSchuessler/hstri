@@ -3,59 +3,64 @@
 {-# LANGUAGE ImplicitParams #-}
 import HsTri 
 import TypeLevel.TF.Nat.Small
-import Simplicial.AnySimplex
 import Data.Vect.Double.Util.Dim3
 import Data.Vect.Double.Base
 import Data.Maybe
 import Control.Exception
+import Data.Lens.Common
+import CheckAdmissibility
 
 
 
-spqwc = l41
-tr = spqwc_tr spqwc
+tr = snd tr_0
 
-ns = 0./Q_ac
+spqwc = oneTetWithDefaultCoords tr f
+    where
+        f g | ngDomOrCodIs (0 ./ tABC) g = "F"
+            | ngDomOrCodIs (0 ./ tACD) g = "G"
 
-main = do
-    go preCut
-    let ?retetrahedrate = False in go blenderabel
-    let ?retetrahedrate = True in go blenderabel
+
+ns = toAdmissible stdCoordSys tr (0./Q_ab)
+
+-- main = do
+--     go preCut
+--     let ?retetrahedrate = False in go blenderabel
+--     let ?retetrahedrate = True in go blenderabel
 
 
 
 go =            testBlender 
             .   setCams [ oneTetCam ] 
             .   defaultScene 
-            .   transformCoords (rotate3 (-0.0*pi) vec3X . rotate3 (-pi*0.45) vec3Z)
 
 
 
 
 
-blenderabel = pseudomanifoldStyle $
+blenderabel = mkBlenderable pseudomanifoldStyle $
     fragmentAC 
     `disjointUnion`
     fragmentBD
 
 --    `disjointUnion` toPreRenderable spqwc
 
-type PreCutSimplex = Either1 (OTuple Vertex) (OTuple (Corn Vertex))
+-- type PreCutSimplex = Either1 (OTuple Vertex) (OTuple (Corn Vertex))
 
-preCut :: Blenderable PreCutSimplex 
+-- preCut :: Blenderable PreCutSimplex 
 preCut =
     fromSpqwc spqwc `disjointUnion`
     fromIntegerNormalSurface spqwc ns 
 
 
     
-inj1 :: Vertex -> PreCutSimplex N0
-inj1 = Left1 . OT 
-inj2 :: Corn Vertex -> PreCutSimplex N0
-inj2 = Right1 . OT 
+-- inj1 :: Vertex -> PreCutSimplex N0
+inj1 = DJSimp . Left
+-- inj2 :: Corn Vertex -> PreCutSimplex N0
+inj2 = DJSimp . Right
 
 (a,b,c,d) = map4 inj1 allVertices'
 
-cor :: Edge -> PreCutSimplex N0
+-- cor :: Edge -> PreCutSimplex N0
 cor = inj2 . uncurry (corn 0 1) . (vertices :: Edge -> Pair Vertex)
 
 
@@ -76,7 +81,7 @@ stla_g3 = (sTriangleLabelAssoc "G3" (cor eAD) (cor eAB) d) {stla_scale=1.2}
         map2 f (0./tBCD,0./tABD)
 
 
-fragmentAC, fragmentBD :: (?retetrahedrate :: Bool) => PreRenderable (OTuple (PreCutSimplex N0))
+-- fragmentAC, fragmentBD :: (?retetrahedrate :: Bool) => PreRenderable (OTuple (PreCutSimplex N0))
 
 fragmentAC = 
     transformCoords (&- cutNormalDirDisplacement) $
@@ -108,21 +113,21 @@ coords = ba_coords preCut
 mkFragment (tets, newEdges, newTris) stlas =
     let
 
-        ds :: SimplicialComplex (PreCutSimplex N0)
+--         ds :: SimplicialComplex (PreCutSimplex N0)
         ds = fromTets tets
 
 
         visible
-            | ?retetrahedrate = const True
+            | ?retetrahedrate = const Visible
             | otherwise = 
-                foldAnySimplex3
-                    (const True)
-                    (not . (`elem` map sort2 newEdges) . unOT)
-                    (not . (`elem` map sort3 newTris) . unOT)
-                    (assert False undefined)
+                foldAnySimplex2
+                    (const Visible)
+                    (visibleIf . not . (`elem` map sort2 newEdges))
+                    (visibleIf . not . (`elem` map sort3 newTris))
+--                     (assert False undefined)
                
 
     in
-        (mkPreRenderable (coords . unOT) ds)
-            { pr_visible = visible
-            , pr_triangleLabel = triangleLabelsForSimplicial stlas }
+            pr_setVisibility visible
+        .   setL pr_triangleLabelL (triangleLabelsForSimplicial stlas)
+        $   mkPreRenderable (coords) ds

@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TupleSections, NoMonomorphismRestriction, ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, NamedFieldPuns, FlexibleContexts, TupleSections, NoMonomorphismRestriction, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 module VectorUtil where
 import qualified Data.Vector as V
@@ -6,6 +6,9 @@ import qualified Data.Vector.Generic as VG
 import QuickCheckUtil
 import Data.Maybe
 import Test.QuickCheck
+import TupleTH
+import PrettyUtil
+import HomogenousTuples
 
 
 vectorMapMaybe
@@ -23,10 +26,23 @@ prop_mapMaybe :: Blind (Int -> Maybe Bool) -> [Int] -> Property
 prop_mapMaybe (Blind (f :: Int -> Maybe Bool)) xs =
     mapMaybe f xs .=. (V.toList . vectorMapMaybe f . V.fromList) xs 
 
+data PartitioningBySign v r = PartitioningBySign {   
+    _Sneg, _S0, _Spos :: v r
+}
+    deriving Show
+
+instance MaxColumnWidth (v r) => MaxColumnWidth (PartitioningBySign v r) where
+    maxColumnWidth PartitioningBySign{..} =
+
+         $(foldr1Tuple 3) max (map3 maxColumnWidth (_Sneg,_S0,_Spos))
+
+
+
 {-# INLINABLE partitionBySign #-}
 partitionBySign
-  :: (Num b, Ord b) => (a -> b) -> V.Vector a -> (V.Vector a, V.Vector a, V.Vector a)
-partitionBySign f _Vp = (_Sneg,_S0,_Spos)
+  :: (Num b, Ord b) =>
+     (r -> b) -> V.Vector r -> PartitioningBySign V.Vector r
+partitionBySign f _Vp = PartitioningBySign {_Sneg,_S0,_Spos}
     where
                 (_Sneg,_Snn ) = V.partition ((<0)  . f) _Vp
                 (_S0  ,_Spos) = V.partition ((==0) . f) _Snn

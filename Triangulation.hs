@@ -353,6 +353,11 @@ instance TriangulationDSnakeItem INormalCorner where
     canonicalize t (viewI -> I i (edge -> e)) = 
         iNormalCorner $ canonicalize t (i ./ e)
 
+
+-- | Identity
+instance TriangulationDSnakeItem TIndex where
+    canonicalize _ = id
+
 -- | Identity
 instance TriangulationDSnakeItem INormalTri where
     canonicalize _ = id
@@ -436,6 +441,9 @@ tINormalArcNu tr = enumNu' 0 (12*tNumberOfTetrahedra tr - 1)
 
 type LabelledTriangulation = (String,Triangulation)
 
+instance PreTriangulation LabelledTriangulation where
+    glueMap = glueMap . snd
+
 labelledTriangulation :: String -> Triangulation -> LabelledTriangulation
 labelledTriangulation = (,) 
 
@@ -506,5 +514,4 @@ triang gluings = mkTriangulation n gluings
 
 instance UpdatablePreTriangulation Triangulation where
     setGlueMap gm _ = glueMapToTriangulation gm
-
 

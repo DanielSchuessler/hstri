@@ -192,6 +192,11 @@ zipTuple3
   :: (a, a1, a2) -> (b, b1, b2) -> ((a, b), (a1, b1), (a2, b2))
 zipTuple3 = $(zipTuple 3)
 
+zipTuple4
+  :: (a, a1, a2, a3)
+     -> (b, b1, b2, b3) -> ((a, b), (a1, b1), (a2, b2), (a3, b3))
+zipTuple4 = $(zipTuple 4)
+
 subtuples3_2 :: (t, t1, t2) -> ((t, t1), (t, t2), (t1, t2))
 subtuples3_2 = $(subtuples 3 2)
 

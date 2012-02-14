@@ -300,14 +300,14 @@ codegeneracy k i =
 withBaryCoords :: (Std2SimplexPoint -> t) -> Unit2SimplexPoint -> t
 withBaryCoords f (Vec2 u v) = f (Vec3 (1-u-v) u v)
 
-stdToUnit2 :: Std2SimplexPoint -> Unit2SimplexPoint
-stdToUnit2 (Vec3 _ u v) = Vec2 u v
+-- stdToUnit2 :: Std2SimplexPoint -> Unit2SimplexPoint
+-- stdToUnit2 (Vec3 _ u v) = Vec2 u v
 
-baryCoordsEndo
-  :: (Std2SimplexPoint -> Std2SimplexPoint)
-     -> Unit2SimplexPoint -> Unit2SimplexPoint
-baryCoordsEndo f = 
-    withBaryCoords (stdToUnit2 . f)
+-- baryCoordsEndo
+--   :: (Std2SimplexPoint -> Std2SimplexPoint)
+--      -> Unit2SimplexPoint -> Unit2SimplexPoint
+-- baryCoordsEndo f = 
+--     withBaryCoords (stdToUnit2 . f)
 
 
 
@@ -339,3 +339,10 @@ equidistantPoints lmode rmode from to nIntervals =
                 Open -> nIntervals-1
                 Closed -> nIntervals)
            ]
+
+-- floating-point-retardant sqrt
+sqrt' :: (Floating a, Ord a) => a -> a
+sqrt' x = case compare x 0 of
+               LT -> trace ("sqrt' "++show x) 0 
+               EQ -> 0
+               GT -> sqrt x

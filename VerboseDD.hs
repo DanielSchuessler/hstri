@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, ScopedTypeVariables, RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
+{-# LANGUAGE StandaloneDeriving, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, ScopedTypeVariables, RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
 {-# LANGUAGE PolymorphicComponents, ExistentialQuantification #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -23,6 +23,7 @@ module VerboseDD
      sVertexSolutions,
      fundEdgeSolutions,
      qVertexSolutionExts,
+     DDStepResult(..)
      
      )
 
@@ -57,18 +58,16 @@ import VectorUtil
 import VerboseDD.Types
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
+import HomogenousTuples
 
-#if 0
-import Debug.Trace(trace)
-#else
-trace :: a -> b -> b
-trace = const id
-#endif
+dontTrace :: a -> b -> b
+dontTrace = const id
 
 
 data DDResult co =
     forall w. BitVector w => 
         DDResult {
+            _ddr_inputTriangulation :: Triangulation,
             _ddr_steps :: [DDStepResult (IPR co w)],
             _ddr_final :: Vector (IPR co w)
         }
@@ -94,7 +93,7 @@ dds :: ToTriangulation t => t -> DDResult StdCoordSys
 dds = ddWith0 stdCoordSys
 
 ddWith0
-  :: (ToTriangulation tr, CoordSys c adm) => Proxy c -> tr -> DDResult c
+  :: (ToTriangulation tr, CoordSys c) => Proxy c -> tr -> DDResult c
 ddWith0 coord (toTriangulation -> tr) = 
     withBitVectorType 
         (numberOfVariables coord tr) 
@@ -106,7 +105,7 @@ ddWith0 coord (toTriangulation -> tr) =
 {-# SPECIALIZE ddWith :: Proxy QuadCoordSys -> Triangulation -> Proxy (BitVectorSingle Word64) -> DDResult QuadCoordSys #-}
 {-# SPECIALIZE ddWith :: Proxy StdCoordSys -> Triangulation -> Proxy (BitVectorSingle Word) -> DDResult StdCoordSys #-}
 {-# SPECIALIZE ddWith :: Proxy StdCoordSys -> Triangulation -> Proxy (BitVectorSingle Word64) -> DDResult StdCoordSys #-}
-ddWith :: forall w co adm. (CoordSys co adm, BitVector w) => 
+ddWith :: forall w co. (CoordSys co, BitVector w) => 
     Proxy co -> Triangulation -> Proxy w -> DDResult co
 
 ddWith coordSys tr bitvectorTypeProxy =
@@ -139,19 +138,15 @@ ddWith coordSys tr bitvectorTypeProxy =
             | otherwise =
 
 --                 $(traceExps "dd/loop" [ [|i|],[|V.length _Vp|] ]) $
-                trace ("ddWith: length _Vp = "++show (VG.length _Vp)) $
+                dontTrace ("ddWith: length _Vp = "++show (VG.length _Vp)) $
 
             let
-                (_Sneg,_S0,_Spos) = partitionBySign ipr_head _Vp
+                pbs@PartitioningBySign { _Sneg,_S0,_Spos } = partitionBySign ipr_head _Vp
 
 
             in
                 do
-                    pairFates <- {-# SCC "ddWith/pairFates" #-} 
-                                 V.sequence 
-                                    (V.concatMap 
-                                        (\x -> V.map (goPair tr _Vp x) _Sneg)
-                                        _Spos)
+                    ddsr_pairFates <- VG.mapM (goPair tr _Vp) (vectorCart _Spos _Sneg)
 
                     let _V = {-# SCC "ddWith/_V" #-} 
                             V.map ipr_tail _S0
@@ -161,30 +156,29 @@ ddWith coordSys tr bitvectorTypeProxy =
                                     PairFate x y (OK i_) -> Just (ipr_combine x y i_)
                                     _ -> Nothing)
 
-                                pairFates
+                                ddsr_pairFates
                     
-                    tell (return DDSR {_Sneg, _S0, _Spos, pairFates})
+                    tell (return DDSR { ddsr_pbs = pbs, ddsr_pairFates})
                     loop (i+1) _V
 
             
 
-        (_final,_steps) = trace ("ddWith: d = "++show d++"; g = "++show g) $
+        (_final,_steps) = dontTrace ("ddWith: d = "++show d++"; g = "++show g) $
                             runVerboseDD go
         
 
     in 
-        DDResult _steps _final
+        DDResult tr _steps _final
 
 
 
 goPair
-  :: (BitVector w, CoordSys co adm) =>
+  :: (BitVector w, CoordSys co) =>
      Triangulation
      -> Vector (IPR co w)
-     -> IPR co w
-     -> IPR co w
+     -> Pair (IPR co w)
      -> VerboseDD v (PairFate (IPR co w))
-goPair tr _Vp x y = 
+goPair tr _Vp (x, y) = 
 
     fmap (PairFate x y) $
 
@@ -208,13 +202,13 @@ goPair tr _Vp x y =
 vsepVec :: Vector Doc -> Doc
 vsepVec = vsep . V.toList
 
-ppDDRes :: DDResult c -> Doc
-ppDDRes (DDResult steps res) =
+ppDDRes :: CoordSys c => DDResult c -> Doc
+ppDDRes (DDResult tr steps res) =
            vsep (zipWith ppStep [1..] steps)
         <> line <> text "Result"
-        <> line <> indent 2 (ppVecs res)
+        <> line <> indent 2 (ppVecs' tr res)
         <> line <> text "IntegerResult"
-        <> line <> indent 2 (ppVecs (ipr_makeIntegral <$> res))
+        <> line <> indent 2 (ppVecs' tr (ipr_makeIntegral <$> res))
 
     where
         ppStep i r =
@@ -224,30 +218,43 @@ ppDDRes (DDResult steps res) =
                 <> indent 2 (let f x vs =
                                     text x <> text "^(" <> int (i-1) <> text ")" 
                                     <+> text "=" <> line
-                                    <> indent 2 (ppVecs vs) <> line
+                                    <> indent 2 (ppVecs maxWidth tr vs) <> line
 
                              in
-                                    f "S0" (_S0 r) 
-                                <>  f "S+" (_Spos r) 
-                                <>  f "S-" (_Sneg r) 
+                                    f "S0" _S0 
+                                <>  f "S+" _Spos 
+                                <>  f "S-" _Sneg 
                                 <>  line
-                                <>  indent 2 (vsepVec (pretty <$> pairFates r)))
+                                <>  indent 2 (vsepVec (ppPairFateBrief <$> ddsr_pairFates r)))
 
-ppVecs :: BitVector w => Vector (IPR co w) -> Doc
-ppVecs vs =
-    let 
-        maxWidth = V.maximum (V.map ipr_maxScalarWidth vs)
-    in 
-        vsepVec (ipr_pretty BlankZeros maxWidth <$> vs)
+            where
+                PartitioningBySign{..} = ddsr_pbs r
 
+                maxWidth = maxColumnWidth (ddsr_pbs r)
+
+
+
+ppVecs
+  :: (BitVector w, CoordSys co) =>
+     Int -> Triangulation -> Vector (IPR co w) -> Doc
+ppVecs maxWidth tr vs =
+        vsepVec (ipr_pretty (Just tr) maxWidth <$> vs)
+
+-- ppVec
+--   :: (BitVector w, CoordSys co) => Triangulation -> IPR co w -> Doc
+-- ppVec tr v = ppVecs (ipr_maxScalarWidth v) tr (V.singleton v)
+
+-- | Determines the column width from the given vectors only
+ppVecs'
+  :: (BitVector w, CoordSys co) =>
+     Triangulation -> Vector (IPR co w) -> Doc
+ppVecs' tr vs = ppVecs (maxColumnWidth vs) tr vs
 
 ddWrapSolutions
-  :: (ToTriangulation tr,
-      CheckAdmissibility c (WrappedVector c Vector Rational) adm Rational) =>
-     tr
-     -> DDResult c -> Vector (adm (WrappedVector c Vector Rational))
+  :: (CheckAdmissibility c (WrappedVector c Vector Rational) Rational) =>
+        DDResult c -> Vector (AdmissibleFor c (WrappedVector c Vector Rational))
 
-ddWrapSolutions tr (DDResult _ x :: DDResult c) = 
+ddWrapSolutions (DDResult tr _ x :: DDResult c) = 
     V.map (either _err id . admissible (undefined :: Proxy c) tr . WrappedVector . reconstruct) x
 
     where
@@ -258,11 +265,11 @@ ddWrapSolutions tr (DDResult _ x :: DDResult c) =
         reconstruct = ipr_value
 
 vertexSolutions :: 
-    (   CoordSys c adm
+    (   CoordSys c 
     ,   ToTriangulation tr)
 
-    => Proxy c -> tr -> V.Vector (adm (WrappedVector c V.Vector Rational))
-vertexSolutions _ tr = ddWrapSolutions tr . ddWith0 undefined $ tr 
+    => Proxy c -> tr -> V.Vector (AdmissibleFor c (WrappedVector c V.Vector Rational))
+vertexSolutions _ tr = ddWrapSolutions . ddWith0 undefined $ tr 
 
 -- | The vertices of the projective solution space in quadrilateral coordinates. 
 --
@@ -284,4 +291,11 @@ qVertexSolutionExts
   :: ToTriangulation tr =>
      tr -> Vector (Admissible (CanonExt QuadDenseR Rational))
 qVertexSolutionExts = V.map canonExt . qVertexSolutions
+
+data DDStepResult v = DDSR { 
+    ddsr_pbs :: PartitioningBySign Vector v, 
+    ddsr_pairFates :: Vector (PairFate v) 
+}
+
+deriving instance (VerboseDDVectorRepresentation a co w, Show a) => Show (DDStepResult a)
 

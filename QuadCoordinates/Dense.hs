@@ -19,9 +19,11 @@ import Control.Applicative
 
 
 newtype WrappedVector tag v r = WrappedVector (v r)
-    deriving(Eq,Ord,Pretty)
+    deriving(Eq,Ord,Pretty,AsList,MaxColumnWidth)
 
 instance (Num r, Ord r) => NormalSurfaceCoefficients (WrappedVector tag v r) r
+
+type instance Element (WrappedVector tag v r) = r
 
 
 unwrapVector :: WrappedVector tag v r -> v r

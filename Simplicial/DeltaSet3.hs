@@ -1,7 +1,9 @@
-{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts, TemplateHaskell, TypeFamilies, FunctionalDependencies #-}
+{-# LANGUAGE TupleSections, FlexibleInstances, NoMonomorphismRestriction, FlexibleContexts, TemplateHaskell, TypeFamilies, FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Simplicial.DeltaSet3(
     module Simplicial.DeltaSet2,
+    PreDeltaSet3,
     SatisfiesSimplicialIdentities3,
     DeltaSet3,
     DeltaSetMorphism3(..),
@@ -13,6 +15,9 @@ module Simplicial.DeltaSet3(
     defaultVerticesOfTet,
     DefaultEdsOfTet,
     defaultEdgesOfTet,
+    -- * Lookups
+    TetsContainingTris_Cache(..),
+    mkTCTC
     )
     where
 
@@ -20,6 +25,15 @@ import Simplicial.DeltaSet2
 import Control.Arrow
 import Language.Haskell.TH.Lift
 import Control.Exception
+import FileLocation
+import HomogenousTuples
+import qualified Data.Map as M
+import Data.Map(Map)
+
+
+class (PreDeltaSet2 s, Tetrahedra s, Tri (Tet s) ~ Tri s, TetrahedronLike (Tet s)) => PreDeltaSet3 s where
+instance (PreDeltaSet2 s, Tetrahedra s, Tri (Tet s) ~ Tri s, TetrahedronLike (Tet s)) => PreDeltaSet3 s where
+
 
 -- | LAW: @forall i j. i >= j ==> 'triangleGetEdgeAt' i . 'tetrahedronGetTriangleAt' j == 'triangleGetEdgeAt' j . 'tetrahedronGetTriangleAt' (i+1)@  
 --
@@ -27,7 +41,7 @@ import Control.Exception
 class (TetrahedronLike tet, SatisfiesSimplicialIdentities2 (Tri tet)) => SatisfiesSimplicialIdentities3 tet
 
 
-class (DeltaSet2 s, Tetrahedra s, Tri (Tet s) ~ Tri s, SatisfiesSimplicialIdentities3 (Tet s)) => DeltaSet3 s where
+class (DeltaSet2 s, PreDeltaSet3 s, SatisfiesSimplicialIdentities3 (Tet s)) => DeltaSet3 s where
 
 
 newtype AnySimplex3 v e t tet = AnySimplex3 (Either (AnySimplex2 v e t) tet)
@@ -86,4 +100,20 @@ defaultEdgesOfTet tet =
         (ab,ac,ad,bc,bd,cd)
 
 
+newtype TetsContainingTris_Cache tri tet = 
+    TCTC { lookupTetsContainingTri :: tri -> [(tet,Index4)] } 
+
+
+
+mkTCTC
+  :: (Ord (Tri s), PreDeltaSet3 s) => s -> TetsContainingTris_Cache (Tri s) (Tet s)
+mkTCTC s = TCTC (flip $(indx) m)
+    where
+        m = M.fromListWith (++)
+                    . concatMap (\t -> 
+                        toList4 
+                            (zipTuple4 
+                                (triangles t) 
+                                (map4 ((:[]) . (t,)) allIndex4')))
+                    $ tetrahedronList s
 

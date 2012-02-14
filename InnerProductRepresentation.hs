@@ -13,6 +13,8 @@ import qualified Data.Vector.Unboxed as VU
 import Data.BitVector.Adaptive
 import CoordSys
 import VerboseDD.Types
+import Triangulation
+import Data.Proxy
 
 #define IPR_WITHVALUES
 
@@ -56,43 +58,52 @@ ipr_combine x y index =
             ((V.zipWith c `on` ipr_value) x y)
 #endif
 
-instance (BitVector w) => Pretty (IPR co w) where
-    pretty = ipr_pretty ShowZeros 6 
+instance (BitVector w, CoordSys co) => Pretty (IPR co w) where
+    pretty = ipr_pretty Nothing 6 
     
     
     
-ipr_pretty :: BitVector w => ZeroPrinting -> Int -> IPR co w -> Doc
-ipr_pretty zp scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = ips } = 
+ipr_pretty :: forall co w. (CoordSys co, BitVector w) => Maybe Triangulation -> Int -> IPR co w -> Doc
+ipr_pretty trMay scalarWidth ipr@IPR { ipr_index = i, zeroSet = z, innerProducts = ips } = 
             hencloseSep lparen rparen (text " , ")
                 [   pretty i
-                ,   VU.ifoldr f empty (bvToVector z)
+                ,   bitVectorPart
                 ,   V.foldr g empty ips
 #ifdef IPR_WITHVALUES
                 ,   V.foldr g empty (ipr_value ipr)
 #endif
                 ]
         where
+            bitVectorPart = VU.ifoldr f empty 
+                            . (case trMay of
+                                    Nothing -> id
+                                    Just tr -> VU.take (tNumberOfTetrahedra tr*varsPerTet))
+                            . bvToVector 
+                            $ z
+
             f j b r = 
-                            (if j /= 0 && mod j 3 == 0 then space else empty)
+                            (if j /= 0 && mod j varsPerTet == 0 then space else empty)
                         <>  char (if b then '0' else '.') 
                         <>  r
 
-            g (showRational zp -> x) r =
+            varsPerTet = numberOfVariables (undefined :: Proxy co) (mkTriangulation 1 [])
+
+            g (blankingZeros showRational -> x) r =
                 text (pad scalarWidth x ++ " ") <> r
 
-ipr_maxScalarWidth :: IPR co w -> Int
-ipr_maxScalarWidth ipr = 
+instance MaxColumnWidth (IPR co w) where
+    maxColumnWidth ipr = 
         V.maximum (V.snoc (V.map f (innerProducts ipr)) 0)
 #ifdef IPR_WITHVALUES
         `max`
         V.maximum (V.map f (ipr_value ipr))
 #endif
 
-    where
-        f = length . showRational ShowZeros
+        where
+            f = length . blankingZeros showRational
 
 
-instance BitVector w => Show (IPR co w) where
+instance (CoordSys co, BitVector w) => Show (IPR co w) where
     showsPrec = prettyShowsPrec
 
 
@@ -116,11 +127,6 @@ ipr_makeIntegral ipr =
 #endif
 
 
-instance BitVector w => Pretty (PairFate (IPR co w)) where
-    pretty (PairFate x y z) = 
-        string "P" <> 
-            (parens $ hsep (punctuate comma 
-                [ pretty (ipr_index x), pretty (ipr_index y), pretty z ]))
 
 instance (BitVector w) => VerboseDDVectorRepresentation (IPR co w) co w where
 

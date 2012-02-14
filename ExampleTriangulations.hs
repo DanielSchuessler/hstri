@@ -10,6 +10,10 @@ import THUtil
 import TriangulationCxtObject
 import Data.SumType
 import Util
+import PreRenderable
+import Numeric.AD.Vector
+import Data.VectorSpace
+import HomogenousTuples
 
 tr_aroundEdge :: Word -> Triangulation
 tr_aroundEdge n =
@@ -132,4 +136,10 @@ lensSpace p (tindex -> q) =
 
                 
 
+defaultTetEmbedding :: GeneralTetEmbedding
+defaultTetEmbedding = GTetE 10
+    ((\(Tup4 xs) -> 
+        sumV (zipWith (\x v -> x *^ liftVec3 (vertexDefaultCoords v)) (toList4 xs) allVertices)
+        )
 
+        . unitToStd3)

@@ -81,6 +81,9 @@ module TriangulationCxtObject(
     TNormalQuad,
     TNormalDisc,
 
+    -- * Tetrahedra
+    TTet,
+
     -- * For testing
     isSubface_ET,isSubface_VE,isSubface_TTet
     
@@ -131,6 +134,9 @@ type TOEdge = T OIEdge
 
 -- | Triangle in the quotient space of a triangulation
 type TTriangle = T ITriangle
+
+-- | N.B. Tets never identified; this type just carries the triangulation along
+type TTet = T TIndex
 
 -- | Normal corner in the quotient space of a triangulation
 type TNormalCorner = T INormalCorner
@@ -293,6 +299,11 @@ instance Triangles Triangulation where
     type Tris Triangulation = [TTriangle] 
 
     triangles t = nub' (pMap t <$> tITriangles t)
+
+instance Tetrahedra Triangulation where
+    type Tets Triangulation = [ TTet ]
+    tetrahedra tr = pMap tr <$> tTetrahedra_ tr
+
 
 instance NormalCorners Triangulation [TNormalCorner] where
     normalCorners t = tnormalCorner <$> edges t
@@ -642,3 +653,16 @@ instance (TriangulationDSnakeItem a, Quote a) => Quote (T a) where
         quoteParen (prec >= 10)
             ("pMap "++quotePrec 11 (getTriangulation x)++" "
                     ++quotePrec 11 (unT x))
+
+
+instance Triangles TTet where
+    type Tris TTet = Quadruple TTriangle
+    triangles t = map4 (pMap (getTriangulation t)) (triangles (unT t)) 
+
+instance Edges TTet where
+    type Eds TTet = Sextuple TEdge
+    edges t = map6 (pMap (getTriangulation t)) (edges (unT t)) 
+
+instance Vertices TTet where
+    type Verts TTet = Quadruple TVertex
+    vertices t = map4 (pMap (getTriangulation t)) (vertices (unT t)) 

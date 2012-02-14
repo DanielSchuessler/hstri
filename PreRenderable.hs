@@ -10,12 +10,14 @@ module PreRenderable(
     TriangleLabel(..),
     defaultTriangleLabelUpDisplacement,
 
-    -- * Edge/triangle embeddings
-    GeneralTriangleEmbedding(..),
-    EdgeEmbedding(..),
-    TriangleEmbedding(..),
-    GeneralEdgeEmbedding(..),
-    evalEdgeEmbedding,
+    -- * Edge\/triangle immersions
+    GeneralTriangleImmersion(..),
+    EdgeImmersion(..),
+    TriangleImmersion(..),
+    GeneralEdgeImmersion(..),
+    evalEdgeImmersion,
+    GeneralTetEmbedding(..),
+    Resolution,
 
     -- * Main
     EdgeDeco(..),
@@ -26,6 +28,7 @@ module PreRenderable(
 --     rotateAngleAxis,
     mkPreRenderable,
     mkPreRenderableWithTriangleLabels,
+    mkPreRenderableFromTetImmersions,
     tet3d,
     SimplicialTriangleLabelAssoc(..),
     sTriangleLabelAssoc,
@@ -38,20 +41,23 @@ module PreRenderable(
     pr_hide,
     pr_hideEds,
     pr_hideTris,
-    pr_coords,
-    pr_triangleEmbedding,
     pr_quad,
     pr_makeEmbeddingsGeneral,
-    pr_triangleLabel,
-    pr_edgeEmbedding,
 
-    -- * Lenses/getters/setters
-    pr_generalTriangleEmbeddingL,
-    pr_generalEdgeEmbeddingL,
-    pr_setTriangleEmbedding,
-    pr_setGeneralTriangleEmbedding,
+    -- * Lenses\/getters\/setters
+    pr_generalTriangleImmersionL,
+    pr_generalEdgeImmersionL,
+    pr_setTriangleImmersion,
+    pr_setGeneralTriangleImmersion,
     pr_edgeDecoL,
     pr_setEdgeDecoAssocs,
+    pr_triangleLabel,
+    pr_triangleLabelL,
+
+    -- ** Immersions
+    pr_coords,
+    pr_triangleImmersion,
+    pr_edgeImmersion,
 
     -- ** Visibility
     visibleIf,
@@ -87,19 +93,20 @@ import OrphanInstances.Lift()
 import PreRenderable.TriangleLabel
 import PrettyUtil(Pretty(..),prettyRecord,prettyFunction,prettyPrecFromShow)
 import ShortShow
-import Simplicial.DeltaSet2
+import Simplicial.DeltaSet3
 import Simplicial.SimplicialComplex
 import THUtil
 import Tetrahedron.Vertex
 import Util
 import qualified Data.Map as M
+import Data.Maybe
 
 data EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int, edgeDecoDir :: S2 } 
     deriving (Show)
 
 type Resolution = Int
 
-data GeneralTriangleEmbedding = 
+data GeneralTriangleImmersion = 
     -- | SEMANTICS: 
     --
     -- Let (e0,e1,e2) = edges t
@@ -111,14 +118,14 @@ data GeneralTriangleEmbedding =
     -- The arc from vec2X to vec2Y corresponds to e2 
     GTE Resolution (FF Tup2 Tup3 Double)
 
-instance Coords GeneralTriangleEmbedding where
+instance Coords GeneralTriangleImmersion where
     transformCoords f (GTE res g) = GTE res (f . g)
 
-data TriangleEmbedding = 
+data TriangleImmersion = 
         FlatTriangle Vec3 Vec3 Vec3
-    |   GeneralTriangle GeneralTriangleEmbedding
+    |   GeneralTriangle GeneralTriangleImmersion
 
-data GeneralEdgeEmbedding = 
+data GeneralEdgeImmersion = 
     -- | SEMANTICS: 
     --
     -- Let (v0,v1) = vertices e
@@ -129,12 +136,12 @@ data GeneralEdgeEmbedding =
     --
     GEE Resolution (UF Tup3 Double)
 
-instance Coords GeneralEdgeEmbedding where
+instance Coords GeneralEdgeImmersion where
     transformCoords f (GEE res g) = GEE res (f . g)
 
-data EdgeEmbedding =
+data EdgeImmersion =
         FlatEdge Vec3 Vec3
-    |   GeneralEdge GeneralEdgeEmbedding
+    |   GeneralEdge GeneralEdgeImmersion
 
 
 class Coords t where
@@ -157,11 +164,11 @@ mkFaceName = FaceName
 
 data PreRenderable s = PreRenderable {
     pr_ds :: s,
-    -- | Overriden ('pr_coords') by the GeneralTriangleEmbedding in pr_triangleInfo, if it exists for at least one triangle containing the vertex
+    -- | Overriden ('pr_coords') by the GeneralTriangleImmersion in pr_triangleInfo, if it exists for at least one triangle containing the vertex
     pr_coords0 :: Vert s -> Vec3,
     pr_faceInfo :: AnySimplex2Of s -> (Visibility,FaceName), 
-    pr_triangleInfo :: Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleEmbedding),
-    pr_edgeInfo :: Ed s -> (Maybe EdgeDeco, Maybe GeneralEdgeEmbedding)
+    pr_triangleInfo :: Tri s -> (Maybe TriangleLabel, Maybe GeneralTriangleImmersion),
+    pr_edgeInfo :: Ed s -> (Maybe EdgeDeco, Maybe GeneralEdgeImmersion)
 }
     deriving(Generic)
 
@@ -211,7 +218,7 @@ pr_quad reso (f :: FF Tup2 Tup3 Double) =
 instance Coords (PreRenderable a) where
     transformCoords f =
             modL pr_coords0L (\coords0 -> tup3toVec3 . lowerFF f . vec3toTup3 . coords0)
-        .   modL pr_generalEdgeEmbeddingL (fmap (transformCoords f) .)
+        .   modL pr_generalEdgeImmersionL (fmap (transformCoords f) .)
         .   modL (pr_triangleInfoL >>> secondLens) (fmap (transformCoords f) .)
 
 instance 
@@ -304,28 +311,31 @@ pr_triVisibility :: PreRenderable s -> Element (Tris s) -> Visibility
 pr_triVisibility = getL pr_triVisibilityL
 
 
+pr_triangleLabelL
+  :: Lens (PreRenderable s) (Tri s -> Maybe TriangleLabel)
+pr_triangleLabelL = pr_triangleInfoL >>> firstLens
 
 pr_triangleLabel :: PreRenderable s -> Tri s -> Maybe TriangleLabel
-pr_triangleLabel = fmap fst . pr_triangleInfo
+pr_triangleLabel = getL pr_triangleLabelL
 
 
-pr_generalTriangleEmbeddingL
-  :: Lens (PreRenderable s) (Tri s -> Maybe GeneralTriangleEmbedding)
-pr_generalTriangleEmbeddingL = pr_triangleInfoL >>> secondLens
+pr_generalTriangleImmersionL
+  :: Lens (PreRenderable s) (Tri s -> Maybe GeneralTriangleImmersion)
+pr_generalTriangleImmersionL = pr_triangleInfoL >>> secondLens
 
-{-# DEPRECATED pr_setTriangleEmbedding "use pr_setGeneralTriangleEmbedding" #-}
-pr_setTriangleEmbedding
-  :: (Tri s -> Maybe GeneralTriangleEmbedding)
+{-# DEPRECATED pr_setTriangleImmersion "use pr_setGeneralTriangleImmersion" #-}
+pr_setTriangleImmersion
+  :: (Tri s -> Maybe GeneralTriangleImmersion)
      -> PreRenderable s -> PreRenderable s
-pr_setTriangleEmbedding = pr_setGeneralTriangleEmbedding
+pr_setTriangleImmersion = pr_setGeneralTriangleImmersion
 
-pr_setGeneralTriangleEmbedding :: (Tri s -> Maybe GeneralTriangleEmbedding)-> PreRenderable s -> PreRenderable s
-pr_setGeneralTriangleEmbedding = setL pr_generalTriangleEmbeddingL
+pr_setGeneralTriangleImmersion :: (Tri s -> Maybe GeneralTriangleImmersion)-> PreRenderable s -> PreRenderable s
+pr_setGeneralTriangleImmersion = setL pr_generalTriangleImmersionL
 
 pr_edgeDecoL ::  Lens (PreRenderable s) (Ed s -> Maybe EdgeDeco)
 pr_edgeDecoL = pr_edgeInfoL >>> firstLens
-pr_generalEdgeEmbeddingL :: Lens (PreRenderable s) (Ed s -> Maybe GeneralEdgeEmbedding)
-pr_generalEdgeEmbeddingL = pr_edgeInfoL >>> secondLens
+pr_generalEdgeImmersionL :: Lens (PreRenderable s) (Ed s -> Maybe GeneralEdgeImmersion)
+pr_generalEdgeImmersionL = pr_edgeInfoL >>> secondLens
 
 pr_setEdgeDecoAssocs :: Ord (Element (Eds s)) =>[(Ed s, EdgeDeco)] -> PreRenderable s -> PreRenderable s
 pr_setEdgeDecoAssocs = setL pr_edgeDecoL . flip M.lookup . M.fromList 
@@ -333,23 +343,23 @@ pr_setEdgeDecoAssocs = setL pr_edgeDecoL . flip M.lookup . M.fromList
 triResolutionToEdgeResolution ::  Num a => a -> a
 triResolutionToEdgeResolution = (*10)
 
-pr_edgeEmbedding
+pr_edgeImmersion
   :: (PreDeltaSet2 s,
       Show (Ed s),
       Show (Tri s)) =>
      PreRenderable s
      -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
      -> Ed s
-     -> EdgeEmbedding
-pr_edgeEmbedding pr tcec e =
+     -> EdgeImmersion
+pr_edgeImmersion pr tcec e =
             case findJust (\(triangle,i) -> do 
-                        emb <- getL pr_generalTriangleEmbeddingL pr triangle
+                        emb <- getL pr_generalTriangleImmersionL pr triangle
                         return (triangle,i,emb))
                  . lookupTrianglesContainingEdge tcec
                  $ e of 
 
                  Nothing -> 
-                    case getL pr_generalEdgeEmbeddingL pr e of
+                    case getL pr_generalEdgeImmersionL pr e of
                         Just gee -> GeneralEdge gee 
                         Nothing -> flatFace pr (uncurry FlatEdge) map2 vertices e 
 
@@ -381,9 +391,9 @@ flatFace pr ctor mapN verticesAscending face =
                             $   face
                             
 
-pr_triangleEmbedding :: PreDeltaSet2 s => PreRenderable s -> Tri s -> TriangleEmbedding
-pr_triangleEmbedding pr t = 
-    case getL pr_generalTriangleEmbeddingL pr t of
+pr_triangleImmersion :: PreDeltaSet2 s => PreRenderable s -> Tri s -> TriangleImmersion
+pr_triangleImmersion pr t = 
+    case getL pr_generalTriangleImmersionL pr t of
          Nothing -> flatFace pr (uncurry3 FlatTriangle) map3 vertices t
 
          Just emb -> GeneralTriangle emb
@@ -403,7 +413,7 @@ pr_coords pr tcec ecvc v =
 
     (
             findJust (\(e,i) -> 
-                    case pr_edgeEmbedding pr tcec e of
+                    case pr_edgeImmersion pr tcec e of
                          FlatEdge {} -> Nothing
                          GeneralEdge (GEE _ emb) ->
 --                             trace ("Vertex "++show v++" has index "++show i++" in "++show e) $
@@ -439,24 +449,24 @@ pr_visibility = getL pr_visibilityL
 
 
 
--- instance Lift TriangleEmbedding where
+-- instance Lift TriangleImmersion where
 --     lift (FlatTriangle a b c) = [| FlatTriangle a b c |]
 -- 
--- instance Lift EdgeEmbedding where
+-- instance Lift EdgeImmersion where
 --     lift (FlatEdge a b) = [| FlatEdge a b |]
 
 -- | error instance
-instance Lift GeneralTriangleEmbedding where
-    lift _ = [| error "'lift' not supported for GeneralTriangleEmbedding" |]
+instance Lift GeneralTriangleImmersion where
+    lift _ = [| error "'lift' not supported for GeneralTriangleImmersion" |]
 
 -- | error instance
-instance Lift GeneralEdgeEmbedding where
-    lift _ = [| error "'lift' not supported for GeneralEdgeEmbedding" |]
+instance Lift GeneralEdgeImmersion where
+    lift _ = [| error "'lift' not supported for GeneralEdgeImmersion" |]
 
 instance Lift FaceName where
     lift (unFaceName -> x) = [| mkFaceName x |] 
 
-deriveLiftMany [''Visibility,''TriangleEmbedding,''EdgeEmbedding,''EdgeDeco]
+deriveLiftMany [''Visibility,''TriangleImmersion,''EdgeImmersion,''EdgeDeco]
 
 instance (PreDeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
             , Lift (Vert s), Lift (Ed s), Lift (Tri s)) => 
@@ -508,20 +518,20 @@ pr_makeEmbeddingsGeneral
   :: PreDeltaSet2 s =>
      (Tri s -> Resolution) -> PreRenderable s -> PreRenderable s
 pr_makeEmbeddingsGeneral triRes pr_ =
-    setL pr_generalTriangleEmbeddingL
-        (\t -> Just $ case pr_triangleEmbedding pr_ t of
+    setL pr_generalTriangleImmersionL
+        (\t -> Just $ case pr_triangleImmersion pr_ t of
                     GeneralTriangle emb -> emb
                     FlatTriangle a au av ->
                         GTE 
                             (triRes t)
-                            (evalFlatTriangleEmbedding a au av))
+                            (evalFlatTriangleImmersion a au av))
 
  $       pr_
 
 
-evalFlatTriangleEmbedding
+evalFlatTriangleImmersion
   :: Vec3 -> Vec3 -> Vec3 -> FF Tup2 Tup3 Double
-evalFlatTriangleEmbedding a au av =
+evalFlatTriangleImmersion a au av =
                             (\(Tup2 (u, v) :: Tup2 (AD s Double)) -> 
                                 ((1-u-v) *^ liftVec3 a) 
                                 ^+^ 
@@ -532,13 +542,46 @@ evalFlatTriangleEmbedding a au av =
                                 :: Tup3 (AD s Double)
                                 )
 
-evalEdgeEmbedding :: EdgeEmbedding -> UF Tup3 Double
-evalEdgeEmbedding (FlatEdge a0 a1) = 
+evalEdgeImmersion :: EdgeImmersion -> UF Tup3 Double
+evalEdgeImmersion (FlatEdge a0 a1) = 
     \u -> 
         let 
             res = interpol u (liftVec3 a0) (liftVec3 a1) 
         in $(assrt [| allReal res |] ['u, 'a0, 'a1]) res
 
-evalEdgeEmbedding (GeneralEdge (GEE _ f)) = f
+evalEdgeImmersion (GeneralEdge (GEE _ f)) = f
+
+data GeneralTetEmbedding = GTetE Resolution (FF Tup3 Tup3 Double)
+
+mkPreRenderableFromTetImmersions
+  :: forall s. (Ord (Tri s), ShortShow (Vert s), ShortShow (Tri s), ShortShow (Ed s), PreDeltaSet3 s) =>
+     (Tet s -> Maybe GeneralTetEmbedding)
+     -> (Vert s -> Vec3) -> s -> PreRenderable s
+mkPreRenderableFromTetImmersions (getTetImm :: Tet s -> Maybe GeneralTetEmbedding) coords s =
+    setL pr_generalTriangleImmersionL 
+        (\t -> do
+            (GTetE res tetImm,i) <- 
+                listToMaybe 
+                    (do
+                        (tet,i) <- lookupTetsContainingTri tctc t
+                        tetImm <- maybeToList (getTetImm tet)
+                        [ (tetImm,i) ])
+
+            let pretransform :: FF Tup3 Tup4 Double 
+                pretransform (Tup3 (u,v,w)) =
+                    case i of
+                         I4_0 -> Tup4 (u,v,w,0)
+                         I4_1 -> Tup4 (u,v,0,w)
+                         I4_2 -> Tup4 (u,0,v,w)
+                         I4_3 -> Tup4 (0,u,v,w)
+
+            Just (GTE res (tetImm . stdToUnit3 . pretransform . unitToStd2))
+        )
+    
+        (mkPreRenderable coords s)
+
+
+    where
+        tctc = mkTCTC s
 
 

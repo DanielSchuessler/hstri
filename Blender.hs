@@ -329,7 +329,7 @@ dhE    ba tcec _ e =
                 
                 thickness = ba_edgeThickness ba e
 
-                ee = ba_edgeEmbedding ba tcec e
+                ee = ba_edgeImmersion ba tcec e
 
                 name = unFaceName . ba_faceName ba $ e' 
 
@@ -338,14 +338,14 @@ dhE    ba tcec _ e =
                             
 
                             
-mkEdgeDecos :: (?scene::Scene s,?sceneE::Python ()) => EdgeEmbedding -> EdgeDeco -> String -> Maybe Material -> BlenderUnits -> Python ()
+mkEdgeDecos :: (?scene::Scene s,?sceneE::Python ()) => EdgeImmersion -> EdgeDeco -> String -> Maybe Material -> BlenderUnits -> Python ()
 mkEdgeDecos ee (EdgeDeco n dir) edgeName mat edgeThickness = do
 
     let 
         width = decoConeWidthFactor * edgeThickness 
 
         ee' :: UF Tup3 Double
-        ee' = evalEdgeEmbedding ee
+        ee' = evalEdgeImmersion ee
 
     
         -- in absolute distance on the edge, from the midpoint of the edge
@@ -491,7 +491,7 @@ dhT  ba tcec ecvc t = do
                 vis = ba_visibility ba t'
 
                 stmts1 = do
-                    case ba_triangleEmbedding ba t of
+                    case ba_triangleImmersion ba t of
                         FlatTriangle cv0 cv1 cv2 -> 
                             newFlatTriangleObj _objVar cv0 cv1 cv2 name
                         GeneralTriangle (GTE res g) -> do 
@@ -631,20 +631,10 @@ blenderMain doRender s = do
 
 
 meshVar ::  Python ()
-meshVar = py "me"
+meshVar = do 
 
-
-
+        py "me"
         
---         setActiveObject sceneVar var
---         -- don't know how to determine whether we are in editmode already (seems to be determined at random for new objects...), so try/catch
---         ln "try:"
---         indent $ do
---             normals_make_consistent
---         ln "except RuntimeError:" 
---         indent $ do
---             editmode_toggle
---             normals_make_consistent
 
 
 txtVar ::  Python ()
@@ -656,7 +646,7 @@ textThickness = 1E-5
 
 
 -- note: we usually set spline_resolution_u low (1 or 2) and instead compute subdivisions here by increasing 'steps'
-nurbsFromFun :: Int -> GeneralEdgeEmbedding -> BlenderSpline
+nurbsFromFun :: Int -> GeneralEdgeImmersion -> BlenderSpline
 nurbsFromFun spline_resolution (GEE steps f) =
     Nurbs {
         spline_dimOpts = SplineDimOpts {

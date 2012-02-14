@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, TypeFamilies, TemplateHaskell, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, NoMonomorphismRestriction, TypeFamilies, TemplateHaskell, FlexibleInstances #-}
 {-# OPTIONS -Wall #-}
 module Element where
 import Language.Haskell.TH
@@ -8,6 +8,10 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import Data.Tuple.OneTuple
 import Data.Vect.Double.Base
+import Data.Vector.Unboxed(Unbox)
+import THBuild
+import TupleTH
+import Data.Sequence(Seq)
 
 type family Element xs
 
@@ -24,10 +28,19 @@ type instance Element [a] = a
 type instance Element (Set a) = a
 type instance Element (V.Vector a) = a
 type instance Element (VU.Vector a) = a
+type instance Element Vec2 = Double
+type instance Element Vec3 = Double
+type instance Element Vec4 = Double
+type instance Element (e -> a) = a
+type instance Element (Maybe a) = a
+type instance Element (Seq a) = a
 
 
 class AsList xs where
     asList :: xs -> [Element xs]
+
+class Mapable xs ys where
+    yamap :: (Element xs -> Element ys) -> xs -> ys 
 
 instance AsList [a] where 
     asList = id
@@ -47,17 +60,18 @@ $(let
         mkAsList n = 
             sequence [
 
-                instanceD (cxt []) (conT ''AsList `appT` theTupleType )
-                    [ valD (varP 'asList) (normalB (lam1E (tupP (fmap varP xs)) 
-                                                      (listE (fmap varE xs))))
-                                          []
+                instanceD (cxt []) (''AsList `sappT` theTupleType aT)
+                    [ svalD (varP 'asList) (lam1E (stupP xs) (slistE xs)) ]
 
-                    ]
+              , instanceD (cxt []) (''Mapable `sappT` theTupleType aT `sappT` theTupleType bT)
+                    [ svalD (varP 'yamap) (mapTuple n) ]
+
               ]
             where
                 xs = [ mkName ("x"++show i) | i <- [1..n] ]
-                theTupleType = Prelude.foldl appT (tupleT n) (replicate n aT)
+                theTupleType v = Prelude.foldl appT (tupleT n) (replicate n v)
                 aT = varT (mkName ("a"++show n))
+                bT = varT (mkName ("b"++show n))
   in do
     decss <- mapM mkAsList ([2..6] ++ [7,12])
     return (concat decss)
@@ -67,10 +81,20 @@ asListOfLists
   :: (AsList (Element a), AsList a) => a -> [[Element (Element a)]]
 asListOfLists = map asList . asList
 
-type instance Element Vec2 = Double
-type instance Element Vec3 = Double
-type instance Element Vec4 = Double
 
 instance AsList Vec2 where asList (Vec2 a b) = [a,b]
 instance AsList Vec3 where asList (Vec3 a b c) = [a,b,c]
 instance AsList Vec4 where asList (Vec4 a b c d) = [a,b,c,d]
+
+
+
+
+instance Mapable [x] [y] where yamap = map
+instance Mapable (V.Vector x) (V.Vector y) where yamap = V.map
+instance (Unbox x, Unbox y) => Mapable (VU.Vector x) (VU.Vector y) where yamap = VU.map
+instance Mapable (OneTuple x) (OneTuple y) where yamap f (OneTuple x) = OneTuple (f x)
+instance Mapable (e -> x) (e -> y) where yamap = fmap
+instance Mapable (Maybe x) (Maybe y) where yamap = fmap
+instance Mapable (Seq x) (Seq y) where yamap = fmap
+
+

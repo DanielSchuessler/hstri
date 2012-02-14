@@ -179,3 +179,6 @@ mapSimpTriTotal f x = sTriangleAscTotal =<< mapAscTotal f (sTriangleVerts x)
 mapSimpTetTotal :: (SimplicialTet x, SimplicialTet x') =>
      (Vert x -> Vert x') -> x -> EitherC LErrorCall x'
 mapSimpTetTotal f x = sTetAscTotal =<< mapAscTotal f (sTetVerts x)
+
+
+-- deriveSimp

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances, TupleSections, FunctionalDependencies, MultiParamTypeClasses, ImplicitParams, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, TypeSynonymInstances, ScopedTypeVariables, FlexibleContexts, GeneralizedNewtypeDeriving, StandaloneDeriving, ExistentialQuantification #-}
 {-# OPTIONS -Wall -fno-warn-unused-imports #-}
-module FaceLattice(viewFL,test_FaceLattice,FaceLatticeRenderStyle(..),flrs_screen,flrs_paper) where
+module FaceLattice(viewFL,test_FaceLattice,FaceLatticeRenderStyle(..),flrs_screen,flrs_paper,FLN_Class(..)) where
 
 import Control.DeepSeq
 import Control.Monad.Reader
