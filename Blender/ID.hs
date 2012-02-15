@@ -15,6 +15,7 @@ import Blender.Blenderable
 import qualified Data.Vector as V
 import Data.Vect.Double.Base
 import FileLocation
+import Control.Monad
 
 
 
@@ -100,7 +101,7 @@ instance BlenderID Material where
     id_collectUniqueThings = nubOn ma_name . concatMap f . ba_allFaceInfos
         where
             f x = faceMat x
-                    : catMaybes [ bfi_helpLineMat x, bfi_labelMat x ]
+                    : catMaybes [ (helpLineMat <=< bfi_helpLineSettings) x, bfi_labelMat x ]
 
 
 mts_init :: Python () -> MaterialTextureSlot -> Python ()

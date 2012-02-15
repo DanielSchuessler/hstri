@@ -83,6 +83,7 @@ Library
     PreRenderable
     PreRenderable.TriangleLabel
     PrettyUtil
+    PrettyUtil.Matrix
     QuadCoordinates
     QuadCoordinates.Dense
     QuadCoordinates.Class

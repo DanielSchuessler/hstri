@@ -14,13 +14,6 @@ module PrettyUtil(
     prettyAssocs,
     prettyString,
     pr,
-    prettyStringMatrix,
-    prettyStringMatrixWithColumnWidth,
-    prettyMatrix,
-    prettyMatrixWithColumnWidth,
-    prettyVector,
-    prettyVectorWithColumnWidth,
-    prMatrix,
     prettyRecord,
     prettyShowsPrec,
     prettyFunction,
@@ -32,14 +25,8 @@ module PrettyUtil(
     docToString,
     hencloseSep,
     htupled,
-    showRational,
     pad,
     prettyPrecFromShow,
-    blankingZeros,
-    PrettyMatrix(..),
-    PrettyVector(..),
-    PrettyScalar(..),
-    MaxColumnWidth(..),
     -- * Class
     Pretty(..),
     
@@ -48,7 +35,6 @@ module PrettyUtil(
     where
 
 import Control.Arrow((***),(&&&))
-import Data.List(intercalate)
 import Data.Map(Map)
 import Data.Ratio
 import Data.Set(Set)
@@ -58,7 +44,6 @@ import Element
 import GHC.Show
 import HomogenousTuples
 import Numeric
-import Test.QuickCheck(Arbitrary)
 import Text.PrettyPrint.ANSI.Leijen hiding((<$>),Pretty(..),(<>))
 import TupleTH
 import qualified Data.Map as M
@@ -69,10 +54,6 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
 import Text.Groom
 import Numeric.AD.Types(AD)
-import Data.Vector.Unboxed(Unbox)
-import qualified Data.DList as DL
-import Data.DList(DList)
-import qualified Data.Vector.Generic as VG
 --import GHC.Generics hiding(prec)
 
 (<>) ::  Doc -> Doc -> Doc
@@ -110,167 +91,6 @@ prettyString = ($"") . docToShowS . pretty
 pr ::  Pretty a => a -> IO ()
 pr = putStrLn . prettyString
                                    
-prettyStringMatrix
-  :: (AsList (Element a), AsList a, Element (Element a) ~ String) =>
-     a -> String
-prettyStringMatrix (asListOfLists -> xss) = 
-    prettyStringMatrixWithColumnWidth 
-        (maxColumnWidth xss)
-        xss
-
-instance MaxColumnWidth Char where 
-    maxColumnWidth = const 1
-    maxColumnWidthList = length
-
-instance MaxColumnWidth a => MaxColumnWidth [a] where 
-    maxColumnWidth = maxColumnWidthList
-
-instance MaxColumnWidth a => MaxColumnWidth (V.Vector a) where 
-    maxColumnWidth v | VG.null v = 0
-                     | otherwise = VG.maximum . VG.map maxColumnWidth $ v
-
-instance (Unbox a, MaxColumnWidth a) => MaxColumnWidth (VU.Vector a) where 
-    maxColumnWidth v | VG.null v = 0
-                     | otherwise = VG.maximum . VG.map maxColumnWidth $ v
-
-instance (MaxColumnWidth a) => MaxColumnWidth (DList a) where 
-    maxColumnWidth = maxColumnWidth . DL.toList
-    
-
-prettyStringMatrixWithColumnWidth
-  :: (AsList (Element a), AsList a, Element (Element a) ~ [Char]) =>
-     Int -> a -> [Char]
-prettyStringMatrixWithColumnWidth columnWidth (asListOfLists -> xss) =
-            (if (length xss<=1) then drop 1 else id) -- no leading newline if only one row
-        .   concatMap ('\n':)
-        .   map (intercalate " " . map fmtCell) 
-        $   xss 
-    where
-        fmtCell = pad columnWidth
-
-
-pad :: Int -> [Char] -> [Char]
-pad l x = replicate (l - length x) ' ' ++ x
-
-
--- data ZeroPrinting = ShowZeros | BlankZeros
-
-class MaxColumnWidth a => PrettyScalar a where
-    prettyScalar :: a -> String
-
-
-blankingZeros :: (Eq a, Num a) => (a -> [Char]) -> a -> [Char]
-blankingZeros _ 0 = ""
-blankingZeros f x = f x
-
-showRational :: Integral a => Ratio a -> String
-showRational x = 
-        let 
-            n = numerator x
-            d = denominator x 
-        in
-            if d==1         then show n
-            else if n==1    then '/':show d
-            else if n==(-1) then '-':'/':show d
-            else                 show n ++ '/' : show d
-
--- showRational :: (Show a, Integral a) => Ratio a -> [Char]
--- showRational 0 = "0"
--- showRational x = if x < 0 then "-"++showPositiveRational (-x) else showPositiveRational x
--- 
--- 
--- showPositiveRational :: (Show a, Integral a) => Ratio a -> String
--- showPositiveRational x =
---                 case (numerator x,denominator x) of
---                      (1,2) -> "½"
---                      (1,3) -> "⅓"
---                      (2,3) -> "⅔"
---                      (1,4) -> "¼"
---                      (3,4) -> "¾"
---                      (1,5) -> "⅕"
---                      (2,5) -> "⅖"
---                      (3,5) -> "⅗"
---                      (4,5) -> "⅘"
---                      (1,6) -> "⅙"
---                      (5,6) -> "⅚"
---                      (1,8) -> "⅛"
---                      (3,8) -> "⅜"
---                      (5,8) -> "⅝"
---                      (n,1) -> show n
---                      (1,d) -> "⅟"++show d
---                      (n,d) -> show n ++ "/" ++ show d
-                                
-instance MaxColumnWidth Rational where
-    maxColumnWidth = length . blankingZeros prettyScalar
-
-instance MaxColumnWidth Integer where
-    maxColumnWidth = length . blankingZeros prettyScalar
-
-instance MaxColumnWidth Int where
-    maxColumnWidth = length . blankingZeros prettyScalar
-
-instance MaxColumnWidth Double where
-    maxColumnWidth = length . blankingZeros prettyScalar
-
-instance PrettyScalar Rational where
-    prettyScalar = showRational
-
-instance PrettyScalar Integer where
-    prettyScalar = show
-
-instance PrettyScalar Int where
-    prettyScalar = show
-
-instance PrettyScalar Double where
-    prettyScalar 0 = "0"
-    prettyScalar x = showFFloat (Just 4) x "" 
-
-prettyMatrix = 
-    prettyStringMatrix . prettyScalarss
-
-prettyScalarss = (map . map . blankingZeros) prettyScalar . asListOfLists
-
-prettyMatrixWithColumnWidth columnWidth = 
-    prettyStringMatrixWithColumnWidth columnWidth . prettyScalarss 
-
-prettyVectorWithColumnWidth
-  :: (Eq (Element xs), Num (Element xs), AsList xs, PrettyScalar (Element xs)) =>
-     Int -> xs -> [Char]
-prettyVectorWithColumnWidth columnWidth = 
-    prettyMatrixWithColumnWidth columnWidth . (:[])
-
-newtype PrettyMatrix a = PrettyMatrix { unPrettyMatrix :: a }
-    deriving Arbitrary
-
-instance
-     (
-      AsList (Element xss),
-      AsList xss,
-      PrettyScalar (Element (Element xss)),
-      Eq (Element (Element xss)),
-      Num (Element (Element xss))
-      )
-
-     =>
-     
-     Show (PrettyMatrix xss) where
-
-     show = prettyMatrix . unPrettyMatrix
-
-prettyVector = prettyMatrix . map (:[]) . asList 
-
-newtype PrettyVector a = PrettyVector { unPrettyVector :: a }
-    deriving Arbitrary
-
-instance
- (AsList xs, PrettyScalar (Element xs),
-      Eq (Element xs),
-      Num (Element xs))
-    => Show (PrettyVector xs) where
-
-     show = prettyVector . unPrettyVector
-
-prMatrix = putStrLn . prettyMatrix 
 
 
 
@@ -322,15 +142,18 @@ parensIf :: Bool -> Doc -> Doc
 parensIf True = parens
 parensIf False = id
 
+-- | Like 'tupled', but with space after comma
+tupled' = encloseSep lparen   rparen  (comma <> space)
 
 instance (Pretty a,Pretty b) => Pretty (a,b) where
-  pretty = tupled . toList2 . $(mapTuple' 2 [| pretty |])
+  pretty = tupled' . toList2 . $(mapTuple' 2 [| pretty |])
 
 instance (Pretty a,Pretty b,Pretty c) => Pretty (a,b,c) where
-  pretty = tupled . toList3 . $(mapTuple' 3 [| pretty |])
+  pretty = tupled' . toList3 . $(mapTuple' 3 [| pretty |])
 
 instance (Pretty a,Pretty b,Pretty c,Pretty d ) => Pretty (a,b,c,d) where
-  pretty = tupled . toList4 . $(mapTuple' 4 [| pretty |])
+  pretty = tupled' . toList4 . $(mapTuple' 4 [| pretty |])
+
 
 
 
@@ -440,9 +263,7 @@ instance Pretty Word8 where pretty = text . show
 instance (Show (AD f a)) => Pretty (AD f a) where
     prettyPrec = prettyPrecFromShow
 
-class MaxColumnWidth a where
-    -- | Returns 0 if there are no columns
-    maxColumnWidth :: a -> Int 
-    maxColumnWidthList :: [a] -> Int 
-    maxColumnWidthList [] = 0
-    maxColumnWidthList xs = maximum (map maxColumnWidth xs)
+
+pad :: Int -> [Char] -> [Char]
+pad l x = replicate (l - length x) ' ' ++ x
+

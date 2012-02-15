@@ -173,7 +173,7 @@ degreeOfVertex y = ecSize (eqvClassOf (vertexEqv (getTriangulation y)) (unT y))
 type instance Element TVertex = IVertex
 
 vertexEquivalence :: Triangulation -> EnumEqvImpl TVertex
-vertexEquivalence tr = enumEqvImpl (pMap tr) (vertices tr)
+vertexEquivalence tr = enumEqvImpl (pMap_safe tr) (vertices tr)
 
 
 instance AsList TVertex where
@@ -211,7 +211,7 @@ instance IsEquivalenceClass TEdge where
             
 
 edgeEquivalence :: Triangulation -> EnumEqvImpl TEdge
-edgeEquivalence tr = enumEqvImpl (pMap tr . forgetVertexOrder . unCanonOrdered) (edges tr)
+edgeEquivalence tr = enumEqvImpl (pMap_safe tr . forgetVertexOrder . unCanonOrdered) (edges tr)
 
     
 
@@ -245,7 +245,7 @@ instance IsEquivalenceClass TTriangle where
 triangleEquivalence :: Triangulation -> EnumEqvImpl TTriangle
 triangleEquivalence tr =
     enumEqvImpl 
-        (pMap tr . forgetVertexOrder . unCanonOrdered)
+        (pMap_safe tr . forgetVertexOrder . unCanonOrdered)
         (triangles tr)
 
 iTriangleEqv :: Triangulation -> EnumEqvImpl (EqvClassImpl ITriangle)
@@ -254,7 +254,7 @@ iTriangleEqv tr =
         f = forgetVertexOrder . unCanonOrdered
     in
         enumEqvImpl
-            (\t -> ecMap f (pMap tr t))
+            (\t -> ecMap f <$> pMap_safe tr t)
             (fmap (ecMap f) (triangles tr)) 
         
 
@@ -434,14 +434,19 @@ instance  IsSubface TVertex TEdge where
 instance  IsSubface TVertex TTriangle where
     isSubface x y = isSubface_VT x (unT y)
 
+instance IsSubface TVertex TIndex where
+    isSubface x i = any (`isSubface` i) (preimageListOfVertex x)
+
 instance  IsSubface TEdge TTriangle where
     isSubface x y = isSubface_ET x (unT y)
 
+instance IsSubface TEdge TIndex where
+    isSubface x i = any (`isSubface` i) (preimageListOfEdge x)
 
 instance IsSubface TTriangle TIndex where
     isSubface x i = isSubface_TTet (getTriangulation x) (unT x) i
 
-
+instance IsSubface a TIndex => IsSubface a TTet where isSubface x i = isSubface x (unT i)
 
 
 
@@ -539,8 +544,13 @@ instance Intersection TEdge TEdge TEdgeIntersection where
 
 -- | Maps a thing from the disjoint union of tetrahedra of a triangulation to its image in the quotient space
 pMap
-  :: (TriangulationDSnakeItem a, ToTriangulation t) => t -> a -> T a
-pMap (toTriangulation -> t) x = UnsafeMakeT t (canonicalize t x)
+  :: (TriangulationDSnakeItem a, ToTriangulation t, Show a) => t -> a -> T a
+pMap t x =
+ $unEitherC ("pMap _ " ++ show x ++ ": pMap_safe failed")
+ (pMap_safe t x)
+
+
+pMap_safe (toTriangulation -> t) x = UnsafeMakeT t <$> canonicalize_safe t x
 
 -- instance MakeTVertex (Triangulation, IVertex) where
 --     tvertex (t, x) = UnsafeMakeT t (canonicalizeIVertex t x) 

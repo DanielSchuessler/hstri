@@ -5,7 +5,7 @@ module Math.GaussElim where
 
 import Control.Exception
 import Control.DeepSeq
-import PrettyUtil
+import PrettyUtil.Matrix
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
 import qualified Data.Vector.Mutable as VM

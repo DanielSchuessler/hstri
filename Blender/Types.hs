@@ -13,6 +13,7 @@ import ToPython
 import Util
 import qualified Data.Vector as V
 import Control.Monad
+import Data.Vect.Double.Base(Vec3(..))
 
 type BlenderUnits = Double
 
@@ -29,9 +30,14 @@ type Props = [BlenderPropAssoc]
 data TransparencySettings = Trans {
     _alpha :: Double,
     _spec_alpha :: Double,
-    _fresnel :: Double
+    _fresnel :: Double,
+    _fresnel_factor :: Double
 }
     deriving Show
+
+defaultTrans :: Double -- ^ alpha 
+    -> TransparencySettings
+defaultTrans _alpha = Trans {_alpha, _spec_alpha = _alpha, _fresnel = 1, _fresnel_factor = 1.25 }
 
 data BlenderImage = BImg {
     bimg_name :: String,
@@ -121,8 +127,8 @@ transparency Trans{..} =
                 "alpha" & (_alpha),
                 "specular_alpha" & (_spec_alpha),
                 "translucency" & (1-_alpha),
-                "raytrace_transparency.fresnel_factor" & (1::Int),
                 "raytrace_transparency.fresnel" & (_fresnel),
+                "raytrace_transparency.fresnel_factor" & _fresnel_factor,
                 "raytrace_transparency.depth" & (15::Int)
                 ]
 

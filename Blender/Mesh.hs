@@ -11,6 +11,7 @@ import Blender.Types
 import Blender.Blenderable
 import Control.Monad
 import Data.Numbering
+import Data.Vect.Double.Base(Vec2(..),Vec3(..))
 
 
 

@@ -3,9 +3,8 @@
 
 module ConcreteNormal.PreRenderable(
     module SimplicialPartialQuotient,
-    module PreRenderable,
     module Simplicial.SimplicialComplex,
-    Corn,corn,cornVerts,
+    Corn,corn,cornVerts,cornPos,cornCount,
     normalSurfaceToPreRenderable,
     CornerPosition',CornerCount,
 
@@ -41,13 +40,22 @@ data Corn v = Corn CornerPosition' CornerCount v v
 cornVerts :: Corn t -> (t, t)
 cornVerts (Corn _ _ u v) = (u,v)
 
+cornPos :: Corn t -> CornerPosition'
+cornPos (Corn i _ _ _) = i
+cornCount :: Corn t -> CornerCount
+cornCount (Corn _ n _ _) = n
+
+
+
 instance ShortShow v => ShortShow (Corn v) where
     shortShow (Corn cp _ v0 v1) = shortShow (v0,v1) ++ show cp
 
 
 instance Pretty v => Pretty (Corn v) where
-    prettyPrec prec (Corn u n v0 v1) = 
-        prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty v0,anyPretty v1] 
+    prettyPrec _ (Corn u n v0 v1) = 
+--         prettyPrecApp prec "Corn" [anyPretty u,anyPretty n,anyPretty v0,anyPretty v1] 
+            
+            pretty v0 <> char '!' <> pretty u <> char '/' <> pretty n <> char '!' <> pretty v1
 
 
 corn :: (Ord v) => CornerPosition' -> CornerCount -> v -> v -> Corn v
@@ -102,10 +110,13 @@ normalSurfaceToPreRenderableWithOpts opts (SPQWithCoords spq coords _) ns =
                 corn pos (fromIntegral n) u0 u1
 
         concreteONormalArcToCorns :: Concrete OINormalArc -> (Asc2 (Corn v), S2)
-        concreteONormalArcToCorns (unpackOrderedFace -> (x,g)) =
+        concreteONormalArcToCorns xg@(unpackOrderedFace -> (x,g)) =
             let 
                 corns = map2 concreteNormalCornerToCorn $ concreteCornersOfArc x 
-                (y,g') = $unEitherC (sort2WithPermutation' corns)
+                (y,g') = $unEitherC errMsg (sort2WithPermutation' corns)
+
+                errMsg = "normalSurfaceToPreRenderableWithOpts / concreteONormalArcToCorns " ++ show xg ++": sort2WithPermutation' failed" 
+
             in (y,g <> g')
 
 
@@ -164,3 +175,13 @@ isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 (conT ''Corn `appT` varT (mkNa
 instance Lift v => Lift (Corn v) where 
     lift (Corn a b c d) =
         [| corn a b c d |]
+
+
+instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
+    gluingMap gl c = corn (cornPos c) (cornCount c) 
+                        (gluingMap gl v0) (gluingMap gl v1)
+
+
+                        where (v0,v1) = cornVerts c
+
+

@@ -64,7 +64,7 @@ unsafeMkGlueMap = UnsafeGM
 
 -- | Throwy variant of 'mkGlueMap''
 mkGlueMap :: Word -> Map ITriangle OITriangle -> GlueMap
-mkGlueMap = (.) $(unEitherC) . mkGlueMap'
+mkGlueMap = (.) ($(unEitherC) "mkGlueMap") . mkGlueMap'
 
 mkGlueMap' :: Word -> Map ITriangle OITriangle -> EitherC (Located ErrorCall) GlueMap
 mkGlueMap' n mp = do

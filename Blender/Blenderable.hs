@@ -3,6 +3,7 @@
 {-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module Blender.Blenderable where
 
+import PreRenderable
 import ConcreteNormal.PreRenderable
 import Control.Category((>>>))
 import Data.Function
@@ -37,13 +38,31 @@ bpy_types x = py "types" <.> x
 
 triangleUVLayerName :: UVLayerName
 triangleUVLayerName = "Triangle UV from hs"
+
+data HelpLineSettings = HLS {
+    helpLineN :: Int,
+    helpLineMaxSteps :: Int,
+    helpLineMat :: Maybe Material,
+    helpLineThickness :: BlenderUnits
+
+}
+
+nameMakeLens ''HelpLineSettings (Just . (++"L"))
+
+defaultHLS :: HelpLineSettings
+defaultHLS = HLS {
+    helpLineN = 19,
+    helpLineMaxSteps = 100,
+    helpLineMat = Nothing,
+    helpLineThickness = 0.001
+}
                                            
 data BaFaceInfo = BaFaceInfo {
     faceMat :: Material,
     bfi_groups :: [BlenderGroup],
     -- | For triangle labels or edge decos (Nothing = no material, not no label/deco)
     bfi_labelMat :: Maybe Material,
-    bfi_helpLineMat :: Maybe Material
+    bfi_helpLineSettings :: Maybe HelpLineSettings
 }
 
 nameMakeLens ''BaFaceInfo (Just . (++"L"))
@@ -240,6 +259,19 @@ ba_coords
      -> Vec3
 ba_coords = pr_coords . ba_pr
 
+ba_coordsSimple
+  :: (Ord (Element (Eds s)),
+      Ord (Element (Verts s)),
+      Show (Element (Eds s)),
+      Show (Element (Tris s)),
+      Show (Element (Verts s)),
+      Triangles s,
+      Edges (Element (Tris s)),
+      Vertices (Element (Tris s)),
+      PreDeltaSet2 s) =>
+     Blenderable s -> Vert s -> Vec3
+ba_coordsSimple ba = ba_coords ba (mkTCEC (ba_ds ba)) (mkECVC (ba_ds ba))
+
 ba_faceName :: Blenderable s -> AnySimplex2Of s -> FaceName
 ba_faceName = pr_faceName . ba_pr
 
@@ -287,3 +319,14 @@ ba_edgeDecoL = ba_prL >>> pr_edgeDecoL
 setLamps :: [LampObj] -> Scene s -> Scene s
 setLamps = setL scene_lampsL
 
+
+disableHelpLines :: Blenderable s -> Blenderable s
+disableHelpLines = modL ba_faceInfoL (setL bfi_helpLineSettingsL Nothing .) 
+
+
+setHelpLineN :: Int -> Blenderable s -> Blenderable s
+setHelpLineN n = modL ba_faceInfoL (modL bfi_helpLineSettingsL (fmap (setL helpLineNL n)) .)
+
+setHelpLineThickness
+  :: BlenderUnits -> Blenderable s -> Blenderable s
+setHelpLineThickness x = modL ba_faceInfoL (modL bfi_helpLineSettingsL (fmap (setL helpLineThicknessL x)) .)

@@ -3,13 +3,16 @@
 
 -- | Utility functions for Patrick Bahr's /equivalence/ package
 module Equivalence.Class(
+    module EitherC,
     module Element,
     IsEquivalenceClass(..),
     EquivalenceClassOf,
     IsEquivalence(..), 
     EnumerableEquivalence(..),
+    eqvRep_safe, 
     eqvRep, 
     eqvEquivalents,
+    eqvClassOf,
     prettyClass,
     prettyEquivalence,
     ecMap,
@@ -36,6 +39,7 @@ import Control.Applicative
 import QuickCheckUtil
 import Test.QuickCheck
 import PrettyUtil
+import EitherC
 
 
 class AsList cls => IsEquivalenceClass cls where
@@ -60,12 +64,15 @@ class   (   IsEquivalenceClass (EquivalenceClassOf er)
         ,   Element er ~ Element (EquivalenceClassOf er)
         ,   Eq (Element er)) => IsEquivalence er where
 
-    -- | Throws an error if the element is not in the domain of the equivalence
-    eqvClassOf :: er -> Element er -> EquivalenceClassOf er
+    eqvClassOf_safe :: er -> Element er -> AttemptC (EquivalenceClassOf er)
 
     eqvEquivalent :: er -> Element er -> Element er -> Bool
     eqvEquivalent er x y = eqvRep er x == eqvRep er y
 
+-- | Throws an error if the element is not in the domain of the equivalence
+eqvClassOf :: IsEquivalence er => er -> Element er -> EquivalenceClassOf er
+eqvClassOf er = $unEitherC ("eqvClassOf: Element is not in the equivalence relation") 
+    . eqvClassOf_safe er
 
 polyprop_Equivalence
   :: (Ord (Element (EquivalenceClassOf er)),
@@ -118,8 +125,12 @@ polyprop_Equivalence' er = polyprop_Equivalence er . elements
 class IsEquivalence er => EnumerableEquivalence er where
     eqvClasses :: er -> [EquivalenceClassOf er]
 
+
+eqvRep_safe :: IsEquivalence er => er -> Element er -> AttemptC (Element er)
+eqvRep_safe e x = canonicalRep <$> eqvClassOf_safe e x 
+
 eqvRep :: IsEquivalence er => er -> Element er -> Element er
-eqvRep e x = canonicalRep $ eqvClassOf e x 
+eqvRep = ($unEitherC "eqvRep" .) . eqvRep_safe
 
 eqvEquivalents
   :: IsEquivalence er => er -> Element er -> [Element er]
@@ -146,17 +157,17 @@ instance IsEquivalenceClass (EqvClassImpl elt) where
     ecSize = eci_Size
 
 newtype EqvImpl cls = EqvImpl { 
-    eqvi_ClassOf :: Element cls -> cls 
+    eqvi_ClassOf_safe :: Element cls -> AttemptC cls 
 } 
 
 toEqvImpl :: IsEquivalence er => er -> EqvImpl (EquivalenceClassOf er)
-toEqvImpl = EqvImpl <$> eqvClassOf
+toEqvImpl = EqvImpl <$> eqvClassOf_safe
 
 type instance Element (EqvImpl cls) = Element cls
 type instance EquivalenceClassOf (EqvImpl cls) = cls
 
 instance (Eq (Element cls), IsEquivalenceClass cls) => IsEquivalence (EqvImpl cls) where
-    eqvClassOf = eqvi_ClassOf
+    eqvClassOf_safe = eqvi_ClassOf_safe
 
 data EnumEqvImpl cls = EnumEqvImpl { 
     eeqvi_eqvi :: EqvImpl cls
@@ -170,7 +181,7 @@ type instance Element (EnumEqvImpl cls) = Element cls
 type instance EquivalenceClassOf (EnumEqvImpl cls) = cls
 
 instance (Eq (Element cls), IsEquivalenceClass cls) => IsEquivalence (EnumEqvImpl cls) where
-    eqvClassOf = eqvClassOf . eeqvi_eqvi
+    eqvClassOf_safe = eqvClassOf_safe . eeqvi_eqvi
 
 instance (Eq (Element cls), IsEquivalenceClass cls) => EnumerableEquivalence (EnumEqvImpl cls) where
     eqvClasses = eeqvi_Classes
@@ -189,7 +200,7 @@ instance Eq a => IsEquivalenceClass (TrivialEquivalenceClass a) where
 type TrivialEquivalence a = EqvImpl (TrivialEquivalenceClass a)
 
 trivialEquivalence :: TrivialEquivalence a
-trivialEquivalence = EqvImpl TrivialEquivalenceClass 
+trivialEquivalence = EqvImpl (return . TrivialEquivalenceClass)
 
 
 polyprop_respects
@@ -241,7 +252,7 @@ ecProduct ec1 ec2 =
 eqvProduct
   :: (IsEquivalence er, IsEquivalence er1) =>
      er -> er1 -> EqvImpl (EqvClassImpl (Element er, Element er1))
-eqvProduct er1 er2 = EqvImpl (\(x1,x2) -> ecProduct (eqvClassOf er1 x1) (eqvClassOf er2 x2))
+eqvProduct er1 er2 = EqvImpl (\(x1,x2) -> liftA2 ecProduct (eqvClassOf_safe er1 x1) (eqvClassOf_safe er2 x2))
 
 
 polyprop_respects2
@@ -285,7 +296,7 @@ instance (Pretty cls, Eq (Element cls), IsEquivalenceClass cls) => Pretty (EnumE
     pretty = prettyEquivalence
 
 
-enumEqvImpl :: (Element cls -> cls) -> [cls] -> EnumEqvImpl cls
+enumEqvImpl :: (Element cls -> AttemptC cls) -> [cls] -> EnumEqvImpl cls
 enumEqvImpl = EnumEqvImpl . EqvImpl
 
 ecMap

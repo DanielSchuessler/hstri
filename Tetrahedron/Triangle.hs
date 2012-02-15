@@ -166,7 +166,7 @@ ascVerticesToTriangle vs = triangleByDualVertex . unviewVertex $
 
 -- | The vertices must be distinct (but needn't be ordered)
 verticesToTriangle :: (Triple Vertex) -> Triangle
-verticesToTriangle = ascVerticesToTriangle . $unEitherC . asc3total
+verticesToTriangle = ascVerticesToTriangle . $unEitherC "verticesToTriangle" . asc3total
 
 -- | = 'verticesToTriangle'
 triangleByVertices :: (Triple Vertex) -> Triangle
@@ -293,7 +293,7 @@ instance MakeOTriangle (Triple Vertex) where
 -- | Inverse function to @vertices :: O (Triangle) -> Triple Vertex@
 oTriangleByVertices ::  (Triple Vertex) -> OTriangle
 oTriangleByVertices vs =
-    case $(unEitherC) (sort3WithPermutation' vs) of
+    case $(unEitherC) "oTriangleByVertices" (sort3WithPermutation' vs) of
          (vs',g) -> packOrderedFace (ascVerticesToTriangle vs') g
 
 

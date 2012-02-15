@@ -136,8 +136,8 @@ lensSpace p (tindex -> q) =
 
                 
 
-defaultTetEmbedding :: GeneralTetEmbedding
-defaultTetEmbedding = GTetE 10
+defaultTetImmersion :: GeneralTetImmersion
+defaultTetImmersion = GTetE 10
     ((\(Tup4 xs) -> 
         sumV (zipWith (\x v -> x *^ liftVec3 (vertexDefaultCoords v)) (toList4 xs) allVertices)
         )

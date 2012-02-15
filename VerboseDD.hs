@@ -23,7 +23,8 @@ module VerboseDD
      sVertexSolutions,
      fundEdgeSolutions,
      qVertexSolutionExts,
-     DDStepResult(..)
+     DDStepResult(..),
+     DDResult(..)
      
      )
 
@@ -44,7 +45,7 @@ import Data.Ratio
 import Data.Vector(Vector)
 import InnerProductRepresentation
 import MathUtil
-import PrettyUtil
+import PrettyUtil.Matrix
 import QuadCoordinates
 import QuadCoordinates.CanonExt
 import QuadCoordinates.Class
@@ -269,7 +270,7 @@ vertexSolutions ::
     ,   ToTriangulation tr)
 
     => Proxy c -> tr -> V.Vector (AdmissibleFor c (WrappedVector c V.Vector Rational))
-vertexSolutions _ tr = ddWrapSolutions . ddWith0 undefined $ tr 
+vertexSolutions p tr = ddWrapSolutions . ddWith0 p $ tr 
 
 -- | The vertices of the projective solution space in quadrilateral coordinates. 
 --

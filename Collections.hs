@@ -1,10 +1,19 @@
-{-# LANGUAGE NoMonomorphismRestriction, TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving, DeriveFunctor, GADTs, ExistentialQuantification, NoMonomorphismRestriction, TypeFamilies #-}
 module Collections where
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Language.Haskell.TH
 import Test.QuickCheck
 import Data.List as L
+
+-- import Data.Key
+-- 
+-- data AnyMap k v where
+--     AnyMap :: (Indexable fk, Show (fk v)) => fk v -> AnyMap (Key fk) v
+-- 
+-- type instance Key (AnyMap k) = k
+-- 
+-- deriving instance Show (AnyMap k v)
 
 
 type Set = S.Set

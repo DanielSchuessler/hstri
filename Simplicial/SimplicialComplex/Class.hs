@@ -56,13 +56,13 @@ class (DeltaSet3 s, SimplicialTet (Tet s)
 
 
 sEdgeAsc :: (SimplicialEdge e) => Asc2 (Vert e) -> e  
-sEdgeAsc = $unEitherC . sEdgeAscTotal
+sEdgeAsc = $unEitherC "sEdgeAsc" . sEdgeAscTotal
 
 sTriangleAsc :: (SimplicialTriangle t) => Asc3 (Vert t) -> t  
-sTriangleAsc = $unEitherC . sTriangleAscTotal   
+sTriangleAsc = $unEitherC "sTriangleAsc" . sTriangleAscTotal   
 
 sTetAsc :: (SimplicialTet tet) => Asc4 (Vert tet) -> tet  
-sTetAsc = $unEitherC . sTetAscTotal   
+sTetAsc = $unEitherC "sTetAsc" . sTetAscTotal   
 
 sEdge :: (SimplicialEdge c) => (Vert c, Vert c) -> c
 sEdge = sEdgeAsc . asc2

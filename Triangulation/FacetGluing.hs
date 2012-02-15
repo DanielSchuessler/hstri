@@ -55,16 +55,18 @@ gluingUnmap g a = gluingMap (flipGluing g) a
 
 instance GluingMappable IVertex where
 
-    gluingMap (t,ot) v = 
-        maybe (error ("gluingMap: vertex not in left triangle")) 
+    gluingMap gl@(t,ot) v = 
+        maybe 
+            (error ("gluingMap "++show gl++" "++show v))
             (triangleGetVertexAt ot)  
             (triangleGetIndexOf t v)
 
 -- | The input 'Vertex is interpreted as being in the same tetrahedron as the domain triangle of the gluing. The output 'Vertex' should be interpreted as being in the same tetrahedron as the codomain triangle of the gluing.
 instance GluingMappable Vertex where
 
-    gluingMap (t,ot) v = 
-        maybe (error ("gluingMap: vertex not in left triangle")) 
+    gluingMap gl@(t,ot) v = 
+        maybe 
+            (error ("gluingMap "++show gl++" "++show v))
             (triangleGetVertexAt (forgetTIndex ot))  
             (triangleGetIndexOf (forgetTIndex t) v)
 

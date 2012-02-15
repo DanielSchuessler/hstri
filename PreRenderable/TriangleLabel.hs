@@ -73,7 +73,7 @@ stla2tla :: (Ord v, Show v) =>
 stla2tla a =
             let
                 lrt = map3 ($ a) (stla_left,stla_right,stla_top)
-                (sorted,g) = $unEitherC $ sort3WithPermutation' lrt 
+                (sorted,g) = $unEitherC ("stla2tla "++show a) $ sort3WithPermutation' lrt 
             in
                 (
                     sorted

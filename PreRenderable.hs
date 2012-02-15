@@ -16,7 +16,7 @@ module PreRenderable(
     TriangleImmersion(..),
     GeneralEdgeImmersion(..),
     evalEdgeImmersion,
-    GeneralTetEmbedding(..),
+    GeneralTetImmersion(..),
     Resolution,
 
     -- * Main
@@ -42,7 +42,7 @@ module PreRenderable(
     pr_hideEds,
     pr_hideTris,
     pr_quad,
-    pr_makeEmbeddingsGeneral,
+    pr_makeImmersionsGeneral,
 
     -- * Lenses\/getters\/setters
     pr_generalTriangleImmersionL,
@@ -81,7 +81,7 @@ import Data.AscTuples
 import Data.Lens.Common
 import Data.Lens.Template
 import Data.String
-import Data.Vect.Double.Base hiding((*.),(.*),(.*.))
+import Data.Vect.Double.Base hiding((*.),(.*),(.*.),Vector)
 import Data.VectorSpace
 import DisjointUnion
 import GHC.Generics
@@ -514,10 +514,10 @@ visibleIf b = if b then Visible else Invisible
 isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t| (Bool,Bool) |]
 
 -- | Doesn't work on edges yet
-pr_makeEmbeddingsGeneral
+pr_makeImmersionsGeneral
   :: PreDeltaSet2 s =>
      (Tri s -> Resolution) -> PreRenderable s -> PreRenderable s
-pr_makeEmbeddingsGeneral triRes pr_ =
+pr_makeImmersionsGeneral triRes pr_ =
     setL pr_generalTriangleImmersionL
         (\t -> Just $ case pr_triangleImmersion pr_ t of
                     GeneralTriangle emb -> emb
@@ -551,13 +551,15 @@ evalEdgeImmersion (FlatEdge a0 a1) =
 
 evalEdgeImmersion (GeneralEdge (GEE _ f)) = f
 
-data GeneralTetEmbedding = GTetE Resolution (FF Tup3 Tup3 Double)
+data GeneralTetImmersion = GTetE Resolution (FF Tup3 Tup3 Double)
 
 mkPreRenderableFromTetImmersions
   :: forall s. (Ord (Tri s), ShortShow (Vert s), ShortShow (Tri s), ShortShow (Ed s), PreDeltaSet3 s) =>
-     (Tet s -> Maybe GeneralTetEmbedding)
-     -> (Vert s -> Vec3) -> s -> PreRenderable s
-mkPreRenderableFromTetImmersions (getTetImm :: Tet s -> Maybe GeneralTetEmbedding) coords s =
+     (Tet s -> Maybe GeneralTetImmersion)
+     -> (Vert s -> Vec3) -- ^ Vertex coordinates to use for vertices which are in a tetrahedron for which the first argument returns 'Nothing' (or vertices which aren't in any tetrahedron). 
+     -> s 
+     -> PreRenderable s
+mkPreRenderableFromTetImmersions (getTetImm :: Tet s -> Maybe GeneralTetImmersion) coords s =
     setL pr_generalTriangleImmersionL 
         (\t -> do
             (GTetE res tetImm,i) <- 

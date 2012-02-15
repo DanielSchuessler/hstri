@@ -42,7 +42,7 @@ deleteTet' (k :: TIndex) tr =
 
 
 deleteTet :: TIndex -> Triangulation -> Triangulation
-deleteTet = (.) $(unEitherC) . deleteTet'
+deleteTet = (.) ($unEitherC "deleteTet") . deleteTet'
 
 
 -- pachner32 tr e =

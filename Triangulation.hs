@@ -57,6 +57,7 @@ module Triangulation(
     addGluings,
     -- * Canonical representatives for things that are glued
     TriangulationDSnakeItem(..),
+    canonicalize,
     canonicalizeINormalArc,
     canonicalizeOINormalArc,
     -- * Examples
@@ -285,29 +286,33 @@ getOIEdgeGluingSense t oedge1 oedge2 =
 
 
 class TriangulationDSnakeItem a where
-    canonicalize :: Triangulation -> a -> a
+    canonicalize_safe :: Triangulation -> a -> AttemptC a
+
+canonicalize
+  :: (Show c, TriangulationDSnakeItem c) => Triangulation -> c -> c
+canonicalize tr x = $unEitherC ("canonicalize _ " ++ show x ++ ": canonicalize_safe failed") . canonicalize_safe tr $ x
 
 instance TriangulationDSnakeItem IVertex where
-    canonicalize t x = eqvRep (vertexEqv t) x
+    canonicalize_safe t x = eqvRep_safe (vertexEqv t) x
 
 instance TriangulationDSnakeItem IEdge where
-    canonicalize t = forgetVertexOrder . canonicalize t . toOrderedFace
+    canonicalize_safe t = fmap forgetVertexOrder . canonicalize_safe t . toOrderedFace
 
 iEdgeEqv :: Triangulation -> EnumEqvImpl (EqvClassImpl IEdge)
 iEdgeEqv tr = 
     EnumEqvImpl 
         (EqvImpl
-            (\e -> disorderEquivalenceClass (eqvClassOf (oEdgeEqv tr) (toOrderedFace e))))
+            (\e -> disorderEquivalenceClass <$> eqvClassOf_safe (oEdgeEqv tr) (toOrderedFace e)))
 
         (fmap disorderEquivalenceClass . filter isCanonicallyOrderedClass
             . eqvClasses . oEdgeEqv $ tr) 
 
 
 instance TriangulationDSnakeItem OIEdge where
-    canonicalize t x = (eqvRep (oEdgeEqv t) x)
+    canonicalize_safe t x = eqvRep_safe (oEdgeEqv t) x
 
 instance TriangulationDSnakeItem ITriangle where
-    canonicalize t rep = 
+    canonicalize_safe t rep = return $ 
         case M.lookup rep (tGlueMap_ t) of
                                 Just (forgetVertexOrder -> rep') | rep' < rep -> rep'
                                 _ -> rep
@@ -330,7 +335,7 @@ tGetThingOnOtherSide triangleContainingThing tr thing =
 
 -- | = 'canonicalizeINormalArc'
 instance TriangulationDSnakeItem INormalArc where
-    canonicalize = canonicalizeINormalArc 
+    canonicalize_safe = (return .) . canonicalizeINormalArc 
     
     
 canonicalizeINormalArc :: Triangulation -> INormalArc -> INormalArc
@@ -340,7 +345,7 @@ canonicalizeINormalArc t ina =
          Just ina' -> min ina ina'
 
 instance TriangulationDSnakeItem OINormalArc where
-    canonicalize = canonicalizeOINormalArc
+    canonicalize_safe = (return .) . canonicalizeOINormalArc
 
 canonicalizeOINormalArc
   :: Triangulation -> OINormalArc -> OINormalArc
@@ -350,25 +355,25 @@ canonicalizeOINormalArc t ina =
          Just ina' -> min ina ina'
 
 instance TriangulationDSnakeItem INormalCorner where
-    canonicalize t (viewI -> I i (edge -> e)) = 
-        iNormalCorner $ canonicalize t (i ./ e)
+    canonicalize_safe t (viewI -> I i (edge -> e)) = 
+        iNormalCorner <$> canonicalize_safe t (i ./ e)
 
 
 -- | Identity
 instance TriangulationDSnakeItem TIndex where
-    canonicalize _ = id
+    canonicalize_safe _ = return
 
 -- | Identity
 instance TriangulationDSnakeItem INormalTri where
-    canonicalize _ = id
+    canonicalize_safe _ = return
 
 -- | Identity
 instance TriangulationDSnakeItem INormalQuad where
-    canonicalize _ = id
+    canonicalize_safe _ = return
 
 -- | Identity
 instance TriangulationDSnakeItem INormalDisc where
-    canonicalize _ = id
+    canonicalize_safe _ = return
 
 
 
@@ -476,7 +481,7 @@ glueMapToTriangulationSafe gm =
 glueMapToTriangulation :: GlueMap -> Triangulation
 glueMapToTriangulation =
     fmap
-        $(unEitherC)
+        ($unEitherC "glueMapToTriangulation")
         glueMapToTriangulationSafe 
 
 
@@ -501,7 +506,7 @@ tNumberOfTetrahedra = numberOfTetrahedra
 mkTriangulation :: Word -> [Gluing] -> Triangulation
 mkTriangulation = 
     (fmap . fmap)
-        $(unEitherC)
+        ($unEitherC "mkTriangulation")
         mkTriangulationSafe 
 
 -- | Convenience function for the special case that there are no isolated tetrahedra

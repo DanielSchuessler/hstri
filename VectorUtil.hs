@@ -7,7 +7,7 @@ import QuickCheckUtil
 import Data.Maybe
 import Test.QuickCheck
 import TupleTH
-import PrettyUtil
+import PrettyUtil.Matrix
 import HomogenousTuples
 
 

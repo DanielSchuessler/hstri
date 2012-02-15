@@ -36,7 +36,7 @@ import Language.Haskell.TH.Lift
 import ShortShow
 import Data.Tuple.Index
 import MathUtil
-import FileLocation
+import Text.Groom
 
 
 class (Vertices s, Edges s, Vert s ~ Vert (Ed s), EdgeLike (Ed s)) => DeltaSet1 s where
@@ -72,8 +72,11 @@ newtype EdgesContainingVertex_Cache vert ed =
     ECVC { lookupEdgesContainingVertex :: vert -> [(ed,Index2)] } 
 
 mkECVC
-  :: (Ord (Vert s), DeltaSet1 s) => s -> EdgesContainingVertex_Cache (Vert s) (Ed s)
-mkECVC s = ECVC (flip $(indx) m)
+  :: (Ord (Vert s), Show (Vert s), Show (Ed s), DeltaSet1 s) => s -> EdgesContainingVertex_Cache (Vert s) (Ed s)
+mkECVC s = ECVC (\x -> case M.lookup x m of
+                            Just y -> y
+                            Nothing -> error ("mkECVC: Element not in the map: "++show x++
+                                                ". The map is:\n" ++ groom m)) 
     where
         m = M.fromListWith (++)
                     . concatMap (\e -> 

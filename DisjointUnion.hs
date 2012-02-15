@@ -9,7 +9,7 @@ module DisjointUnion(module Data.SumType, DisjointUnion(..), DisjointUnionable(.
 
 import Control.Monad
 import Simplicial.DeltaSet3
-import GHC.Generics
+import GHC.Generics hiding(prec)
 import Language.Haskell.TH
 import ZapUnits
 import Data.SumType
@@ -152,7 +152,10 @@ djZapUnits (DisjointUnion o a b c) = DisjointUnion o (zapUnits a) (zapUnits b) (
 
 -- | Disjoint union simplex
 newtype DJSimp dim a b = DJSimp (Either a b)
-    deriving(Show,Eq,Ord,SubSumTy,SuperSumTy,Pretty)
+    deriving(Show,Eq,Ord,SubSumTy,SuperSumTy)
+
+instance (Pretty a, Pretty b) => Pretty (DJSimp dim a b) where
+    prettyPrec prec = prettyPrec prec |||| prettyPrec prec
 
 type instance L (DJSimp dim a b) = a
 type instance Data.SumType.R (DJSimp dim a b) = b

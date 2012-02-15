@@ -10,9 +10,10 @@ module Equivalence(
     -- * Equivalence relations
     Equivalence, eqv_classmap, eqv_classes, eqv_eq, mkEquivalence, mkEquivalence0, eqv_classcount,
     eqv_class_elements, eqv_reps, eqv_generators, eqv_equivalents, eqv_rep,
-    eqv_classOf
+    eqv_classOf, eqv_classOf_safe
     )   where
 
+import EitherC
 import Data.Equivalence.Monad
 import Data.Function
 import Data.Hashable
@@ -29,7 +30,6 @@ import qualified Data.Set as S
 import Data.Set(Set)
 import qualified Data.Map as M
 import Data.Map(Map)
-import FileLocation
 
 
 
@@ -93,13 +93,21 @@ type instance Element (Equivalence a) = a
 deriving instance (Show a, Ord a) => Show (Equivalence a)
 
 instance Ord a => IsEquivalence (Equivalence a) where
-    eqvClassOf = eqv_classOf
+    eqvClassOf_safe = eqv_classOf_safe
 
 instance Ord a => EnumerableEquivalence (Equivalence a) where
     eqvClasses = eqv_classes
     
 eqv_classOf :: Ord k => Equivalence k -> k -> SetBasedEquivalenceClass k
-eqv_classOf e x = $(indx) x (eqv_classmap e)
+eqv_classOf = eqvClassOf
+
+eqv_classOf_safe
+  :: Ord k =>
+     Equivalence k -> k -> AttemptC (SetBasedEquivalenceClass k)
+eqv_classOf_safe e x = 
+    case M.lookup x (eqv_classmap e) of
+         Just y -> return y
+         Nothing -> toAttemptC $ ($failureStr "eqv_classOf_safe: Element not in the equivalence relation") 
 
 
 -- | Checks whether the given elements are equivalent. Throws an error if the first argument is not in the domain of the equivalence.

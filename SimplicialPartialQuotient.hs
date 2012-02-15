@@ -74,8 +74,8 @@ spq_mapTri (spq_map -> m) tri = map3 m (vertices tri)
 
 instance Ord v => DeltaSetMorphism2 ITriangle (Asc3 v) (SimplicialPartialQuotient v) where
     mapVert = spq_map 
-    mapEd spq = $unEitherC . mapSimpEdTotal (spq_map spq)
-    mapTri spq = $unEitherC . mapSimpTriTotal (spq_map spq)
+    mapEd spq = $unEitherC "mapEd: mapSimpEdTotal failed" . mapSimpEdTotal (spq_map spq)
+    mapTri spq = $unEitherC "mapEd: mapSimpTriTotal failed" . mapSimpTriTotal (spq_map spq)
 
 
 type GluingLabeller = NormalizedGluing -> String
@@ -87,9 +87,12 @@ makeTriangleLabelling
 makeTriangleLabelling spq gluingLabeller = triangleLabelsForSimplicial stlas
     where
         stlas = do
-            gl@(tri,otri) <- extraGluings spq
+            ng <- extraGluings spq
 
-            let lbl = gluingLabeller (normalizeGluing gl)
+            let lbl = gluingLabeller ng
+
+                tri  = ngDom ng
+                otri = ngCod ng
 
                 (l ,r ,t ) = spq_mapTri spq tri
                 (l',r',t') = spq_mapTri spq otri
@@ -117,18 +120,18 @@ defaultGluingLabeller =
 
 -- | Gluings of the original triangulation which are *not* implemented by 'spq_map'
 extraGluings
-  :: Eq v => SimplicialPartialQuotient v -> [Gluing]
+  :: Eq v => SimplicialPartialQuotient v -> [NormalizedGluing]
 extraGluings spq = 
             L.filter 
-                (not . isGluingImplemented spq)
-                (tGluingsIrredundant (spq_tr spq))  
+                (not . isGluingImplemented spq . ngToGluing)
+                (tNormalizedGluings (spq_tr spq))  
 
 implementedGluings
-  :: Eq v => SimplicialPartialQuotient v -> [Gluing]
+  :: Eq v => SimplicialPartialQuotient v -> [NormalizedGluing]
 implementedGluings spq = 
             L.filter 
-                (isGluingImplemented spq)
-                (tGluingsIrredundant (spq_tr spq))  
+                (isGluingImplemented spq . ngToGluing)
+                (tNormalizedGluings (spq_tr spq))  
 
 isGluingImplemented
   :: (Eq v) => SimplicialPartialQuotient v -> Gluing -> Bool
@@ -211,7 +214,10 @@ addEdgeDecos (tr :: Triangulation) _mapEd = setL pr_edgeDecoL _edgeDeco
             
 
 spq_mapOEd :: (Ord v, Show v) => SimplicialPartialQuotient v -> OIEdge -> (Asc2 v, S2)
-spq_mapOEd spq = $unEitherC . sort2WithPermutation' . spq_mapEd spq 
+spq_mapOEd spq ed = 
+    $unEitherC ("spq_mapOEd _ " ++ show ed ++": sort2WithPermutation' failed") 
+    . sort2WithPermutation' 
+    . spq_mapEd spq $ ed
 
 data TriangPreRenderableOpts = TPRO {
     decorateEdges :: Bool
@@ -256,8 +262,8 @@ spq_Equivalence_helper thingsOfTri allThings spq =
     mkEquivalence 
         (do
             gl <- implementedGluings spq
-            na <- thingsOfTri (fst gl)
-            [(na,gluingMap gl na)])
+            na <- thingsOfTri (ngDom gl)
+            [(na,ngMap gl na)])
         (allThings (spq_tr spq))
 
 
@@ -398,7 +404,7 @@ instance (Ord v, Pretty v) => Pretty (SPQWithCoords v) where
             [("spqwc_spq",pretty spqwc_spq),
              ("spqwc_coords",prettyFunction spqwc_coords (spq_verts spqwc_spq)),
              ("spqwc_gluingLabeller",prettyFunction 
-                                        (spqwc_gluingLabeller . normalizeGluing)
+                                        (spqwc_gluingLabeller)
                                         (extraGluings spqwc_spq))
              
              ]
@@ -424,12 +430,22 @@ instance Coords (SPQWithCoords v) where
 
 
 
+-- | Identifies all the vertices that are identified in the triangulation.
 spq_fullQuotient
   :: Triangulation -> SimplicialPartialQuotient TVertex
 spq_fullQuotient tr = 
     SimplicialPartialQuotient tr (pMap tr)
         (map (map4 (pMap tr) . vertices) (tTetrahedra_ tr))
 
+
+-- | Identifies all the vertices that are identified in the triangulation.
+spqwc_fullQuotient
+  :: Triangulation -> (TVertex -> Vec3) -> SPQWithCoords TVertex
+spqwc_fullQuotient tr coords =
+    SPQWithCoords 
+        (spq_fullQuotient tr) 
+        coords
+        (\_ -> $err' ("The result of spqwc_fullQuotient does not have a GluingLabeller because there aren't supposed to be any gluings leftover to be labelled. Maybe you got here through record updates?"))
 
 
 

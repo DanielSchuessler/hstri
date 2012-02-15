@@ -13,6 +13,10 @@ import THUtil
 newtype EitherC e a = EitherC { runEitherC :: forall r. (e -> r) -> (a -> r) -> r }
     deriving Functor
 
+-- | Convenient argument reordering of 'runEitherC'
+runEitherC' :: (e -> r) -> (a -> r) -> EitherC e a -> r
+runEitherC' ke ks x = runEitherC x ke ks
+
 instance Applicative (EitherC e) where
     pure a = EitherC (\_ ks -> ks a) 
     mf <*> mx = EitherC (\ke ks -> runEitherC mf ke
@@ -44,11 +48,11 @@ eitherCToEither :: EitherC e a -> Either e a
 eitherCToEither = toEither
 
 
-unEitherCWithLoc :: Show e => [Char] -> EitherC e a -> a
-unEitherCWithLoc loc ma = runEitherC ma (\e -> error (loc ++ ": unEitherC: "++show e)) id
-
-unEitherC :: ExpQ
-unEitherC = [| unEitherCWithLoc $liftedLocationString |]
+-- unEitherCWithLoc :: Show e => [Char] -> EitherC e a -> a
+-- unEitherCWithLoc loc ma = runEitherC ma (\e -> error (loc ++ ": unEitherC: "++show e)) id
+-- 
+-- unEitherC :: ExpQ
+-- unEitherC = [| unEitherCWithLoc $liftedLocationString |]
 
 eitherCFromEither :: Either e a -> EitherC e a
 eitherCFromEither = fromEither
@@ -82,17 +86,40 @@ idLErrorCall = id
 failureStr :: Q Exp
 failureStr = [| idLErrorCall . $failure . ErrorCall |]
 
+mkWrappedError _newMsgName = 
+    [| \_err -> $failureStr ($(varE _newMsgName)++"\n\tInner error: "++show _err) |]
+
 -- | Catches and rethrows with a message prepended
 --
 -- @$(wrapFailureStr) :: Show e => [Char] -> EitherC e a -> EitherC LErrorCall a@
 wrapFailureStr :: Q Exp
 wrapFailureStr = 
-    [| \_newMsg _x -> 
-            idLErrorCall (
-                runEitherC _x 
-                    (\_err -> $failureStr (_newMsg++"\n\tInner error: "++show _err))
+    [| \_newMsg -> 
+                runEitherC'
+                    $(mkWrappedError '_newMsg)
                     return
-                    )
-                    
                     |]
                 
+-- | Unwrap an 'EitherC', wrapping the exception (if any) with the message given as first arg of the generated expression.
+unEitherC :: Q Exp
+unEitherC = [| (runEitherC' throw id .) . $wrapFailureStr |] 
+
+
+type AttemptC = EitherC SomeException
+
+idAttemptC :: AttemptC a -> AttemptC a
+idAttemptC = id
+
+-- | Generates a specialization of 'unEitherC'.
+unAttempt :: Q Exp
+unAttempt = [| (. idAttemptC) . $unEitherC |] 
+
+
+toAttemptC :: Exception e => EitherC e a -> AttemptC a
+toAttemptC = mapLeft SomeException 
+
+-- | > $toAttemptCAndWrap :: Show a1 => [Char] -> EitherC a1 a -> AttemptC a
+toAttemptCAndWrap :: Q Exp
+toAttemptCAndWrap = [| (toAttemptC .) . $wrapFailureStr |]
+
+

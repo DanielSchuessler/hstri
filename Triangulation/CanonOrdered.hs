@@ -92,4 +92,5 @@ polyprop_CanonicallyOrderable (_ :: Proxy ot) tr =
 -- 
 --     forAllElements 
 
-
+instance IsSubface a b => IsSubface (CanonOrdered a) b where
+    isSubface = isSubface . unCanonOrdered

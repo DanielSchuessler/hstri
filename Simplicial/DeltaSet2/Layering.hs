@@ -149,7 +149,7 @@ instance (Show (Vert t), Show t) => Pretty (LayeringSetup t) where
 layeringSetup
   :: (SatisfiesSimplicialIdentities2 t, Eq (Vert t), Eq (Ed t), Show t) =>
      EdgeInTriangle t -> EdgeInTriangle t -> LayeringSetup t
-layeringSetup = (.) $unEitherC . layeringSetupTotal
+layeringSetup = (.) ($unEitherC "layeringSetup") . layeringSetupTotal
 
 
 data LayeringEdge t 

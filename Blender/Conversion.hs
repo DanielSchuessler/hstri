@@ -1,7 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, RecordWildCards, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, FlexibleContexts, TypeFamilies, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
 module Blender.Conversion(
-    module ConcreteNormal.PreRenderable,
 
     -- * Convenience conversions
     fromSpqwc,
@@ -23,23 +22,86 @@ module Blender.Conversion(
 
     ) where
 
+
+
 import Blender.Blenderable
+    ( Scene,
+      HelpLineSettings(helpLineMat),
+      Blenderable(..),
+      BaFaceInfo(BaFaceInfo, bfi_groups, bfi_helpLineSettings,
+                 bfi_labelMat, faceMat),
+      triangleUVLayerName,
+      faceMatL,
+      defaultScene0,
+      defaultHLS,
+      ba_triangleInfoL,
+      ba_prL )
 import Blender.Types
+    ( TransparencySettings(_fresnel, _fresnel_factor),
+      Texture(..),
+      MaterialTextureSlot(..),
+      Material(ma_name, ma_specular_hardness, ma_specular_intensity,
+               ma_transparency),
+      BlenderUnits,
+      BlenderImage(BImg, bimg_filepath, bimg_name),
+      BlenderGroup(BlenderGroup),
+      ma_transparencyL,
+      defaultTrans,
+      basicMaterial )
+import PreRenderable
+    ( Visibility(OnlyLabels),
+      PreRenderable,
+      pr_setTriVisibility,
+      pr_popDimension,
+      pr_generalTriangleImmersionL )
+import SimplicialPartialQuotient ( SPQWithCoords, toPreRenderable )
+import Simplicial.SimplicialComplex
+    ( Triple, foldAnySimplex2, disjointUnion, Asc3, Asc2, SC2, DJSC2 )
 import ConcreteNormal.PreRenderable
-import Control.Category((>>>))
-import Data.Function
-import Data.Lens.Common
-import Data.List
-import NormalEverything
-import Prelude hiding(catch,mapM_,sequence_) 
-import PrettyUtil
-import ShortShow
-import StandardCoordinates.MatchingEquations
+    ( Corn, normalSurfaceToPreRenderable )
+import Control.Category ( (>>>) )
+import Data.Function ( id, const, (.) )
+import Data.Lens.Common ( setL, modL, getL )
+import Data.List ( (++) )
+import NormalEverything ( StandardCoords )
+import Prelude
+    ( Integral,
+      Functor(fmap),
+      Num((*)),
+      Ord,
+      Show,
+      Char,
+      Double,
+      Int,
+      Integer,
+      Maybe(Just, Nothing) )
+
+import PrettyUtil ( Pretty )
+import ShortShow ( ShortShow )
+import StandardCoordinates.MatchingEquations ( Admissible )
+
+
+
+-- import Blender.Blenderable
+-- import Blender.Types
+-- import PreRenderable
+-- import SimplicialPartialQuotient
+-- import Simplicial.SimplicialComplex
+-- import ConcreteNormal.PreRenderable(Corn,normalSurfaceToPreRenderable)
+-- import Control.Category((>>>))
+-- import Data.Function
+-- import Data.Lens.Common
+-- import Data.List
+-- import NormalEverything
+-- import Prelude hiding(catch,mapM_,sequence_) 
+-- import PrettyUtil
+-- import ShortShow
+-- import StandardCoordinates.MatchingEquations
 
 data Style = Style {
     mat0, mat1, mat2, mat2curved :: Material,
     style_vertexThickness :: BlenderUnits,
-    -- | Blender groups to which all objects having this style should be added
+   -- | Blender groups to which all objects having this style should be added
     style_groups :: [BlenderGroup],
     style_helpLineMat :: Material,
     style_labelMat :: Material
@@ -65,7 +127,7 @@ mkBlenderable Style{..} pr_ = Blenderable {
                     asi,
             bfi_groups = style_groups,
             bfi_labelMat = Just style_labelMat,
-            bfi_helpLineMat = Just style_helpLineMat
+            bfi_helpLineSettings = Just (defaultHLS { helpLineMat = Just style_helpLineMat })
         },
 
     ba_vertexThickness = const style_vertexThickness,
@@ -96,7 +158,7 @@ threeMFGroup :: BlenderGroup
 threeMFGroup = BlenderGroup "ThreeMF"
 
 surfaceSpecularHardness :: Int
-surfaceSpecularHardness = 200
+surfaceSpecularHardness = 400
 
 pseudomanifoldStyle :: Style
 pseudomanifoldStyle = Style {
@@ -121,7 +183,11 @@ pseudomanifoldStyle = Style {
     mat2 = (basicMaterial  "pmMat2" (0.7, 0.7, 0.8)) {
                ma_specular_hardness = surfaceSpecularHardness ,
                ma_specular_intensity = 0.8, 
-               ma_transparency = Just (Trans 0.25 0.3 1)
+               ma_transparency = Just 
+                    (defaultTrans 0.6) {
+                        _fresnel = 2.5,
+                        _fresnel_factor = 1.25
+                    }
 
             }
 
@@ -171,7 +237,11 @@ mkNormalSurfaceStyle suf col0 col1 col2 = Style {
             }
     mat2 =
                 (basicMaterial ("nsurfMat2"++suf) col2) {
-                    ma_transparency = Just (Trans 0.55 0.7 1),
+                    ma_transparency = Just 
+                        (defaultTrans 1) {
+                            _fresnel = 2.5,
+                            _fresnel_factor = 1.25
+                        },
                     ma_specular_hardness = surfaceSpecularHardness, 
                     ma_specular_intensity = 0.8
                 }
@@ -247,7 +317,7 @@ makeTrisAlmostInvisible =
         (fmap 
             (setL 
                 (faceMatL >>> ma_transparencyL) 
-                (Just (Trans 0.05 0.05 1))))
+                (Just (defaultTrans 0.05))))
 
 makeTrisInvisible :: Blenderable s -> Blenderable s
 makeTrisInvisible = modL ba_prL (pr_setTriVisibility (const OnlyLabels))  

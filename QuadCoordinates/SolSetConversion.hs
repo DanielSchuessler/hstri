@@ -21,15 +21,17 @@ import CoordSys
 import Data.AdditiveGroup
 import Data.BitVector.Adaptive
 import Data.DList(DList)
+import Data.DList(DList)
 import Data.Foldable(foldrM)
 import Data.List(foldl')
 import Data.Proxy
 import Data.Ratio
 import Data.Vector(Vector)
 import Data.VectorSpace
+import HomogenousTuples
 import MathUtil
 import NormalSurfaceBasic
-import PrettyUtil
+import PrettyUtil.Matrix
 import QuadCoordinates.CanonExt
 import QuadCoordinates.Class
 import StandardCoordinates.Dense
@@ -37,14 +39,12 @@ import Triangulation
 import Triangulation.Class
 import Triangulation.VertexLink
 import TriangulationCxtObject
+import TupleTH
 import Util
 import VectorUtil
 import VerboseDD.Types
-import qualified Data.Vector.Generic as VG
-import TupleTH
-import HomogenousTuples
 import qualified Data.DList as DL
-import Data.DList(DList)
+import qualified Data.Vector.Generic as VG
 
 data SolSetConversionVectorRepresentation v r w = SSCVR VectorIndex (StandardDense v r) 
 

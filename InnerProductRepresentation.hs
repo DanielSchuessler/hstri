@@ -7,7 +7,7 @@ import Data.Function
 import Data.Semigroup
 import MathUtil
 import OrphanInstances()
-import PrettyUtil
+import PrettyUtil.Matrix
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import Data.BitVector.Adaptive

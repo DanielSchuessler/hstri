@@ -22,7 +22,12 @@ import Data.VectorSpace
 import Numeric.AD.Vector
 import R3Immersions
 
-main = edge20
+bcmd = DoRender
+
+main = do
+--     pachner32 
+--     vertex20
+    edge20
 
 pachner32 = 
     let
@@ -41,14 +46,19 @@ pachner32 =
         
             --mkPreRenderableWithTriangleLabels (const Nothing)
                 
-        go ba = testBlender (setCam cam . setLamps [oldDefaultLamp] . defaultScene $ ba) 
+        go fn ba = blenderMain bcmd 
+                    . setRenderFilepath fn
+                    . setRenderRes 1000 1400
+                    . setCam pachnerCam 
+                    . setLamps [oldDefaultLamp] 
+                    . defaultScene $ ba 
             
     in do
-        go before
-        go after
+        go "/h/dipl/pictures/pachner32_3.png" before
+        go "/h/dipl/pictures/pachner32_2.png" after
 
-cam :: Cam
-cam = readCam "(Vector((1.6595690250396729, -5.473565101623535, 0.8606469035148621)), Euler((1.4290757179260254, 3.992030087829335e-06, 0.2902868092060089), 'XYZ'), 0.8575560591178853)"
+pachnerCam :: Cam
+pachnerCam = readCam "(Vector((0.9365710020065308, -3.0533230304718018, 0.5091270804405212)), Euler((1.4390627145767212, 6.663020940322895e-06, 0.3214598298072815), 'XYZ'), 0.8575560591178853)"
 
  
         
@@ -59,13 +69,13 @@ collapseEdge =
 
         step0 = mkBlenderable pseudomanifoldStyle 
                 . transformCoords f0 
-                . pr_makeEmbeddingsGeneral (const 25)
+                . pr_makeImmersionsGeneral (const 25)
                 . toPreRenderable $ before
 
         f0 (Tup3 (x, y, z)) = tup3 x y (z * (twoNorm (tup2 x y)))
 
     in do
-        testBlender (setCam cam . setLamps [oldDefaultLamp] . defaultScene $ step0)
+        blenderMain bcmd (setCam pachnerCam . setLamps [oldDefaultLamp] . defaultScene $ step0)
 
 
 tr_vertex20 = mkTriangulation 2 
@@ -145,16 +155,18 @@ vertex20 =
                     $ before
                 
 
-        go ba = testBlender (
+        go fn ba = blenderMain bcmd (
                       setCam cam20 
                     . setLamps [oldDefaultLamp]
+                    . setRenderFilepath fn
                     . defaultScene 
+--                     . disableHelpLines
                     . mkBlenderable pseudomanifoldStyle $ ba) 
 
 
     in do
-        testBlender (setCam cam20 . defaultScene . mkBlenderable pseudomanifoldStyle $ before) 
-        testBlender (setCam cam20 . defaultScene . mkBlenderable pseudomanifoldStyle $ after) 
+        go "/h/dipl/pictures/vertex20Before.png" before
+        go "/h/dipl/pictures/vertex20After.png" after
 
 
 cam20 = readCam "(Vector((0.370949923992157, -2.3874809741973877, 0.7168295383453369)), Euler((1.273403286933899, 6.27131976216333e-06, 0.13297684490680695), 'XYZ'), 0.8575560591178853)"
@@ -192,7 +204,7 @@ edge20 =
 
                     ])
 
-        res = 20
+        res = 60
 
 
         sphericalTriangle ydir zdir (Tup2 (u, v)) = 
@@ -255,10 +267,11 @@ edge20 =
 --         cam_edge20 = readCam "(Vector((4.056652069091797, -1.6806788444519043, 1.085201621055603)), Euler((1.3310924768447876, 1.799694018700393e-06, 1.1548134088516235), 'XYZ'), 0.8575560591178853)"
 
 
-        go fp pr = testBlender (setCam cam_edge20 
+        go fp pr = blenderMain bcmd (setCam cam_edge20 
                                 . setRS (RS 1200 1200 (Just fp))
                                 . setLamps [oldDefaultLamp]
                                 . defaultScene 
+                                . disableHelpLines
                                 . mkBlenderable pseudomanifoldStyle 
                                 $ pr) 
 

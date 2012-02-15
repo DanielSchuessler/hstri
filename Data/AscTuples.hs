@@ -36,10 +36,10 @@ class AscTuple1 asc where
 
 
 mapAsc :: (AscTuple1 asc, Ord b) => (a -> b) -> asc a -> asc b
-mapAsc f = $unEitherC . mapAscTotal f
+mapAsc f = $unEitherC "mapAsc" . mapAscTotal f
 
 mapAscMonotonic :: (AscTuple1 asc, Ord b) => (a -> b) -> asc a -> asc b
-mapAscMonotonic f = $unEitherC . mapAscMonotonicTotal f 
+mapAscMonotonic f = $unEitherC "mapAscMonotonic" . mapAscMonotonicTotal f 
 
 class (AscTuple1 asc, AsList (asc a), AsList tup, Element (asc a) ~ a, Element tup ~ a) => 
     AscTuple tup asc a | tup -> asc a, asc a -> tup where
@@ -103,7 +103,7 @@ $(flip concatMapM [2,3,4] (\i -> do
          |]
 
      , sigD  smartCtorName (forall_a (cxt[ord_a]) [t| $tupTy_a -> $asciTy_a |]) 
-     , svalD smartCtorName [| $unEitherC . $(varE smartCtorTotalName) |]
+     , svalD smartCtorName [| $unEitherC $(lift (nameBase smartCtorName)) . $(varE smartCtorTotalName) |]
 
      , tySynInstD ''Element [asciTy_a] aTy 
 

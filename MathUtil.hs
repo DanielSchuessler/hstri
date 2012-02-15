@@ -226,23 +226,26 @@ hillClimb successors badness initial = go (initial,badness initial)
                 Nothing -> x
                 Just suc -> go suc
 
-data SolidTorusPoint = STP {
-    long :: Double, 
-    lat :: Double, 
+data SolidTorusPoint r = STP {
+    -- | Period 2pi 
+    long :: r, 
+    -- | Period 2pi
+    lat :: r, 
     -- | 0 to 1, 1 is on the boundary
-    boundaryness :: Double 
+    boundaryness :: r 
 
 }
+    deriving Show
 
 mapSolidTorus
-  :: Mat2 -> SolidTorusPoint -> SolidTorusPoint
+  :: Mat2 -> SolidTorusPoint Double -> SolidTorusPoint Double
 mapSolidTorus (Mat2 (Vec2 a b) (Vec2 c d)) (STP long lat boundaryness) =
     STP (a*long + b*lat) (c*long + d*lat) boundaryness
 
-torusBoundary :: UnitSquare -> SolidTorusPoint
+torusBoundary :: UnitSquare -> SolidTorusPoint Double
 torusBoundary (Vec2 long lat) = STP (2*pi*long) (2*pi*lat) 1
 
-meridionalDisc :: UnitSquare -> SolidTorusPoint
+meridionalDisc :: UnitSquare -> SolidTorusPoint Double
 meridionalDisc (Vec2 x y) = STP 0 (2*pi*x) y
 -- meridionalDisc p0 = STP 0 (angle2 p) (2*max (abs x) (abs y))
 --     where
@@ -251,7 +254,7 @@ meridionalDisc (Vec2 x y) = STP 0 (2*pi*x) y
 torusCoords :: 
        Double -- ^ Major radius
     -> Double -- ^ Minor radius
-    -> SolidTorusPoint
+    -> SolidTorusPoint Double
     -> Vec3
 torusCoords major minor (STP long lat boundaryness) =
     let

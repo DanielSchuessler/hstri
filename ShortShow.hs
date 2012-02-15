@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction #-}
+{-# LANGUAGE OverlappingInstances, FlexibleContexts, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module ShortShow where
 import Element
@@ -54,3 +54,7 @@ instance ShortShow Word where shortShow = show
 instance ShortShow Integer where shortShow = show
 
 instance ShortShow Bool where shortShow b = [if b then 'T' else 'F'] 
+
+-- | Prints no indication of wheter the value is a Left or a Right, as it's usually clear. Write an OverlappingInstance otherwise.
+instance (ShortShow a, ShortShow b) => ShortShow (Either a b) where shortShow = either shortShow shortShow
+

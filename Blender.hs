@@ -14,6 +14,8 @@ module Blender(
     blenderMain,
     BCommand(..)) where
 
+import PreRenderable
+import Simplicial.DeltaSet2
 import Blender.Blenderable
 import Blender.Mesh
 import Blender.Conversion
@@ -26,7 +28,7 @@ import Data.Maybe
 import Data.MemoTrie
 import Data.Monoid
 import Data.Numbering
-import Data.Vect.Double hiding((*.),(.*.))
+import Data.Vect.Double(Vec3(..),norm,scalingUniformProj4,normalize,dotprod,Mat3(..),crossprod,translation,normsqr)
 import MathUtil
 import Prelude hiding(catch,mapM_,sequence_) 
 import System.Environment
@@ -56,14 +58,7 @@ import Blender.Build
 #define CONSTRAINTS(s) ?sceneE::Python(),?scene::Scene s, CONSTRAINTS0(s) 
 
 
-helpLineThickness :: BlenderUnits
-helpLineThickness = 0.001
 
-helpLineN :: Int
-helpLineN = 19 :: Int
-
-helpLineMaxSteps :: Int
-helpLineMaxSteps = 100 :: Int
 
 
 -- * Edge-deco-related constants
@@ -154,7 +149,7 @@ extraGrps = [
 
 
 data BCommand = DoRender | JustLook
-    deriving Show
+    deriving (Show,Eq)
 
 toBlender :: (CONSTRAINTS0(s)) => Scene s -> BCommand -> Python ()
 toBlender scene@Scene{
@@ -496,7 +491,8 @@ dhT  ba tcec ecvc t = do
                             newFlatTriangleObj _objVar cv0 cv1 cv2 name
                         GeneralTriangle (GTE res g) -> do 
                             newTriangularSurfaceObj res _objVar g name
-                            mkHelpLines g helpLineMat 
+
+                            awhen (bfi_helpLineSettings bfi) (mkHelpLines g)
 
 
                     _objVar <.> "show_transparent" .= True
@@ -504,7 +500,6 @@ dhT  ba tcec ecvc t = do
 
 
                 bfi = getL ba_triangleInfoL ba $ t
-                helpLineMat = bfi_helpLineMat bfi 
                 name = unFaceName $ ba_faceName ba t'
 
 
@@ -568,7 +563,14 @@ handleTriLabel ba tcec ecvc grpTriLabels t =
 
                             scalingUniformProj4 thescale 
                             .*.
-                            safeOrthogonal (Mat3 rightunit upunit (crossprod rightunit upunit)) 
+--                                 -- correct sign error parity
+--                             safeOrthogonal (Mat3 vec3X vec3Y (neg vec3Z))
+--                             .*.
+                            safeOrthogonal 
+                                (Mat3 
+                                    rightunit 
+                                    upunit 
+                                    (crossprod rightunit upunit))
                             .*.
                             translation textCenterBase
 
@@ -619,6 +621,7 @@ renderBlender = blenderMain DoRender
 
 
 blenderMain doRender s = do
+    when (doRender==DoRender) (putStrLn "BATCH RENDERING MODE")
     let fn = "/tmp/testBlender.py"
     starttime <- getCurrentTime
 
@@ -719,8 +722,8 @@ newTriangularSurfaceObj = memo prepare
 
 
 
-mkHelpLines :: (?sceneE::Python ()) => FF Tup2 Tup3 Double -> Maybe Material -> Python ()
-mkHelpLines (emb :: FF Tup2 Tup3 Double) helpLineMat = do
+mkHelpLines :: (?sceneE::Python ()) => FF Tup2 Tup3 Double -> HelpLineSettings -> Python ()
+mkHelpLines (emb :: FF Tup2 Tup3 Double) HLS{..} = do
     newCurveObj (py "helpLine") (BlenderCurve {
         curve_base = BlenderCurveBase {
             curve_name = "HelpLineCurve",

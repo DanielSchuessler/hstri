@@ -280,22 +280,25 @@ getArcNumberingVsCornerNumberingSense narc ncorner =
 
 
 instance TriangulationDSnakeItem (Concrete INormalCorner) where
-    canonicalize tr x = 
+    canonicalize_safe tr x = 
         let
             surf = c_surf x
             e = iNormalCornerGetContainingEdge . c_type $ x
-            (e',g) = unpackOrderedFace . canonicalize tr .  toOrderedFace $ e
+        in
+            do
+                (e',g) <- fmap unpackOrderedFace 
+                            . $toAttemptCAndWrap "Concrete INormalCorner/canonicalize_safe: canonicalize_safe for the OIEdge failed" 
+                            . canonicalize_safe tr 
+                            . toOrderedFace $ e
 
-            pos' = case g of
+                let pos' = case g of
                         NoFlip -> c_pos x
                         Flip -> fi (numberOfCornersOfType surf (c_type x)) - c_pos x - 1 
 
-        in
-
-            Concrete surf pos' (iNormalCorner e')
+                return (Concrete surf pos' (iNormalCorner e'))
 
 canonicalizeConcreteArc
-  :: (Eq t, TriangulationDSnakeItem t) =>
+  :: (Eq t, TriangulationDSnakeItem t, Show t) =>
      Triangulation -> Concrete t -> Concrete t
 canonicalizeConcreteArc (tr :: Triangulation) x =
         let
@@ -306,19 +309,19 @@ canonicalizeConcreteArc (tr :: Triangulation) x =
                      | otherwise -> Concrete (c_surf x) (c_pos x) ina' 
 
 instance TriangulationDSnakeItem (Concrete INormalArc) where
-    canonicalize = canonicalizeConcreteArc
+    canonicalize_safe = (return .) . canonicalizeConcreteArc
 
 instance TriangulationDSnakeItem (Concrete OINormalArc) where
-    canonicalize = canonicalizeConcreteArc
+    canonicalize_safe = (return .) . canonicalizeConcreteArc
 
 
 -- | Identity
 instance TriangulationDSnakeItem (Concrete INormalTri) where
-    canonicalize = const id
+    canonicalize_safe = const return
 
 -- | Identity
 instance TriangulationDSnakeItem (Concrete INormalQuad) where
-    canonicalize = const id
+    canonicalize_safe = const return
 
 
 type TConcrete x = T (Concrete x)
@@ -347,7 +350,7 @@ toConcrete s =
 
     where
         f :: forall a.
-                    TriangulationDSnakeItem a =>
+                    (Show a, TriangulationDSnakeItem a) =>
                     (Admissible s -> [a]) -> [T a]
 
         f g = map (pMap (adm_Triangulation s)) (g s) 

@@ -6,7 +6,8 @@ module EdgeCentered(
     EdgeNeighborhoodVertex(..),
     makeEdgeNeighborhood,
     polyprop_edgeIsGlued,
-
+    edgeNeighborhoodVertexCoords,
+    equatorVertexCoords
     ) where
 
 import Equivalence
@@ -77,7 +78,21 @@ makeEdgeNeighborhoodMap tr oiEdge =
         fromMap tr res (L.map (map4 snd) theAssocs) 
 
 
+edgeNeighborhoodVertexCoords :: 
+       Double -- ^ height
+    -> Int -- ^ number of equator vertices 
+    -> EdgeNeighborhoodVertex
+    -> Vec3
+edgeNeighborhoodVertexCoords h _ Bottom = (-h) *& vec3Z
+edgeNeighborhoodVertexCoords h _ Top = h *& vec3Z
+edgeNeighborhoodVertexCoords _ n (EquatorVertex i) = equatorVertexCoords n i 
 
+equatorVertexCoords :: Int -> Int -> Vec3
+equatorVertexCoords n i = Vec3 (sin phi) (-(cos phi)) 0  
+            where 
+                phi = 2*pi*(2*i'-1)/(2*n')
+                i' = fromIntegral i
+                n' = fromIntegral n
 
 makeEdgeNeighborhood
   :: Triangulation
@@ -95,22 +110,12 @@ makeEdgeNeighborhood tr oiEdge gluingLabeller =
 
         h = max 0.2 (sqrt (equatorEdgeLengthSqr - 1))
 
-        equatorEdgeLengthSqr = normsqr (coords (EquatorVertex 1) &- coords (EquatorVertex 0))
+        equatorEdgeLengthSqr = normsqr (equatorVertexCoords n 1 &- equatorVertexCoords n 0)
+
+        coords = edgeNeighborhoodVertexCoords h n
 
         -- equatorEdgeLength = sqrt (1 + h^2)
         -- sqrt (equatorEdgeLengthSqr - 1) = h
-
-
-
-
-        coords Bottom = (-h) *& vec3Z
-        coords Top = h *& vec3Z
-        coords (EquatorVertex i) = Vec3 (sin phi) (-(cos phi)) 0  
-            where 
-                phi = 2*pi*(2*i'-1)/(2*n')
-                i' = fromIntegral i
-                n' = fromIntegral n
-
         
 
 --         labels = fmap return letters ++ join (liftM2 (\x y -> [x,y])) letters ++ error "out of labels :("

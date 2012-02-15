@@ -261,3 +261,5 @@ unitToStd2 :: Num a => Tup2 a -> Tup3 a
 unitToStd2 (Tup2 (x1,x2)) = Tup3 (1-x1-x2,x1,x2)
 unitToStd3 ::  Num a => Tup3 a -> Tup4 a
 unitToStd3 (Tup3 (x1,x2,x3)) = Tup4 (1-x1-x2-x3,x1,x2,x3)
+
+

@@ -10,7 +10,7 @@ import qualified Data.Vector as V
 import QuadCoordinates.Class
 import Data.VectorSpace
 import Control.Exception
-import PrettyUtil
+import PrettyUtil.Matrix
 import Triangulation
 import qualified Data.Vector.Unboxed as VU
 import Control.DeepSeq

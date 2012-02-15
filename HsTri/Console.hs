@@ -10,6 +10,8 @@ import Blender
 import Data.Lens.Common
 import ShortShow
 import PrettyUtil
+import Simplicial.SimplicialComplex
+import ConcreteNormal.PreRenderable(Corn)
 
 viewFundEdgeSolutionsInBlender
   :: (Ord v, Show v, Pretty v, ShortShow v) =>

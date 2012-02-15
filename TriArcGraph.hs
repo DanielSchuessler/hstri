@@ -12,7 +12,7 @@ import DotUtil
 import Latexable
 import MathUtil
 import Prelude hiding(writeFile)
-import PrettyUtil
+import PrettyUtil.Matrix
 import QuadCoordinates(QuadCoordinates,qMatchingEquationsMatrixRat)
 import QuadCoordinates.Class
 import QuadCoordinates.Dense
