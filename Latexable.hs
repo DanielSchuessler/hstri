@@ -1,9 +1,11 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
-{-# OPTIONS -Wall -fno-warn-unused-imports #-}
+{-# LANGUAGE NamedFieldPuns, TemplateHaskell, TransformListComp, ScopedTypeVariables, TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports -fno-warn-unused-binds #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
     ,latexifyStandardMatchingEquations
     ,latexifyQMatchingEquations
+    ,latexifyEns
+    ,latexifyDDResults
     ,latexTwoRows
     ,op1,op2
     ,textcolor
@@ -42,6 +44,14 @@ import qualified Data.ByteString.Lazy as B
 import Triangulation.PreTriangulation
 import Control.Monad
 import System.Exit
+import Triangulation.AbstractNeighborhood
+import VerboseDD
+import VectorUtil
+import Data.Proxy
+import VerboseDD
+import qualified Data.Vector.Generic as VG
+import Data.BitVector.Adaptive
+import FileLocation
 
 type Latex = String
 
@@ -133,18 +143,24 @@ instance Latexable a => Latexable (CanonOrdered a) where
 tuple :: Latexable a => [a] -> Latex
 tuple xs = "("<>intercalate "," (toLatex <$> xs)<>")"
 
+tuple' :: Latexable a => [a] -> [Char]
+tuple' xs = "\\left("<>intercalate "," (toLatex <$> xs)<>"\\right)"
 
 verboseTri :: INormalTri -> Latex
-verboseTri tri = operatorname "Tri" <> tuple [ iNormalTriGetVertex tri ]
+verboseTri tri = op1 "Tri" (iNormalTriGetVertex tri)
 
 verboseQuad :: INormalQuad -> Latex
-verboseQuad x = operatorname "Quad" <> tuple [ fst (iNormalQuadGetDisjointEdges x) ]
+verboseQuad x = op1 "Quad" ( fst (iNormalQuadGetDisjointEdges x) )
 
 instance Latexable INormalTri where
-    toLatex = toLatex . iNormalTriGetVertex 
+    toLatex = 
+        verboseTri
+--         toLatex . iNormalTriGetVertex 
 
 instance Latexable INormalQuad where
-    toLatex = toLatex . fst . iNormalQuadGetDisjointEdges
+    toLatex = 
+        verboseQuad
+--         toLatex . fst . iNormalQuadGetDisjointEdges
 
 instance Latexable INormalDisc where
     toLatex = eitherIND toLatex toLatex
@@ -194,8 +210,6 @@ latexEnv x body = begin x <> body <> end x
 latexEnvNL :: Latex -> String -> String
 latexEnvNL x body = unlines [ begin x, body, end x ]
 
--- | Left: verbatim row (not followed by @\\\\@)
--- Right: cells (@&@ and @\\\\@ added) 
 tabularLike :: String -> [Latex] -> Latex -> String
 tabularLike env colSpecs body = 
     unlines
@@ -230,13 +244,19 @@ zeroAsBlank x = if x == 0
 tabular :: [Latex] -> Latex -> String
 tabular = tabularLike "tabular" 
 
+array :: [Latex] -> Latex -> String
+array = tabularLike "array" 
+
+
+
 small :: Latex -> Latex
 small x = "{\\small"<> x <> "}"
 
-meHeader :: MakeINormalDisc a => [a] -> Latex
-meHeader discs = amps (fmap headerCell discs)
+matchingEquationsHeader
+  :: Latexable b => (Latex -> Latex) -> (a -> b) -> [a] -> Latex
+matchingEquationsHeader _size discTypeToLatex discs = amps (fmap headerCell discs)
     where
-                headerCell = small . mathmode . briefDiscType 
+                headerCell = _size . mathmode . discTypeToLatex 
 
 latexifyStandardMatchingEquations :: Triangulation -> Latex
 latexifyStandardMatchingEquations tr =
@@ -248,16 +268,22 @@ latexifyStandardMatchingEquations tr =
 
         colSpecs = replicate (tNumberOfNormalDiscTypes tr) "r"
 
-        body = meHeader (tINormalDiscs tr) \\ 
+        body = matchingEquationsHeader small briefDiscType (tINormalDiscs tr) \\ 
                ("\\hline" <> slashes (fmap mkRow mes))
 
 
         mkRow (sc,_) = amps (fmap zeroAsBlank sc)
     in
         tabular colSpecs body
+
+hspace :: Latexable a => a -> Latex
+hspace = op1 "hspace"
+
+
             
-latexifyQMatchingEquations :: Triangulation -> Latex
-latexifyQMatchingEquations tr =
+latexifyQMatchingEquations
+  :: String -> String -> Triangulation -> String
+latexifyQMatchingEquations columnSep hspaceAfterNumber tr =
     let
         mes = 
                 sortBy (comparing (fmap (/= (0::Integer)) . fst))
@@ -265,13 +291,22 @@ latexifyQMatchingEquations tr =
                     (\e -> fmap ((,e) . quad_toDenseList tr) . qMatchingEquation $ e) 
             .   edges $ tr
 
-        colSpecs = "l" : "|" : replicate (tNumberOfNormalQuadTypes tr) "r"
+        colSpecs = "l" : "|" : replicate 
+                                    (tNumberOfNormalQuadTypes tr) 
+                                    ("r@{\\hspace{"++columnSep++"}}")
 
-        body = ("Kante&"<>meHeader (tINormalQuads tr)) \\ 
-               ("\\hline " <> slashes (fmap mkRow mes))
+        body = ("Kante&"<>
+                matchingEquationsHeader 
+                        (id)
+                        verboseQuad 
+                        (tINormalQuads tr)) \\ 
+               ("\\hline\n" <> slashes (fmap mkRow mes))
 
 
-        mkRow (me,e) = mathmode (toLatex e) <> "&" <> amps (fmap zeroAsBlank me)
+        mkRow (me,e) = mathmode (toLatex e) <> "&" <> amps (fmap mkCell me)
+
+        mkCell 0 = mempty
+        mkCell i = mathmode (toLatex i <> hspace hspaceAfterNumber)
     in
         tabular colSpecs body
 
@@ -302,6 +337,13 @@ instance (Integral i, Latexable i) => Latexable (Ratio i) where
     toLatex x 
         | Just i <- ratioToIntegral x = toLatex i 
         | otherwise = (op2 "frac" <$> numerator <*> denominator) x
+
+
+plus :: (Num a, Ord a, Latexable a) => a -> Latex
+plus y = 
+        if y < 0
+           then " - " ++ toLatex (-y)
+           else " + " ++ toLatex y
 
 
 instance (Latexable k, Latexable r, Num r, Ord r) => Latexable (SparseVector k r) where
@@ -357,3 +399,140 @@ quad_latex tr qc =
 runOkularAsync :: String -> IO ()
 runOkularAsync pdffile = rawSystemAsyncS "okular" [pdffile]
 
+braces :: [Char] -> [Char]
+braces x = "{"++x++"}"
+
+
+
+instance Latexable IEdgeNeighborhoodTet where
+
+    toLatex ient = "\\ent"++concatMap braces
+                                (show (getTIndex ient)
+                                  : map (show . forgetTIndex . ($ ient)) 
+                                        [ient_top,ient_bot,ient_left,ient_right]) 
+                        
+instance Latexable InnerEdgeNeighborhood where toLatex = tuple' . ien_toList 
+instance Latexable BoundaryEdgeNeighborhood where toLatex = tuple' . ben_toList 
+
+-- | Ens = edge neighborhoods
+latexifyEns :: Triangulation -> Latex
+latexifyEns tr = 
+    slashes
+        [ amps ((either toLatex toLatex $ en)
+                    : case (isClosedTriangulation tr, en) of
+                           (True,_) -> []
+                           (False,Left _) -> [op1 "textit" "(Rand)"]
+                           (False,Right _) -> [""])
+
+            | e <- edges tr
+            , let en = someEdgeNeighborhood e
+            , then sortWith by (either ben_length ien_length en)
+
+                  ]
+
+instance Latexable VectorIndex where
+    toLatex i = "v_{"++show (toInteger i)++"}"
+
+align :: Latex -> Latex
+align = latexEnv "align*" 
+-- aligned = latexEnv "aligned" 
+
+displaymath :: Latex -> Latex
+displaymath = latexEnv "displaymath"
+
+latexifyDDResults :: CoordSys co => DDResult co -> Latex
+latexifyDDResults (DDResult tr steps final :: DDResult co) =
+
+
+    braces (
+--         "\\newcommand{funbox}[1]{\\makebox[1cm][flushright]{#1}}\n" ++
+        unlines (zipWith goStep steps [0::Int ..])
+        ++
+        goFinal 
+
+    )
+
+
+    where
+        g = length (hyperplanes (undefined :: Proxy co) tr)
+        n = numberOfVariables (undefined :: Proxy co) tr
+
+        goStep (DDSR pbs pairFates) i =
+
+            align (
+--             array ("lcc":replicate (g-i) "r") 
+                (unlines . concat $ zipWith (goPartition i) [_S0 pbs, _Spos pbs, _Sneg pbs] "0+-")
+                )
+            ++
+            "Paare:\n"
+            ++
+            goPairFates pairFates
+
+
+        goPartition i s name =
+           (op1 "intertext" (mathmode ([str|S_{$[name]$}^{($:i$)}|]
+                ++ if VG.null s
+                      then " = \\emptyset"
+                      else ":")))
+           :
+           map goIPR (VG.toList s)
+
+        goFinal =
+            "Ergebnis:\n" ++
+            align (unlines (map goIPR (VG.toList final)))
+
+
+        goIPR IPR {ipr_index,zeroSet,innerProducts} =
+
+            toLatex ipr_index 
+                ++ " &=& "
+                ++ "&(&" 
+                ++ goZeroSet zeroSet 
+                ++ "&,&"
+                ++ goInnerProducts innerProducts
+                ++ "&)"
+                ++ "\\\\"
+
+
+        goZeroSet zs = 
+            op1 "overline" . latexSet $
+                [ i | i <- [0..n-1], not (bvUnsafeIndex zs i) ]
+
+        goInnerProducts v =
+
+--             concatMap (op1 "funbox") (VG.toList v)
+           intercalate "&&" (map toLatex $ VG.toList v) 
+
+
+        goPairFates pfs = 
+            tabular ["c","c","l"]
+                (slashes (map goPairFate . VG.toList $ pfs))
+
+
+        goPairFate (PairFate u w k) =
+            mathmode (ddrep_index u) &
+            mathmode (ddrep_index w) &
+            case k of
+                OK ix -> "OK, "++mathmode ix ++" := " 
+                            ++ mathmode (
+                                   toLatex (w0 / (w0-u0))
+                                ++ toLatex (ddrep_index u)
+                                ++ plus (-u0 / (w0-u0))
+                                ++ toLatex (ddrep_index w)
+                                )
+
+
+                    where
+                        u0 = ipr_head u
+                        w0 = ipr_head w
+
+                NotAdjacent z -> "Nicht adjazent ("++mathmode ("z="++toLatex (ddrep_index z))++")"
+                Incompatible -> "Inkompatibel (Bei Tetraeder "
+                                    ++ toLatex ($fromJst (findTetViolatingQuadConstraints tr
+                                                    (intersectZeroSets u w))) 
+                                    ++ ")"
+
+
+
+(&) ::  (Latexable a, Latexable a1) => a -> a1 -> [Char]
+x & y = toLatex x ++"&"++toLatex y

@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, EmptyDataDecls, ViewPatterns, CPP, ExistentialQuantification, TupleSections, UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, EmptyDataDecls, ViewPatterns, CPP, ExistentialQuantification, TupleSections, UndecidableInstances, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, FunctionalDependencies, NoMonomorphismRestriction #-}
 --{-# OPTIONS -Wall #-}
 module StandardCoordinates.Class where
 
@@ -20,6 +20,7 @@ import Data.Map(Map)
 import Math.SparseVector
 import Triangulation.Class
 import MathUtil
+import Data.Typeable
 
 
 -- | 
@@ -183,7 +184,7 @@ instance (Num n, StandardCoords s n) => StandardCoords [s] n where
     triAssocs = concatMap triAssocs 
     triAssocsDistinct = default_triAssocsDistinct_from_triAssocs
 
-instance (Num n, StandardCoords s n) => StandardCoords (FormalProduct n s) n where
+instance (Typeable n, Num n, StandardCoords s n) => StandardCoords (FormalProduct n s) n where
     discCount (n :* s) = (n *) <$> discCount s
     discAssocs (n :* s) = second (n *) <$> discAssocs s
     discAssocsDistinct (n :* s) = second (n *) <$> discAssocsDistinct s
@@ -224,6 +225,8 @@ cornerAssocsDistinct = M.toList . M.fromListWith (+) . cornerAssocs
 data AnyStandardCoords i = 
     forall s. (StandardCoords s i) => AnyStandardCoords s
 
+    deriving Typeable
+
 instance Show (AnyStandardCoords i) where
     show _ = "<AnyStandardCoords>"
 
@@ -250,12 +253,12 @@ instance (Num r, Ord r) => NormalSurfaceCoefficients (AnyStandardCoords r) r
 
 
 #define F(X) X (AnyStandardCoords s) = X s
-instance (Num i, Ord i) => QuadCoords (AnyStandardCoords i) i where
+instance (Typeable i, Num i, Ord i) => QuadCoords (AnyStandardCoords i) i where
     F(quadCount)
     F(quadAssocs)
     F(quadAssocsDistinct)
 
-instance (Num i, Ord i) => StandardCoords (AnyStandardCoords i) i where
+instance (Typeable i, Num i, Ord i) => StandardCoords (AnyStandardCoords i) i where
     F(discCount)
     F(discAssocs)
     F(discAssocsDistinct)
@@ -268,7 +271,7 @@ instance (Num i, Ord i) => StandardCoords (AnyStandardCoords i) i where
 onlyTriAssocs :: [(INormalDisc, r)] -> [(INormalTri, r)]
 onlyTriAssocs = mapMaybe (traverseFst (eitherIND Just (const Nothing)))
 
-instance (Num r, Ord r) => StandardCoords (SparseVector INormalDisc r) r where
+instance (Typeable r, Num r, Ord r) => StandardCoords (SparseVector INormalDisc r) r where
     discCount = sparse_get
     discAssocs = discAssocsDistinct
     discAssocsDistinct = sparse_toAssocs
@@ -280,7 +283,7 @@ instance (Num r, Ord r) => StandardCoords (SparseVector INormalDisc r) r where
 
 
 
-instance (Num r, Ord r) => 
+instance (Typeable r, Num r, Ord r) => 
     UpdatableStandardCoords 
         (SparseVector INormalDisc r) 
         (SparseVector INormalDisc r) 

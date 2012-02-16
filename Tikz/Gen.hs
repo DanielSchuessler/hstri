@@ -18,10 +18,13 @@ module Tikz.Gen(
     noExtraEdgeStyles,
     Way(..),
     previewAuto,
+    previewAutoEns,
+    previewAutoFor,
     StructureGraphLayout(..),
     StructureGraphExtraOptions(..),
     defaultSGEE,
     PtcToVertex(..),
+    renderEdgeNeighborhood_core
 
 
 
@@ -63,7 +66,7 @@ regularPolygonLocs v =
         eqvs = asList v
         step = 360 / genericLength eqvs
         _assocs = 
-            [ (x, Polar (i*step) (scopeUnitLength 1))
+            [ (x, XYPolar (i*step) 1)
 
                 | (x,i) <- zip eqvs [0..] ]
 
@@ -179,7 +182,8 @@ tikzStructureGraph_restricted
                          _ -> (Nothing,"")
                                 
 
-            return [str| 
+            return 
+                [str| 
                     \draw [$drawStyle$] ($nodeName ivertex1$) to[$renderTikzStyle toStyle$] $lblNode$($nodeName ivertex2$);
                     |]
 
@@ -262,7 +266,7 @@ tikzStructureGraph_restricted
 
             $edgeScope$
 
-            $renderEdgeNeighborhoods tr eds$
+            $renderEdgeNeighborhoods eds$
 
             \end{tikzpicture}|]
 
@@ -273,22 +277,31 @@ nodeName (viewI -> (I i x)) = show x ++ show i
 
 previewAuto :: ToTriangulation t => t -> StructureGraphExtraOptions -> IO ()
 previewAuto (toTriangulation -> tr) opts =
-    let
-        verts = tIVertices tr
-        eds = edges tr
-    in
+    previewAutoFor tr (tIVertices tr) (edges tr) opts
+
+-- | Only edge neighbordhoods
+previewAutoEns
+  :: ToTriangulation t => t -> StructureGraphExtraOptions -> IO ()
+previewAutoEns (toTriangulation -> tr) opts =
+    previewAutoFor tr [] (edges tr) opts 
+
+previewAutoFor
+  :: ToTriangulation t =>
+     t -> [IVertex] -> [TEdge] -> StructureGraphExtraOptions -> IO ()
+previewAutoFor (toTriangulation -> tr) verts eds opts =
+
         withAuto tr verts eds (previewTikz 
             (tikzStructureGraph_restricted tr verts eds opts))
 
 
 renderEdgeNeighborhoods
   :: (?layout::StructureGraphLayout) =>
-     Triangulation -> [TEdge] -> Tikz
-renderEdgeNeighborhoods tr eds = concatMap f eds
+     [TEdge] -> Tikz
+renderEdgeNeighborhoods eds = concatMap f eds
     where
         f e = [str|
                 \begin{scope}[shift={$_loc$}]
-                $renderEdgeNeighborhood tr e$
+                $renderEdgeNeighborhood e$
                 \end{scope}
               |]
             where
@@ -296,75 +309,150 @@ renderEdgeNeighborhoods tr eds = concatMap f eds
 
 
 
-renderEdgeNeighborhood :: Triangulation -> TEdge -> Tikz
-renderEdgeNeighborhood tr e =
-    case someEdgeNeighborhood tr e of 
-        Left _ -> $err' "renderEdgeNeighborhood: boundary edge not supported"
+renderEdgeNeighborhood :: TEdge -> Tikz
+renderEdgeNeighborhood e = 
+          case someEdgeNeighborhood e of 
+                 Left x -> renderEdgeNeighborhood_core 1 (f (ben_toList x)) True
+                 Right x -> renderEdgeNeighborhood_core 1 (f (ien_toList x)) False    
 
-        Right (ien_toList -> ients) -> 
-            let
-                n = length ients
-                n' = 360/fi n
-                n'' = (180-n')/2
+    where
+        f = map (\x -> (ient_top x, ient_bot x, ient_left x, ient_right x))
 
-                radius :: Double
-                radius = case n of
-                             3 -> 3.5
-                             _ -> 3
+renderEdgeNeighborhood_core
+  :: Latexable a => TikzFactor -- ^ extra radius scaling factor
+  -> [Quadruple a] -> Bool -> [Char]
+renderEdgeNeighborhood_core extraScale ients isBoundary =
 
-                _main =
-                    flip concatMap (zip ients [0..n-1]) (\(ient,(fi -> i)) ->
-                        let
-                            ccorner = Polar (i * n')       (show radius)
-                            dcorner = Polar ((i+1) * n')   (show radius)
+      let
+        realn = length ients
+
+        n | isBoundary = realn + 1 
+          | realn == 1 = 2
+          | otherwise = realn
+        centralAngle = 360/fi n
+        cdAngle 
+            | n == 1 = 70
+            | n == 2 = 70
+            | otherwise = (180-centralAngle)/2
+
+        radius :: Double
+        radius = extraScale * case n of
+                        2 -> 1.5
+                        3 -> 3.5
+                        _ -> 3
+
+        _main =
+            flip concatMap (zip ients [0..realn-1]) (\((a_lbl,b_lbl,c_lbl,d_lbl),iint) ->
+                let
+                    i = fi iint
+
+                    ccorner = XYPolar (i * centralAngle)       radius
+                    dcorner = XYPolar ((i+1) * centralAngle)   radius
+
+                    ab_extraDist | realn == 1 = 0.5
+                                 | otherwise = 0
+
+                    a = 
+                        simpleNode 
+                            (CanvasPolar ((i+0.5)*centralAngle) (dist ab_extraDist centralAngle))
+                            (mathmode a_lbl)
+                    b = 
+                        simpleNode
+                            (CanvasPolar ((i+0.5)*centralAngle) (dist (ab_extraDist + 3.3) centralAngle))
+                            (mathmode b_lbl)
+
+                    dist _plus ang = show (250/ang + _plus) ++ "ex"
 
 
-                            a = 
-                                simpleNode 
-                                    (Polar ((i+0.5)*n') (dist 0 n'))
-                                    (mathmode (ient_top ient))
-                            b = 
-                                simpleNode
-                                    (Polar ((i+0.5)*n') (dist 3.3 n'))
-                                    (mathmode (ient_bot ient))
+                    c = 
+                        simpleNode
+                            (DistanceRot ccorner (dist 0 cdAngle) (-cdAngle/2) tikzOrigin)
+                            (mathmode c_lbl)
 
-                            dist _plus ang = show (250/ang + _plus) ++ "ex"
+                    d = 
+                        simpleNode
+                            (DistanceRot dcorner (dist 0 cdAngle) (cdAngle/2) tikzOrigin)
+                            (mathmode d_lbl)
+
+                    _lines = 
+                        (if i==0 && isBoundary
+                            then simpleDraw bdryOpts tikzOrigin [TikzLineTo ccorner] 
+                            else "")
+                        ++
+                        simpleDraw bdryOpts ccorner [TikzLineTo dcorner]
+                        ++
+                        simpleDraw 
+                            (if iint == realn-1 && isBoundary then bdryOpts else []) 
+                            tikzOrigin [TikzLineTo dcorner]
 
 
-                            c = 
-                                simpleNode
-                                    (DistanceRot ccorner (dist 0 n'') (-n''/2) tikzOrigin)
-                                    (mathmode (ient_left ient))
+                in
+                    (case (isBoundary,realn) of
+                          (False,1) -> deg1stuff radius
+                          (False,2) -> if i==0 then deg2stuff radius else mempty
+                          _ -> _lines)
+                    `mappend`
+                    concatMap renderNode [a,b,c,d]
+            )
 
-                            d = 
-                                simpleNode
-                                    (DistanceRot dcorner (dist 0 n'') (n''/2) tikzOrigin)
-                                    (mathmode (ient_right ient))
+        scopeOpts = renderOptions
+                            (case (isBoundary,realn) of
+                                  (False,1) -> ["rotate=90"]
+                                  (False,2) -> []
+                                  _ -> 
 
-                        in
-                            [str|
-                                \draw $renderTikzLoc ccorner$ -- $renderTikzLoc dcorner$ -- (0,0); 
-                            |]
-                            ++ concatMap renderNode [a,b,c,d]
-                    )
+                                    -- prettify orientation
+                                    if odd n
+                                       then ["rotate="++show (centralAngle/4)]
+                                       else ["rotate="++show (centralAngle/2)]
+                            )
 
-            in
+      in
+
                 [str|
-                        \begin{scope}
+                        % Edge neighborhood
+                        \begin{scope}$scopeOpts$
                         $_main$
                         \end{scope} |]
 
 
-simpleNode :: TikzLoc -> Tikz -> TikzNode
-simpleNode = TikzNode ""
+bdryOpts :: TikzGraphicsOptions
+bdryOpts = ["thick"]
 
-data TikzNode = TikzNode {
-    n_style :: String,
-    n_loc :: TikzLoc,
-    n_lbl :: Tikz
-}
-            
-renderNode :: TikzNode -> [Char]
-renderNode TikzNode{..} = [str| \node [$n_style$] at $renderTikzLoc n_loc$ {$n_lbl$}; 
-|]
+
+
+deg1stuff :: TikzFactor -> Tikz
+deg1stuff radius =
+    let
+        r = XYPolar 0 radius
+        l = XYPolar 180 radius
+        p = 10
+        q = 0.7
+    in
+        "% Degree 1 edge\n"
+        `mappend`
+        simpleDraw bdryOpts tikzOrigin [ TikzCircle radius ]
+        `mappend`
+        simpleDraw [] l [ TikzLineTo r ]
+        `mappend`
+        simpleDraw ["<->"] 
+            (XYPolar (180+p) (q*radius)) 
+            [ TikzArc ((-180)+p) (-p) (q*radius) (q*radius) ] 
+
+
+
+deg2stuff :: TikzFactor -> Tikz
+deg2stuff radius =
+    let
+        r = XYPolar 0 radius
+        l = XYPolar 180 radius
+    in
+        "% Degree 2 edge\n"
+        `mappend`
+        simpleDraw bdryOpts tikzOrigin [ TikzCircle radius ]
+        `mappend`
+        simpleDraw [] l [ TikzLineTo r ]
+
+    
+
 

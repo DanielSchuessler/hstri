@@ -38,12 +38,17 @@ import Data.Ratio
 import Control.Exception
 import NormalSurfaceBasic
 import Triangulation.PreTriangulation
+import Data.Typeable
 
 
--- | Minimal implementation:
+-- | Representations of quadrilateral coordinate vectors.
+--
+-- Minimal implementation:
 --
 -- 'quadAsSparse' || 'quadCount' && ('quadAssocs' || 'quadAssocsDistinct') 
-class (NormalSurfaceCoefficients q r, Ord q) => QuadCoords q r | q -> r where
+--
+-- The 'Typeable' constraint is mostly for use with typed exceptions.
+class (Typeable q, NormalSurfaceCoefficients q r, Ord q) => QuadCoords q r | q -> r where
      quadCount :: q -> INormalQuad -> r
                                          
      -- | May (but need not) omit zero coefficients. May contain repeated quads.
@@ -80,7 +85,7 @@ instance (Num n, QuadCoords q n) => QuadCoords [q] n where
     quadAssocs = concatMap quadAssocs 
     quadAsSparse = sparse_sumWith (+) . map quadAsSparse
 
-instance (Num n, QuadCoords q n) => QuadCoords (FormalProduct n q) n where
+instance (Typeable n, Num n, QuadCoords q n) => QuadCoords (FormalProduct n q) n where
     quadCount (n :* q) = (n *) <$> quadCount q
     quadAssocs (n :* q) = second (n *) <$> quadAssocs q
     quadAssocsDistinct (n :* q) = second (n *) <$> quadAssocsDistinct q
@@ -91,7 +96,7 @@ instance (Num n, QuadCoords q n, QuadCoords q' n) => QuadCoords (FormalSum q q')
     quadAssocs = foldFormalSum (++) . bimapFormalSum quadAssocs quadAssocs
     quadAsSparse (a :+ b) = sparse_addWith (+) (quadAsSparse a) (quadAsSparse b)
 
-instance (Ord i, Num i) => QuadCoords (SparseVector INormalQuad i) i where
+instance (Ord i, Num i, Typeable i) => QuadCoords (SparseVector INormalQuad i) i where
     quadCount = sparse_get
     quadAssocsDistinct = sparse_toAssocs
     quadAsSparse = id
@@ -100,7 +105,7 @@ onlyQuadAssocs :: [(INormalDisc, t1)] -> [(INormalQuad, t1)]
 onlyQuadAssocs = mapMaybe (traverseFst (eitherIND (const Nothing) Just))
 
 
-instance (Ord i, Num i) => QuadCoords (SparseVector INormalDisc i) i where
+instance (Typeable i, Ord i, Num i) => QuadCoords (SparseVector INormalDisc i) i where
     quadCount v q = sparse_get v (iNormalQuadToINormalDisc q)
     quadAssocs = quadAssocsDistinct
     quadAssocsDistinct = onlyQuadAssocs . sparse_toAssocs 

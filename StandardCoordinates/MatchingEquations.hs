@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, FlexibleInstances, ViewPatterns, TemplateHaskell, NoMonomorphismRestriction #-}
+{-# LANGUAGE DeriveDataTypeable, TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, FlexibleInstances, ViewPatterns, TemplateHaskell, NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-orphans #-}
 module StandardCoordinates.MatchingEquations where
@@ -16,27 +16,46 @@ import MathUtil
 import Control.Exception
 import Control.Applicative
 import Control.DeepSeq
+import Data.Typeable
+import Data.SumType
 
 
 
 
 standard_admissible
-  :: (Show r, ToTriangulation tr, StandardCoords s r) =>
-     tr -> s -> Either [Char] (Admissible s)
+  :: (Show r, ToTriangulation tr, StandardCoords s r, Show s) =>
+     tr -> s -> AttemptC (Admissible s)
 standard_admissible (toTriangulation -> tr) stc = do
-    mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient")))
+    mapM_ (\r -> unless (snd r >= 0) (toAttemptC $ $failureStr ("Negative coefficient")))
           (discAssocs stc)
-    satisfiesQuadrilateralConstraints tr stc 
-    satisfiesMatchingEquations tr stc
+    toAttemptC $ satisfiesQuadrilateralConstraints tr stc 
+    toAttemptC $ satisfiesMatchingEquations tr stc
     return (UnsafeToAdmissible tr stc)
 
+data MatchingEquationViolation s = MatchingEquationViolation {
+        mev_vector :: s,
+        mev_me :: MatchingEquationReason
+    }
+    deriving (Show,Typeable)
+
+instance (Show s, Typeable s) => Exception (MatchingEquationViolation s)
+
+
+instance Pretty s => Pretty (MatchingEquationViolation s) where
+    pretty (MatchingEquationViolation v me) = 
+        text "Standard coordinate vector " <> pretty v <>
+            text " doesn't satisfy the matching equation " 
+            <> text (show me)
+
+
+
 satisfiesMatchingEquations
-  :: (Show r, StandardCoords s r) => Triangulation -> s -> Either [Char] ()
+  :: (Show r, StandardCoords s r) => Triangulation -> s -> EitherC (MatchingEquationViolation s) ()
 satisfiesMatchingEquations tr stc =
         mapM_ p (matchingEquationReasons tr)
     where
         p me = unless (r==0)
-                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
+                      (left' (MatchingEquationViolation stc me))
             where
                 r = evalMatchingEquation me stc
 

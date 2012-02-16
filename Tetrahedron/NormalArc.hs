@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies, ViewPatterns, TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances  #-}
+{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, TypeFamilies, ViewPatterns, TemplateHaskell, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances  #-}
 {-# OPTIONS -Wall #-}
 module Tetrahedron.NormalArc(
         module Tetrahedron.NormalCorner,
@@ -48,9 +48,10 @@ import Test.QuickCheck
 import Util
 import Control.DeepSeq.TH
 import FileLocation(err')
+import Data.Typeable
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
-    deriving (Eq,Ord)
+    deriving (Eq,Ord,Typeable)
 
 deriveNFData ''NormalArc
 
@@ -232,7 +233,7 @@ instance Vertices NormalArc where
 
 -- | Ordered 'NormalArc'
 newtype ONormalArc = ONormalArc (Pair NormalCorner) 
-    deriving(RightAction S2, MakeNormalArc, Eq, Ord, Pretty, Show)
+    deriving(RightAction S2, MakeNormalArc, Eq, Ord, Pretty, Show,Typeable)
 
 class MakeONormalArc a where
     oNormalArc :: a -> ONormalArc 

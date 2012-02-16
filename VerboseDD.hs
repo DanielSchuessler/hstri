@@ -256,11 +256,11 @@ ddWrapSolutions
         DDResult c -> Vector (AdmissibleFor c (WrappedVector c Vector Rational))
 
 ddWrapSolutions (DDResult tr _ x :: DDResult c) = 
-    V.map (either _err id . admissible (undefined :: Proxy c) tr . WrappedVector . reconstruct) x
+    V.map ($unEitherC _err . admissible (undefined :: Proxy c) tr . WrappedVector . reconstruct) x
 
     where
-        _err e =
-            error ("ddWrapSolutions: result vector not admissible: "++e)
+        _err =
+            "ddWrapSolutions: Result vector not admissible"
 
 
         reconstruct = ipr_value

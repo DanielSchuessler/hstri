@@ -210,7 +210,7 @@ dotGraphParamsForAuto =
 
 
 vec2InPointsToTikzLoc :: Vec2 -> TikzLoc
-vec2InPointsToTikzLoc (Vec2 x y) = Cartesian (map2 ptLength (x,y))
+vec2InPointsToTikzLoc (Vec2 x y) = Canvas (map2 ptLength (x,y))
 
 auto :: Triangulation -> [IVertex] -> [TEdge] -> IO StructureGraphLayout
 auto tr verts eds = 

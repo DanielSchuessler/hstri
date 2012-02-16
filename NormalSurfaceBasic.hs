@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, FunctionalDependencies, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, TypeFamilies, FunctionalDependencies, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 module NormalSurfaceBasic where
 import Data.Proxy
@@ -6,19 +6,24 @@ import Data.FormalOps
 import Tetrahedron.INormalDisc
 import Math.SparseVector
 import Element
+import Data.Typeable
 
 data QuadCoordSys
+    deriving Typeable
 
 quadCoordSys :: Proxy QuadCoordSys
 quadCoordSys = undefined
 
 data StdCoordSys
+    deriving Typeable
 
 stdCoordSys :: Proxy StdCoordSys
 stdCoordSys = undefined
 
 -- | Wrapper type for vectors admissible with respect to the normal surface coordinate system @c@.
 data family AdmissibleFor c :: (* -> *)
+
+deriving instance Typeable2 AdmissibleFor
 
 type instance Element (AdmissibleFor c s) = Element s
 

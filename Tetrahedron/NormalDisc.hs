@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, GADTs, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, GADTs, NoMonomorphismRestriction, ImplicitParams, TypeFamilies, TypeOperators, StandaloneDeriving, FlexibleContexts, FlexibleInstances, TemplateHaskell, UndecidableInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, MultiParamTypeClasses, TypeSynonymInstances, ViewPatterns #-}
 {-# LANGUAGE Rank2Types #-}
 -- {-# OPTIONS -ddump-splices #-}
 {-# OPTIONS -Wall #-}
@@ -71,11 +71,12 @@ import Data.Ix
 import Control.DeepSeq
 import Control.DeepSeq.TH
 import Language.Haskell.TH.Lift
+import Data.Typeable
 
 
     
 
-newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary,Finite,Ix,NFData)
+newtype NormalTri = NormalTri Vertex deriving(Enum,Bounded,Eq,Ord,Arbitrary,Finite,Ix,NFData,Typeable)
 
 instance Show NormalTri where
     showsPrec = prettyShowsPrec 
@@ -96,7 +97,7 @@ data NormalQuad =
     -- | The quad disjoint from the edges 'eAD' and 'eBC'.                  
     Q_ad 
     
-    deriving(Enum,Bounded,Eq,Ord,Show,Ix)
+    deriving(Enum,Bounded,Eq,Ord,Show,Ix,Typeable)
 
 
 deriveNFData ''NormalQuad
@@ -439,7 +440,7 @@ type instance L NormalDisc = NormalTri
 type instance R NormalDisc = NormalQuad
 
 newtype NormalDisc = NormalDisc { unNormalDisc :: Either NormalTri NormalQuad }
-    deriving(Eq,Ord,Arbitrary,SubSumTy,SuperSumTy,NFData)
+    deriving(Eq,Ord,Arbitrary,SubSumTy,SuperSumTy,NFData,Typeable)
 
 eitherND
   :: (NormalTri -> r) -> (NormalQuad -> r) -> NormalDisc -> r

@@ -98,6 +98,7 @@ import Triangulation.GlueMap
 import Triangulation.PreTriangulation
 import qualified Data.Map as M
 import Data.Map(Map)
+import DisjointUnion
 
 
 -- Note: All fields except the first two ('triangTets_', 'tGlueMap_') are semantically redundant, 
@@ -519,4 +520,32 @@ triang gluings = mkTriangulation n gluings
 
 instance UpdatablePreTriangulation Triangulation where
     setGlueMap gm _ = glueMapToTriangulation gm
+
+instance DisjointUnionable Triangulation Triangulation Triangulation (TIndex -> TIndex) (TIndex -> TIndex) (TIndex -> Either TIndex TIndex) where
+
+
+    disjointUnionWithInjs tr1 tr2 = 
+        let
+            n1 = tNumberOfTetrahedra tr1
+            n2 = tNumberOfTetrahedra tr2
+        in
+            DisjointUnion 
+                (mkTriangulation (n1+n2) 
+                    (tGluingsIrredundant tr1 ++
+                        map (mapTIndicesStrictlyMonotonic (+fi n1)) (tGluingsIrredundant tr2)))
+                id
+                (+fi n1)
+                (\i -> if i < fi n1 then Left i else Right (i-fi n1))
+
+
+
+instance DisjointUnionable LabelledTriangulation LabelledTriangulation LabelledTriangulation (TIndex -> TIndex) (TIndex -> TIndex) (TIndex -> Either TIndex TIndex) where
+
+
+        disjointUnionWithInjs (l1,tr1) (l2,tr2) =
+
+            let 
+                x = disjointUnionWithInjs tr1 tr2 
+            in 
+                x { djObject = ("Disjoint union of "++l1++" and "++l2, djObject x) }
 

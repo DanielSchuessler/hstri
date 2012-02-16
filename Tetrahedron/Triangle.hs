@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving, FlexibleContexts, TypeFamilies,BangPatterns,MultiParamTypeClasses, StandaloneDeriving, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, GeneralizedNewtypeDeriving, FlexibleContexts, TypeFamilies,BangPatterns,MultiParamTypeClasses, StandaloneDeriving, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.Triangle(
     module Tetrahedron.Edge,
@@ -96,11 +96,12 @@ import Simplicial.DeltaSet3
 import Test.QuickCheck
 import Tetrahedron.Edge
 import Util
+import Data.Typeable
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
 newtype Triangle = Triangle { triangleDualVertex :: Vertex }
-    deriving (Eq,Binary,NFData)
+    deriving (Eq,Binary,NFData,Typeable)
 
 triangleByDualVertex :: Vertex -> Triangle
 triangleByDualVertex = Triangle
@@ -211,7 +212,7 @@ instance Quote Triangle where
 
 -- | A 'Triangle' with a tetrahedron index attached to it
 data ITriangle = ITriangle {-# UNPACK #-} !TIndex !Triangle
-    deriving (Eq,Ord,Generic)
+    deriving (Eq,Ord,Generic,Typeable)
 
 instance Binary ITriangle where
     put = derivePut
@@ -232,7 +233,7 @@ instance ShortShow ITriangle where shortShow = shortShow . viewI
 
 -- | Triangle of an abstract tetrahedron, with ordered vertices
 data OTriangle = OTriangle !Triangle !S3 
-    deriving(Eq,Ord,Generic)
+    deriving(Eq,Ord,Generic,Typeable)
     
 
 instance Binary OTriangle where

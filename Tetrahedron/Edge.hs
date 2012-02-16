@@ -1,4 +1,4 @@
-{-# LANGUAGE FunctionalDependencies, DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, BangPatterns, TypeFamilies, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable, FunctionalDependencies, DeriveGeneric, StandaloneDeriving, GeneralizedNewtypeDeriving, FlexibleContexts, BangPatterns, TypeFamilies, NoMonomorphismRestriction, TemplateHaskell, ViewPatterns, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.Edge (
     module Data.Tuple.Index,
@@ -78,13 +78,14 @@ import Tetrahedron.Vertex
 import TupleTH
 import Util
 import Data.AscTuples
+import Data.Typeable
 
 
 -- | Edge of an abstract tetrahedron (unoriented)
 newtype Edge = Edge Word8
                     -- Only the least significant 4 bits are used.
                     -- The i-th least significant bit signifies whether the i-th vertex is part of the edge
-    deriving(Eq,Ord,Binary,NFData) 
+    deriving(Eq,Ord,Binary,NFData,Typeable) 
 
 edgeToBitSet :: Edge -> Word8
 edgeToBitSet (Edge bs) = bs
@@ -204,7 +205,7 @@ instance Quote OEdge where
 
 -- | An 'Edge' with a tetrahedron index attached to it
 data IEdge = IEdge {-# UNPACK #-} !TIndex {-# UNPACK #-} !Edge
-    deriving (Eq,Ord,Generic)
+    deriving (Eq,Ord,Generic,Typeable)
 
 instance Binary IEdge where
     put = derivePut
@@ -226,7 +227,7 @@ instance ShortShow IEdge where shortShow = shortShow . viewI
                             
 -- | Oriented edge of an abstract tetrahedron
 newtype OEdge = OEdge Word8 {- The lower nibble encodes the first vertex, the upper nibble encodes the second vertex. Invariant: The vertices are distinct. -}
-    deriving(Eq,Ord,Binary,NFData)
+    deriving(Eq,Ord,Binary,NFData,Typeable)
 
 deriveLift ''OEdge
 

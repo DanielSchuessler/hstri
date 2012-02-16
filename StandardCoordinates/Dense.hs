@@ -28,6 +28,7 @@ import Math.SparseVector
 import qualified Data.Vector.Unboxed as VU
 import Data.List
 import Data.BitVector.Adaptive
+import Data.Typeable
 
 
 type StandardDense v r = WrappedVector StdCoordSys v r
@@ -42,12 +43,12 @@ sd_fromVector (v :: v r) =
     assert (mod (VG.length v) 7 == 0) $
     (WrappedVector v :: StandardDense v r)
 
-instance (VG.Vector v r, Num r, Ord r, Ord (v r)) => QuadCoords (StandardDense v r) r where
+instance (VG.Vector v r, Num r, Ord r, Ord (v r), Typeable1 v, Typeable r) => QuadCoords (StandardDense v r) r where
     quadCount = default_quadCount_from_discCount
     quadAssocs = quadAssocsDistinct
     quadAssocsDistinct = default_quadAssocsDistinct_from_discAssocsDistinct
 
-instance (VG.Vector v r, Num r, Ord r, Ord (v r)) => StandardCoords (StandardDense v r) r where
+instance (VG.Vector v r, Num r, Ord r, Ord (v r), Typeable1 v, Typeable r) => StandardCoords (StandardDense v r) r where
     discCount v i = sd_toVector v VG.! fromEnum i
     discAssocs = discAssocsDistinct
     discAssocsDistinct = filter ((/= 0) . snd) . zip [toEnum 0 ..] . VG.toList . sd_toVector
@@ -64,7 +65,7 @@ sd_fromStandardCoords tr x =
     sd_fromVector $ V.generate (tNumberOfNormalDiscTypes tr) (discCount x . toEnum)
 
 instance 
-    (VG.Vector v r, Num r, Ord r, Ord (v r)) =>
+    (VG.Vector v r, Num r, Ord r, Ord (v r), Typeable1 v, Typeable r) =>
     UpdatableStandardCoords 
         (StandardDense v r)
         (StandardDense v r)

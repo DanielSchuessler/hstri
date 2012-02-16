@@ -16,6 +16,7 @@ import Data.SumType
 import ShortShow
 import PrettyUtil
 import Language.Haskell.TH.Lift
+import Data.Lens.Template
 
 data DisjointUnion c inj1 inj2 djEither = 
     DisjointUnion {
@@ -24,6 +25,8 @@ data DisjointUnion c inj1 inj2 djEither =
         djInjection2 :: inj2,
         djEither :: djEither
     }
+
+nameMakeLens ''DisjointUnion (Just . (++"L"))
 
 class DisjointUnionable a b c inj1 inj2 djEither | a b -> c inj1 inj2 djEither where
     disjointUnionWithInjs :: a -> b -> DisjointUnion c inj1 inj2 djEither

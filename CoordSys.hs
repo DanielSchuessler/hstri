@@ -23,6 +23,7 @@ import MathUtil
 import QuadCoordinates.Class
 import QuadCoordinates
 import FileLocation
+import qualified Data.List as L
 
 
 
@@ -37,14 +38,19 @@ class ( CheckAdmissibility c (WrappedVector c Vector Rational) Rational
         => CoordSys c where
 
     numberOfVariables :: Proxy c -> Triangulation -> Int
+    -- |  Matching equations
     hyperplanes :: Proxy c -> Triangulation -> [[Rational]]
+    -- | Only one per tetrahedron (the other two must have index 1 resp. 2 higher)
     quadIndexOffsets :: Proxy c -> Triangulation -> [BitVectorPosition]
+
+    discIndexToDisc :: Proxy c -> BitVectorPosition -> INormalDisc 
 
 
 instance CoordSys QuadCoordSys where
     numberOfVariables _ = tNumberOfNormalQuadTypes 
     hyperplanes _ tr = fmap (quad_toDenseList tr) . qMatchingEquationsRat $ tr
     quadIndexOffsets _ tr = map (3*) [0.. tNumberOfTetrahedra tr - 1]
+    discIndexToDisc _ = iNormalQuadToINormalDisc . toEnum
 
 
 instance CoordSys StdCoordSys where
@@ -56,6 +62,8 @@ instance CoordSys StdCoordSys where
         quadIndexOffsets _ tr = 
                         [ (fromEnum . iNormalQuadToINormalDisc) (tindex i ./ minBound)
                                 | i <- [0.. tNumberOfTetrahedra tr - 1] ]
+
+        discIndexToDisc _ = toEnum
 
 
 
@@ -88,20 +96,34 @@ newtype ZeroSet coords w = ZeroSet { unZeroSet :: w}
     deriving(Eq,Ord,Show,BitVector,FixedBitVector)
 
 
-zeroSetAdmissible
-  :: (BitVector w, CoordSys coords) =>
-     Triangulation -> ZeroSet coords w -> Bool
-zeroSetAdmissible tr (z :: ZeroSet coords w) =
-
-            all (\i ->
+zeroSetSatisfiesQuadConstraintsAtOffset z i = 
                     atLeastTwo
                         (bvUnsafeIndex z i)
                         (bvUnsafeIndex z (i+1))
                         (bvUnsafeIndex z (i+2))
                         
                         
-                        )
+
+zeroSetAdmissible
+  :: (BitVector w, CoordSys coords) =>
+     Triangulation -> ZeroSet coords w -> Bool
+zeroSetAdmissible tr (z :: ZeroSet coords w) =
+
+            all (zeroSetSatisfiesQuadConstraintsAtOffset z)
 
                 (quadIndexOffsets ($undef :: Proxy coords) tr)
 
 
+
+findTetViolatingQuadConstraints
+  :: (BitVector w, CoordSys coords) =>
+     Triangulation -> ZeroSet coords w -> Maybe TIndex
+findTetViolatingQuadConstraints tr (z :: ZeroSet coords w) =
+            fmap (getTIndex . discIndexToDisc co) $
+
+            L.find (not . zeroSetSatisfiesQuadConstraintsAtOffset z)
+
+                (quadIndexOffsets co tr)
+
+
+    where co = ($undef :: Proxy coords)

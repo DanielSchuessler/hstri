@@ -36,6 +36,7 @@ import qualified Data.Map as M
 import Element
 import Control.Monad.Writer.Class(tell)
 import Control.Monad.Writer.Class(MonadWriter)
+import Data.Ord
 
 
 fi :: (Integral a, Num b) => a -> b
@@ -378,3 +379,7 @@ teller
   :: (Monad m1, MonadWriter (m1 a) m) =>
      a -> m ()
 teller = tell . return
+
+
+sortWith :: Ord a1 => (a -> a1) -> [a] -> [a]
+sortWith = sortBy . comparing

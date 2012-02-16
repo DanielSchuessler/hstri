@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, KindSignatures, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell, FlexibleContexts, KindSignatures, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 module CheckAdmissibility where
 
@@ -21,9 +21,9 @@ import StandardCoordinates.MatchingEquations
 --  [r] Coefficient type of both @s@ and @adm s@
 class (NormalSurfaceCoefficients s r, NormalSurfaceCoefficients (AdmissibleFor c s) r) => CheckAdmissibility c s r where 
 
-    admissible :: ToTriangulation tr => Proxy c -> tr -> s -> Either String (AdmissibleFor c s)
+    admissible :: ToTriangulation tr => Proxy c -> tr -> s -> AttemptC (AdmissibleFor c s)
 
-instance (Show r, QuadCoords q r) => CheckAdmissibility QuadCoordSys q r where 
+instance (Show r, QuadCoords q r, Show q) => CheckAdmissibility QuadCoordSys q r where 
     admissible _ = quad_admissible
 
 isAdmissible
@@ -34,19 +34,19 @@ isAdmissible p = (.) isRight . admissible p
 toAdmissible
   :: (Show s, ToTriangulation tr, CheckAdmissibility c s r) =>
      Proxy c -> tr -> s -> AdmissibleFor c s
-toAdmissible p tr x = either _err id . admissible p tr $ x
+toAdmissible p tr x = $unEitherC _err . admissible p tr $ x
     where
-        _err e = error ("toAdmissible "++showsPrec 11 x ""++": "++e)
+        _err = "toAdmissible "++showsPrec 11 x ""
 
 
-instance (Show r, StandardCoords s r) => CheckAdmissibility StdCoordSys s r where
+instance (Show r, StandardCoords s r, Show s) => CheckAdmissibility StdCoordSys s r where
     admissible _ = standard_admissible
 
 quad_isAdmissible
-  :: (Show r, QuadCoords q r, ToTriangulation tr) => tr -> q -> Bool
+  :: (Show r, QuadCoords q r, ToTriangulation tr, Show q) => tr -> q -> Bool
 quad_isAdmissible = isAdmissible quadCoordSys
 
 standard_isAdmissible
-  :: (Show r, ToTriangulation tr, StandardCoords s r) => tr -> s -> Bool
+  :: (Show r, ToTriangulation tr, StandardCoords s r, Show s) => tr -> s -> Bool
 standard_isAdmissible = isAdmissible stdCoordSys
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, ViewPatterns, TupleSections, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, NoMonomorphismRestriction, ViewPatterns, TupleSections, MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
 module Triangulation.VertexLink where
@@ -9,17 +9,20 @@ import TriangulationCxtObject
 import Triangulation.Class
 import Math.SparseVector
 import Control.Arrow
-import FileLocation
 import StandardCoordinates.MatchingEquations
 import StandardCoordinates.SurfaceQueries
+import Data.Typeable
 
 newtype VertexLink = VertexLink TVertex 
-    deriving (Show,Eq,Ord)
+    deriving (Show,Eq,Ord,Typeable)
 
 -- | Constructs the vertex link around the given vertex.
 vertexLinkingSurface :: TVertex -> Admissible VertexLink
 vertexLinkingSurface v_ = 
-    $(fromRht) . standard_admissible (getTriangulation v_) . VertexLink $ v_
+    $unEitherC ("vertexLinkingSurface "++showsPrec 11 v_ ""++": Result not admissible")
+    . standard_admissible (getTriangulation v_) 
+    . VertexLink 
+    $ v_
 
 -- | Calculates the euler characteristic of the vertex link.
 vertexLinkEulerC :: TVertex -> Integer

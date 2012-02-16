@@ -1,32 +1,40 @@
-{-# LANGUAGE TypeFamilies, FunctionalDependencies, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE DeriveDataTypeable, TypeFamilies, FunctionalDependencies, TemplateHaskell, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, ViewPatterns #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module QuadCoordinates.MatchingEquations where
 
-import Triangulation.AbstractNeighborhood
+import Control.Applicative
 import Control.Arrow((&&&))
+import Control.DeepSeq
 import Control.Exception
 import Control.Monad.State
 import Data.Function
 import Data.List as L
 import Data.Maybe as May
+import Data.SumType
+import Data.Typeable
 import HomogenousTuples
-import Tetrahedron.INormalDisc
 import MathUtil
 import PrettyUtil
 import QuadCoordinates.Class
 import Tetrahedron
+import Triangulation.AbstractNeighborhood
 import Triangulation.Class
 import TriangulationCxtObject
-import Control.Applicative
-import Control.DeepSeq
 
 
+data QuadConstraintViolation = QuadConstraintViolation TIndex
+    deriving(Show,Typeable)
+
+instance Exception QuadConstraintViolation
+
+instance Pretty QuadConstraintViolation where 
+    pretty (QuadConstraintViolation tet) = text "Quadrilateral constraints violated at tet "<>pretty tet
 
 
 satisfiesQuadrilateralConstraints
-  :: (Num r, QuadCoords s r) => Triangulation -> s -> Either [Char] ()
+  :: (Num r, QuadCoords s r) => Triangulation -> s -> EitherC QuadConstraintViolation ()
 satisfiesQuadrilateralConstraints tr stc = 
         mapM_ p tets
     where
@@ -34,7 +42,7 @@ satisfiesQuadrilateralConstraints tr stc =
         
         p tet = 
             unless (sum3 (map3 f (normalQuads tet)) <= (1::Int))
-                   (Left ("Quadrilateral constraints violated at tet "++show tet))
+                   (left' (QuadConstraintViolation tet))
 
         f quad = if quadCount stc quad == 0 
                     then 0
@@ -43,18 +51,18 @@ satisfiesQuadrilateralConstraints tr stc =
 
 areCompatible
   :: (QuadCoords a r, QuadCoords b r) =>
-     Triangulation -> a -> b -> Either [Char] ()
+     Triangulation -> a -> b -> EitherC QuadConstraintViolation ()
 areCompatible tr x y =
     satisfiesQuadrilateralConstraints tr (x :+ y)
 
-
 quad_admissible
-  :: (Show r, ToTriangulation tr, QuadCoords q r) =>
-     tr -> q -> Either [Char] (QAdmissible q)
+  :: (Show q, Show r, ToTriangulation tr, QuadCoords q r) =>
+     tr -> q -> AttemptC (QAdmissible q)
 quad_admissible (toTriangulation -> tr) qc = do
-    mapM_ (\r -> unless (snd r >= 0) (Left ("Negative coefficient"))) (quadAssocs qc) 
-    satisfiesQuadrilateralConstraints tr qc 
-    satisfiesQMatchingEquations tr qc
+    mapM_ (\r -> unless (snd r >= 0) 
+                (toAttemptC $ $failureStr ("Negative coefficient"))) (quadAssocs qc) 
+    toAttemptC $ satisfiesQuadrilateralConstraints tr qc 
+    toAttemptC $ satisfiesQMatchingEquations tr qc
     return (UnsafeToQAdmissible tr qc)
 
 evalQMatchingEquation
@@ -64,23 +72,38 @@ evalQMatchingEquation (me :: QMatchingEquation) qc =
     . L.map (\(_,(u,d)) -> quadCount qc u - quadCount qc d) 
     $ me
 
-
-satisfiesQMatchingEquations
-  :: (Show r, QuadCoords q r) => Triangulation -> q -> Either [Char] ()
-satisfiesQMatchingEquations tr qc =
-        mapM_ p (qMatchingEquations0 tr)
-    where
-        p me = unless (r==0)
-                      (Left ("Matching equation not satisfied: "++show me++" (LHS: "++show r++")"))
-            where
-                r = evalQMatchingEquation me qc
-
 type QMatchingEquation = [(IEdgeNeighborhoodTet, 
     (
     INormalQuad {- upwards sloped -}, 
     INormalQuad {- downwards sloped -}
     )
     )]
+
+data QMatchingEquationViolation q = QMatchingEquationViolation {
+        qmev_vector :: q,
+        qmev_qme :: QMatchingEquation
+    }
+    deriving (Show,Typeable)
+
+instance (Show q, Typeable q) => Exception (QMatchingEquationViolation q)
+
+instance Pretty q => Pretty (QMatchingEquationViolation q) where
+    pretty (QMatchingEquationViolation v me) = 
+        text "Quad coordinate vector " <> pretty v <>
+            text " doesn't satisfy the Q-matching equation " 
+            <> pretty me
+
+
+satisfiesQMatchingEquations
+  :: (Show r, QuadCoords q r) => Triangulation -> q -> EitherC (QMatchingEquationViolation q) ()
+satisfiesQMatchingEquations tr qc =
+        mapM_ p (qMatchingEquations0 tr)
+    where
+        p me = unless (r==0)
+                    (left' (QMatchingEquationViolation qc me))
+            where
+                r = evalQMatchingEquation me qc
+
 
 -- | The sign of the resulting equation is chosen arbitrarily.
 qMatchingEquation0 :: TEdge -> Maybe QMatchingEquation

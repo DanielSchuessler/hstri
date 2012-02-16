@@ -27,7 +27,7 @@ previewTikzFile texfile pdffile = do
 
     runPdfLatex texfile
 
-    runOkularAsync pdffile
+    rawSystemS "pdf-viewer" [pdffile]
 
 wrapTikzAsDoc :: Tikz -> Tikz
 wrapTikzAsDoc tikz = [str|

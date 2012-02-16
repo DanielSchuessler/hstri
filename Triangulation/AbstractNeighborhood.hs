@@ -9,9 +9,9 @@ module Triangulation.AbstractNeighborhood(
     ient_mirrorLR,
 
     InnerEdgeNeighborhood,
-    ien_toList, ien_toNonEmpty,
+    ien_toList, ien_toNonEmpty, ien_length,
     BoundaryEdgeNeighborhood,
-    ben_toList, ben_toNonEmpty,
+    ben_toList, ben_toNonEmpty, ben_length,
     innerEdgeNeighborhood',
     innerEdgeNeighborhood,
     edgeNeighborhood,
@@ -197,7 +197,12 @@ edgeNeighborhood tr e =
 
 -- | Uses arbitrary orders
 someEdgeNeighborhood
-  :: Triangulation
-     -> TEdge
+  :: 
+        TEdge
      -> Either BoundaryEdgeNeighborhood InnerEdgeNeighborhood
-someEdgeNeighborhood tr = edgeNeighborhood tr . toOrderedFace . unT
+someEdgeNeighborhood e = edgeNeighborhood (getTriangulation e) . toOrderedFace . unT $ e
+
+ben_length :: BoundaryEdgeNeighborhood -> Int
+ben_length = length . ben_toList
+ien_length :: InnerEdgeNeighborhood -> Int
+ien_length = length . ien_toList

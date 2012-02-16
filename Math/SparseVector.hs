@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, GeneralizedNewtypeDeriving, NoMonomorphismRestriction, TypeSynonymInstances, TypeFamilies #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, GeneralizedNewtypeDeriving, NoMonomorphismRestriction, TypeSynonymInstances, TypeFamilies #-}
 {-# OPTIONS -Wall #-}
 module Math.SparseVector where
 
@@ -18,6 +18,7 @@ import PrettyUtil
 import Data.Traversable(Traversable)
 import OrphanInstances() -- NFData Map
 import Control.DeepSeq
+import Data.Typeable
 
 
 isZero :: (Eq a, Num a) => a -> Bool
@@ -28,7 +29,7 @@ zero = 0
 
 -- | Represents a function @k -> r@ with all but finitely many values being zero.
 newtype SparseVector k r = SparseV { illdefinedSparseToMap :: Map k r }
-    deriving(Foldable,Functor,Traversable,NFData)
+    deriving(Foldable,Functor,Traversable,NFData,Typeable)
 
 instance (Eq r, Num r, Ord k) => Eq (SparseVector k r) where
     (==) = (==) `on` (illdefinedSparseToMap . sparse_normalize)
@@ -217,7 +218,7 @@ sparse_showWith showString_ empty_ append_ sp11_r sp11_k sparse =
 
 
 newtype Variable = Variable { variableName :: String }
-    deriving(Eq,Ord,IsString)
+    deriving(Eq,Ord,IsString,Typeable)
 
 variable :: String -> Variable
 variable = Variable

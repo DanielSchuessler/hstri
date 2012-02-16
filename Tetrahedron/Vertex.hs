@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, TypeFamilies, DeriveGeneric, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving, TypeFamilies, DeriveGeneric, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, MultiParamTypeClasses #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.Vertex 
     (
@@ -59,9 +59,10 @@ import FileLocation
 import Data.Tuple.Index
 import Control.DeepSeq.TH
 import Language.Haskell.TH.Lift
+import Data.Typeable
 
 data Vertex = A | B | C | D
-    deriving(Eq,Ord,Bounded,Ix)
+    deriving(Eq,Ord,Bounded,Ix,Typeable)
 
 -- | Must remain in @allVertices'@-compatible order!!
 deriving instance Enum Vertex
@@ -142,7 +143,7 @@ vertexTripleToString (u,v,w) = concatMap show [u,v,w]
 
 -- | A 'Vertex' with a tetrahedron index attached to it
 data IVertex = IVertex {-# UNPACK #-} !TIndex {- UNPACK -} !Vertex
-    deriving(Eq,Ord,Generic,Ix)
+    deriving(Eq,Ord,Generic,Ix,Typeable)
 
 instance Binary IVertex where
     put = derivePut

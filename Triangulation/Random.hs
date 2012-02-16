@@ -148,19 +148,34 @@ randomManifoldT :: Int -> Int -> Int -> Gen Triangulation
 randomManifoldT n minGl maxGl =
      (randT n =<< choose (minGl,maxGl)) `suchThat` isManifoldTriangulation
 
-genTTriangle
-  :: (PreTriangulation tr, ToTriangulation tr) =>
-     tr -> Maybe (Gen (T ITriangle))
-genTTriangle tr 
+genT
+  :: (Show a,
+      PreTriangulation t,
+      TriangulationDSnakeItem a,
+      ToTriangulation t) =>
+     (t -> [a]) -> t -> Maybe (Gen (T a))
+genT getTs tr 
     | numberOfTetrahedra_ tr == 0 = Nothing
-    | otherwise = Just (pMap tr <$> elements (tITriangles tr))  
+    | otherwise = Just (pMap tr <$> elements (getTs tr))  
 
 
+arbitraryTriangulationContextObject
+  :: (Show a, TriangulationDSnakeItem a) =>
+     (Triangulation -> [a]) -> Gen (T a)
+arbitraryTriangulationContextObject getTs = 
+    generateUntilJust $ do
+        (tr :: Triangulation) <- arbitrary
+        promote (genT getTs tr)
+
+instance Arbitrary TVertex where
+    arbitrary = arbitraryTriangulationContextObject tIVertices
+
+instance Arbitrary TEdge where
+    arbitrary = arbitraryTriangulationContextObject tIEdges
 
 instance Arbitrary TTriangle where
-    arbitrary = generateUntilJust $ do
-        (tr :: Triangulation) <- arbitrary
-        promote (genTTriangle tr)
+    arbitrary = arbitraryTriangulationContextObject tITriangles
+
 
 
 

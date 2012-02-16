@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable, ViewPatterns, FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, MultiParamTypeClasses, TemplateHaskell, ScopedTypeVariables #-}
 module QuadCoordinates.CanonExt(
     module StandardCoordinates.Class,
     module QuadCoordinates.MatchingEquations,
@@ -24,6 +24,7 @@ import Math.SparseVector
 import qualified Data.Map as M
 import Triangulation.Class
 import Control.DeepSeq.TH
+import Data.Typeable
 
 
 canonExtDbg = canonExt
@@ -41,7 +42,7 @@ data CanonExt q r = CanonExt {
     canonExt_quads :: q,
     canonExt_tris :: SparseVector INormalTri r
 }
-    deriving (Eq, Ord, Show)
+    deriving (Eq,Ord,Show,Typeable)
 
 instance (Pretty q, Pretty r, Num r, Ord r) => Pretty (CanonExt q r) where
     prettyPrec prec x = parensIf (prec>10)
@@ -49,14 +50,14 @@ instance (Pretty q, Pretty r, Num r, Ord r) => Pretty (CanonExt q r) where
             [("quads",pretty (canonExt_quads x))
             ,("tris",pretty (canonExt_tris x))])
 
-instance NormalSurfaceCoefficients q r => NormalSurfaceCoefficients (CanonExt q r) r
+instance (Typeable r, NormalSurfaceCoefficients q r) => NormalSurfaceCoefficients (CanonExt q r) r
 
-instance QuadCoords q r => QuadCoords (CanonExt q r) r where
+instance (Typeable r, QuadCoords q r) => QuadCoords (CanonExt q r) r where
     quadCount = quadCount . canonExt_quads
     quadAssocs = quadAssocs . canonExt_quads
     quadAssocsDistinct = quadAssocs . canonExt_quads
 
-instance (Num r, QuadCoords q r) => StandardCoords (CanonExt q r) r where
+instance (Num r, QuadCoords q r, Typeable r) => StandardCoords (CanonExt q r) r where
     discCount = default_discCount_from_triQuadCount
     discAssocs = default_discAssocs_from_triQuadAssocs
     discAssocsDistinct = default_discAssocsDistinct_from_triQuadAssocsDistinct
@@ -68,14 +69,12 @@ instance (Num r, QuadCoords q r) => StandardCoords (CanonExt q r) r where
     triAssocs = triAssocsDistinct
     triAssocsDistinct = sparse_toAssocs . canonExt_tris 
 
-canonExt :: forall q r tr. (Show r, Pretty q, QuadCoords q r, Ord r, Pretty r) => 
+canonExt :: forall q r tr. (Show r, Pretty q, QuadCoords q r, Ord r, Pretty r, Show q, Typeable r) => 
     QAdmissible q -> Admissible (CanonExt q r)
 canonExt qc = 
 
-             case standard_admissible tr preResult of
-                Right x -> x
-                Left str -> error ("canonExtDbg: result not admissible:\n"++str++"\n"++
-                                    $(showExps ['qc,'preResult]))
+             $unEitherC "canonExt: The \"impossible\" happened: Result not admissible"    
+                (standard_admissible tr preResult)
 
 
     where

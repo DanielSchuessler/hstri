@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, UndecidableInstances, FlexibleInstances, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TemplateHaskell #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, UndecidableInstances, FlexibleInstances, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 {-# OPTIONS -Wall #-}
 module TIndex where
 
@@ -22,13 +22,14 @@ import System.Random
 import THUtil
 import Control.DeepSeq.TH
 import Control.DeepSeq
+import Data.Typeable
 
 
 
 
 -- | Tetrahedron index
 newtype TIndex = TIndex Word
-    deriving(Eq,Ord,Pretty,Enum,Real,Integral,Binary,Ix,Random,NFData)
+    deriving(Eq,Ord,Pretty,Enum,Real,Integral,Binary,Ix,Random,NFData,Typeable)
 
 
 instance Num TIndex where
@@ -65,7 +66,7 @@ tindex = TIndex
 
 -- | Thing with a tetrahedron index attached to it
 data I a = I TIndex a 
-    deriving(Eq,Ord,Generic,Ix)
+    deriving(Eq,Ord,Generic,Ix,Typeable)
 
 instance Binary a => Binary (I a) where
     put = derivePut

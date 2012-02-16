@@ -14,6 +14,7 @@ import Tetrahedron
 import TriangulationCxtObject
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
+import Data.Typeable
 
 type QuadCoordinates r = SparseVector INormalQuad r
 
@@ -97,7 +98,7 @@ unrestrictedQCGen tr = sparse_gen (tINormalQuads tr)
 
 
 qMatchingEquationsMatrix
-  :: (Num a, Ord a) =>
+  :: (Num a, Ord a, Typeable a) =>
      Triangulation
      -> V.Vector (V.Vector a)
 qMatchingEquationsMatrix tr = 

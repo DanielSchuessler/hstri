@@ -1,18 +1,19 @@
-{-# LANGUAGE DeriveFunctor,DeriveFoldable,DeriveTraversable, NoMonomorphismRestriction #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor,DeriveFoldable,DeriveTraversable, NoMonomorphismRestriction #-}
 module Data.FormalOps where
 
 import Data.Foldable(Foldable)
 import Data.Traversable(Traversable)
 import Control.Applicative
 import Data.Monoid
+import Data.Typeable
 
 data FormalProduct a b = a :* b
-    deriving (Show,Functor,Foldable,Traversable,Eq,Ord)
+    deriving (Show,Functor,Foldable,Traversable,Eq,Ord,Typeable)
 
 infixl 7 :*
 
 data FormalSum a b = a :+ b
-    deriving (Show,Eq,Ord)
+    deriving (Show,Eq,Ord,Typeable)
 
 infixl 6 :+
 

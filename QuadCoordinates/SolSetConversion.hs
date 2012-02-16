@@ -45,6 +45,7 @@ import VectorUtil
 import VerboseDD.Types
 import qualified Data.DList as DL
 import qualified Data.Vector.Generic as VG
+import Data.Typeable
 
 data SolSetConversionVectorRepresentation v r w = SSCVR VectorIndex (StandardDense v r) 
 
@@ -220,6 +221,8 @@ quadToStandardSolSet
       Fractional r,
       Pretty r,
       Pretty q,
+      Show q,
+      Typeable r,
       QuadCoords q r) =>
      tr -> Vector (QAdmissible q) -> SolSetConversionResult r
 quadToStandardSolSet (toTriangulation -> tr) quadSolSet =

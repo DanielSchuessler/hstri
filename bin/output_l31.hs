@@ -7,9 +7,12 @@ import Control.Exception
 import Control.DeepSeq
 import FileLocation
 import Data.Lens.Common
+import Triangulation.AbstractNeighborhood
+import Data.Maybe
+import Util
 
 
-bcmd = DoRender
+bcmd = JustLook
 
 tr = tr_l31
 spqwc = spqwc_l31
@@ -77,13 +80,14 @@ vl_A0 way =
         tikz = 
             let ?layout = 
                     SGL 
-                        (ptcToIVertex_fromS3s nodePerm)
-                        (regularPolygonLocs triOrder) 
+                        (funToMap (tIVertices tr) (ptcToIVertex_fromS3s nodePerm))
+                        (funToMap (tIVertices tr) (regularPolygonLocs triOrder))
+                        $undef
             in
                 tikzStructureGraphForVertexLink 
                     v 
                     (SGEE
-                        ("x=3cm,y=3cm,scale=0.8,scale="++show scaleTweak)
+                        ["x=3cm","y=3cm","scale=0.8","scale="++show scaleTweak]
                         noExtraEdgeStyles
                         way)
     in 
@@ -103,14 +107,15 @@ vl_D0 way =
         tikz = 
             let ?layout = 
                     SGL
-                        (ptcToIVertex_fromS3s nodePerm)
-                        (regularPolygonLocs triOrder) 
+                        (funToMap (tIVertices tr) (ptcToIVertex_fromS3s nodePerm))
+                        (funToMap (tIVertices tr) (regularPolygonLocs triOrder))
+                        $undef
             in
                 tikzStructureGraphForVertexLink 
                     v 
                     (SGEE
-                        ("x=3cm,y=3cm,shift={(0.5,2)},scale=0.4,scale="++show scaleTweak)
-                        (\x -> if x == 0 ./ tABD then "looseness=2" else "") 
+                        [ "x=3cm","y=3cm","shift={(0.5,2)}","scale=0.4","scale="++show scaleTweak ]
+                        (\x -> if x == 0 ./ tABD then ["looseness=2"] else []) 
                         way)
                 
     in 
@@ -130,3 +135,11 @@ graphs = do
                 NoQuad
     vl_A0 way 
     vl_D0 way
+
+
+
+ens =
+          unlines
+        . map ((++"\\\\") . either toLatex toLatex . someEdgeNeighborhood tr)
+        . edges $ tr
+        

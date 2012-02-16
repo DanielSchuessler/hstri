@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, NoMonomorphismRestriction, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables, DeriveDataTypeable, StandaloneDeriving, NoMonomorphismRestriction, TypeFamilies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
@@ -16,10 +16,17 @@ import qualified Data.Vector.Unboxed as VU
 import Control.DeepSeq
 import MathUtil
 import Control.Applicative
+import Data.Typeable
 
 
 newtype WrappedVector tag v r = WrappedVector (v r)
     deriving(Eq,Ord,Pretty,AsList,MaxColumnWidth)
+
+instance (Typeable tag, Typeable1 v) => Typeable1 (WrappedVector tag v) where
+
+    typeOf1 _ = mkTyConApp (mkTyCon3 "hstri" "QuadCoordinates.Dense" "WrappedVector")
+                    [typeOf (undefined :: tag), typeOf1 (undefined :: v ())]
+
 
 instance (Num r, Ord r) => NormalSurfaceCoefficients (WrappedVector tag v r) r
 
@@ -83,7 +90,8 @@ qd_fromVector v =
     assert (mod (VG.length v) 3 == 0) $
     WrappedVector v
 
-instance (VG.Vector v r, Num r, Ord r, Ord (v r)) => QuadCoords (QuadDense v r) r where
+instance (VG.Vector v r, Num r, Ord r, Ord (v r), Typeable r, Typeable1 v) 
+        => QuadCoords (QuadDense v r) r where
     quadCount v i = qd_toVector v VG.! fromEnum i
     quadAssocs = filter ((/= 0) . snd) . zip [toEnum 0 ..] . VG.toList . qd_toVector
 
