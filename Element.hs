@@ -12,6 +12,8 @@ import Data.Vector.Unboxed(Unbox)
 import THBuild
 import TupleTH
 import Data.Sequence(Seq)
+import qualified Data.DList as DL
+import Data.DList(DList)
 
 type family Element xs
 
@@ -34,6 +36,7 @@ type instance Element Vec4 = Double
 type instance Element (e -> a) = a
 type instance Element (Maybe a) = a
 type instance Element (Seq a) = a
+type instance Element (DList a) = a
 
 
 class AsList xs where
@@ -50,6 +53,9 @@ instance AsList (V.Vector a) where
 
 instance (VU.Unbox a) => AsList (VU.Vector a) where
     asList = VU.toList
+
+instance AsList (DList a) where
+    asList = DL.toList
 
 instance AsList (OneTuple a) where 
     asList = return . only

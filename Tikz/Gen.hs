@@ -7,7 +7,6 @@
 module Tikz.Gen(
     module Tikz.StructureGraphLayout,
     tikzStructureGraph,
-    tikzStructureGraphForVertexLink,
     PaperTriangleCorner(..),
     allPaperTriangleCorners,
     allPaperTriangleCorners',
@@ -49,10 +48,11 @@ import Control.Monad
 import Util
 import Data.List
 import Data.Monoid(mempty)
+import Text.Groom
 
 
 data Way = NoQuad
-         | forall q. QuadCoords q Integer => QuadGiven q
+         | forall q r. (Latexable r, QuadCoords q r) => QuadGiven q
 
 
 
@@ -83,20 +83,6 @@ regularPolygonLocs v =
 
 
 
-tikzStructureGraph
-  :: (?layout::StructureGraphLayout) =>
-     Triangulation -> StructureGraphExtraOptions -> Tikz
-tikzStructureGraph tr = 
-    tikzStructureGraph_restricted tr (tIVertices tr) (edges tr)
-
-tikzStructureGraphForVertexLink
-  :: (?layout::StructureGraphLayout) =>
-     T IVertex -> StructureGraphExtraOptions -> Tikz
-tikzStructureGraphForVertexLink v = 
-    tikzStructureGraph_restricted (getTriangulation v) (preimageListOfVertex v) []
-
-
-
 
 --sideAngle = (`mod` 360) . (+30) . (*120)
 
@@ -111,17 +97,17 @@ data StructureGraphExtraOptions = SGEE
 defaultSGEE :: StructureGraphExtraOptions
 defaultSGEE = SGEE mempty noExtraEdgeStyles NoQuad
 
-tikzStructureGraph_restricted
+tikzStructureGraph
   :: (?layout::StructureGraphLayout) =>
-     Triangulation -> [IVertex] -> [TEdge] -> StructureGraphExtraOptions -> Tikz
-tikzStructureGraph_restricted 
+     Triangulation -> StructureGraphExtraOptions -> Tikz
+tikzStructureGraph 
     (tr :: Triangulation)
-    (verts::[IVertex]) 
-    eds
     SGEE{..}
         =
 
     let
+        verts = sgl_verts ?layout
+        eds = sgl_eds ?layout
 
         edgeDraws :: [Tikz]
         edgeDraws = do
@@ -134,11 +120,14 @@ tikzStructureGraph_restricted
                 (ivertex1,ivertex2) = map2 portNode ports
                 (ed1,ed2) = map2 portIEdge ports :: Pair IEdge
 
-                ((side1,o1), (side2,o2)) = map2 portSide ports
+                ((side1,_), (side2,_)) = map2 portSide ports
+--                 ((side1,o1), (side2,o2)) = map2 portSide ports
+--                 orientation = o1 .*. o2
 
-                orientation = o1 .*. o2
+                outAngle = adjustedSideAngle ivertex1 side1
+                inAngle  = adjustedSideAngle ivertex2 side2
 
-                (outAngle,inAngle) = map2 sideAngle (side1,side2)
+                adjustedSideAngle v s = fi (sideAngle s) + nodeRot_ ?layout v  
 
                 extraEdgeStyle :: TikzStyle
                 extraEdgeStyle = 
@@ -146,10 +135,10 @@ tikzStructureGraph_restricted
                         ++ extraEdgeStyles (portTriangle port2)
                         ++ do { guard (ivertex1==ivertex2); ["looseness=7"] }
 
-                maybeFlipWarning = 
-                    if orientation == NoFlip && kind == GluingEdge 
-                                then Just "draw=red,thick" 
-                                else Nothing
+                maybeFlipWarning = Nothing 
+--                     if orientation == NoFlip && kind == GluingEdge 
+--                                 then Just "draw=red,thick" 
+--                                 else Nothing
 
                 toStyle = [str|out=$:outAngle$|] :  [str|in=$:inAngle$|] : extraEdgeStyle
 
@@ -208,16 +197,28 @@ tikzStructureGraph_restricted
                     | NoQuad <- way = "0.45em"
                     | otherwise = "0.1em"
 
-                goVert ivertex = [str|\node ($ nodeName ivertex $) at $ theLoc $ {$lbl$};|]
+                goVert ivertex = 
+                        renderScope [theshift]
+                        [str|\node $renderOptions opts$($ nodeName ivertex $) {$lbl$};|]
                     where
-                        theLoc = renderTikzLoc (loc ivertex)
+                        opts = rotationAsOpts "shape border rotate" ivertex
                         trilbl = [str|$$$ toLatex ivertex $$$|]
                         lbl = case way of
                                    NoQuad -> trilbl 
                                    QuadGiven{} -> trilbl
+
+
+                        theshift = "shift={"++renderTikzLoc (loc ivertex)++"}"
+                                
+
+
+        rotationAsOpts optName ivertex = case nodeRot_ ?layout ivertex of
+                                      0 -> []
+                                      d -> [optName++"="++show d]
                         
 
-        nodeCornerLabelScope
+        nodeCornerLabelScope   
+
             | NoQuad <- way = [str|
                                 % Node corner labels
                                 \begin{scope}[
@@ -238,6 +239,8 @@ tikzStructureGraph_restricted
                             
                             nn = nodeName ivertex
                         in
+                            renderScope (rotationAsOpts "rotate" ivertex) $
+
                             [str|
                                 # (c,v) in assocs:
                                     \path ($nn$.center) to node[pos=0.56] {$$$ toLatex v $$$} 
@@ -291,7 +294,7 @@ previewAutoFor
 previewAutoFor (toTriangulation -> tr) verts eds opts =
 
         withAuto tr verts eds (previewTikz 
-            (tikzStructureGraph_restricted tr verts eds opts))
+            (tikzStructureGraph tr opts))
 
 
 renderEdgeNeighborhoods
@@ -305,7 +308,10 @@ renderEdgeNeighborhoods eds = concatMap f eds
                 \end{scope}
               |]
             where
-                _loc = renderTikzLoc $ edgeLoc_ ?layout e
+                _loc = renderTikzLoc 
+                            ($unEitherC 
+                                ("renderEdgeNeighborhoods "++groom eds) 
+                                (edgeLoc_ ?layout e))
 
 
 

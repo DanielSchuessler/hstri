@@ -28,11 +28,15 @@ import Orientation
 import Tikz.StructureGraph
 import FileLocation
 import Util
+import Math.SparseVector
 
 data StructureGraphLayout = SGL {
+    sgl_verts :: [IVertex],
+    sgl_eds :: [TEdge],
     ptcToVertex0 :: Map IVertex PtcToVertex,
     loc0 :: Map IVertex TikzLoc,
-    edgeLoc0 :: Map TEdge TikzLoc
+    edgeLoc0 :: Map TEdge TikzLoc,
+    nodeRot0 :: SparseVector IVertex Degrees
 }
     deriving Show
 
@@ -41,11 +45,16 @@ ptcToVertex_ :: StructureGraphLayout -> IVertex -> PtcToVertex
 ptcToVertex_ = flip $indx . ptcToVertex0
 loc_ :: StructureGraphLayout -> IVertex -> TikzLoc
 loc_ = flip $indx . loc0
-edgeLoc_ :: StructureGraphLayout -> TEdge -> TikzLoc
-edgeLoc_ = flip $indx . edgeLoc0
+edgeLoc_ :: StructureGraphLayout -> TEdge -> EitherC LErrorCall TikzLoc
+edgeLoc_ sgl e = 
+    maybe ($failureStr ("edgeLoc_: Element not in the map: "++show e)) return 
+        . M.lookup e 
+        . edgeLoc0
+        $ sgl
 
 
-
+nodeRot_ :: StructureGraphLayout -> IVertex -> Degrees
+nodeRot_ = sparse_get . nodeRot0
 
 ptcToVertex
   :: (?layout::StructureGraphLayout) =>
@@ -282,9 +291,12 @@ auto tr verts eds =
             --return (optimize tr verts (SGL _ptcToVertex _loc))
             return 
                 (SGL {
+                    sgl_verts = verts,
+                    sgl_eds = eds,
                     ptcToVertex0 = funToMap verts _ptcToVertexAlt,
                     loc0 = funToMap verts _loc,
-                    edgeLoc0 = funToMap eds _edgeLoc
+                    edgeLoc0 = funToMap eds _edgeLoc,
+                    nodeRot0 = sparse_empty
                 })
 
 

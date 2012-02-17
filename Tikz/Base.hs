@@ -29,6 +29,7 @@ data TikzLoc = XYPolar Degrees TikzFactor
              | DistanceRot TikzLoc TikzDimension Degrees TikzLoc
              | UnknownTikzLoc String
              | NodeLoc TikzNodeName
+             | Anchor TikzNodeName String
 
     deriving Show
 
@@ -72,6 +73,7 @@ renderTikzLoc (Distance a p b) = [str|($$$renderTikzLoc a$!$p$!$renderTikzLoc b$
 renderTikzLoc (DistanceRot a p ang b) = [str|($$$renderTikzLoc a$!$p$!$:ang$:$renderTikzLoc b$$$)|]
 renderTikzLoc (UnknownTikzLoc s) = s
 renderTikzLoc (NodeLoc x) = "("++show x++")"
+renderTikzLoc (Anchor x _anchor) = "("++show x++"."++show _anchor++")"
 
 
 
@@ -186,3 +188,7 @@ tikzpicture opts bod =
         ["\\begin{tikzpicture}"++renderOptions opts
         ,bod
         ,"\\end{tikzpicture}"]
+
+
+renderScope :: [String] -> [Char] -> [Char]
+renderScope opts bod = "\\begin{scope}"++renderOptions opts++bod++"\\end{scope}" 

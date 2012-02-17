@@ -72,7 +72,7 @@ runVerboseDDSubWriter (VerboseDD x) = VerboseDD $ do
 --     VerboseDDVectorPairWithZeroSetIntersection !v !v !(ZeroSet co w)
 
 
-class (BitVector w) => VerboseDDVectorRepresentation a co w | a -> co w where
+class (BitVector w, CoordSys co) => VerboseDDVectorRepresentation a co w | a -> co w where
 
     ddrep_index :: a -> VectorIndex
     ddrep_zeroSet :: a -> ZeroSet co w 

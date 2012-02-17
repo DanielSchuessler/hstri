@@ -127,3 +127,12 @@ findTetViolatingQuadConstraints tr (z :: ZeroSet coords w) =
 
 
     where co = ($undef :: Proxy coords)
+
+
+
+-- | Indices of bits not set, up to the 'numberOfVariables'
+zeroSetComplElements
+  :: (BitVector w, CoordSys c) =>
+     Proxy c -> Triangulation -> w -> [Int]
+zeroSetComplElements co tr zs = [ i | i <- [0..numberOfVariables co tr-1], not (bvUnsafeIndex zs i) ]
+

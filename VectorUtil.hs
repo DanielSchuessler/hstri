@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, NamedFieldPuns, FlexibleContexts, TupleSections, NoMonomorphismRestriction, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies, RecordWildCards, TemplateHaskell, NamedFieldPuns, FlexibleContexts, TupleSections, NoMonomorphismRestriction, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 module VectorUtil where
 import qualified Data.Vector as V
@@ -9,6 +9,7 @@ import Test.QuickCheck
 import TupleTH
 import PrettyUtil.Matrix
 import HomogenousTuples
+import Element
 
 
 vectorMapMaybe
@@ -30,6 +31,11 @@ data PartitioningBySign v r = PartitioningBySign {
     _Sneg, _S0, _Spos :: v r
 }
     deriving Show
+
+type instance Element (PartitioningBySign v r) = Element (v r) 
+
+instance AsList (v r) => AsList (PartitioningBySign v r) where
+    asList (PartitioningBySign a b c) = asList a ++ asList b ++ asList c
 
 instance MaxColumnWidth (v r) => MaxColumnWidth (PartitioningBySign v r) where
     maxColumnWidth PartitioningBySign{..} =

@@ -128,7 +128,7 @@ ipr_makeIntegral ipr =
 
 
 
-instance (BitVector w) => VerboseDDVectorRepresentation (IPR co w) co w where
+instance (BitVector w, CoordSys co) => VerboseDDVectorRepresentation (IPR co w) co w where
 
     ddrep_index = ipr_index
     ddrep_zeroSet = zeroSet

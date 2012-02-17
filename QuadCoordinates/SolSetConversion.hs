@@ -6,6 +6,7 @@ module QuadCoordinates.SolSetConversion(
     module StandardCoordinates.Dense,
     module QuadCoordinates.Class,
     quadToStandardSolSet,
+    quadToStandardSolSet',
     SolSetConversionVectorRepresentation(..),
     unSSCVR,
     SolSetConversionResult(..),
@@ -46,6 +47,8 @@ import VerboseDD.Types
 import qualified Data.DList as DL
 import qualified Data.Vector.Generic as VG
 import Data.Typeable
+import Control.Monad.State.Class(put)
+import VerboseDD
 
 data SolSetConversionVectorRepresentation v r w = SSCVR VectorIndex (StandardDense v r) 
 
@@ -154,6 +157,7 @@ instance MaxColumnWidth (TriStepResult r w) => MaxColumnWidth (VertexStepResult 
     maxColumnWidth = maxColumnWidth . vsr_triStepResults
 
 data SolSetConversionResult r =
+
     forall w. (Show w, BitVector w) => 
         SolSetConversionResult {
             sscr_inputTriangulation :: Triangulation,
@@ -190,9 +194,8 @@ vertexStep v (_L_r1, _C_r1) =
 
 
 canonExts =
-    VG.mapM (\q -> do
-        i <- nextIndex
-        return (SSCVR i (conv . canonExt $ q)))
+    VG.map (\(i,q) ->
+        SSCVR i (conv . canonExt $ q))
 
                  
 
@@ -207,8 +210,11 @@ quadToStandardSolSet_core quadSolSet (_ :: Proxy w) =
                         :: ZeroSet StdCoordSys w 
 
 
+        _L_0 = canonExts quadSolSet
+
     in do 
-        _L_0 <- canonExts quadSolSet
+        -- Set VectorIndex supply to one more than the max of the input VectorIndices 
+        put (succ (maximum (0 : map fst (VG.toList quadSolSet))))
 
         (_L'_m,_) <- foldrM vertexStep (_L_0, _C_0) (vertices ?tr) 
         return (_L_0, VG.map (sd_projectiveImage . unSSCVR) _L'_m)
@@ -224,7 +230,7 @@ quadToStandardSolSet
       Show q,
       Typeable r,
       QuadCoords q r) =>
-     tr -> Vector (QAdmissible q) -> SolSetConversionResult r
+     tr -> Vector (VectorIndex,QAdmissible q) -> SolSetConversionResult r
 quadToStandardSolSet (toTriangulation -> tr) quadSolSet =
     let     t = 7*tNumberOfTetrahedra tr
     in let  ?tr = tr
@@ -239,6 +245,17 @@ quadToStandardSolSet (toTriangulation -> tr) quadSolSet =
 
 
 
+-- | Convenience wrapper taking a 'DDResult'
+quadToStandardSolSet'
+  :: DDResult QuadCoordSys -> SolSetConversionResult Rational
+quadToStandardSolSet' DDResult { _ddr_inputTriangulation = tr, _ddr_final = final } =
+    quadToStandardSolSet 
+        tr
+        (VG.map 
+            (\ipr -> (ipr_index ipr, 
+                toAdmissible quadCoordSys tr (qd_fromVector $ ipr_value ipr))) 
+
+            final)
 
 
 ppSSCRes SolSetConversionResult {sscr_canonExtsOfInput,sscr_steps,sscr_final} =

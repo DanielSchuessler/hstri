@@ -1,19 +1,19 @@
 {-# LANGUAGE NamedFieldPuns, TemplateHaskell, TransformListComp, ScopedTypeVariables, TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
-{-# OPTIONS -Wall -fno-warn-unused-imports -fno-warn-unused-binds #-}
+{-# OPTIONS -Wall -fno-warn-unused-binds -fwarn-missing-local-sigs #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
     ,latexifyStandardMatchingEquations
     ,latexifyQMatchingEquations
     ,latexifyEns
-    ,latexifyDDResults
     ,latexTwoRows
     ,op1,op2
     ,textcolor
     ,verboseTri,verboseQuad,verboseArc
     ,quad_latex
+    ,slashes,amps,newcommand,tabular,array,latexEnv,latexEnvNL,(&),unlineses,align,plus,
     
     -- * Program invocation
-    ,runPdfLatex,runPdfLatexSilent,runPdfLatexSilentS,runOkularAsync
+    runPdfLatex,runPdfLatexSilent,runPdfLatexSilentS,runOkularAsync
     ) where
 
 import Control.Applicative
@@ -22,14 +22,11 @@ import Control.Concurrent
 import Data.Function
 import Data.List(intercalate,sort,sortBy,groupBy)
 import Data.Maybe(mapMaybe)
-import Data.Monoid(Monoid(..))
 import Data.Ord
 import Data.Ratio
 import Data.Semigroup
-import Data.String.Interpolation
 import Element
 import Math.SparseVector
-import MathUtil
 import QuadCoordinates
 import QuadCoordinates.Class
 import StandardCoordinates
@@ -46,12 +43,6 @@ import Control.Monad
 import System.Exit
 import Triangulation.AbstractNeighborhood
 import VerboseDD
-import VectorUtil
-import Data.Proxy
-import VerboseDD
-import qualified Data.Vector.Generic as VG
-import Data.BitVector.Adaptive
-import FileLocation
 
 type Latex = String
 
@@ -332,11 +323,13 @@ textcolor = op2 "textcolor"
 matrix :: Latex -> Latex
 matrix = latexEnv "matrix"
 
-instance (Integral i, Latexable i) => Latexable (Ratio i) where
+instance (Eq i, Integral i, Latexable i) => Latexable (Ratio i) where
 
-    toLatex x 
-        | Just i <- ratioToIntegral x = toLatex i 
-        | otherwise = (op2 "frac" <$> numerator <*> denominator) x
+    toLatex x =
+        case (numerator x, denominator x) of
+             (n,1) -> toLatex n
+             (n,d) | x >= 0    -> op2 "frac" n d
+                   | otherwise -> "-"++op2 "frac" (-n) d
 
 
 plus :: (Num a, Ord a, Latexable a) => a -> Latex
@@ -440,97 +433,14 @@ align = latexEnv "align*"
 displaymath :: Latex -> Latex
 displaymath = latexEnv "displaymath"
 
-latexifyDDResults :: CoordSys co => DDResult co -> Latex
-latexifyDDResults (DDResult tr steps final :: DDResult co) =
+newcommand :: Latexable a => [Char] -> Int -> a -> [Char]
+newcommand cmd (nargs::Int) expn = "\\newcommand{"++cmd++"}"
+    ++ (if nargs==0 then "" else "["++show nargs++"]") ++ "{"++toLatex expn++"}"
 
 
-    braces (
---         "\\newcommand{funbox}[1]{\\makebox[1cm][flushright]{#1}}\n" ++
-        unlines (zipWith goStep steps [0::Int ..])
-        ++
-        goFinal 
+unlineses :: [[String]] -> String
+unlineses = unlines . concat
 
-    )
-
-
-    where
-        g = length (hyperplanes (undefined :: Proxy co) tr)
-        n = numberOfVariables (undefined :: Proxy co) tr
-
-        goStep (DDSR pbs pairFates) i =
-
-            align (
---             array ("lcc":replicate (g-i) "r") 
-                (unlines . concat $ zipWith (goPartition i) [_S0 pbs, _Spos pbs, _Sneg pbs] "0+-")
-                )
-            ++
-            "Paare:\n"
-            ++
-            goPairFates pairFates
-
-
-        goPartition i s name =
-           (op1 "intertext" (mathmode ([str|S_{$[name]$}^{($:i$)}|]
-                ++ if VG.null s
-                      then " = \\emptyset"
-                      else ":")))
-           :
-           map goIPR (VG.toList s)
-
-        goFinal =
-            "Ergebnis:\n" ++
-            align (unlines (map goIPR (VG.toList final)))
-
-
-        goIPR IPR {ipr_index,zeroSet,innerProducts} =
-
-            toLatex ipr_index 
-                ++ " &=& "
-                ++ "&(&" 
-                ++ goZeroSet zeroSet 
-                ++ "&,&"
-                ++ goInnerProducts innerProducts
-                ++ "&)"
-                ++ "\\\\"
-
-
-        goZeroSet zs = 
-            op1 "overline" . latexSet $
-                [ i | i <- [0..n-1], not (bvUnsafeIndex zs i) ]
-
-        goInnerProducts v =
-
---             concatMap (op1 "funbox") (VG.toList v)
-           intercalate "&&" (map toLatex $ VG.toList v) 
-
-
-        goPairFates pfs = 
-            tabular ["c","c","l"]
-                (slashes (map goPairFate . VG.toList $ pfs))
-
-
-        goPairFate (PairFate u w k) =
-            mathmode (ddrep_index u) &
-            mathmode (ddrep_index w) &
-            case k of
-                OK ix -> "OK, "++mathmode ix ++" := " 
-                            ++ mathmode (
-                                   toLatex (w0 / (w0-u0))
-                                ++ toLatex (ddrep_index u)
-                                ++ plus (-u0 / (w0-u0))
-                                ++ toLatex (ddrep_index w)
-                                )
-
-
-                    where
-                        u0 = ipr_head u
-                        w0 = ipr_head w
-
-                NotAdjacent z -> "Nicht adjazent ("++mathmode ("z="++toLatex (ddrep_index z))++")"
-                Incompatible -> "Inkompatibel (Bei Tetraeder "
-                                    ++ toLatex ($fromJst (findTetViolatingQuadConstraints tr
-                                                    (intersectZeroSets u w))) 
-                                    ++ ")"
 
 
 

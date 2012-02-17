@@ -1,6 +1,9 @@
-{-# LANGUAGE RankNTypes, NoMonomorphismRestriction, ViewPatterns, ScopedTypeVariables, ImplicitParams #-}
-{-# OPTIONS -Wall -fno-warn-missing-signatures #-}
-module Tikz.InteractiveLayout(interactiveLayoutMain) where
+{-# LANGUAGE NamedFieldPuns, TemplateHaskell, RankNTypes, NoMonomorphismRestriction, ViewPatterns, ScopedTypeVariables, ImplicitParams #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-unused-binds #-}
+module Tikz.InteractiveLayout(
+    interactiveLayoutMain,interactiveLayoutMainV,interactiveLayoutMainWith,
+    
+    ) where
 
 import Tikz.StructureGraphLayout
 import Tikz.Gen
@@ -19,24 +22,47 @@ import Control.Monad.Cont
 import Util
 import Data.Void
 import Triangulation.Class
+import Control.Monad.State.Strict
+import Data.Lens.Template
+import Data.Lens.Strict
+import Text.Groom
 
+data TheState = TheState {
+    sgl :: StructureGraphLayout,
+    sgee :: StructureGraphExtraOptions
+}
+nameMakeLens ''TheState (Just . (++"L"))
+
+type M0 r a = StateT TheState (ContT r IO) a
+type M r a = (?quit:: M0 r Void, ?outfilePrefix :: FilePath, ?tr :: Triangulation) => M0 r a 
 
 texfile = ?outfilePrefix ++ ".tex"
 pdffile = ?outfilePrefix ++ ".pdf"
 
-interactiveLayoutMain
+interactiveLayoutMainV
   :: ToTriangulation t => t -> FilePath -> IO ()
-interactiveLayoutMain (toTriangulation -> tr) (outfilePrefix :: FilePath) = 
+interactiveLayoutMainV = interactiveLayoutMain True False
+
+interactiveLayoutMain
+  :: ToTriangulation t => 
+       Bool -- ^ vertices? 
+    -> Bool -- ^ edges? 
+    -> t -> FilePath -> IO ()
+interactiveLayoutMain doVerts doEds (toTriangulation -> tr) (outfilePrefix :: FilePath) = 
     do
         let ?tr = tr
         let ?outfilePrefix = outfilePrefix
 
         putStrLn "Computing initial layout with Graphviz..."
-        sgl0 <- auto ?tr (tIVertices ?tr) (edges tr)
-        let 
-            sgee = defaultSGEE
-        reRender sgl0 sgee
-        runOkularAsync pdffile
+        sgl0 <- auto ?tr 
+                    (guard doVerts >> tIVertices tr) 
+                    (guard doEds >> edges tr) 
+
+        interactiveLayoutMainWith sgl0
+
+
+interactiveLayoutMainWith sgl0 = do
+        let sgee = defaultSGEE
 
         hSetBuffering stdin NoBuffering
         hSetBuffering stdout NoBuffering
@@ -45,27 +71,30 @@ interactiveLayoutMain (toTriangulation -> tr) (outfilePrefix :: FilePath) =
         putStrLn "Permutation input format: a,w,d: transpositions; r,f: rotations"
         putStrLn "Press Q at any time to quit"
 
-        runContT (contMain sgl0) return
+        st <- runContT (execStateT contMain (TheState sgl0 sgee)) return
+
+        writeFile (?outfilePrefix++".hs") ("sgl = "++groom (sgl st))
 
 
 contMain
   :: (?outfilePrefix::FilePath, ?tr::Triangulation) =>
-     StructureGraphLayout -> ContT r IO ()
-contMain sgl0 = callCC (\cc -> let ?quit = cc () in loop sgl0 defaultSGEE)
+     M0 r ()
+contMain = callCC (\cc -> do
+    reRender
+    io (runOkularAsync pdffile)
+    let ?quit = cc () in loop)
 
-type M r a = (?quit:: ContT r IO Void, ?outfilePrefix :: FilePath, ?tr :: Triangulation) => ContT r IO a
 
-loop :: StructureGraphLayout -> StructureGraphExtraOptions -> M r ()
-loop sgl0 sgee = do
+loop :: M r b 
+loop = do
     v <- inputIVertexWithPrompt
     g <- inputS3WithPrompt
     io $ putStrLn "Regenerating...\n"
 
-    let sgl0' = adjustPtcToVertex sgl0 v (*. g) 
-        sgee' = sgee
+    void (sglL !%= (\sgl -> adjustPtcToVertex sgl v (*. g))) 
 
-    reRender sgl0' sgee'
-    loop sgl0' sgee'
+    reRender
+    loop
 
 inputS3WithPrompt :: M r S3
 inputS3WithPrompt = do
@@ -76,7 +105,8 @@ inputS3WithPrompt = do
 getChar' = do
     c <- io getChar
     case c of
-         'Q' -> vacuous ?quit
+         'Q' -> do
+            vacuous ?quit
          _ -> return c
 
 inputS3 = do
@@ -134,12 +164,13 @@ beep = io $ do
     putStr "beep "
     putChar '\a'
 
-reRender sgl0 sgee = io $ do
-            writeFile texfile 
-                (wrapTikzAsDoc 
-                    (let ?layout = sgl0
-                     in tikzStructureGraph ?tr sgee))
-            runPdfLatexSilentS texfile
+reRender = do
+    TheState {sgl, sgee} <- get 
+    io $ writeFile texfile 
+        (wrapTikzAsDoc 
+            (let ?layout = sgl
+                in tikzStructureGraph ?tr sgee))
+    io $ runPdfLatexSilentS texfile
 
 
 putLn = io $ putStrLn ""

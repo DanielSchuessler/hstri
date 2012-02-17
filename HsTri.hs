@@ -19,7 +19,6 @@ module HsTri(
     module FaceLattice,
     module HomogenousTuples,
     module HsTri.Console,
-    module Latexable,
     module Numeric.AD.Vector,
     module PreRenderable,
     module PrettyUtil,
@@ -48,6 +47,7 @@ module HsTri(
     module Triangulation.VertexLink,
     module TriangulationCxtObject,
     module VerboseDD,
+    module Latexable.DD
 
     ) where
 
@@ -69,7 +69,6 @@ import ExampleTriangulations
 import FaceLattice
 import HomogenousTuples
 import HsTri.Console
-import Latexable
 import Numeric.AD.Vector
 import PreRenderable
 import PrettyUtil
@@ -98,3 +97,4 @@ import Triangulation.Transformations
 import Triangulation.VertexLink
 import TriangulationCxtObject
 import VerboseDD
+import Latexable.DD
