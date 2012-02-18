@@ -12,6 +12,7 @@ import Data.DList
 import CoordSys
 import Data.Function
 import Control.Arrow(second)
+import Control.Applicative
 
 newtype VectorIndex = VectorIndex Int
     deriving(Eq,Enum,Ord,Real,Num,Integral)
@@ -47,7 +48,7 @@ data PairFateKind v =
 
 
 newtype VerboseDD stepLog a = VerboseDD (WriterT (DList stepLog) (State VectorIndex) a)
-    deriving(Functor,Monad,MonadWriter (DList stepLog),MonadState VectorIndex)
+    deriving(Functor,Applicative,Monad,MonadWriter (DList stepLog),MonadState VectorIndex)
 
 
 nextIndex :: VerboseDD v VectorIndex

@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, TemplateHaskell, TransformListComp, ScopedTypeVariables, TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE OverlappingInstances, NamedFieldPuns, TemplateHaskell, TransformListComp, ScopedTypeVariables, TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds -fwarn-missing-local-sigs #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
@@ -9,11 +9,15 @@ module Latexable(
     ,op1,op2
     ,textcolor
     ,verboseTri,verboseQuad,verboseArc
+    ,briefDiscType
+    ,veryBriefDiscType,veryBriefEdge
     ,quad_latex
-    ,slashes,amps,newcommand,tabular,array,latexEnv,latexEnvNL,(&),unlineses,align,plus,
+    ,slashes,amps,newcommand,tabular,array,latexEnv,latexEnvNL,(&),unlineses,align,plus,hspace,vspace
+    ,nl
+    ,safeUnlines
     
     -- * Program invocation
-    runPdfLatex,runPdfLatexSilent,runPdfLatexSilentS,runOkularAsync
+    ,runPdfLatex,runPdfLatexSilent,runPdfLatexSilentS,runOkularAsync
     ) where
 
 import Control.Applicative
@@ -49,6 +53,11 @@ type Latex = String
 class Latexable a where
     toLatex :: a -> Latex
 
+nl :: Latex
+nl = "%\n"
+
+safeUnlines :: [Latex] -> Latex
+safeUnlines = concatMap (++nl)
 
 op1 :: Latexable a => String -> a -> Latex
 op1 f x = "\\"<>f<>"{"<>toLatex x<>"}"
@@ -196,7 +205,7 @@ end :: Latex -> Latex
 end = op1 "end"
 
 latexEnv :: Latex -> Latex -> Latex
-latexEnv x body = begin x <> body <> end x
+latexEnv x body = begin x <> "%\n" <> body <> "%\n" <> end x
 
 latexEnvNL :: Latex -> String -> String
 latexEnvNL x body = unlines [ begin x, body, end x ]
@@ -226,6 +235,27 @@ briefDiscType =
         (toLatex . iNormalTriGetVertex)
         (toLatex . fst . iNormalQuadGetDisjointEdges)
     . iNormalDisc
+
+
+veryBriefDiscType
+  :: (MakeINormalDisc a, Latexable a1) => a1 -> a -> Latex
+veryBriefDiscType space =
+    eitherIND
+        (toLatex . iNormalTriGetVertex)
+        (veryBriefEdge space . fst . iNormalQuadGetDisjointEdges)
+    . iNormalDisc
+
+veryBriefEdge
+  :: (Show a1,
+      Show a3,
+      Vertices a,
+      HasTIndex ia a,
+      Latexable a2,
+      Verts a ~ (a1, a3)) =>
+     a2 -> ia -> [Char]
+veryBriefEdge space (viewI -> I i (vertices -> (v0,v1))) =
+    show v0 ++ hspace space ++ show v1 ++ "_{"++show i++"}" 
+
 
 zeroAsBlank :: (Eq a, Num a, Latexable a) => a -> Latex
 zeroAsBlank x = if x == 0
@@ -267,9 +297,10 @@ latexifyStandardMatchingEquations tr =
     in
         tabular colSpecs body
 
-hspace :: Latexable a => a -> Latex
+hspace,vspace :: Latexable a => a -> Latex
 hspace = op1 "hspace"
 
+vspace = op1 "vspace"
 
             
 latexifyQMatchingEquations
@@ -446,3 +477,6 @@ unlineses = unlines . concat
 
 (&) ::  (Latexable a, Latexable a1) => a -> a1 -> [Char]
 x & y = toLatex x ++"&"++toLatex y
+
+instance (Latexable a, Latexable b) => Latexable (a,b) where
+    toLatex (a,b) = tuple [toLatex a, toLatex b]

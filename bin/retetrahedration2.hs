@@ -152,30 +152,48 @@ mainRender = do
 weightedVertexLinkGraphs :: Latex
 weightedVertexLinkGraphs =
     latexEnvNL "description" (
-    concat (
-     case ddr of 
-      DDResult { _ddr_final = finals } -> do
-        ipr <- VG.toList finals 
+
+       makeFunboxCommand "1.5em" "\\small $#1$" ++ "\n" 
+    ++ makeSemicolonBoxCommand ++ "\n"
+    ++ concat (
+     case (ddr,sscr) of 
+      ( DDResult { _ddr_final = finals }, 
+        SolSetConversionResult { sscr_canonExtsOfInput = theCanonExts } ) -> do
+        (ipr,theCanonExt) <- zip (VG.toList finals) (VG.toList theCanonExts) 
         return (
-                "\\itemNL{Gewichteter \\eckenlink-Graph für "
-                    ++mathmode (ipr_index ipr)++"}\n"++
-                let ?layout = sgl
-                in tikzStructureGraph tr' 
-                    sgee { way = QuadGiven (qd_fromVector . ipr_value $ ipr) } ++
-                "\n\n\n")
-               ))
+            "\\itemNL{Gewichteter \\eckenlink-Graph für "
+                ++mathmode (ipr_index ipr)++":}\n"++
+            let ?layout = sgl
+            in 
+                tikzStructureGraph tr' 
+                    sgee { way = QuadGiven (qd_fromVector . ipr_value $ ipr) } 
+                ++ "\nLösung: "++mathmode (
+                        toLatex (ddrep_index theCanonExt) 
+                        ++ " := " 
+                        ++ op1 "canonExt" (
+                               "("
+                            ++ toLatex (ipr_index ipr)
+                            ++")"
+                        ) ++ " =\n"
+                    )
+                ++ "$$" ++ enfunboxenAndSemicolonEvery7th (unSSCVR theCanonExt) ++ "$$"
+
+
+                ++ "\n\n\n"
+                
+                )
+            ))
+
 
 main = do
 --     writeFile "/h/dipl/tex/cut0QMES.tex" (latexifyQMatchingEquations "0.7em" "0.5em" tr')
---     writeFile "/h/dipl/tex/cut0DD.tex" . latexifyDDResults "2.2em" $ ddr
+    writeFile "/h/dipl/tex/cut0DD.tex" . latexifyDDResults "2.2em" $ ddr
 
     let ?layout = sgl
     writeFile "/h/dipl/graphs/cut0vl.tex" (tikzStructureGraph tr' sgee) 
     writeFile "/h/dipl/graphs/cut0weightedvls.tex" weightedVertexLinkGraphs
 
---     writeFile "/h/dipl/tex/cut0SolSetConversion.tex"  
---         . latexifySolSetConversionResult "1.5em" 
---         $ sscr
+    writeFile "/h/dipl/tex/cut0SolSetConversion.tex"  . latexifySolSetConversionResult "1.5em" $ sscr
 
 
 --     putStrLn (latexifyEns tr')
@@ -230,8 +248,8 @@ sgl = SGL{sgl_verts =
 
          (0 ./ A, a0node 1),
          (0 ./ B, a0node (-1)),
-         (1 ./ B, a0node (-a0centralDistFraction)),
-         (2 ./ B, a0node (a0centralDistFraction))
+         (1 ./ B, b1node (-1)),
+         (2 ./ B, b1node (1))
         ],
     edgeLoc0 = M.fromList [],
 
@@ -247,8 +265,8 @@ sgl = SGL{sgl_verts =
                 (2 ./ C, 0),
                 (2 ./ D, -90),
 
-                (0 ./ A, a0phi_deg+30),
-                (0 ./ B, a0phi_deg-30),
+                (0 ./ A, a0phi_deg-150),
+                (0 ./ B, a0phi_deg+150),
                 (1 ./ B, a0phi_deg+30),
                 (2 ./ B, a0phi_deg-30)
 
@@ -260,15 +278,24 @@ sgl = SGL{sgl_verts =
 
     where
         a0phi_deg = 180 * a0phi_rad/pi
-        a0phi_rad = asin (dy1/a0stretch) 
+        a0phi_rad = pi/2 --asin (dy1/a0stretch) 
 
-        a0stretch = 70
+        a0stretch = 50
+        a0stretch' = 65
         a0centralDistFraction = 0.4
+                    
+        b1node_xshift k = k*a0stretch*cos a0phi_rad
+        b1node_yshift k = k*a0stretch*sin a0phi_rad
+
+        b1node k = Canvas (ptLength x, ptLength y)
+            where
+                x = offsetx + b1node_xshift k 
+                y = offsety + b1node_yshift k 
 
         a0node k = Canvas (ptLength x, ptLength y)
             where
-                x = offsetx + k*a0stretch*cos a0phi_rad
-                y = offsety + k*a0stretch*sin a0phi_rad
+                x = offsetx + b1node_xshift k - a0stretch'*cos (a0phi_rad+pi/2)
+                y = offsety + b1node_yshift k - a0stretch'*sin (a0phi_rad+pi/2)
 
 
         xc0 = -75
@@ -277,5 +304,5 @@ sgl = SGL{sgl_verts =
         dy1 = 50
         dx1 = 23/40 * dy1
         y2 = 200
-        offsetx = 170
+        offsetx = 140
         offsety = 200

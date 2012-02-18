@@ -9,7 +9,11 @@ module QuadCoordinates.SolSetConversion(
     quadToStandardSolSet',
     SolSetConversionVectorRepresentation(..),
     unSSCVR,
+    sscvr_index,
+    sscvr_value,
+    SolSetConversionResultItem(..),
     SolSetConversionResult(..),
+    sscr_final,
     VertexStepResult(..),
     TriStepResult(..),
     ppSSCRes  
@@ -49,10 +53,16 @@ import qualified Data.Vector.Generic as VG
 import Data.Typeable
 import Control.Monad.State.Class(put)
 import VerboseDD
+import Control.Arrow(second)
 
 data SolSetConversionVectorRepresentation v r w = SSCVR VectorIndex (StandardDense v r) 
 
 unSSCVR (SSCVR _ x) = x
+
+sscvr_index (SSCVR i _) = i
+
+-- | = unSSCVR
+sscvr_value (SSCVR _ v) = v
 
 instance MaxColumnWidth (v r) => MaxColumnWidth (SolSetConversionVectorRepresentation v r w) where
     maxColumnWidth = maxColumnWidth . unSSCVR
@@ -86,6 +96,7 @@ partialCanonicalPart' v (SSCVR _ x) = do
 ntriToIx = fromEnum . iNormalTriToINormalDisc
 
 data TriStepResult r w = TriStepResult { 
+    tsr_C_r_s1 :: w,
     tsr_pbs :: PartitioningBySign Vector (SolSetConversionVectorRepresentation Vector r w), 
     tsr_pairFates :: Vector (PairFate (SolSetConversionVectorRepresentation Vector r w)),
     tsr_tri :: INormalTri
@@ -108,7 +119,7 @@ ntriStep nt (_L_r_s1, _C_r_s1) =
                     if zeroSetAdmissible ?tr zeroSetIntersection
                     then
                             case findVectorDifferentThanTheseAndWithZeroSetAtLeast x y
-                                    (bvIntersection zeroSetIntersection _C_r_s1) _L_r_s1 of
+                                    (bvIntersection zeroSetIntersection (ZeroSet _C_r_s1)) _L_r_s1 of
                                 Just z -> return (NotAdjacent z)
                                 Nothing -> OK <$> nextIndex
 
@@ -138,7 +149,7 @@ ntriStep nt (_L_r_s1, _C_r_s1) =
 
             _C_r_s = bvSetBit _C_r_s1 (ntriToIx nt)
         
-        teller (TriStepResult { tsr_pbs = pbs, tsr_pairFates, tsr_tri = nt})
+        teller (TriStepResult { tsr_pbs = pbs, tsr_pairFates, tsr_tri = nt, tsr_C_r_s1 = _C_r_s1})
 
 
         
@@ -163,8 +174,17 @@ data SolSetConversionResult r =
             sscr_inputTriangulation :: Triangulation,
             sscr_canonExtsOfInput :: Vector ( SolSetConversionVectorRepresentation Vector r w ),  
             sscr_steps :: [VertexStepResult r w],
-            sscr_final :: Vector (Admissible (StandardDense Vector r))
+            sscr_finalVerbose :: Vector (SolSetConversionResultItem r) 
         }
+
+sscr_final = VG.map sscri_value . sscr_finalVerbose
+
+data SolSetConversionResultItem r = 
+    SolSetConversionResultItem {
+        sscri_indexOfProjectivePreimage :: VectorIndex,
+        sscri_index :: VectorIndex,
+        sscri_value :: Admissible (StandardDense Vector r)
+    }
 
 vertexStep v (_L_r1, _C_r1) =
     let
@@ -194,8 +214,8 @@ vertexStep v (_L_r1, _C_r1) =
 
 
 canonExts =
-    VG.map (\(i,q) ->
-        SSCVR i (conv . canonExt $ q))
+    VG.mapM (\(_,q) ->
+        SSCVR <$> nextIndex <*> pure (conv . canonExt $ q))
 
                  
 
@@ -210,14 +230,24 @@ quadToStandardSolSet_core quadSolSet (_ :: Proxy w) =
                         :: ZeroSet StdCoordSys w 
 
 
-        _L_0 = canonExts quadSolSet
+        
 
     in do 
         -- Set VectorIndex supply to one more than the max of the input VectorIndices 
         put (succ (maximum (0 : map fst (VG.toList quadSolSet))))
+        _L_0 <- canonExts quadSolSet
 
         (_L'_m,_) <- foldrM vertexStep (_L_0, _C_0) (vertices ?tr) 
-        return (_L_0, VG.map (sd_projectiveImage . unSSCVR) _L'_m)
+
+        final <- VG.mapM (\(SSCVR i q) -> 
+                    SolSetConversionResultItem i 
+                        <$> nextIndex 
+                        <*> pure 
+                             (toAdmissible stdCoordSys ?tr .  sd_projectiveImage $ q))
+                             
+                         _L'_m
+
+        return (_L_0, final )
 
 
 
@@ -240,7 +270,7 @@ quadToStandardSolSet (toTriangulation -> tr) quadSolSet =
                 sscr_inputTriangulation = tr,
                 sscr_canonExtsOfInput = canonExtsOfInput,
                 sscr_steps = steps,
-                sscr_final = VG.map (toAdmissible stdCoordSys tr) final
+                sscr_finalVerbose = final
              })
 
 
@@ -258,19 +288,23 @@ quadToStandardSolSet' DDResult { _ddr_inputTriangulation = tr, _ddr_final = fina
             final)
 
 
-ppSSCRes SolSetConversionResult {sscr_canonExtsOfInput,sscr_steps,sscr_final} =
+ppSSCRes
+  :: (Integral b, PrettyScalar (Ratio b), PrettyScalar b) =>
+     SolSetConversionResult (Ratio b) -> Doc
+ppSSCRes SolSetConversionResult {sscr_canonExtsOfInput,sscr_steps,sscr_finalVerbose} =
            line <> text "Canonical extensions of input"
         <> line <> exts
         <> line
         <> vsep (map ppVertexStep sscr_steps)
         <> line <> text "Result"
-        <> line <> indent 2 (string $ prettyMatrix sscr_final)
+        <> line <> indent 2 (string $ prettyMatrix final')
         <> line <> text "IntegerResult"
-        <> line <> indent 2 (string . prettyMatrix 
-                                . VG.map (makeVecIntegral . sd_toVector . adm_coords) 
-                                $ sscr_final)
+        <> line <> indent 2 (string . prettyMatrix . VG.map makeVecIntegral $ final') 
 
     where
+        final' =  VG.map (sd_toVector . adm_coords . sscri_value) 
+                                sscr_finalVerbose 
+
         exts = vsep (map (\x -> 
                  text (prettyString (ddrep_index x) ++ 
                     " := (" ++ prettyVectorWithColumnWidth columnWidth (unSSCVR x)++")"))

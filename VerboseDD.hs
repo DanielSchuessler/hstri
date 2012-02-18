@@ -24,7 +24,8 @@ module VerboseDD
      fundEdgeSolutions,
      qVertexSolutionExts,
      DDStepResult(..),
-     DDResult(..)
+     DDResult(..),
+     ddr_lastIndex
      
      )
 
@@ -73,6 +74,10 @@ data DDResult co =
             _ddr_final :: Vector (IPR co w)
         }
 
+ddr_lastIndex :: DDResult t -> Maybe VectorIndex
+ddr_lastIndex DDResult {_ddr_final = f } 
+    | VG.null f = Nothing
+    | otherwise = Just (ipr_index . VG.last $ f)
 
 
 
