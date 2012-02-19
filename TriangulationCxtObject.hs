@@ -112,6 +112,7 @@ import Triangulation.CanonOrdered
 import Triangulation.Class
 import Util
 import qualified Data.Map as M
+import DisjointUnion
 
 -- | INVARIANT: the 'unT' is a canonical representative of its equivalence class (under the gluing)
 data T a = 
@@ -346,6 +347,16 @@ instance ShortShow TEdge where
     shortShow = shortShowAsSet
 instance ShortShow TTriangle where 
     shortShow = shortShowAsSet
+instance ShortShow TNormalCorner where 
+    shortShow = shortShow . unT
+instance ShortShow TNormalArc where 
+    shortShow = shortShow . unT
+instance ShortShow TNormalTri where 
+    shortShow = shortShow . unT
+instance ShortShow TNormalQuad where 
+    shortShow = shortShow . unT
+instance ShortShow TNormalDisc where 
+    shortShow = shortShow . unT
 
 instance  Pretty TVertex where
     pretty = prettyListAsSet . preimageList
@@ -676,3 +687,9 @@ instance Edges TTet where
 instance Vertices TTet where
     type Verts TTet = Quadruple TVertex
     vertices t = map4 (pMap (getTriangulation t)) (vertices (unT t)) 
+
+
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t|TVertex|]
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM1 [t|TEdge|]
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM2 [t|TTriangle|]
+isRegardedAsSimplexByDisjointUnionDeriving ''DIM3 [t|TTet|]

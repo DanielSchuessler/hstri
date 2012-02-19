@@ -1,5 +1,6 @@
-{-# LANGUAGE TemplateHaskell, NoMonomorphismRestriction, TupleSections, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, FunctionalDependencies, TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances, TemplateHaskell, NoMonomorphismRestriction, TupleSections, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts, FunctionalDependencies, TypeFamilies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 -- {-# OPTIONS -ddump-deriv #-}
 module Simplicial.DeltaSet1(
@@ -13,13 +14,13 @@ module Simplicial.DeltaSet1(
     face10,
     AnySimplex1,
     OneSkeletonable(..),
+    OrdToDim1,
+    ShowToDim1,
     foldAnySimplex1,
     biMapAnySimplex1,
     vertToAnySimplex1,
     edToAnySimplex1,
     anySimplex1s,
-    EdgesContainingVertex_Cache,
-    lookupEdgesContainingVertex,
     mkECVC,
 --     UnitInterval(..),
     UnitIntervalPoint
@@ -36,7 +37,6 @@ import Language.Haskell.TH.Lift
 import ShortShow
 import Data.Tuple.Index
 import MathUtil
-import Text.Groom
 
 
 class (Vertices s, Edges s, Vert s ~ Vert (Ed s), EdgeLike (Ed s)) => DeltaSet1 s where
@@ -68,19 +68,18 @@ class OneSkeletonable a where
     oneSkeleton :: a -> a
 
 
-newtype EdgesContainingVertex_Cache vert ed = 
-    ECVC { lookupEdgesContainingVertex :: vert -> [(ed,Index2)] } 
 
 mkECVC
-  :: (Ord (Vert s), Show (Vert s), Show (Ed s), DeltaSet1 s) => s -> EdgesContainingVertex_Cache (Vert s) (Ed s)
-mkECVC s = ECVC (\x -> case M.lookup x m of
-                            Just y -> y
-                            Nothing -> error ("mkECVC: Element not in the map: "++show x++
-                                                ". The map is:\n" ++ groom m)) 
+  :: (Ord v,
+      Vertices (Element (Eds s)),
+      Edges s,
+      Verts (Element (Eds s)) ~ (v, v)) =>
+     s -> M.Map v [(Ed s, Index2)]
+mkECVC s = m
     where
         m = M.fromListWith (++)
                     . concatMap (\e -> 
-                        asList 
+                        toList2 
                             (zipTuple2 
                                 (vertices e) 
                                 (map2 ((:[]) . (e,)) allIndex2' )))
@@ -117,3 +116,9 @@ deriveLiftMany [''AnySimplex1]
 --     edges UnitInterval = OneTuple UnitInterval
 -- 
 -- instance DeltaSet1 UnitInterval where
+
+class (Show (Vert s), Show (Ed s)) => ShowToDim1 s
+instance (Show (Vert s), Show (Ed s)) => ShowToDim1 s
+
+class (Ord (Vert s), Ord (Ed s)) => OrdToDim1 s
+instance (Ord (Vert s), Ord (Ed s)) => OrdToDim1 s

@@ -97,6 +97,7 @@ import Test.QuickCheck
 import Tetrahedron.Edge
 import Util
 import Data.Typeable
+import FileLocation
 
 
 -- | Triangle of an abstract tetrahedron (vertices unordered) 
@@ -299,7 +300,16 @@ oTriangleByVertices vs =
 
 
 trianglesContainingEdge :: Edge -> (Pair Triangle)
-trianglesContainingEdge e = fromList2 ( filter4 (e `isEdgeOfTriangle`) allTriangles' ) 
+trianglesContainingEdge e = 
+    -- generated from: \e -> fromList2 ( filter4 (e `isEdgeOfTriangle`) allTriangles' ) 
+    case vertices e of
+        (A,B) -> (tABC,tABD)
+        (A,C) -> (tABC,tACD)
+        (A,D) -> (tABD,tACD)
+        (B,C) -> (tABC,tBCD)
+        (B,D) -> (tABD,tBCD)
+        (C,D) -> (tACD,tBCD)
+        _ -> $err' ("trianglesContainingEdge "++show e)
 
 
 gedgesOfTriangle
@@ -594,3 +604,7 @@ instance SimplicialTriangle Triangle where
 instance SimplicialTriangle ITriangle where
     sTriangleAscTotal = return . iTriangleByVertices . unAsc3 
     sTriangleVerts = asc3 . vertices -- could skip check
+
+instance Show a => Show (Triangle -> a) where show = showFiniteFunc "t"
+instance Show a => Show (OTriangle -> a) where show = showFiniteFunc "t"
+

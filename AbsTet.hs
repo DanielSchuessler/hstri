@@ -48,9 +48,10 @@ instance Link Vertex (ZeroSkeleton AbsTet) (Triple Vertex) where
 instance Link IVertex (ZeroSkeleton AbsTet) (Triple IVertex) where
     link v p = traverseI map3 (flip link p) v
 
+
 -- | Edges containing a given vertex
 instance Star Vertex (OneSkeleton AbsTet) (Triple Edge) where
-    star v _ = fromList3 (filter6 (isVertexOfEdge v) allEdges')
+    star = const . edgesContainingVertex
 
 -- | Edges containing a given vertex
 instance Star IVertex (OneSkeleton AbsTet) (Triple IEdge) where

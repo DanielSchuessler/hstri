@@ -82,8 +82,8 @@ isClosedSurface s =
 surfaceBoundary
   :: StandardCoords s Integer =>
      Admissible s
-     -> (Numbering (TConcrete INormalCorner),
-         Gr (TConcrete INormalCorner) (TConcrete INormalArc))
+     -> (Numbering TConcreteNCorner,
+         Gr TConcreteNCorner TConcreteNArc)
 surfaceBoundary s = 
     let
         c = toConcrete s

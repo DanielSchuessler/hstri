@@ -237,3 +237,6 @@ vertexToIndex4 = $(fromJst) . indexOf4 allVertices'
 deriveNFData ''Vertex
 deriveNFData ''IVertex
 deriveLift ''Vertex
+
+
+instance Show a => Show (Vertex -> a) where show = showFiniteFunc "v"

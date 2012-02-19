@@ -248,7 +248,7 @@ tikzStructureGraph
 
         _pre = case way of
                    NoQuad -> ""
-                   QuadGiven w -> "" -- [str|% \[ w = $quad_latex tr w$ \\]|]
+                   QuadGiven _ -> "" -- [str|% \[ w = $quad_latex tr w$ \\]|]
 
 
         edgeScope = [str|

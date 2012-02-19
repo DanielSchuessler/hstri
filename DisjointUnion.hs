@@ -276,3 +276,31 @@ instance (SatisfiesSimplicialIdentities3 a, SatisfiesSimplicialIdentities3 b) =>
 
 
 deriveLiftMany [''DJSimp]
+
+instance DisjointUnionable (GenericDeltaSet2 s1) (GenericDeltaSet2 s2) 
+                (GenericDeltaSet2 (DJSimp DIM2 s1 s2)) () () () where
+
+    disjointUnionWithInjs (GDS2 v1 e1 t1) (GDS2 v2 e2 t2)
+        = DisjointUnion 
+            (GDS2 (maplr v1 v2) (maplr e1 e2) (maplr t1 t2))
+            () () ()
+
+
+maplr :: SuperSumTy a => [L a] -> [Data.SumType.R a] -> [a]
+maplr a b = map left' a ++ map right' b 
+
+instance 
+    (DisjointUnionable s1 s2 s inj1 inj2 djEither,
+        PreDeltaSet2 s,
+        OrdToDim1 s) =>
+    (DisjointUnionable (WithSuperfaceLookup2 s1) (WithSuperfaceLookup2 s2) (WithSuperfaceLookup2 s) inj1 inj2 djEither) where
+
+
+        disjointUnionWithInjs s1 s2 =
+            let
+                DisjointUnion a b c d = disjointUnionWithInjs (wsl2_underlying s1) (wsl2_underlying s2)
+            in
+                DisjointUnion (addSuperfaceLookup2 a) b c d
+
+                
+

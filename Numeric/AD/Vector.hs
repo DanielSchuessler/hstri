@@ -26,6 +26,7 @@ import PrettyUtil(Pretty)
 import Data.Vect.Double.Base(Vec2(..),Vec3(..))
 import Data.Cross
 import Data.Function
+import Data.Tuple.Index
 
 innerProductForFoldableApplicative x y = getSum . foldMap Sum $ (liftA2 (*) x y) 
 
@@ -263,3 +264,46 @@ unitToStd3 ::  Num a => Tup3 a -> Tup4 a
 unitToStd3 (Tup3 (x1,x2,x3)) = Tup4 (1-x1-x2-x3,x1,x2,x3)
 
 
+std2IntoStd3 :: Num a => 
+       Index4 -- ^ Index of zero component is 3 minus this  
+    -> Tup3 a -> Tup4 a
+std2IntoStd3 i (Tup3 (u,v,w)) =
+                    case i of
+                         I4_0 -> Tup4 (u,v,w,0)
+                         I4_1 -> Tup4 (u,v,0,w)
+                         I4_2 -> Tup4 (u,0,v,w)
+                         I4_3 -> Tup4 (0,u,v,w)
+
+
+stdBasisVector4 :: Num a => Index4 -> Tup4 a
+stdBasisVector4 i = Tup4 (tupleFromFun4 (\j -> if i==j then 1 else 0))
+
+combo2 :: VectorSpace v => ((Scalar v, v), (Scalar v, v)) -> v
+combo2 ((x0,v0), (x1,v1)) =
+     x0 *^ v0 
+    ^+^
+    x1 *^ v1 
+
+combo3
+  :: VectorSpace v =>
+     ((Scalar v, v), (Scalar v, v), (Scalar v, v)) -> v
+combo3 ((x0,v0), (x1,v1), (x2,v2)) =
+     x0 *^ v0 
+    ^+^
+    x1 *^ v1 
+    ^+^
+    x2 *^ v2 
+
+
+
+combo4
+  :: VectorSpace v =>
+     ((Scalar v, v), (Scalar v, v), (Scalar v, v), (Scalar v, v)) -> v
+combo4 ((x0,v0), (x1,v1), (x2,v2), (x3,v3)) =
+     x0 *^ v0 
+    ^+^
+    x1 *^ v1 
+    ^+^
+    x2 *^ v2 
+    ^+^
+    x3 *^ v3 

@@ -146,7 +146,7 @@ cutNormalDirDisplacement =
         
 
 coords :: Vert PreCutComplex -> Vec3
-coords = ba_coordsSimple preCut
+coords = ba_coords preCut
 
 mkFragment :: (?retetrahedrate :: Bool) =>
      ([Quadruple PreCutVert],

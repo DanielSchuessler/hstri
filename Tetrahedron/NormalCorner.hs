@@ -19,6 +19,7 @@ import Language.Haskell.TH.Syntax
 import Quote
 import Control.DeepSeq
 import ShortShow
+import Util
 
 
 class AsList normalCornerTuple => NormalCorners a normalCornerTuple | a -> normalCornerTuple where
@@ -29,7 +30,7 @@ normalCornerList ::  NormalCorners a normalCornerTuple => a -> [Element normalCo
 normalCornerList = asList . normalCorners
 
 newtype NormalCorner = NormalCorner Edge 
-    deriving (Eq,Ord,Enum,Bounded,Arbitrary,NFData)
+    deriving (Eq,Ord,Enum,Bounded,Arbitrary,NFData,Finite)
 
 class MakeNormalCorner a where
     normalCorner :: a -> NormalCorner
@@ -84,4 +85,6 @@ instance Quote NormalCorner where
 
 instance ShortShow NormalCorner where
     shortShow (NormalCorner (vertices -> (v0,v1))) = shortShow v0++shortShow v1
+
+instance Show a => Show (NormalCorner -> a) where show = showFiniteFunc "nc"
 

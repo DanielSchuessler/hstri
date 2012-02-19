@@ -92,6 +92,12 @@ nubOn f =
 
 class (Enum a, Bounded a) => Finite a where
 
+showFiniteFunc :: (Show a, Finite a, Show b) => String -> (a -> b) -> String
+showFiniteFunc varName f =
+    unlines (("\\"++varName++" -> case "++varName++" of")
+        : [ "    "++show v++" -> "++show (f v) | v <- [minBound..maxBound] ])
+
+
 -- | Like 'Either', but I use a new type to avoid orphan instances
 data EnumEither a b = EnumLeft a | EnumRight b
     deriving(Eq,Show)

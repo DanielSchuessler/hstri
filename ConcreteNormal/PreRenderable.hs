@@ -7,6 +7,7 @@ module ConcreteNormal.PreRenderable(
     Corn,corn,cornVerts,cornPos,cornCount,
     normalSurfaceToPreRenderable,
     CornerPosition',CornerCount,
+    prnsFromTetImmersions
 
     ) where
 
@@ -28,6 +29,12 @@ import StandardCoordinates.MatchingEquations
 import Util
 import Triangulation
 import Control.Applicative
+import Data.Lens.Common
+import FileLocation
+import Numeric.AD.Vector
+import Numeric.AD as AD
+import TriangulationCxtObject
+import R3Immersions
 
 type CornerPosition' = Int
 type CornerCount = Int
@@ -185,3 +192,35 @@ instance (Ord v, GluingMappable v) => GluingMappable (Corn v) where
                         where (v0,v1) = cornVerts c
 
 
+prnsFromTetImmersions
+  :: (ShortShow (Element (Verts s)),
+      ShortShow (Element (Eds s)),
+      PreDeltaSet2 s,
+      Element (Tris s) ~ NTriOrNQuadHalf) =>
+     (TIndex -> GeneralTetImmersion) -> s -> PreRenderable s
+prnsFromTetImmersions getTetImm cns =
+    setL pr_generalTriangleImmersionL (Just . timm)
+    $ mkPreRenderable $undef cns
+
+  where
+    timm = either' timm_tri timm_cnqh
+
+    timm_tri :: TConcreteNTri -> GeneralTriangleImmersion
+    timm_tri tcntri = 
+        GTE res (   tetImm 
+                .   stdToUnit3 
+                .   combo3 
+                .   (\(Tup3 xs) -> zipTuple3 xs (map3 (fmap AD.lift) cornsInStd3)) 
+                .   unitToStd2)
+        where
+            cntri = unT tcntri
+
+            cornsInStd3 :: Triple (Tup4 Double)
+            cornsInStd3 = map3 embedNCorner (vertices cntri)
+
+            GTetE res tetImm = getTetImm (getTIndex cntri)
+
+
+
+    timm_cnqh _ = undefined 
+    

@@ -49,6 +49,7 @@ import Util
 import Control.DeepSeq.TH
 import FileLocation(err')
 import Data.Typeable
+import ShortShow
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
     deriving (Eq,Ord,Typeable)
@@ -276,3 +277,7 @@ instance OrderableFace NormalArc ONormalArc where
 oNormalArcGetTriangle :: ONormalArc -> Triangle
 oNormalArcGetTriangle = normalArcGetTriangle . forgetVertexOrder
 
+instance ShortShow NormalArc where
+    shortShow a = shortShow (normalArcGetTriangle a, normalArcGetVertex a)
+
+instance Show a => Show (NormalArc -> a) where show = showFiniteFunc "na"

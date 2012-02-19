@@ -8,7 +8,13 @@ import Language.Haskell.TH
 import FileLocation
 import Language.Haskell.TH.Syntax
 import Data.Typeable(Typeable)
-import THUtil
+
+locationString :: Q String
+locationString = locationToString <$> location
+
+liftedLocationString :: Q Exp
+liftedLocationString = lift =<< locationString
+
 
 newtype EitherC e a = EitherC { runEitherC :: forall r. (e -> r) -> (a -> r) -> r }
     deriving Functor
@@ -61,7 +67,9 @@ instance (Show e, Show a) => Show (EitherC e a) where
     showsPrec prec x = showParen (prec > 10) 
         (showString "eitherCFromEither " . showsPrec 11 (eitherCToEither x))
 
-data Located e = Located String e
+type LocationString = String
+
+data Located e = Located LocationString e
     deriving (Typeable)
 
 instance Show e => Show (Located e) where
@@ -72,37 +80,57 @@ instance Exception e => Exception (Located e)
 failureWithoutLoc :: e -> EitherC e a
 failureWithoutLoc e = EitherC (\ke _ -> ke e)
 
-failureWithLoc :: String -> e -> EitherC (Located e) a
+failureWithLoc :: LocationString -> e -> EitherC (Located e) a
 failureWithLoc l e = failureWithoutLoc (Located l e)
 
+withCurrentLoc :: Name -> ExpQ
+withCurrentLoc f = appE (varE f) liftedLocationString
+
 failure :: Q Exp
-failure = [| failureWithLoc $liftedLocationString |] 
+failure = withCurrentLoc 'failureWithLoc
 
 type LErrorCall = Located ErrorCall
 
 idLErrorCall :: EitherC LErrorCall a -> EitherC LErrorCall a
 idLErrorCall = id
 
-failureStr :: Q Exp
-failureStr = [| idLErrorCall . $failure . ErrorCall |]
+failureStrWithLoc :: LocationString -> String -> EitherC LErrorCall a
+failureStrWithLoc l = failureWithLoc l . ErrorCall
 
-mkWrappedError _newMsgName = 
-    [| \_err -> $failureStr ($(varE _newMsgName)++"\n\tInner error: "++show _err) |]
+failureStr :: Q Exp
+failureStr = withCurrentLoc 'failureStrWithLoc 
+
+data CommentedException e = CommentedException String e 
+    deriving Typeable
+
+instance Show e => Show (CommentedException e) where
+    show (CommentedException c e) = c++"\n\tInner error: "++show e
+
+instance (Show e, Typeable e) => Exception (CommentedException e)
+
+type LCommentedException e = Located (CommentedException e)
+
+commentIfExceptionWithLoc
+  :: LocationString
+     -> String
+     -> EitherC e a
+     -> EitherC (LCommentedException e) a
+commentIfExceptionWithLoc l comment = 
+    runEitherC' (failureWithLoc l . CommentedException comment) return 
 
 -- | Catches and rethrows with a message prepended
 --
--- @$(wrapFailureStr) :: Show e => [Char] -> EitherC e a -> EitherC LErrorCall a@
-wrapFailureStr :: Q Exp
-wrapFailureStr = 
-    [| \_newMsg -> 
-                runEitherC'
-                    $(mkWrappedError '_newMsg)
-                    return
-                    |]
+-- @$(commentIfException) :: Show e => String -> EitherC e a -> EitherC (LCommentedException e) a@
+commentIfException :: Q Exp
+commentIfException = [| commentIfExceptionWithLoc $liftedLocationString |]
+
+
+unEitherCWithLoc :: (Show e, Typeable e) => LocationString -> String -> EitherC e c -> c
+unEitherCWithLoc l comment = runEitherC' throw id . commentIfExceptionWithLoc l comment 
                 
--- | Unwrap an 'EitherC', wrapping the exception (if any) with the message given as first arg of the generated expression.
+-- | Unwrap an 'EitherC', commenting the exception (if any) with the message given as first arg of the generated expression.
 unEitherC :: Q Exp
-unEitherC = [| (runEitherC' throw id .) . $wrapFailureStr |] 
+unEitherC = [| unEitherCWithLoc $liftedLocationString |] 
 
 
 type AttemptC = EitherC SomeException
@@ -110,16 +138,35 @@ type AttemptC = EitherC SomeException
 idAttemptC :: AttemptC a -> AttemptC a
 idAttemptC = id
 
+-- | Specialization of 'unEitherCWithLoc'.
+unAttemptWithLoc :: LocationString -> String -> AttemptC a -> a
+unAttemptWithLoc = unEitherCWithLoc
+
 -- | Generates a specialization of 'unEitherC'.
 unAttempt :: Q Exp
-unAttempt = [| (. idAttemptC) . $unEitherC |] 
-
+unAttempt = [| unAttemptWithLoc $liftedLocationString |] 
 
 toAttemptC :: Exception e => EitherC e a -> AttemptC a
 toAttemptC = mapLeft SomeException 
 
--- | > $toAttemptCAndWrap :: Show a1 => [Char] -> EitherC a1 a -> AttemptC a
-toAttemptCAndWrap :: Q Exp
-toAttemptCAndWrap = [| (toAttemptC .) . $wrapFailureStr |]
+-- | Comment on an exception and wrap the result into 'SomeException'
+commentIfExceptionWithLoc' :: (Show e, Typeable e) =>
+     LocationString -> String -> EitherC e a -> AttemptC a
+commentIfExceptionWithLoc' l c = toAttemptC . commentIfExceptionWithLoc l c
 
+-- | > $commentIfException' :: Show a1 => [Char] -> EitherC a1 a -> AttemptC a
+commentIfException' :: Q Exp
+commentIfException' = [| commentIfExceptionWithLoc' $liftedLocationString |]
 
+failureWithLoc'
+  :: Exception e => LocationString -> e -> AttemptC b
+failureWithLoc' l = toAttemptC . failureWithLoc l
+
+failure' :: ExpQ
+failure' = withCurrentLoc 'failureWithLoc'
+
+failureStrWithLoc' :: LocationString -> String -> AttemptC b
+failureStrWithLoc' l = toAttemptC . failureStrWithLoc l
+
+failureStr' :: ExpQ
+failureStr' = withCurrentLoc 'failureStrWithLoc'

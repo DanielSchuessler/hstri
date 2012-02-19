@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, NoMonomorphismRestriction #-}
+{-# LANGUAGE TupleSections, TemplateHaskell, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall #-}
 module FaceClasses where
@@ -9,6 +9,9 @@ import Data.Tuple.Index
 import PrettyUtil
 import qualified Data.Vector.Generic as VG
 import Language.Haskell.TH
+import THUtil
+import THBuild
+import Util
 
 data DIMMINUS1
 data DIM0
@@ -189,3 +192,20 @@ vInT_dual (VertexInTriangle t i) = EdgeInTriangle t (i3reverse i)
 
 instance Dual (VertexInTriangle t) (EdgeInTriangle t) where dual = vInT_dual
 instance Dual (EdgeInTriangle t) (VertexInTriangle t) where dual = eInT_dual
+
+
+inheritVertices :: (Convertible accessor ExpQ,Convertible sub TypeQ,Convertible super TypeQ) =>sub -> super -> accessor -> Q [Dec]
+inheritVertices = inheritSingleArgClass ''Vertices ['vertices] [''Verts]
+
+inheritEdges :: (Convertible accessor ExpQ,Convertible sub TypeQ,Convertible super TypeQ) =>sub -> super -> accessor -> Q [Dec]
+inheritEdges = inheritSingleArgClass ''Edges ['edges] [''Eds]
+
+inheritTriangles :: (Convertible accessor ExpQ,Convertible sub TypeQ,Convertible super TypeQ) =>sub -> super -> accessor -> Q [Dec]
+inheritTriangles = inheritSingleArgClass ''Triangles ['triangles] [''Tris]
+
+inheritTetrahedra :: (Convertible accessor ExpQ,Convertible sub TypeQ,Convertible super TypeQ) =>sub -> super -> accessor -> Q [Dec]
+inheritTetrahedra = inheritSingleArgClass ''Tetrahedra ['tetrahedra] [''Tets]
+
+inheritToDim2 :: (Convertible accessor ExpQ,Convertible sub TypeQ,Convertible super TypeQ) =>sub -> super -> accessor -> Q [Dec]
+inheritToDim2 sub super ac = 
+    concatMapM (\f -> f sub super ac) [inheritVertices,inheritEdges,inheritTriangles]

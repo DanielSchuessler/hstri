@@ -54,7 +54,7 @@ import PrettyUtil(pretty)
 import Data.AdditiveGroup((^-^))
 import Blender.Build
 
-#define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), Pretty (Vert s), Pretty (Ed s), Pretty (Tri s), PreDeltaSet2 s, Pretty s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
+#define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), PreDeltaSet2 s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
 #define CONSTRAINTS(s) ?sceneE::Python(),?scene::Scene s, CONSTRAINTS0(s) 
 
 

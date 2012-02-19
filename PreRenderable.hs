@@ -35,6 +35,7 @@ module PreRenderable(
     triangleLabelsForSimplicial,
 
 
+    pr_ds,
     pr_mapDs,
     pr_popDimension,
     pr_faceName,
@@ -100,6 +101,7 @@ import Tetrahedron.Vertex
 import Util
 import qualified Data.Map as M
 import Data.Maybe
+import THBuild
 
 data EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int, edgeDecoDir :: S2 } 
     deriving (Show)
@@ -163,7 +165,7 @@ mkFaceName :: String -> FaceName
 mkFaceName = FaceName
 
 data PreRenderable s = PreRenderable {
-    pr_ds :: s,
+    pr_wsl2 :: WithSuperfaceLookup2 s,
     -- | Overriden ('pr_coords') by the GeneralTriangleImmersion in pr_triangleInfo, if it exists for at least one triangle containing the vertex
     pr_coords0 :: Vert s -> Vec3,
     pr_faceInfo :: AnySimplex2Of s -> (Visibility,FaceName), 
@@ -174,11 +176,34 @@ data PreRenderable s = PreRenderable {
 
 nameMakeLens ''PreRenderable (Just . (++"L"))
 
+pr_ds :: PreRenderable s -> s
+pr_ds = wsl2_underlying . pr_wsl2 -- NB: less constraints than the lens
+
+pr_dsL
+  :: (Ord (Element (Verts c)),
+      Ord (Element (Eds c)),
+      Vertices (Element (Tris c)),
+      Triangles c,
+      Edges (Element (Tris c)),
+      DeltaSet1 c,
+      Verts (Element (Eds c)) ~ (Element (Verts c), Element (Verts c)),
+      Verts (Element (Tris c))
+        ~
+      (Element (Verts c), Element (Verts c), Element (Verts c)),
+      Eds (Element (Tris c))
+        ~
+      (Element (Eds c), Element (Eds c), Element (Eds c))) =>
+     Lens (PreRenderable c) c
+pr_dsL = wsl2_underlyingL <<< pr_wsl2L 
+
+inheritToDim2 (''PreRenderable `sappT` "s") "s" 'pr_ds
+inheritSuperfaceLookup2 (''PreRenderable `sappT` "s") (''WithSuperfaceLookup2 `sappT` "s") 'pr_wsl2
+
 
 pr_quad :: Resolution-> FF Tup2 Tup3 Double -> PreRenderable (SC2 (Bool, Bool))
 pr_quad reso (f :: FF Tup2 Tup3 Double) = 
     PreRenderable {
-        pr_ds = ds,
+        pr_wsl2 = addSuperfaceLookup2 ds,
         pr_coords0 = const (assert False undefined),
         pr_faceInfo = \asi -> ( if asi == edToAnySimplex2 _diag then Invisible else Visible
                               , mkFaceName $ shortShow asi),
@@ -222,7 +247,8 @@ instance Coords (PreRenderable a) where
         .   modL (pr_triangleInfoL >>> secondLens) (fmap (transformCoords f) .)
 
 instance 
-    (   DisjointUnionable s1 s2 s inj1 inj2 ei
+    (   DisjointUnionable (WithSuperfaceLookup2 s1) (WithSuperfaceLookup2 s2) 
+            (WithSuperfaceLookup2 s) inj1 inj2 ei
     
     ,   CoDisjointUnionable
                         (Vert s1) (Vert s2) (Vert s)
@@ -239,26 +265,26 @@ instance
 
 
 mkPreRenderable
-  :: (ShortShow (Vert s), ShortShow (Arc s), ShortShow (Tri s)) =>
+  :: (ShortShow (Vert s), ShortShow (Arc s), ShortShow (Tri s), OrdToDim1 s, PreDeltaSet2 s) =>
      (Vert s -> Vec3) -> s -> PreRenderable s
 mkPreRenderable = mkPreRenderableWithTriangleLabels (const Nothing)
 
 mkPreRenderableWithTriangleLabels
-  :: (ShortShow (Vert s), ShortShow (Arc s), ShortShow (Tri s)) =>
+  :: (ShortShow (Vert s), ShortShow (Arc s), ShortShow (Tri s), OrdToDim1 s, PreDeltaSet2 s) =>
 
      (Tri s -> Maybe TriangleLabel)
      -> (Vert s -> Vec3) -> s -> PreRenderable s
 mkPreRenderableWithTriangleLabels triangleLabels pr_coords_ pr_ds_ = 
     PreRenderable {
-        pr_ds = pr_ds_,
+        pr_wsl2 = addSuperfaceLookup2 pr_ds_,
         pr_coords0 = pr_coords_, 
         pr_triangleInfo = triangleLabels &&& const Nothing,
         pr_faceInfo = const Visible &&& (mkFaceName . shortShow),
         pr_edgeInfo = const (Nothing,Nothing)
     }
 
-instance OneSkeletonable s => OneSkeletonable (PreRenderable s) where
-    oneSkeleton _pr = _pr { pr_ds = oneSkeleton (pr_ds _pr) }
+-- instance OneSkeletonable s => OneSkeletonable (PreRenderable s) where
+--     oneSkeleton _pr = _pr { pr_ds = oneSkeleton (pr_ds _pr) }
 
 
 --type PreRenderableSimplicialComplex v = PreRenderable (OTuple v)
@@ -271,11 +297,16 @@ tet3d = mkPreRenderable vertexDefaultCoords abstractTet
 pr_mapDs
   :: (Vert t ~ Vert s,
       Ed t ~ Ed s,
-      Tri t ~ Tri s) =>
+      Tri t ~ Tri s,
+      PreDeltaSet2 s,
+      OrdToDim1 s
+      ) =>
      (t -> s) -> PreRenderable t -> PreRenderable s
-pr_mapDs f (PreRenderable a b c d e) = PreRenderable (f a) b c d e
+pr_mapDs f (PreRenderable a b c d e) = PreRenderable a' b c d e 
+    where
+        a' = addSuperfaceLookup2 (f (wsl2_underlying a))
 
-pr_popDimension :: PreRenderable (SC3 v) -> PreRenderable (SC2 v)
+pr_popDimension :: Ord v => PreRenderable (SC3 v) -> PreRenderable (SC2 v)
 pr_popDimension = pr_mapDs sccons_skeleton
 
 pr_faceName :: PreRenderable s -> AnySimplex2Of s -> FaceName
@@ -345,17 +376,16 @@ triResolutionToEdgeResolution = (*10)
 
 pr_edgeImmersion
   :: (PreDeltaSet2 s,
-      Show (Ed s),
-      Show (Tri s)) =>
+      OrdToDim1 s,
+      ShowToDim2 s) =>
      PreRenderable s
-     -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
      -> Ed s
      -> EdgeImmersion
-pr_edgeImmersion pr tcec e =
+pr_edgeImmersion pr e =
             case findJust (\(triangle,i) -> do 
                         emb <- getL pr_generalTriangleImmersionL pr triangle
                         return (triangle,i,emb))
-                 . lookupTrianglesContainingEdge tcec
+                 . trisContainingEd pr
                  $ e of 
 
                  Nothing -> 
@@ -364,8 +394,8 @@ pr_edgeImmersion pr tcec e =
                         Nothing -> flatFace pr (uncurry FlatEdge) map2 vertices e 
 
                  -- edge is contained in some curved triangle
-                 Just (_, i, GTE res emb) -> 
---                     trace ("Edge "++show e++" has index "++show i++" in "++show t) $
+                 Just (_t, i, GTE res emb) -> 
+                    trace ("Edge "++show e++"\n\thas index "++show i++"\n\tin "++show _t) $
 
                     GeneralEdge
                         (GEE
@@ -401,19 +431,16 @@ pr_triangleImmersion pr t =
 -- | See also: 'pr_coords0'
 pr_coords
   :: (PreDeltaSet2 s,
-      Show (Vert s),
-      Show (Ed s),
-      Show (Tri s)) =>
+      OrdToDim1 s,
+      ShowToDim2 s) =>
      PreRenderable s
-     -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
-     -> EdgesContainingVertex_Cache (Vert s) (Ed s)
      -> Vert s
      -> Vec3
-pr_coords pr tcec ecvc v = 
+pr_coords pr v = 
 
     (
             findJust (\(e,i) -> 
-                    case pr_edgeImmersion pr tcec e of
+                    case pr_edgeImmersion pr e of
                          FlatEdge {} -> Nothing
                          GeneralEdge (GEE _ emb) ->
 --                             trace ("Vertex "++show v++" has index "++show i++" in "++show e) $
@@ -421,7 +448,7 @@ pr_coords pr tcec ecvc v =
                                             I2_0 -> 0
                                             I2_1 -> 1)))
 
-                 . lookupEdgesContainingVertex ecvc
+                 . edsContainingVert pr
                  $ v 
     )
     `orElse`
@@ -434,13 +461,13 @@ instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
     Pretty (PreRenderable s) where
 
 
-    pretty PreRenderable{..} = 
+    pretty pr@PreRenderable{..} = 
         prettyRecord "PreRenderable"
-            [ ("pr_ds",pretty pr_ds)
-            , ("pr_coords0",prettyFunction pr_coords0 (vertices pr_ds))
-            , ("pr_faceInfo",prettyFunction pr_faceInfo (anySimplex2s pr_ds))
+            [ ("pr_ds",pretty (pr_ds pr))
+            , ("pr_coords0",prettyFunction pr_coords0 (vertices pr))
+            , ("pr_faceInfo",prettyFunction pr_faceInfo (anySimplex2s pr))
             , ("pr_triangleInfo",prettyFunction 
-                    (second (fmap (const "<<function>>")) . pr_triangleInfo) (triangles pr_ds))
+                    (second (fmap (const "<<function>>")) . pr_triangleInfo) (triangles pr))
             ]
 
 
@@ -468,19 +495,19 @@ instance Lift FaceName where
 
 deriveLiftMany [''Visibility,''TriangleImmersion,''EdgeImmersion,''EdgeDeco]
 
-instance (PreDeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
-            , Lift (Vert s), Lift (Ed s), Lift (Tri s)) => 
-
-    Lift (PreRenderable s) where
-
-    lift PreRenderable{..} = 
-        [| PreRenderable {
-                pr_ds = pr_ds,
-                pr_coords0 = $(liftFunction (vertexList pr_ds) pr_coords0),
-                pr_faceInfo = $(liftFunction (anySimplex2s pr_ds) pr_faceInfo),
-                pr_triangleInfo = $(liftFunction (triangleList pr_ds) pr_triangleInfo),
-                pr_edgeInfo = $(liftFunction (edgeList pr_ds) pr_edgeInfo)
-        } |]
+-- instance (PreDeltaSet2 s, Lift s, Ord (Vert s), Ord (Ed s), Ord (Tri s)
+--             , Lift (Vert s), Lift (Ed s), Lift (Tri s)) => 
+-- 
+--     Lift (PreRenderable s) where
+-- 
+--     lift PreRenderable{..} = 
+--         [| PreRenderable {
+--                 pr_ds = pr_ds,
+--                 pr_coords0 = $(liftFunction (vertexList pr_ds) pr_coords0),
+--                 pr_faceInfo = $(liftFunction (anySimplex2s pr_ds) pr_faceInfo),
+--                 pr_triangleInfo = $(liftFunction (triangleList pr_ds) pr_triangleInfo),
+--                 pr_edgeInfo = $(liftFunction (edgeList pr_ds) pr_edgeInfo)
+--         } |]
 
 
 -- pr_ghide
@@ -554,7 +581,7 @@ evalEdgeImmersion (GeneralEdge (GEE _ f)) = f
 data GeneralTetImmersion = GTetE Resolution (FF Tup3 Tup3 Double)
 
 mkPreRenderableFromTetImmersions
-  :: forall s. (Ord (Tri s), ShortShow (Vert s), ShortShow (Tri s), ShortShow (Ed s), PreDeltaSet3 s) =>
+  :: forall s. (OrdToDim2 s, ShortShow (Vert s), ShortShow (Tri s), ShortShow (Ed s), PreDeltaSet3 s) =>
      (Tet s -> Maybe GeneralTetImmersion)
      -> (Vert s -> Vec3) -- ^ Vertex coordinates to use for vertices which are in a tetrahedron for which the first argument returns 'Nothing' (or vertices which aren't in any tetrahedron). 
      -> s 
@@ -570,12 +597,7 @@ mkPreRenderableFromTetImmersions (getTetImm :: Tet s -> Maybe GeneralTetImmersio
                         [ (tetImm,i) ])
 
             let pretransform :: FF Tup3 Tup4 Double 
-                pretransform (Tup3 (u,v,w)) =
-                    case i of
-                         I4_0 -> Tup4 (u,v,w,0)
-                         I4_1 -> Tup4 (u,v,0,w)
-                         I4_2 -> Tup4 (u,0,v,w)
-                         I4_3 -> Tup4 (0,u,v,w)
+                pretransform = std2IntoStd3 i 
 
             Just (GTE res (tetImm . stdToUnit3 . pretransform . unitToStd2))
         )

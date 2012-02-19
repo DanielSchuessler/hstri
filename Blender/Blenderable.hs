@@ -172,7 +172,7 @@ defaultWorldProps = ["use_sky_blend" & False,
 
 
 instance 
-    (   DisjointUnionable s1 s2 s inj1 inj2 ei
+    (   DisjointUnionable (PreRenderable s1) (PreRenderable s2) (PreRenderable s) inj1 inj2 ei
     
     ,   CoDisjointUnionable
                         (Vert s1) (Vert s2) (Vert s)
@@ -237,40 +237,21 @@ ba_triangleImmersion :: PreDeltaSet2 s => Blenderable s -> Tri s -> TriangleImme
 ba_triangleImmersion = pr_triangleImmersion . ba_pr
 
 ba_edgeImmersion
-  :: (Show (Element (Eds s)),
-      Show (Element (Tris s)),
-      Show (Vert s),
+  :: (ShowToDim2 s, OrdToDim1 s,
       PreDeltaSet2 s) =>
      Blenderable s
-     -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
      -> Ed s
      -> EdgeImmersion
 ba_edgeImmersion = pr_edgeImmersion . ba_pr
 
 ba_coords
-  :: (Show (Element (Eds s)),
-      Show (Element (Tris s)),
-      Show (Vert s),
+  :: (ShowToDim2 s, OrdToDim1 s,
       PreDeltaSet2 s) =>
      Blenderable s
-     -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
-     -> EdgesContainingVertex_Cache (Vert s) (Ed s)
      -> Vert s
      -> Vec3
 ba_coords = pr_coords . ba_pr
 
-ba_coordsSimple
-  :: (Ord (Element (Eds s)),
-      Ord (Element (Verts s)),
-      Show (Element (Eds s)),
-      Show (Element (Tris s)),
-      Show (Element (Verts s)),
-      Triangles s,
-      Edges (Element (Tris s)),
-      Vertices (Element (Tris s)),
-      PreDeltaSet2 s) =>
-     Blenderable s -> Vert s -> Vec3
-ba_coordsSimple ba = ba_coords ba (mkTCEC (ba_ds ba)) (mkECVC (ba_ds ba))
 
 ba_faceName :: Blenderable s -> AnySimplex2Of s -> FaceName
 ba_faceName = pr_faceName . ba_pr

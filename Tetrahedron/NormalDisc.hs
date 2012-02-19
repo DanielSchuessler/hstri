@@ -25,10 +25,17 @@ module Tetrahedron.NormalDisc(
 
         -- * Normal triangles
         NormalTri(..),
-        allNormalTris, allNormalTris', normalTriGetVertex, 
+        NormalTris(..),
+        normalTriList,
+        -- ** Construction
+        allNormalTris, allNormalTris',
         MakeNormalTri(..),
-        NormalTris(..),normalTriList,normalTriByNormalArc,
+        normalTriByNormalArc,
         adjacentNormalCornersInTri,
+        -- ** Properties
+        normalTriGetVertex, 
+        normalTriGetNormalCorners,
+        normalTriGetNormalArcs,
 
 
         -- * Normal quadrilaterals
@@ -42,6 +49,9 @@ module Tetrahedron.NormalDisc(
         otherNormalQuads,
         NormalQuads(..),normalQuadList,
         adjacentNormalCornersInQuad,
+        normalQuadGetNormalCornersInOrder,
+        normalQuadGetNormalArcsInOrder,
+
 
 
 
@@ -72,6 +82,8 @@ import Control.DeepSeq
 import Control.DeepSeq.TH
 import Language.Haskell.TH.Lift
 import Data.Typeable
+import ShortShow
+import Data.Char
 
 
     
@@ -219,7 +231,11 @@ normalQuadByNormalArc na = normalQuadByVertexAndTriangle (normalArcGetVertex na)
 
 
 instance NormalArcs NormalTri (Triple NormalArc) where
-    normalArcs (normalTriGetVertex -> v) = map3 (\t -> normalArc (t, v)) (star v (TwoSkeleton AbsTet))
+    normalArcs = normalTriGetNormalArcs
+
+instance Edges NormalTri  where
+    type Eds NormalTri = (Triple NormalArc)
+    edges = normalTriGetNormalArcs
 
 instance NormalArcs NormalDisc [NormalArc] where
     normalArcs = eitherND normalArcList normalArcList
@@ -252,11 +268,6 @@ instance IsSubface NormalCorner NormalDisc where
 -- deriveCollectionKeyClass ''NormalDisc
 
 
-instance NormalArcs NormalQuad (Quadruple NormalArc) where
-    normalArcs q = case normalCorners q of
-                        cs -> map4 
-                                normalArc 
-                                ($(zipTuple 4) (rotate4_1 cs) cs)
 
 
 
@@ -288,10 +299,23 @@ instance NormalTris Edge (Pair NormalTri) where
 instance NormalTris OEdge (Pair NormalTri) where
     normalTris = map2 normalTri . vertices 
 
+-- | = normalTriGetNormalCorners
 instance NormalCorners NormalTri (Triple NormalCorner) where
-    normalCorners nt =
-        map3 normalCorner (star (normalTriGetVertex  nt) (OneSkeleton AbsTet))
+    normalCorners = normalTriGetNormalCorners
 
+-- | = normalTriGetNormalCorners
+instance Vertices NormalTri  where
+    type Verts NormalTri = Triple NormalCorner
+    vertices = normalTriGetNormalCorners
+
+-- | In order corresponding to 'edgesContainingVertex'.
+normalTriGetNormalCorners :: NormalTri -> Triple NormalCorner
+normalTriGetNormalCorners nt = 
+    map3 normalCorner (edgesContainingVertex (normalTriGetVertex nt))
+
+normalTriGetNormalArcs :: NormalTri -> Triple NormalArc
+normalTriGetNormalArcs =
+   \(normalTriGetVertex -> v) -> map3 (\t -> normalArc (t, v)) (star v (TwoSkeleton AbsTet))
 
 -- | Elements (circularly) adjacent in the returned tuple are adjacent corners
 normalQuadGetNormalCornersInOrder
@@ -299,9 +323,25 @@ normalQuadGetNormalCornersInOrder
      -> (Quadruple NormalCorner)
 normalQuadGetNormalCornersInOrder = map4 normalCorner . normalQuadGetIntersectedEdges
 
--- | Equivalent to 'normalQuadGetNormalCornersInOrder'
+-- | = 'normalQuadGetNormalCornersInOrder'
 instance NormalCorners NormalQuad (Quadruple NormalCorner) where
     normalCorners = normalQuadGetNormalCornersInOrder
+
+instance Vertices NormalQuad where
+    type Verts NormalQuad = Quadruple NormalCorner
+    vertices = normalQuadGetNormalCornersInOrder
+
+
+-- | @i@th component of the result spans from the @i-1@th component of 'normalQuadGetNormalCornersInOrder' to its @i@th component 
+normalQuadGetNormalArcsInOrder :: NormalQuad -> Quadruple NormalArc
+normalQuadGetNormalArcsInOrder q =  
+    case normalQuadGetNormalCornersInOrder q of
+        cs -> map4 
+                normalArc
+                ($(zipTuple 4) cs (rotate4_1 cs))
+
+instance NormalArcs NormalQuad (Quadruple NormalArc) where
+    normalArcs = normalQuadGetNormalArcsInOrder 
 
 
 -- | Returns the unique normal tri type containing a normal arc of the given type
@@ -383,6 +423,11 @@ instance Quote NormalDisc where
 instance Finite NormalQuad
 instance Finite NormalDisc
 
+instance Show a => Show (NormalDisc -> a) where show = showFiniteFunc "nd"
+instance Show a => Show (NormalQuad -> a) where show = showFiniteFunc "q"
+instance Show a => Show (NormalTri -> a) where show = showFiniteFunc "t"
+
+
 normalDiscsContainingNormalArc
   :: NormalArc -> (Pair NormalDisc)
 normalDiscsContainingNormalArc = 
@@ -450,3 +495,12 @@ class MakeNormalDisc a where
     normalDisc :: a -> NormalDisc
 
 deriveLift ''NormalQuad
+
+instance ShortShow NormalQuad where
+    shortShow = map toUpper . drop 2 . show
+
+instance ShortShow NormalTri where
+    shortShow = shortShow . normalTriGetVertex
+
+instance ShortShow NormalDisc where
+    shortShow = eitherND shortShow shortShow

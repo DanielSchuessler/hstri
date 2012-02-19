@@ -102,6 +102,8 @@ instance Convertible TypeQ [StrictTypeQ] where convert = return . strictTypeQ
 instance Convertible Name [StrictTypeQ] where convert = return . strictTypeQ
 instance Convertible String [StrictTypeQ] where convert = return . strictTypeQ 
 
+instance Convertible [ DecQ ] [ DecQ ] where convert = id
+instance Convertible DecQ [ DecQ ] where convert = return
 
 svalD
   :: (Convertible a PatQ, Convertible a1 ExpQ) => a -> a1 -> DecQ
@@ -165,20 +167,49 @@ stupP = tupP . patQs
 
 infixr 0 \->
 
+
+preconvert :: Convertible a b => (b -> c) -> a -> c
+preconvert = (. convert) 
+
+preconvert2
+  :: (Convertible a1 b, Convertible a b1) =>
+     (b1 -> b -> c) -> a -> a1 -> c
+preconvert2 f = preconvert . preconvert f
+
+preconvert3
+  :: (Convertible a1 b, Convertible a2 b1, Convertible a b2) =>
+     (b2 -> b1 -> b -> c) -> a -> a2 -> a1 -> c
+preconvert3 f = preconvert2 . preconvert f
+
+preconvert4
+  :: (Convertible a1 b,
+      Convertible a2 b1,
+      Convertible a3 b2,
+      Convertible a b3) =>
+     (b3 -> b2 -> b1 -> b -> c) -> a -> a3 -> a2 -> a1 -> c
+preconvert4 f = preconvert3 . preconvert f
+
 sconP
   :: (Convertible a Name, Convertible a1 [PatQ]) => a -> a1 -> PatQ
-sconP n ps = conP (name n) (patQs ps)
+sconP = preconvert2 conP
 
 sclassP
   :: (Convertible a Name, Convertible a1 [TypeQ]) => a -> a1 -> PredQ
-sclassP na tys = classP (name na) (typeQs tys)
+sclassP = preconvert2 classP
 
 stySynInstD
   :: (Convertible a Name,
       Convertible a1 [TypeQ],
       Convertible a2 TypeQ) =>
      a -> a1 -> a2 -> DecQ
-stySynInstD na tys ty = tySynInstD (name na) (typeQs tys) (typeQ ty)
+stySynInstD = preconvert3 tySynInstD
 
 slistE :: Convertible a [ExpQ] => a -> ExpQ
-slistE = listE . expQs
+slistE = preconvert listE
+
+sinstanceD
+  :: (Convertible a1 [DecQ],
+      Convertible a2 TypeQ,
+      Convertible a CxtQ) =>
+     a -> a2 -> a1 -> DecQ
+sinstanceD = preconvert3 instanceD

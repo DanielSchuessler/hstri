@@ -69,7 +69,7 @@ instance NormalCorners INormalTri (Triple INormalCorner) where
     normalCorners = traverseI map3 normalCorners
     
 instance NormalCorners INormalQuad (Quadruple INormalCorner) where
-    normalCorners = traverseI map4 normalCorners
+    normalCorners = iNormalQuadGetNormalCornersInOrder
 
 instance NormalCorners INormalDisc [INormalCorner] where
     normalCorners = traverseI map normalCorners
@@ -242,3 +242,12 @@ instance OrderableFace INormalArc OINormalArc where
     type VertexSymGroup INormalArc = S2
     packOrderedFace = defaultPackOrderedFaceI 
     unpackOrderedFace = defaultUnpackOrderedFaceI
+
+-- | Elements (circularly) adjacent in the returned tuple are adjacent corners
+iNormalQuadGetNormalCornersInOrder
+  :: INormalQuad -> Quadruple INormalCorner
+iNormalQuadGetNormalCornersInOrder = traverseI map4 normalQuadGetNormalCornersInOrder
+
+iNormalQuadGetNormalArcsInOrder
+  :: INormalQuad -> Quadruple INormalArc
+iNormalQuadGetNormalArcsInOrder = traverseI map4 normalQuadGetNormalArcsInOrder

@@ -140,6 +140,7 @@ Library
     Math.SparseVector
     ZapUnits
     Data.BitVector.Adaptive
+    Data.FiniteFunc
     Blender.Mesh
     QuadCoordinates.SolSetConversion
     NormalSurfaceBasic

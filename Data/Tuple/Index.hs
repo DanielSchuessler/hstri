@@ -122,6 +122,12 @@ i3reverse i = case i of
                    I3_1 -> I3_1
                    I3_2 -> I3_0
 
+i4reverse :: Index4 -> Index4
+i4reverse i = case i of
+                   I4_0 -> I4_3
+                   I4_1 -> I4_2
+                   I4_2 -> I4_1
+                   I4_3 -> I4_0
 
 instance Pretty Index2 where pretty = dullyellow . int . fromEnum
 instance Pretty Index3 where pretty = dullyellow . int . fromEnum

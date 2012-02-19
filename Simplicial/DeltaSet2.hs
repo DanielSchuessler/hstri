@@ -11,6 +11,8 @@ module Simplicial.DeltaSet2(
     DefaultVertsOfTri,
     defaultVerticesOfTri,
     DeltaSetMorphism2(..),
+    ShowToDim2,
+    OrdToDim2,
 
     -- * AnySimplex2
     AnySimplex2,
@@ -24,14 +26,19 @@ module Simplicial.DeltaSet2(
     anySimplex1To2,
     anySimplex2s,
     -- * Lookups
-    TrianglesContainingEdge_Cache,
-    lookupTrianglesContainingEdge,
     mkTCEC,
+    SuperfaceLookup2(..),
+    inheritSuperfaceLookup2,
+    WithSuperfaceLookup2(..),
+    wsl2_underlyingL,
+    addSuperfaceLookup2,
+
 --     Unit2Simplex(..),
     Unit2SimplexPoint,
     -- * Generic
     GenericDeltaSet2(..),
     gds2_fromTris,
+    gds2
 
 
     ) where
@@ -39,14 +46,19 @@ module Simplicial.DeltaSet2(
 import Simplicial.DeltaSet1
 import Control.Arrow
 import qualified Data.Map as M
+import Data.Map(Map)
 import Control.Applicative
 import PrettyUtil
 import Language.Haskell.TH.Lift
+import Language.Haskell.TH
 import ShortShow
 import MathUtil
 import FileLocation
 import Data.Ord
 import Util
+import THBuild
+import THUtil
+import Data.Lens.Common
 
 
 -- | LAW: @forall i j. i >= j ==> 'edgeGetVertexAt' i . 'triangleGetEdgeAt' j == 'edgeGetVertexAt' j . 'triangleGetEdgeAt' (i+1)@  
@@ -70,6 +82,12 @@ class DeltaSetMorphism2 t t' f | f -> t t' where
 
 face21 :: (Triangles t, Tris t ~ (e, e, e)) => t -> Index3 -> e
 face21 = tupleToFun3 . triangles
+
+class (ShowToDim1 s, Show (Tri s)) => ShowToDim2 s
+instance (ShowToDim1 s, Show (Tri s)) => ShowToDim2 s
+
+class (OrdToDim1 s, Ord (Tri s)) => OrdToDim2 s
+instance (OrdToDim1 s, Ord (Tri s)) => OrdToDim2 s
 
 newtype AnySimplex2 v e t = AnySimplex2 (Either (AnySimplex1 v e) t) 
     deriving(Show,SubSumTy,SuperSumTy,Eq,Ord)
@@ -122,14 +140,16 @@ defaultVerticesOfTri t = (v0,v1,v2)
 
 
 
-newtype TrianglesContainingEdge_Cache ed tri = 
-    TCEC { lookupTrianglesContainingEdge :: ed -> [(tri,Index3)] } 
 
 
 
 mkTCEC
-  :: (Ord (Ed s), PreDeltaSet2 s) => s -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
-mkTCEC s = TCEC (flip $(indx) m)
+  :: (Ord k,
+      Triangles a,
+      Edges (Element (Tris a)),
+      Eds (Element (Tris a)) ~ (k, k, k)) =>
+     a -> Map k [(Tri a, Index3)]
+mkTCEC s = m
     where
         m = M.fromListWith (++)
                     . concatMap (\t -> 
@@ -190,7 +210,7 @@ instance Triangles (GenericDeltaSet2 t) where
     type Tris (GenericDeltaSet2 t) = [t]
     triangles = gds2_triangles
 
-instance (SatisfiesSimplicialIdentities2 t) => DeltaSet1 (GenericDeltaSet2 t) 
+instance (TriangleLike t) => DeltaSet1 (GenericDeltaSet2 t) 
 instance (SatisfiesSimplicialIdentities2 t) => DeltaSet2 (GenericDeltaSet2 t) 
 
 
@@ -202,6 +222,17 @@ gds2_fromTris tris =
         verts = nub' . concatMap vertexList $ eds
     in
         GDS2 verts eds tris
+
+gds2
+  :: (Vertices a,
+      Triangles a,
+      Edges a,
+      Verts a ~ [Element (Verts t)],
+      Tris a ~ [t],
+      Eds a ~ [Element (Eds t)]) =>
+     a -> GenericDeltaSet2 t
+gds2 ds = GDS2 (vertices ds) (edges ds) (triangles ds)
+
 
 -- data Unit2Simplex = Unit2Simplex
 --     deriving Show
@@ -227,4 +258,44 @@ gds2_fromTris tris =
 --             a = Vec2 0 0
 --             b = Vec2 0 1
 --             c = Vec2 1 0
+
+
+class SuperfaceLookup2 s where 
+    edsContainingVert :: s -> Vert s -> [(Ed s, Index2)] 
+    trisContainingEd :: s -> Ed s -> [(Tri s, Index3)]
+
+inheritSuperfaceLookup2
+  :: (Convertible accessor ExpQ,
+      Convertible sub TypeQ,
+      Convertible super TypeQ) =>
+     sub -> super -> accessor -> Q [Dec]
+inheritSuperfaceLookup2 = 
+    inheritSingleArgClass ''SuperfaceLookup2 ['edsContainingVert,'trisContainingEd] [] 
+
+data WithSuperfaceLookup2 s =
+    WithSuperfaceLookup2 {
+        wsl2_underlying :: s,
+        wsl2_ecvc :: Map (Vert s) [(Ed s,Index2)],
+        wsl2_tcec :: Map (Ed s) [(Tri s,Index3)]
+    }
+
+
+
+deriving instance (ShowToDim2 s, Show s) => Show (WithSuperfaceLookup2 s)
+instance DeltaSet1 s => DeltaSet1 (WithSuperfaceLookup2 s) 
+
+inheritToDim2 (''WithSuperfaceLookup2 `sappT` "s") "s" 'wsl2_underlying
+
+instance (ShowToDim1 s, OrdToDim1 s) => SuperfaceLookup2 (WithSuperfaceLookup2 s) where
+    edsContainingVert = flip $indxShow . wsl2_ecvc
+    trisContainingEd = flip $indxShow . wsl2_tcec
+
+
+
+addSuperfaceLookup2 :: (OrdToDim1 s, PreDeltaSet2 s) => s -> WithSuperfaceLookup2 s
+addSuperfaceLookup2 s = WithSuperfaceLookup2 s (mkECVC s) (mkTCEC s)
+
+-- | Regenerates the lookups when set
+wsl2_underlyingL :: (OrdToDim1 s, PreDeltaSet2 s) => Lens (WithSuperfaceLookup2 s) s
+wsl2_underlyingL = lens wsl2_underlying (const . addSuperfaceLookup2)
 

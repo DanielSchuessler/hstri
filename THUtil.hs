@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, TypeSynonymInstances, TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns, FlexibleContexts, NoMonomorphismRestriction, FlexibleInstances, TypeSynonymInstances, TemplateHaskell #-}
 {-# OPTIONS -Wall #-}
 module THUtil(
     module Debug.Trace,
@@ -16,6 +16,8 @@ module THUtil(
     liftFunction,
     straceExp,
     ltraceExp,
+    inherit,
+    inheritSingleArgClass,
     -- * Error locations
     liftedLocationString,
     debugIndex,
@@ -39,7 +41,9 @@ import Data.Generics
 import Data.Maybe
 import FileLocation
 import qualified Data.Vector.Generic as VG
-import Control.Applicative
+import EitherC
+import THBuild
+import Control.Monad
 
 atType ::  TypeQ -> ExpQ
 atType t = [| \f -> f (undefined :: $(t)) |]
@@ -174,11 +178,6 @@ debugIndex = do
 
 
 
-locationString :: Q String
-locationString = locationToString <$> location
-
-liftedLocationString :: Q Exp
-liftedLocationString = lift =<< locationString
 
 fromListNoCollision :: Q Exp
 fromListNoCollision =
@@ -190,3 +189,41 @@ insertNoCollision =
 
 
 
+-- ClassD Cxt Name [TyVarBndr] [FunDep] [Dec]
+
+inherit
+  :: (Convertible accessor ExpQ, Convertible sub TypeQ, Convertible super TypeQ) =>
+     (TypeQ -> Q (Name, [Type]))
+     -> [Name] -> [Name] -> sub -> super -> accessor -> Q [Dec]
+inherit cls methods asstysyns (typeQ -> sub) (typeQ -> super) accessor = do
+    (cls_n, cls_tys) <- cls sub 
+    (cls_n', cls_tys') <- cls super 
+
+    sequence $ [
+        instanceD 
+            (cxt [return (ClassP cls_n' cls_tys')])
+            (return (foldl AppT (ConT cls_n) cls_tys))
+            (
+            [
+                svalD (varP m) ('(.) `sappE` varE m `sappE` accessor)
+
+                | m <- methods
+            
+            ]
+            ++
+            [
+                tySynInstD asstysyn (map return cls_tys) 
+                    (return (foldl AppT (ConT asstysyn) cls_tys'))
+
+                    | asstysyn <- asstysyns
+            ]
+            )
+        ]
+
+        
+inheritSingleArgClass
+  :: (Convertible accessor ExpQ,
+      Convertible sub TypeQ,
+      Convertible super TypeQ) =>
+     Name -> [Name] -> [Name] -> sub -> super -> accessor -> Q [Dec]
+inheritSingleArgClass clsn = inherit (liftM (\t -> (clsn,[t])))

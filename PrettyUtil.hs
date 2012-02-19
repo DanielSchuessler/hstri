@@ -54,6 +54,7 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Text.PrettyPrint.ANSI.Leijen as Leijen
 import Text.Groom
 import Numeric.AD.Types(AD)
+import Data.FiniteFunc
 --import GHC.Generics hiding(prec)
 
 (<>) ::  Doc -> Doc -> Doc
@@ -115,6 +116,9 @@ prettyFunction
   :: (AsList xs, Pretty y, Pretty (Element xs)) =>
      (Element xs -> y) -> xs -> Doc
 prettyFunction f domain = prettyAssocs (fmap (id &&& f) (asList domain))
+
+instance (Pretty a, Pretty b) => Pretty (FiniteFunc a b) where
+    pretty ff = prettyFunction (ff_apply ff) (ff_domain ff)
 
 
 prettyRealFloat :: RealFloat a => a -> Doc

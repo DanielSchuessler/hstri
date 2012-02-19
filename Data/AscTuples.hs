@@ -167,13 +167,14 @@ subtuplesAsc4_3 = unsafeAsc . map4 unsafeAsc . subtuples4_3 . unAsc
 
 
 sort3WithPermutation'
-  :: (Ord a, Show a) => (a, a, a) -> EitherC LErrorCall (Asc3 a,S3)
+  :: (Ord a, Show a) =>
+     (a, a, a) -> EitherC (LCommentedException LErrorCall) (Asc3 a, S3)
 sort3WithPermutation' xs = 
     let (xs',g) = sort3WithPermutation xs 
     in
         (,g) <$>
 
-        $(wrapFailureStr) 
+        $(commentIfException) 
             ("sort3WithPermutation': Args not distinct: "++show xs) 
             (asc3total xs')
 
