@@ -197,8 +197,8 @@ instance
 
 --normalSurface' s = normalSurface (addCoordFunc id (const Nothing) s)
 
-instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
-            , Vertices s, Edges s, Triangles s) => 
+instance (Pretty (PreRenderable s), Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
+            ) => 
                     Pretty (Blenderable s) where
 
     pretty Blenderable{..} = prettyRecord "Blenderable"
@@ -206,8 +206,8 @@ instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
 --         ("ba_coords",prettyFunction ba_coords (vertices ba_ds))
         ]
 
-instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
-            , Vertices s, Edges s, Triangles s) => 
+instance (Pretty (PreRenderable s), Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
+            ) => 
                     Show (Blenderable s) where
 
     showsPrec = prettyShowsPrec

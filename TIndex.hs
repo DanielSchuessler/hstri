@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, UndecidableInstances, FlexibleInstances, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TemplateHaskell #-}
+{-# LANGUAGE NoMonomorphismRestriction, TypeFamilies, FlexibleContexts, DeriveDataTypeable, DeriveGeneric, UndecidableInstances, FlexibleInstances, ViewPatterns, MultiParamTypeClasses, FunctionalDependencies, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 {-# OPTIONS -Wall #-}
 module TIndex where
 
@@ -23,6 +23,7 @@ import THUtil
 import Control.DeepSeq.TH
 import Control.DeepSeq
 import Data.Typeable
+import Data.SumType
 
 
 
@@ -209,3 +210,36 @@ instance (MapTIndices a, MapTIndices b) => MapTIndices (a,b) where
     mapTIndices f = mapTIndices f *** mapTIndices f
 
 deriveNFData ''I
+
+
+mapTIndices_sum
+  :: (SuperSumTy r,
+      SubSumTy ab,
+      MapTIndices (L ab),
+      MapTIndices (R ab),
+      R r ~ R ab,
+      L r ~ L ab) =>
+     (TIndex -> TIndex) -> ab -> r
+mapTIndices_sum f = mapTIndices f ++++ mapTIndices f
+
+
+viewI_sum
+  :: (SuperSumTy a,
+      SubSumTy ab,
+      HasTIndex (L ab) (L a),
+      HasTIndex (R ab) (R a)) =>
+     ab -> I a
+viewI_sum =
+ either' 
+            (\(viewI -> I i x) -> I i (left' x))
+            (\(viewI -> I i x) -> I i (right' x)) 
+
+
+addTIndex_sum
+  :: (SuperSumTy r,
+      SubSumTy ab,
+      HasTIndex (L r) (L ab),
+      HasTIndex (R r) (R ab)) =>
+     TIndex -> ab -> r
+addTIndex_sum i y = either' (left' . (i ./)) (right' . (i ./)) y
+

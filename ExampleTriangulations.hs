@@ -14,6 +14,7 @@ import PreRenderable
 import Numeric.AD.Vector
 import Data.VectorSpace
 import HomogenousTuples
+import Text.PrettyPrint.ANSI.Leijen(text)
 
 tr_aroundEdge :: Word -> Triangulation
 tr_aroundEdge n =
@@ -137,7 +138,7 @@ lensSpace p (tindex -> q) =
                 
 
 defaultTetImmersion :: GeneralTetImmersion
-defaultTetImmersion = GTetE 10
+defaultTetImmersion = GTetE (text "defaultTetImmersion") 10
     ((\(Tup4 xs) -> 
         sumV (zipWith (\x v -> x *^ liftVec3 (vertexDefaultCoords v)) (toList4 xs) allVertices)
         )

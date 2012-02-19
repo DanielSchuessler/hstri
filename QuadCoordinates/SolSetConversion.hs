@@ -177,6 +177,7 @@ data SolSetConversionResult r =
             sscr_finalVerbose :: Vector (SolSetConversionResultItem r) 
         }
 
+sscr_final :: SolSetConversionResult r -> Vector (Admissible (StandardDense Vector r))
 sscr_final = VG.map sscri_value . sscr_finalVerbose
 
 data SolSetConversionResultItem r = 

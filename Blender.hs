@@ -50,7 +50,7 @@ import Data.AdditiveGroup((^+^))
 import Data.VectorSpace((^*))
 import PrettyUtil(docToString)
 import PrettyUtil(prettyEqs)
-import PrettyUtil(pretty)
+import PrettyUtil(pretty,text)
 import Data.AdditiveGroup((^-^))
 import Blender.Build
 
@@ -210,12 +210,10 @@ toBlender scene@Scene{
 
 
             let ds = ba_ds ba
-                tcec = mkTCEC ds
-                ecvc = mkECVC ds
 
-            mapM_ (handleSimplex dhV ba tcec ecvc) (vertexList ds)
-            mapM_ (handleSimplex dhE ba tcec ecvc) (edgeList ds)
-            mapM_ (handleSimplex dhT ba tcec ecvc) (triangleList ds)
+            mapM_ (handleSimplex dhV ba) (vertexList ds)
+            mapM_ (handleSimplex dhE ba) (edgeList ds)
+            mapM_ (handleSimplex dhT ba) (triangleList ds)
 
             --ln "ops.view3d.viewnumpad(type='CAMERA')"
 
@@ -261,8 +259,6 @@ type DimensionHandler s a =
         (CONSTRAINTS(s)) => 
 
                Blenderable s
-            -> TrianglesContainingEdge_Cache (Ed s) (Tri s) 
-            -> EdgesContainingVertex_Cache (Vert s) (Ed s) 
             -> a 
             -> Python ()
 
@@ -271,20 +267,18 @@ handleSimplex
 
         DimensionHandler s a
      -> Blenderable s
-     -> TrianglesContainingEdge_Cache (Ed s) (Tri s)
-     -> EdgesContainingVertex_Cache (Vert s) (Ed s)
      -> a
      -> Python ()
-handleSimplex dh ba tcec ecvc si = do
+handleSimplex dh ba si = do
     ln ""
-    dh ba tcec ecvc si
+    dh ba si
 
 -- | Logic specific for vertices
 dhV :: DimensionHandler s (Vert s)
-dhV   ba tcec ecvc v = 
+dhV   ba v = 
     when (ba_visibility ba v' == Visible) $ do
             let _objVar = pyv "sphereObj"
-            (newSphereObj _objVar (ba_coords ba tcec ecvc v) (ba_vertexThickness ba v)) 
+            (newSphereObj _objVar (ba_coords ba v) (ba_vertexThickness ba v)) 
             asiCommon ba v' vertexGrp _objVar
 
   where
@@ -292,7 +286,7 @@ dhV   ba tcec ecvc v =
 
 -- | Logic specific for edges
 dhE :: DimensionHandler s (Ed s)
-dhE    ba tcec _ e =
+dhE    ba e =
     when (ba_visibility ba e' == Visible) $ do 
         awhen (getL ba_edgeDecoL ba e) 
             (\d -> mkEdgeDecos ee d name (bfi_labelMat bfi) thickness)
@@ -324,7 +318,7 @@ dhE    ba tcec _ e =
                 
                 thickness = ba_edgeThickness ba e
 
-                ee = ba_edgeImmersion ba tcec e
+                ee = ba_edgeImmersion ba e
 
                 name = unFaceName . ba_faceName ba $ e' 
 
@@ -471,12 +465,12 @@ coneAlongCurve (c :: UF Tup3 Double) width name mat =
 
 -- | Logic specific for triangles
 dhT :: DimensionHandler s (Tri s)
-dhT  ba tcec ecvc t = do 
+dhT  ba t = do 
     when (vis==Visible) $ do
         stmts1
         asiCommon ba t' triGrp _objVar
     when (vis/=Invisible) $ do
-        handleTriLabel ba tcec ecvc triLblGrp t
+        handleTriLabel ba triLblGrp t
 
             where
                 _objVar = pyv "triObj"
@@ -489,7 +483,7 @@ dhT  ba tcec ecvc t = do
                     case ba_triangleImmersion ba t of
                         FlatTriangle cv0 cv1 cv2 -> 
                             newFlatTriangleObj _objVar cv0 cv1 cv2 name
-                        GeneralTriangle (GTE res g) -> do 
+                        GeneralTriangle (GTE _ res g) -> do 
                             newTriangularSurfaceObj res _objVar g name
 
                             awhen (bfi_helpLineSettings bfi) (mkHelpLines g)
@@ -507,17 +501,15 @@ dhT  ba tcec ecvc t = do
 handleTriLabel :: (CONSTRAINTS(s)) => 
 
         Blenderable s 
-    ->  TrianglesContainingEdge_Cache (Ed s) (Tri s) 
-    ->  EdgesContainingVertex_Cache (Vert s) (Ed s) 
     ->  BlenderGroup -> Tri s -> Python ()
 
-handleTriLabel ba tcec ecvc grpTriLabels t =
+handleTriLabel ba grpTriLabels t =
             case ba_triangleLabel ba t of
                 Nothing -> return ()
 
                 Just tl -> 
                     let
-                        text = tl_text tl
+                        _text = tl_text tl
                         perm = tl_transform tl
 
                     in let 
@@ -591,19 +583,19 @@ handleTriLabel ba tcec ecvc grpTriLabels t =
                                     curve_mats = maybeToList mat,
                                     curve_resolution_u = 12
                                 },
-                                textCurve_text = text,
+                                textCurve_text = _text,
                                 textCurve_extrude = textThickness
                             })
                         objVar <.> matrix_basis .= m
                         objCommon objVar
                             groups 
-                            (text ++ " on "++show perm++" "++unFaceName (ba_faceName ba asi))
+                            (_text ++ " on "++show perm++" "++unFaceName (ba_faceName ba asi))
                             Nothing
 
 
     where
         vs = vertices t
-        cvs = map3 (ba_coords ba tcec ecvc) vs
+        cvs = map3 (ba_coords ba) vs
 
         asi = triToAnySimplex2 t
 
@@ -650,7 +642,7 @@ textThickness = 1E-5
 
 -- note: we usually set spline_resolution_u low (1 or 2) and instead compute subdivisions here by increasing 'steps'
 nurbsFromFun :: Int -> GeneralEdgeImmersion -> BlenderSpline
-nurbsFromFun spline_resolution (GEE steps f) =
+nurbsFromFun spline_resolution (GEE _ steps f) =
     Nurbs {
         spline_dimOpts = SplineDimOpts {
             use_endpoint = True,
@@ -735,9 +727,12 @@ mkHelpLines (emb :: FF Tup2 Tup3 Double) HLS{..} = do
         curve_splines = map (nurbsFromFun 1) 
             ( concat 
                 [ 
-                [ GEE steps' (emb . (\x -> tup2 (x*lift p') (lift p))) -- horiz 
-                , GEE steps' (emb . (\x -> tup2 (lift p) (x*lift p'))) -- vert
-                , GEE steps' (emb . (\x -> lift p' *^ interpol x tup2X tup2Y)) -- diag
+                [ GEE (text "<helpLines>") steps' 
+                    (emb . (\x -> tup2 (x*lift p') (lift p))) -- horiz 
+                , GEE (text "<helpLines>") steps' 
+                    (emb . (\x -> tup2 (lift p) (x*lift p'))) -- vert
+                , GEE (text "<helpLines>") steps' 
+                    (emb . (\x -> lift p' *^ interpol x tup2X tup2Y)) -- diag
                 ]
 
                     |  i <- [ 1 .. helpLineN ]

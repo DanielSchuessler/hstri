@@ -109,7 +109,7 @@ embedTri (vertices -> (v0,v1,v2)) (Tup3 (x0,x1,x2)) =
     x2 *^ embedVert v2 
 
 
-embedNCorner :: Fractional a1 => ConcreteNormalCorner -> Tup4 a1
+embedNCorner :: Fractional a1 => NmCorner -> Tup4 a1
 embedNCorner c = 
     embedEd 
         (edge . unI . c_type $ c)

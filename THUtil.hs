@@ -3,6 +3,7 @@
 module THUtil(
     module Debug.Trace,
     module FileLocation,
+    
     Pretty,
     mkConstantDecls,
     showVars,
@@ -16,7 +17,7 @@ module THUtil(
     liftFunction,
     straceExp,
     ltraceExp,
-    inherit,
+    inherit,inheritPretty,inheritShow,
     inheritSingleArgClass,
     -- * Error locations
     liftedLocationString,
@@ -24,6 +25,11 @@ module THUtil(
     -- ** Map-related functions
     fromListNoCollision,
     insertNoCollision,
+
+    -- ** Reex
+    Convertible,
+    ExpQ,
+    TypeQ,Q,Dec
     ) where
 
 import Language.Haskell.TH
@@ -227,3 +233,17 @@ inheritSingleArgClass
       Convertible super TypeQ) =>
      Name -> [Name] -> [Name] -> sub -> super -> accessor -> Q [Dec]
 inheritSingleArgClass clsn = inherit (liftM (\t -> (clsn,[t])))
+
+inheritShow
+  :: (Convertible accessor ExpQ,
+      Convertible sub TypeQ,
+      Convertible super TypeQ) =>
+     sub -> super -> accessor -> Q [Dec]
+inheritShow = inheritSingleArgClass ''Show ['show] []
+inheritPretty
+  :: (Convertible accessor ExpQ,
+      Convertible sub TypeQ,
+      Convertible super TypeQ) =>
+     sub -> super -> accessor -> Q [Dec]
+inheritPretty = inheritSingleArgClass ''Pretty ['pretty] []
+

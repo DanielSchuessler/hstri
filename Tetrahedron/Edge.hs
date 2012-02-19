@@ -23,6 +23,7 @@ module Tetrahedron.Edge (
     oppositeEdge0,
     bitSetToEdge,
     edgesContainingVertex,
+    edgesContainingVertexAsc,
 
 
     -- * Oriented
@@ -409,6 +410,7 @@ instance SimplicialEdge IEdge where
 instance Show a => Show (Edge -> a) where show = showFiniteFunc "e"
 instance Show a => Show (OEdge -> a) where show = showFiniteFunc "e"
 
+-- if you change this, change edgesContainingVertexAsc!
 edgesContainingVertex :: Vertex -> Triple Edge
 edgesContainingVertex v = 
     -- generated from: \v -> fromList3 (filter6 (isVertexOfEdge v) allEdges')
@@ -418,4 +420,10 @@ edgesContainingVertex v =
         C -> (eAC,eBC,eCD)
         D -> (eAD,eBD,eCD)
 
+edgesContainingVertexAsc :: Vertex -> Asc3 Edge
+edgesContainingVertexAsc = unsafeAsc . edgesContainingVertex
+
+instance QuoteConstPat Edge where
+    quoteConstPat (vertices -> vs) = quoteConstPatPair vs 
+    quoteConstPat_view _ x = "vertices " ++ x 
 

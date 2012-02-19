@@ -85,14 +85,13 @@ import Data.String
 import Data.Vect.Double.Base hiding((*.),(.*),(.*.),Vector)
 import Data.VectorSpace
 import DisjointUnion
-import GHC.Generics
+import GHC.Generics(Generic)
 import Language.Haskell.TH.Lift
 import Math.Groups.S3
 import Numeric.AD(FF,UF,lowerFF,lowerUF,AD)
 import Numeric.AD.Vector
 import OrphanInstances.Lift()
 import PreRenderable.TriangleLabel
-import PrettyUtil(Pretty(..),prettyRecord,prettyFunction,prettyPrecFromShow)
 import ShortShow
 import Simplicial.DeltaSet3
 import Simplicial.SimplicialComplex
@@ -102,6 +101,8 @@ import Util
 import qualified Data.Map as M
 import Data.Maybe
 import THBuild
+import PrettyUtil hiding(pr)
+import Text.Groom
 
 data EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int, edgeDecoDir :: S2 } 
     deriving (Show)
@@ -118,14 +119,35 @@ data GeneralTriangleImmersion =
     -- The arc from zero to vec2Y corresponds to e1 
     --
     -- The arc from vec2X to vec2Y corresponds to e2 
-    GTE Resolution (FF Tup2 Tup3 Double)
+    GTE Doc Resolution (FF Tup2 Tup3 Double)
+
+instance Show GeneralTriangleImmersion where
+    showsPrec = prettyShowsPrec
+
+instance Pretty GeneralTriangleImmersion where
+    prettyPrec = prettyRecordPrec
+            (\(GTE s _ e) ->
+                let
+                    f = pretty . lowerFF e . stdToUnit2
+                in
+                    ("GTE",
+                        [("doc", s)
+                        ,("im (1,0,0)",f tup3X)
+                        ,("im (0,1,0)",f tup3Y)
+                        ,("im (0,0,1)",f tup3Z)
+                        ])) 
 
 instance Coords GeneralTriangleImmersion where
-    transformCoords f (GTE res g) = GTE res (f . g)
+    transformCoords f (GTE s res g) = GTE s res (f . g)
 
 data TriangleImmersion = 
         FlatTriangle Vec3 Vec3 Vec3
     |   GeneralTriangle GeneralTriangleImmersion
+    deriving Show
+
+instance Pretty TriangleImmersion where
+    prettyPrec prec (FlatTriangle a b c) = prettyPrecApp prec "FlatTriangle" [a,b,c] 
+    prettyPrec prec (GeneralTriangle a) = prettyPrecApp prec "GeneralTriangle" [a] 
 
 data GeneralEdgeImmersion = 
     -- | SEMANTICS: 
@@ -136,15 +158,34 @@ data GeneralEdgeImmersion =
     --
     -- 1 corresponds to v1
     --
-    GEE Resolution (UF Tup3 Double)
+    GEE Doc Resolution (UF Tup3 Double)
+
+instance Show GeneralEdgeImmersion where
+    showsPrec = prettyShowsPrec
+
+instance Pretty GeneralEdgeImmersion where
+    prettyPrec = prettyRecordPrec
+            (\(GEE s _ e) ->
+                let
+                    f = pretty . lowerUF e . stdToUnit1
+                in
+                    ("GEE",
+                        [("doc", s)
+                        ,("im (1,0)",f tup2X)
+                        ,("im (0,1)",f tup2Y)
+                        ])) 
 
 instance Coords GeneralEdgeImmersion where
-    transformCoords f (GEE res g) = GEE res (f . g)
+    transformCoords f (GEE s res g) = GEE s res (f . g)
 
 data EdgeImmersion =
         FlatEdge Vec3 Vec3
     |   GeneralEdge GeneralEdgeImmersion
+    deriving Show
 
+instance Pretty EdgeImmersion where
+    prettyPrec prec (FlatEdge a b) = prettyPrecApp prec "FlatEdge" [a,b] 
+    prettyPrec prec (GeneralEdge a) = prettyPrecApp prec "GeneralEdge" [a] 
 
 class Coords t where
     transformCoords :: (FF Tup3 Tup3 Double) -> t -> t
@@ -218,7 +259,7 @@ pr_quad reso (f :: FF Tup2 Tup3 Double) =
                                 then id
                                 else \(Tup2 (u, v)) -> Tup2 (u+v, 1-v)
 
-                    in (Just . GTE reso) (f . pretransform)
+                    in (Just . GTE (text "(from pr_quad)") reso) (f . pretransform)
                     )
 
             
@@ -394,11 +435,12 @@ pr_edgeImmersion pr e =
                         Nothing -> flatFace pr (uncurry FlatEdge) map2 vertices e 
 
                  -- edge is contained in some curved triangle
-                 Just (_t, i, GTE res emb) -> 
-                    trace ("Edge "++show e++"\n\thas index "++show i++"\n\tin "++show _t) $
+                 Just (_t, i, GTE doc res emb) -> 
+--                     trace ("Edge "++show e++"\n\thas index "++show i++"\n\tin "++show _t) $
 
                     GeneralEdge
                         (GEE
+                            (pretty i<>text "th edge of "<>hang 2 doc)
                             (triResolutionToEdgeResolution res)
                             (emb . pretransform))
 
@@ -442,7 +484,7 @@ pr_coords pr v =
             findJust (\(e,i) -> 
                     case pr_edgeImmersion pr e of
                          FlatEdge {} -> Nothing
-                         GeneralEdge (GEE _ emb) ->
+                         GeneralEdge (GEE _ _ emb) ->
 --                             trace ("Vertex "++show v++" has index "++show i++" in "++show e) $
                             Just (tup3toVec3 $ lowerUF emb (case i of
                                             I2_0 -> 0
@@ -457,17 +499,22 @@ pr_coords pr v =
 
 
 instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
-            , Vertices s, Edges s, Triangles s) => 
+            , PreDeltaSet2 s
+            , OrdToDim1 s  
+            , ShowToDim2 s
+            ) => 
     Pretty (PreRenderable s) where
 
 
     pretty pr@PreRenderable{..} = 
         prettyRecord "PreRenderable"
             [ ("pr_ds",pretty (pr_ds pr))
-            , ("pr_coords0",prettyFunction pr_coords0 (vertices pr))
             , ("pr_faceInfo",prettyFunction pr_faceInfo (anySimplex2s pr))
             , ("pr_triangleInfo",prettyFunction 
                     (second (fmap (const "<<function>>")) . pr_triangleInfo) (triangles pr))
+            , ("pr_coords",prettyFunction (pr_coords pr) (vertices pr))
+            , ("pr_edgeImmersion",prettyFunction (pr_edgeImmersion pr) (edges pr))
+            , ("pr_triangleImmersion",prettyFunction (pr_triangleImmersion pr) (triangles pr))
             ]
 
 
@@ -548,8 +595,9 @@ pr_makeImmersionsGeneral triRes pr_ =
     setL pr_generalTriangleImmersionL
         (\t -> Just $ case pr_triangleImmersion pr_ t of
                     GeneralTriangle emb -> emb
-                    FlatTriangle a au av ->
+                    flat@(FlatTriangle a au av) ->
                         GTE 
+                            (text "from "<>string (groom flat))
                             (triRes t)
                             (evalFlatTriangleImmersion a au av))
 
@@ -576,33 +624,53 @@ evalEdgeImmersion (FlatEdge a0 a1) =
             res = interpol u (liftVec3 a0) (liftVec3 a1) 
         in $(assrt [| allReal res |] ['u, 'a0, 'a1]) res
 
-evalEdgeImmersion (GeneralEdge (GEE _ f)) = f
+evalEdgeImmersion (GeneralEdge (GEE _ _ f)) = f
 
-data GeneralTetImmersion = GTetE Resolution (FF Tup3 Tup3 Double)
+data GeneralTetImmersion = GTetE Doc Resolution (FF Tup3 Tup3 Double)
+
+instance Show GeneralTetImmersion where
+    showsPrec = prettyShowsPrec
+
+instance Pretty GeneralTetImmersion where
+    prettyPrec =
+        prettyRecordPrec
+            (\(GTetE s _ e) ->
+                let
+                    f = pretty . lowerFF e . stdToUnit3
+                in
+                    ("GTetE",
+                        [("doc", s)
+                        ,("im (1,0,0,0)",f tup4X)
+                        ,("im (0,1,0,0)",f tup4Y)
+                        ,("im (0,0,1,0)",f tup4Z)
+                        ,("im (0,0,0,1)",f tup4A)
+                        ]))
+
 
 mkPreRenderableFromTetImmersions
   :: forall s. (OrdToDim2 s, ShortShow (Vert s), ShortShow (Tri s), ShortShow (Ed s), PreDeltaSet3 s) =>
-     (Tet s -> Maybe GeneralTetImmersion)
-     -> (Vert s -> Vec3) -- ^ Vertex coordinates to use for vertices which are in a tetrahedron for which the first argument returns 'Nothing' (or vertices which aren't in any tetrahedron). 
+     (Tet s -> GeneralTetImmersion)
      -> s 
      -> PreRenderable s
-mkPreRenderableFromTetImmersions (getTetImm :: Tet s -> Maybe GeneralTetImmersion) coords s =
+mkPreRenderableFromTetImmersions (getTetImm :: Tet s -> GeneralTetImmersion) s =
     setL pr_generalTriangleImmersionL 
         (\t -> do
-            (GTetE res tetImm,i) <- 
+            (GTetE doc res tetImm,i) <- 
                 listToMaybe 
                     (do
                         (tet,i) <- lookupTetsContainingTri tctc t
-                        tetImm <- maybeToList (getTetImm tet)
-                        [ (tetImm,i) ])
+                        [ (getTetImm tet,i) ])
 
             let pretransform :: FF Tup3 Tup4 Double 
                 pretransform = std2IntoStd3 i 
 
-            Just (GTE res (tetImm . stdToUnit3 . pretransform . unitToStd2))
+            Just (GTE 
+                (pretty i <> text "th triangle of " <> hang 2 doc)
+                res 
+                (tetImm . stdToUnit3 . pretransform . unitToStd2))
         )
     
-        (mkPreRenderable coords s)
+        (mkPreRenderable $undef s)
 
 
     where

@@ -193,6 +193,13 @@ data GenericDeltaSet2 t = GDS2 {
         gds2_triangles :: [t] 
     }
 
+instance (Pretty t, Pretty (Vert t), Pretty (Ed t)) => Pretty (GenericDeltaSet2 t) where
+    prettyPrec = prettyRecordPrec 
+        (\(GDS2 v e t) ->
+                ("GDS2",[("gds2_vertices",pretty v), ("gds2_edges",pretty e), 
+                    ("gds2_triangles",pretty t)])) 
+
+
 #define DERIVE(C) deriving instance (C t, C (Ed t), C (Vert t)) => C (GenericDeltaSet2 t)
 DERIVE(Show)
 #undef DERIVE

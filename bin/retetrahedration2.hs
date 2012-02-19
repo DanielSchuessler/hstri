@@ -12,6 +12,7 @@ import Tikz.Base
 import Latexable
 import qualified Data.Vector.Generic as VG
 import Math.SparseVector
+import Blender.Conversion
 
 tr' :: Triangulation
 tr' = mkTriangulation 3
@@ -68,16 +69,14 @@ imm2 (unitToStd3 -> Tup4 (a,b,c,d)) = STP {
 
 
 
-pr' = mkPreRenderableFromTetImmersions 
-        (\(unT -> i) -> Just $ GTetE res (torusCoords' major minor . ([imm0,imm1,imm2]!!fi i))) 
-        ($err' . show)
-        
-        tr'
-
-
+getTetImm i = GTetE (text"it") res (torusCoords' major minor . ([imm0,imm1,imm2]!!fi i)) 
     where
         major = 1.5
         minor = 1
+
+pr' = mkPreRenderableFromTetImmersions (getTetImm . unT) tr'
+
+
 
 
 -- cam for major=1.5 torus
@@ -120,8 +119,8 @@ sscr :: SolSetConversionResult Rational
 sscr = quadToStandardSolSet' ddr
 
 res = 
---     60  
-    120
+    60  
+--     120
 
 go fp (w,h,_cam) =
     blenderMain JustLook 
@@ -133,20 +132,58 @@ go fp (w,h,_cam) =
     . setHelpLineN 19
     . setHelpLineThickness 0.002
     . disableHelpLines 
-    . mkBlenderable pseudomanifoldStyle
+
+
+
+goPM fp view = go fp view . mkBlenderable pseudomanifoldStyle
 
 
 mainRender = do
     forM_ 
         [
---             ("",midView)
---             ,
+            ("",midView)
+            ,
             ("B",midView2)
-        ]
-        (\(suf,view) -> do
-            go ("/h/dipl/pictures/cut0torus"++suf++".png") view pr'
-            forM_ [0,1,2] 
-                (\i -> go ("/h/dipl/pictures/cut0torus"++suf++show i++".png") view (hideAllBut i pr')))
+        ] 
+        $ \(suf,view) -> do
+
+--             goPM ("/h/dipl/pictures/cut0torus"++suf++".png") view pr'
+--             forM_ [0,1,2] 
+--                 (\i -> goPM 
+--                     ("/h/dipl/pictures/cut0torus"++suf++show i++".png") 
+--                     view 
+--                     (hideAllBut i pr'))
+                
+            case sscr of
+                 SolSetConversionResult { sscr_finalVerbose = fv } ->
+                    VG.forM_ fv
+                        (renderSol suf view)
+
+
+
+renderSol suf view (sol :: SolSetConversionResultItem Rational) = do
+
+    let fundEdgeSolution = standard_toFundEdgeSol (sscri_value sol)
+
+    go ("/h/dipl/pictures/cut0torus"++suf++"_v"++show (toInteger (sscri_index sol)) ++".png")
+        view
+
+        (setTrisTransp
+                    (Just (defaultTrans 0.1) {
+                        _fresnel = 2.5,
+                        _fresnel_factor = 1.25
+                    })
+            (mkBlenderable pseudomanifoldStyle (pr_mapDs gds2 pr'))
+            `disjointUnion`
+         mkBlenderable normalSurfaceStyle 
+            (prnsFromTetImmersions getTetImm (gds2 (toConcrete fundEdgeSolution))))
+
+
+                
+                
+
+        
+
 
 
 weightedVertexLinkGraphs :: Latex
@@ -185,7 +222,7 @@ weightedVertexLinkGraphs =
             ))
 
 
-main = do
+mainTex = do
 --     writeFile "/h/dipl/tex/cut0QMES.tex" (latexifyQMatchingEquations "0.7em" "0.5em" tr')
     writeFile "/h/dipl/tex/cut0DD.tex" . latexifyDDResults "2.2em" $ ddr
 
@@ -306,3 +343,7 @@ sgl = SGL{sgl_verts =
         y2 = 200
         offsetx = 140
         offsety = 200
+
+
+
+main = mainRender

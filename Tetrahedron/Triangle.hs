@@ -608,3 +608,7 @@ instance SimplicialTriangle ITriangle where
 instance Show a => Show (Triangle -> a) where show = showFiniteFunc "t"
 instance Show a => Show (OTriangle -> a) where show = showFiniteFunc "t"
 
+instance QuoteConstPat Triangle where
+    quoteConstPat (triangleDualVertex -> v) = quoteConstPat v 
+    quoteConstPat_view _ x = "triangleDualVertex " ++ x 
+

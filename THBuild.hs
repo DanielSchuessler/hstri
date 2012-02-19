@@ -213,3 +213,7 @@ sinstanceD
       Convertible a CxtQ) =>
      a -> a2 -> a1 -> DecQ
 sinstanceD = preconvert3 instanceD
+
+shtuple :: Convertible a TypeQ => Int -> a -> TypeQ
+shtuple n t = foldl appT (tupleT n) (replicate n (typeQ t))
+

@@ -1,4 +1,4 @@
-{-# LANGUAGE OverlappingInstances, FlexibleContexts, NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell, OverlappingInstances, FlexibleContexts, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall #-}
 module ShortShow where
 import Element
@@ -6,6 +6,7 @@ import Data.List
 import Math.Groups.S2
 import Math.Groups.S3
 import Data.Word
+import THUtil
 
 -- | This class is for stringifying things (for humans) in contexts where characters are at a premium, e.g. Blender object names
 class ShortShow a where
@@ -57,4 +58,11 @@ instance ShortShow Bool where shortShow b = [if b then 'T' else 'F']
 
 -- | Prints no indication of wheter the value is a Left or a Right, as it's usually clear. Write an OverlappingInstance otherwise.
 instance (ShortShow a, ShortShow b) => ShortShow (Either a b) where shortShow = either shortShow shortShow
+
+inheritShortShow
+  :: (Convertible accessor ExpQ,
+      Convertible sub TypeQ,
+      Convertible super TypeQ) =>
+     sub -> super -> accessor -> Q [Dec]
+inheritShortShow = inheritSingleArgClass ''ShortShow ['shortShow] []
 

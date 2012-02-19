@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, TypeFamilies, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, TypeFamilies, ViewPatterns, NoMonomorphismRestriction, TemplateHaskell, FlexibleContexts, TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall -fno-warn-missing-signatures #-}
@@ -15,10 +15,12 @@ module PrettyUtil(
     prettyString,
     pr,
     prettyRecord,
+    prettyRecordPrec,
     prettyShowsPrec,
     prettyFunction,
     prettyRealFloat,
     prettyPrecApp,
+    prettyAppPrec,
     parensIf,
     anyPretty,AnyPretty,
     prettyEqs,
@@ -27,6 +29,7 @@ module PrettyUtil(
     htupled,
     pad,
     prettyPrecFromShow,
+    docToShowS,
     -- * Class
     Pretty(..),
     
@@ -97,10 +100,15 @@ pr = putStrLn . prettyString
 
 prettyRecord :: String -> [(String, Doc)] -> Doc
 prettyRecord name fields =
+    align $
          vsep ( (text name <+> lbrace)
                : [indent 2 (text x <+> nest 2 (char '=' </> y)) | (x,y) <- fields ]
                ++ [rbrace] )
 
+prettyRecordPrec
+  :: (t -> (String, [(String, Doc)])) -> Int -> t -> Doc
+prettyRecordPrec f (prec :: Int) x =
+    parensIf (prec >= 10) $ let (name, fields) = f x in prettyRecord name fields
 
 prettyShowsPrec :: Pretty a => Int -> a -> ShowS
 prettyShowsPrec prec x = docToShowS (prettyPrec prec x)
@@ -121,10 +129,11 @@ instance (Pretty a, Pretty b) => Pretty (FiniteFunc a b) where
     pretty ff = prettyFunction (ff_apply ff) (ff_domain ff)
 
 
-prettyRealFloat :: RealFloat a => a -> Doc
-prettyRealFloat = text . addSpace . ($"") . showFFloat (Just 3)
-    where
-        addSpace s = if head s == '-' then s else ' ':s
+prettyRealFloat :: (Eq a, RealFloat a) => a -> Doc
+prettyRealFloat 0 = text "  0   "
+prettyRealFloat x = text . pad 6 . ($"") . showFFloat (Just 2) $ x
+--     where
+--         addSpace s = if head s == '-' then s else ' ':s
         
 class Pretty a where
     prettyPrec :: Int -> a -> Doc
@@ -141,6 +150,10 @@ prettyPrecApp prec f xs =
     parensIf (prec > appPrec)
     (hang 2 $ sep 
         (prettyPrec appPrec f : fmap (prettyPrec appPrec1) xs))
+
+prettyAppPrec
+  :: (Pretty a, Pretty bs) => (t -> (a, [bs])) -> Int -> t -> Doc
+prettyAppPrec g prec y = uncurry (prettyPrecApp prec) (g y)  
 
 parensIf :: Bool -> Doc -> Doc
 parensIf True = parens

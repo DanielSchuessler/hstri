@@ -38,6 +38,7 @@ Library
     ClosedOrCensus6
     Collections
     ConcreteNormal
+    ConcreteNormal.Identification
     ConcreteNormal.PreRenderable
     Data.AscTuples
     Data.EdgeLabelledTree
@@ -85,6 +86,7 @@ Library
     PrettyUtil
     PrettyUtil.Matrix
     Latexable.DD
+    QuadHalf
     QuadCoordinates
     QuadCoordinates.Dense
     QuadCoordinates.Class
@@ -215,6 +217,7 @@ Library
         , numbering
         , blaze-builder
         , blaze-textual
+        , semigroupoids
 
 --        , yices-painless
 

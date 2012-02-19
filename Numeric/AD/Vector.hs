@@ -1,38 +1,42 @@
 {-# LANGUAGE TemplateHaskell, DeriveDataTypeable, DeriveTraversable, DeriveFunctor, DeriveFoldable #-}
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Numeric.AD.Vector where
 
-import MathUtil
-import TupleTH
-import Data.List
-import Prelude hiding((<=))
-import qualified Prelude as P
-import Data.Ord(comparing)
-import Language.Haskell.TH
-import Data.Foldable(Foldable,foldMap)
-import Data.Traversable(Traversable)
-import Control.Monad
 import Control.Applicative
-import THBuild
+import Control.Monad
 import Data.AdditiveGroup(AdditiveGroup(..))
-import Data.VectorSpace(VectorSpace(..),InnerSpace(..))
-import Data.Monoid(Sum(..))
-import qualified Numeric.AD.Internal.Classes as AD
-import Data.Monoid(Sum(..))
-import qualified Data.Foldable as Fold
-import Data.Foldable(Foldable)
-import Data.VectorSpace hiding(Sum(..))
-import PrettyUtil(Pretty)
-import Data.Vect.Double.Base(Vec2(..),Vec3(..))
 import Data.Cross
+import Data.Foldable(Foldable)
+import Data.Foldable(Foldable,foldMap)
 import Data.Function
+import Data.List
+import Data.Monoid(Sum(..))
+import Data.Monoid(Sum(..))
+import Data.Ord(comparing)
+import Data.Traversable(Traversable)
 import Data.Tuple.Index
+import Data.Vect.Double.Base(Vec2(..),Vec3(..))
+import Data.VectorSpace hiding(Sum(..))
+import Data.VectorSpace(VectorSpace(..),InnerSpace(..))
+import Language.Haskell.TH
+import MathUtil
+import Prelude hiding((<=))
+import PrettyUtil(Pretty)
+import THBuild
+import THUtil
+import TupleTH
+import qualified Data.Foldable as Fold
+import qualified Numeric.AD.Internal.Classes as AD
+import qualified Prelude as P
+import Util
 
 innerProductForFoldableApplicative x y = getSum . foldMap Sum $ (liftA2 (*) x y) 
 
+#define WANTED_DIMS [2,3,4]
 
-
-$(liftM concat $ forM [2,3,4] (\n ->
+$(liftM concat $ forM WANTED_DIMS (\n ->
     let
         na = mkName ("Tup"++show n)
         ctorname = na
@@ -94,6 +98,13 @@ $(liftM concat $ forM [2,3,4] (\n ->
 
     ))
 
+-- $(concatMapM 
+--     (\n -> 
+--         inheritPretty 
+--             (("Tup"++show n) `sappT` "a") 
+--             (shtuple n "a")
+--             ("untup"++show n))
+--     WANTED_DIMS) 
 
 tup2X ::  Num a => Tup2 a
 tup2X = tup2 1 0
@@ -118,6 +129,7 @@ tup4A = tup4 0 0 0 1
 
 deriving instance Pretty a => Pretty (Tup2 a)
 deriving instance Pretty a => Pretty (Tup3 a)
+deriving instance Pretty a => Pretty (Tup4 a)
 
 tup2toVec2 ::  Tup2 Double -> Vec2
 tup2toVec2 = foldT2 Vec2
@@ -252,12 +264,15 @@ areKindaOrthogonal v0 v1 = abs (v0 <.> v1) < 1E-10
 oneNorm :: (Num c, Foldable t) => t c -> c
 oneNorm = getSum . foldMap (Sum . abs)
 
-
+stdToUnit1 :: Tup2 t -> t
+stdToUnit1 (Tup2 (_,x1)) = x1
 stdToUnit2 ::  Tup3 a -> Tup2 a
 stdToUnit2 (Tup3 (_,x1,x2)) = Tup2 (x1,x2)
 stdToUnit3 ::  Tup4 a -> Tup3 a
 stdToUnit3 (Tup4 (_,x1,x2,x3)) = Tup3 (x1,x2,x3)
 
+unitToStd1 :: Num a => a -> Tup2 a
+unitToStd1 x1 = Tup2 (1-x1,x1)
 unitToStd2 :: Num a => Tup2 a -> Tup3 a
 unitToStd2 (Tup2 (x1,x2)) = Tup3 (1-x1-x2,x1,x2)
 unitToStd3 ::  Num a => Tup3 a -> Tup4 a

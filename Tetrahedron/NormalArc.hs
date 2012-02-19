@@ -22,8 +22,8 @@ module Tetrahedron.NormalArc(
         normalArcGetParallelEdge,
         normalArcGetVertexIndex,
         normalArcGetAngle,
-        normalTriCorners,
-        normalTriCornersAsc,
+        na_corners,
+        na_cornersAsc,
 
         -- * Ordered
         ONormalArc,
@@ -50,22 +50,29 @@ import Control.DeepSeq.TH
 import FileLocation(err')
 import Data.Typeable
 import ShortShow
+import Data.Ord
+import Control.Arrow
 
 data NormalArc = NormalArc !Triangle !Vertex  -- Invariant: The 'Vertex' is contained in the 'Triangle'
-    deriving (Eq,Ord,Typeable)
+    deriving (Eq,Typeable)
 
 deriveNFData ''NormalArc
+
+-- | Lexical order on normal corners of the arc
+instance Ord NormalArc where
+    compare = comparing na_cornersAsc
+
 
 instance Show NormalArc where
     showsPrec = prettyShowsPrec 
 
--- | = 'normalTriCorners'
+-- | = 'na_corners'
 instance NormalCorners NormalArc (Pair NormalCorner) where
-    normalCorners = normalTriCorners 
+    normalCorners = na_corners 
     
     
-normalTriCorners :: NormalArc -> (NormalCorner, NormalCorner)
-normalTriCorners (NormalArc t v) =  
+na_corners :: NormalArc -> (NormalCorner, NormalCorner)
+na_corners (NormalArc t v) =  
             fromList2
           . fmap normalCorner
           . filter3 (v `isSubface`)
@@ -73,8 +80,8 @@ normalTriCorners (NormalArc t v) =
           $ t
 
 
-normalTriCornersAsc :: NormalArc -> Asc2 NormalCorner
-normalTriCornersAsc = asc2 . normalTriCorners 
+na_cornersAsc :: NormalArc -> Asc2 NormalCorner
+na_cornersAsc = asc2 . na_corners 
 
 
 class MakeNormalArc a where
@@ -164,7 +171,12 @@ allNormalArcs = [minBound .. maxBound]
 
 
 instance Pretty NormalArc where 
-    pretty = green . text . quote
+
+    pretty (normalArcGetAngle -> (v0,v,v1)) =
+        green (text (concatMap show [v0',v,v1']))
+      where
+        (v0',v1') = sort2 (v0,v1)
+
 --     pretty na = green (lbrace <> text "Arc dual to" <+> 
 --                         pretty (normalArcGetVertex na) <+> text "in" <+> 
 --                         pretty (normalArcGetTriangle na) <>
@@ -264,7 +276,7 @@ instance ONormalArcs OTriangle (Triple NormalArc) where
 instance OrderableFace NormalArc ONormalArc where
     type VertexSymGroup NormalArc = S2
 
-    packOrderedFace na g = ONormalArc (unAsc2 (normalTriCornersAsc na) *. g)
+    packOrderedFace na g = ONormalArc (unAsc2 (na_cornersAsc na) *. g)
 
     unpackOrderedFace (ONormalArc ncs) = 
         (normalArcByCorners ncs,
@@ -281,3 +293,11 @@ instance ShortShow NormalArc where
     shortShow a = shortShow (normalArcGetTriangle a, normalArcGetVertex a)
 
 instance Show a => Show (NormalArc -> a) where show = showFiniteFunc "na"
+
+
+instance QuoteConstPat NormalArc where
+    quoteConstPat ((normalArcGetTriangle &&& normalArcGetVertex) -> tv) = 
+        quoteConstPatPair tv 
+
+    quoteConstPat_view _ x = "(normalArcGetTriangle " ++ x++", normalArcGetVertex "++x++")" 
+

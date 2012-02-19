@@ -14,6 +14,7 @@ import Tetrahedron.NormalDisc
 import Data.Ix
 import Simplicial.DeltaSet3
 import Data.AscTuples
+import QuadHalf
 
 
 qc_Tetrahedron = $quickCheckAll
@@ -339,4 +340,11 @@ prop_MapAbsTet_id =
     (\x -> mapTri (MapAbsTet AbsTet) x == x)
     .&&.
     mapTet (MapAbsTet AbsTet) AbsTet == AbsTet
+
+
+
+instance SatisfiesSimplicialIdentities2 (QuadHalf NormalQuad)
+
+prop_Quad_Simpidents :: QuadHalf NormalQuad -> Property
+prop_Quad_Simpidents = polyprop_SatisfiesSimplicialIdentities2
 

@@ -29,6 +29,7 @@ class AsList normalCornerTuple => NormalCorners a normalCornerTuple | a -> norma
 normalCornerList ::  NormalCorners a normalCornerTuple => a -> [Element normalCornerTuple]
 normalCornerList = asList . normalCorners
 
+-- | Ordered like the 'Edge's they're on.
 newtype NormalCorner = NormalCorner Edge 
     deriving (Eq,Ord,Enum,Bounded,Arbitrary,NFData,Finite)
 
@@ -39,7 +40,7 @@ instance Show NormalCorner where
     showsPrec = prettyShowsPrec
 
 instance Pretty NormalCorner where 
-    pretty = green . text . quote
+    pretty (NormalCorner (vertices -> (v0,v1))) = (green.text) (show v0++show v1)
 
 allNormalCorners' :: (Sextuple NormalCorner)
 allNormalCorners' = map6 NormalCorner allEdges'
@@ -87,4 +88,9 @@ instance ShortShow NormalCorner where
     shortShow (NormalCorner (vertices -> (v0,v1))) = shortShow v0++shortShow v1
 
 instance Show a => Show (NormalCorner -> a) where show = showFiniteFunc "nc"
+
+
+instance QuoteConstPat NormalCorner where
+    quoteConstPat (normalCornerGetContainingEdge -> e) = quoteConstPat e 
+    quoteConstPat_view _ x = "normalCornerGetContainingEdge " ++ x 
 

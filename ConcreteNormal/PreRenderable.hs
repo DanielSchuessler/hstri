@@ -2,6 +2,7 @@
 {-# OPTIONS -Wall #-}
 
 module ConcreteNormal.PreRenderable(
+    module ConcreteNormal.Identification,
     module SimplicialPartialQuotient,
     module Simplicial.SimplicialComplex,
     Corn,corn,cornVerts,cornPos,cornCount,
@@ -11,6 +12,7 @@ module ConcreteNormal.PreRenderable(
 
     ) where
 
+import ConcreteNormal.Identification
 import ConcreteNormal
 import Data.Function
 import qualified Data.Set as S
@@ -196,31 +198,34 @@ prnsFromTetImmersions
   :: (ShortShow (Element (Verts s)),
       ShortShow (Element (Eds s)),
       PreDeltaSet2 s,
-      Element (Tris s) ~ NTriOrNQuadHalf) =>
+      Element (Tris s) ~ TNmTriOrQuadHalf) =>
      (TIndex -> GeneralTetImmersion) -> s -> PreRenderable s
-prnsFromTetImmersions getTetImm cns =
-    setL pr_generalTriangleImmersionL (Just . timm)
+
+prnsFromTetImmersions (getTetImm :: TIndex -> GeneralTetImmersion) cns =
+        setL pr_generalTriangleImmersionL (Just . timm)
+    .   pr_hideEds isRight
     $ mkPreRenderable $undef cns
 
   where
-    timm = either' timm_tri timm_cnqh
 
-    timm_tri :: TConcreteNTri -> GeneralTriangleImmersion
-    timm_tri tcntri = 
-        GTE res (   tetImm 
+    timm tNmTriOrQuadHalf = 
+        GTE doc' 
+            res (   tetImm 
                 .   stdToUnit3 
                 .   combo3 
                 .   (\(Tup3 xs) -> zipTuple3 xs (map3 (fmap AD.lift) cornsInStd3)) 
                 .   unitToStd2)
         where
-            cntri = unT tcntri
+            nmTriOrQuadHalf = unT tNmTriOrQuadHalf
 
             cornsInStd3 :: Triple (Tup4 Double)
-            cornsInStd3 = map3 embedNCorner (vertices cntri)
+            cornsInStd3 = map3 embedNCorner (vertices nmTriOrQuadHalf)
 
-            GTetE res tetImm = getTetImm (getTIndex cntri)
+            GTetE doc res tetImm = getTetImm (getTIndex nmTriOrQuadHalf)
+
+            doc' = parens doc <> space <> text "." <> line <>
+                    hang 2 (prettyFunction (pretty . tupleToFun3 cornsInStd3) allIndex3) 
 
 
 
-    timm_cnqh _ = undefined 
     

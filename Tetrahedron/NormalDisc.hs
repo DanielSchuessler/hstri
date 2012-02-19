@@ -35,6 +35,7 @@ module Tetrahedron.NormalDisc(
         -- ** Properties
         normalTriGetVertex, 
         normalTriGetNormalCorners,
+        normalTriGetNormalCornersAsc,
         normalTriGetNormalArcs,
 
 
@@ -211,9 +212,9 @@ instance Show NormalDisc where show = eitherND show show
 
 instance Pretty NormalDisc where pretty = eitherND pretty pretty
 
-instance Pretty NormalQuad where pretty = green . text . quote 
+instance Pretty NormalQuad where pretty = green . text . show
 
-instance Pretty NormalTri where pretty = green . text . quote
+instance Pretty NormalTri where pretty = green . text . show . normalTriGetVertex
 
 instance Quote NormalTri where quote nt = "nt" ++ show (normalTriGetVertex nt)
 instance Quote NormalQuad where quote = show
@@ -310,18 +311,49 @@ instance Vertices NormalTri  where
 
 -- | In order corresponding to 'edgesContainingVertex'.
 normalTriGetNormalCorners :: NormalTri -> Triple NormalCorner
-normalTriGetNormalCorners nt = 
-    map3 normalCorner (edgesContainingVertex (normalTriGetVertex nt))
+normalTriGetNormalCorners = 
+    map3 normalCorner . unAsc . edgesContainingVertexAsc . normalTriGetVertex
 
+
+normalTriGetNormalCornersAsc :: NormalTri -> Asc3 NormalCorner
+normalTriGetNormalCornersAsc = 
+    unsafeAsc . normalTriGetNormalCorners
+
+-- Ascending
 normalTriGetNormalArcs :: NormalTri -> Triple NormalArc
 normalTriGetNormalArcs =
-   \(normalTriGetVertex -> v) -> map3 (\t -> normalArc (t, v)) (star v (TwoSkeleton AbsTet))
+--    \(normalTriGetVertex -> v) -> sort3 (map3 (\t -> normalArc (t, v)) (star v (TwoSkeleton AbsTet)))
+
+    -- DO NOT TOUCH THE ORDERING without adjusting the QuadHalf module
+    \x -> map3 (uncurry normalArcByTriangleAndVertex) $ case normalTriGetVertex x of
+        A -> ((tABC, vA), (tABD, vA), (tACD, vA))
+        B -> ((tABC, vB), (tABD, vB), (tBCD, vB))
+        C -> ((tABC, vC), (tACD, vC), (tBCD, vC))
+        D -> ((tABD, vD), (tACD, vD), (tBCD, vD))
+
 
 -- | Elements (circularly) adjacent in the returned tuple are adjacent corners
 normalQuadGetNormalCornersInOrder
   :: NormalQuad
      -> (Quadruple NormalCorner)
-normalQuadGetNormalCornersInOrder = map4 normalCorner . normalQuadGetIntersectedEdges
+normalQuadGetNormalCornersInOrder = 
+    --map4 normalCorner . normalQuadGetIntersectedEdges
+
+    -- DO NOT TOUCH THE ORDERING without adjusting the QuadHalf module
+    \x -> map4 normalCorner $ case x of
+        Q_ab -> (eAD, eAC, eBC, eBD)
+        Q_ac -> (eAD, eAB, eBC, eCD)
+        Q_ad -> (eAC, eAB, eBD, eCD)
+
+dihedral4 :: (t, t, t, t) -> [(t, t, t, t)]
+dihedral4 x = do
+    x' <- [x,
+            $(rotateTuple 4 1) x, 
+            $(rotateTuple 4 2) x, 
+            $(rotateTuple 4 3) x 
+         ]
+
+    [x',$(reverseTuple 4) x']
 
 -- | = 'normalQuadGetNormalCornersInOrder'
 instance NormalCorners NormalQuad (Quadruple NormalCorner) where
@@ -504,3 +536,16 @@ instance ShortShow NormalTri where
 
 instance ShortShow NormalDisc where
     shortShow = eitherND shortShow shortShow
+
+
+instance QuoteConstPat NormalQuad where
+    quoteConstPat = show
+
+instance QuoteConstPat NormalTri where
+    quoteConstPat = quoteConstPat . normalTriGetVertex
+
+    quoteConstPat_view _ x = "normalTriGetVertex "++x
+
+instance Edges NormalQuad where
+    type Eds NormalQuad = Quadruple NormalArc
+    edges = normalQuadGetNormalArcsInOrder

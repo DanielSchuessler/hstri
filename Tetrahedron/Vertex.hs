@@ -240,3 +240,7 @@ deriveLift ''Vertex
 
 
 instance Show a => Show (Vertex -> a) where show = showFiniteFunc "v"
+
+instance QuoteConstPat Vertex where
+    quoteConstPat = show
+

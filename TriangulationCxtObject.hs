@@ -13,6 +13,8 @@ module TriangulationCxtObject(
     T,getTriangulation,unT,
     pMap,
     preimageList,
+    traverseT,
+    mapT,
 
     -- * Vertices
     TVertex,
@@ -693,3 +695,14 @@ isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t|TVertex|]
 isRegardedAsSimplexByDisjointUnionDeriving ''DIM1 [t|TEdge|]
 isRegardedAsSimplexByDisjointUnionDeriving ''DIM2 [t|TTriangle|]
 isRegardedAsSimplexByDisjointUnionDeriving ''DIM3 [t|TTet|]
+
+
+
+traverseT
+  :: (Show a, TriangulationDSnakeItem a) =>
+     ((a -> T a) -> t1 -> t) -> (a1 -> t1) -> T a1 -> t
+traverseT _map f x = _map (pMap (getTriangulation x)) (f (unT x))
+
+mapT
+  :: (Show a, TriangulationDSnakeItem a) => (a1 -> a) -> T a1 -> T a
+mapT f x = pMap (getTriangulation x) (f (unT x))

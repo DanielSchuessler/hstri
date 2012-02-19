@@ -15,13 +15,14 @@ module ConcreteNormal(
     unPos,
     posOfCornerOfTri,
     posOfCornerOfQuad,
+    coercePos,
 
     -- * Concrete normal faces
-    Concrete,c_surf,c_pos,c_type,
-    ConcreteNormalCorner,
-    ConcreteNormalArc,
-    ConcreteNormalTri,
-    ConcreteNormalQuad,
+    Concrete,c_surf,c_pos,c_type,c_questionableUpdate,
+    NmCorner,
+    NmArc,
+    NmTri,
+    NmQuad,
 
 
     concreteTris,
@@ -40,20 +41,12 @@ module ConcreteNormal(
     arcsOfSameType,
     cornersOfSameType,
 
-    -- * Concrete normal surfaces
-    TConcreteNCorner,
-    TConcreteNArc,
-    TConcreteNTri,
-    TConcreteNQuad,
-    ConcreteNSurface(..),
-    toConcrete,
-
+    canonicalizeConcreteArc,
 
     -- * Quad halfs
-    TConcreteNQuadHalf(..),
-    WhichHalf(..),
-    NArcOrNQuadDiagonal(..),
-    NTriOrNQuadHalf(..)
+    NmQuadHalf,
+    NmTriOrQuadHalf,
+    NmAdjoinQuadDiags,
 
     )
     where
@@ -72,12 +65,8 @@ import Tetrahedron.INormalDisc
 import Control.Arrow
 import Data.Function
 import StandardCoordinates.MatchingEquations
-import Language.Haskell.TH
-import THBuild
 import Control.Monad
-import Data.SumType
-import Simplicial.DeltaSet1
-import DisjointUnion
+import QuadHalf
 
 firstDisjointEdge :: NormalQuad -> Edge
 firstDisjointEdge q = uncurry min (normalQuadGetDisjointEdges q)
@@ -106,12 +95,16 @@ coercePos (Pos i) = Pos i
 instance Show (Pos a) where show = show . unPos
 
 data Concrete a = Concrete (AnyStandardCoords Integer) !(Pos a) !a
-    deriving(Show)
 
-type ConcreteNormalCorner = Concrete INormalCorner
-type ConcreteNormalArc = Concrete INormalArc
-type ConcreteNormalTri = Concrete INormalTri
-type ConcreteNormalQuad = Concrete INormalQuad
+instance Show a => Show (Concrete a) where
+    showsPrec prec (Concrete _ p t) = 
+        showParen (prec>10)
+            (showString "Conc " . showsPrec 11 p . showChar ' ' . showsPrec 11 t)
+
+type NmCorner = Concrete INormalCorner
+type NmArc = Concrete INormalArc
+type NmTri = Concrete INormalTri
+type NmQuad = Concrete INormalQuad
 
 c_surf :: Concrete t -> AnyStandardCoords Integer
 c_surf (Concrete s _ _) = s
@@ -122,9 +115,9 @@ c_pos (Concrete _ u _) = u
 c_type ::  Concrete t -> t
 c_type (Concrete _ _ a) = a
 
-c_update
+c_questionableUpdate
   :: (Pos t -> Pos a) -> (t -> a) -> Concrete t -> Concrete a
-c_update mapPos mapType (Concrete a b c) = Concrete a (mapPos b) (mapType c)
+c_questionableUpdate mapPos mapType (Concrete a b c) = Concrete a (mapPos b) (mapType c)
 
 -- | Assumes the operands belong to the same normal surface; does /not/ compare the surfaces.
 instance Eq a => Eq (Concrete a) where
@@ -175,13 +168,13 @@ discPosToCornerPos_helper cns_x_arcPos x corner takeFst =
          
 
 posOfCornerOfTri
-  :: ConcreteNormalTri -> NormalCorner -> CornerPosition
+  :: NmTri -> NormalCorner -> CornerPosition
 posOfCornerOfTri x c = assert (r1==r2) $ r1
   where
     (r1,r2) = map2 (discPosToCornerPos_helper posOfArcOfTri x c) (True,False)
 
 posOfCornerOfQuad
-  :: ConcreteNormalQuad -> NormalCorner -> CornerPosition
+  :: NmQuad -> NormalCorner -> CornerPosition
 posOfCornerOfQuad x c = 
   let
     (r1,r2) = map2 (discPosToCornerPos_helper posOfArcOfQuad x c) (True,False)
@@ -194,7 +187,7 @@ posOfCornerOfQuad x c =
 
 posOfCornerOfArc
   :: 
-     ConcreteNormalArc -> NormalCorner -> CornerPosition
+     NmArc -> NormalCorner -> CornerPosition
 posOfCornerOfArc (Concrete surf (unPos -> arcPos) arc) corner = Pos $
                 let
                     icorner = getTIndex arc ./ corner
@@ -212,11 +205,11 @@ posOfCornerOfArc (Concrete surf (unPos -> arcPos) arc) corner = Pos $
 
 
 posOfArcOfTri
-  :: ConcreteNormalTri -> NormalArc -> ArcPosition
+  :: NmTri -> NormalArc -> ArcPosition
 posOfArcOfTri x _ = coercePos (c_pos x)
 
 posOfArcOfQuad
-  :: ConcreteNormalQuad -> NormalArc -> ArcPosition
+  :: NmQuad -> NormalArc -> ArcPosition
 posOfArcOfQuad cquad arc = Pos $
   let
     u = unPos . c_pos $ cquad 
@@ -250,19 +243,19 @@ concreteThings thingAssocsDistinct (ns :: Admissible s) = do
 
 concreteTris
   :: StandardCoords s Integer =>
-     Admissible s -> [ConcreteNormalTri]
+     Admissible s -> [NmTri]
 concreteTris = concreteThings triAssocsDistinct
 concreteQuads
   :: StandardCoords s Integer =>
-     Admissible s -> [ConcreteNormalQuad]
+     Admissible s -> [NmQuad]
 concreteQuads = concreteThings quadAssocsDistinct
 concreteArcs
   :: StandardCoords s Integer =>
-     Admissible s -> [ConcreteNormalArc]
+     Admissible s -> [NmArc]
 concreteArcs = concreteThings arcAssocsDistinct
 concreteCorners
   :: StandardCoords s Integer =>
-     Admissible s -> [ConcreteNormalCorner]
+     Admissible s -> [NmCorner]
 concreteCorners = concreteThings cornerAssocsDistinct
 
     
@@ -277,19 +270,19 @@ concreteSubSomethings mapN somethings posOfSomething x =
                 (\sth -> Concrete (c_surf x) (posOfSomething x (unI sth)) sth) 
                 (somethings . c_type $ x) 
 
-concreteArcsOfTri :: ConcreteNormalTri -> Triple (ConcreteNormalArc)
+concreteArcsOfTri :: NmTri -> Triple (NmArc)
 concreteArcsOfTri = concreteSubSomethings map3 normalArcs posOfArcOfTri
 
-concreteCornersOfTri :: ConcreteNormalTri -> Triple (ConcreteNormalCorner)
+concreteCornersOfTri :: NmTri -> Triple (NmCorner)
 concreteCornersOfTri = concreteSubSomethings map3 normalCorners posOfCornerOfTri
 
-concreteArcsOfQuad :: ConcreteNormalQuad -> Quadruple (ConcreteNormalArc)
+concreteArcsOfQuad :: NmQuad -> Quadruple (NmArc)
 concreteArcsOfQuad = concreteSubSomethings map4 iNormalQuadGetNormalArcsInOrder posOfArcOfQuad
 
-concreteCornersOfQuad :: ConcreteNormalQuad -> Quadruple (ConcreteNormalCorner)
+concreteCornersOfQuad :: NmQuad -> Quadruple (NmCorner)
 concreteCornersOfQuad = concreteSubSomethings map4 iNormalQuadGetNormalCornersInOrder posOfCornerOfQuad
 
-concreteCornersOfArc :: ConcreteNormalArc -> Pair (ConcreteNormalCorner)
+concreteCornersOfArc :: NmArc -> Pair (NmCorner)
 concreteCornersOfArc = concreteSubSomethings map2 normalCorners posOfCornerOfArc
 
 
@@ -308,8 +301,77 @@ getArcNumberingVsCornerNumberingSense narc ncorner =
            then NoFlip
            else assert (v1==v) Flip
 
+trisOfSameType :: NmTri -> Integer
+trisOfSameType c = triCount (c_surf c) (c_type c)
 
-instance TriangulationDSnakeItem (ConcreteNormalCorner) where
+quadsOfSameType :: NmQuad -> Integer
+quadsOfSameType c = quadCount (c_surf c) (c_type c)
+
+arcsOfSameType :: Concrete INormalArc -> Integer
+arcsOfSameType c = numberOfArcsOfType (c_surf c) (c_type c)
+
+cornersOfSameType :: Concrete INormalCorner -> Integer
+cornersOfSameType c = numberOfCornersOfType (c_surf c) (c_type c)
+
+
+instance Vertices (NmArc) where
+    type Verts (NmArc) = Pair (NmCorner)
+    vertices = concreteCornersOfArc
+
+instance Vertices (Concrete OINormalArc) where
+    type Verts (Concrete OINormalArc) = Pair (NmCorner)
+    vertices = defaultVerticesForOrderedFace
+
+instance Vertices (NmTri) where
+    type Verts (NmTri) = Triple (NmCorner)
+    vertices = concreteCornersOfTri
+
+instance Vertices (NmQuad) where
+    type Verts (NmQuad) = Quadruple (NmCorner)
+    vertices = concreteCornersOfQuad
+
+instance Edges (NmTri) where
+    type Eds (NmTri) = Triple (NmArc)
+    edges = concreteArcsOfTri
+
+instance Edges (NmQuad) where
+    type Eds (NmQuad) = Quadruple (NmArc)
+    edges = concreteArcsOfQuad
+
+instance RightAction S2 (Concrete OINormalArc) where 
+    x *. g = c_questionableUpdate id (*. g) x 
+
+instance OrderableFace (NmArc) (Concrete OINormalArc) where
+    type VertexSymGroup (NmArc) = S2
+
+    packOrderedFace x g = c_questionableUpdate coercePos (`packOrderedFace` g) x
+    unpackOrderedFace ox =
+        let
+            (y,g) = unpackOrderedFace (c_type ox)
+        in
+            (c_questionableUpdate coercePos (const y) ox, g)
+
+
+
+type NmQuadHalf = QuadHalf NmQuad
+type NmTriOrQuadHalf = TriOrQuadHalf NmTri NmQuad
+type NmAdjoinQuadDiags = AdjoinQuadDiags NmArc NmQuad
+
+instance MapTIndices ia => MapTIndices (Concrete ia) where
+    mapTIndices f (Concrete s p ia) = Concrete s (coercePos p) (mapTIndices f ia)
+    mapTIndicesStrictlyMonotonic f (Concrete s p ia) = Concrete s (coercePos p) (mapTIndicesStrictlyMonotonic f ia)
+
+instance HasTIndex ia a => HasTIndex (Concrete ia) (Concrete a) where
+    viewI (Concrete s p (viewI -> (I i a))) = I i (Concrete s (coercePos p) a) 
+    i ./ Concrete s p a = Concrete s (coercePos p) (i ./ a)
+
+
+
+
+
+-- the TriangulationDSnakeItem instances really belong in ConcreteNormal.Identification, but would be orphans
+
+instance TriangulationDSnakeItem NmCorner where
     canonicalize_safe tr x = 
         let
             surf = c_surf x
@@ -317,7 +379,7 @@ instance TriangulationDSnakeItem (ConcreteNormalCorner) where
         in
             do
                 (e',g) <- fmap unpackOrderedFace 
-                            . $commentIfException' "ConcreteNormalCorner/canonicalize_safe: canonicalize_safe for the OIEdge failed" 
+                            . $commentIfException' "NmCorner/canonicalize_safe: canonicalize_safe for the OIEdge failed" 
                             . canonicalize_safe tr 
                             . toOrderedFace $ e
 
@@ -338,7 +400,7 @@ canonicalizeConcreteArc (tr :: Triangulation) x =
                 ina' | ina == ina' -> x -- redundant; for efficiency(?)
                      | otherwise -> Concrete (c_surf x) (c_pos x) ina' 
 
-instance TriangulationDSnakeItem (ConcreteNormalArc) where
+instance TriangulationDSnakeItem NmArc where
     canonicalize_safe = (return .) . canonicalizeConcreteArc
 
 instance TriangulationDSnakeItem (Concrete OINormalArc) where
@@ -346,249 +408,10 @@ instance TriangulationDSnakeItem (Concrete OINormalArc) where
 
 
 -- | Identity
-instance TriangulationDSnakeItem (ConcreteNormalTri) where
+instance TriangulationDSnakeItem NmTri where
     canonicalize_safe = const return
 
 -- | Identity
-instance TriangulationDSnakeItem (ConcreteNormalQuad) where
+instance TriangulationDSnakeItem NmQuad where
     canonicalize_safe = const return
-
-
-type TConcreteNCorner = T (Concrete INormalCorner)
-type TConcreteNArc = T (Concrete INormalArc)
-type TConcreteNTri = T (Concrete INormalTri)
-type TConcreteNQuad = T (Concrete INormalQuad)
-
-
-data ConcreteNSurface = ConcreteNSurface {
-    c_corners   :: [ TConcreteNCorner   ],
-    c_arcs      :: [ TConcreteNArc      ],
-    c_tris      :: [ TConcreteNTri      ],
-    c_quads     :: [ TConcreteNQuad     ]
- }
-
--- instance TriangulationDSnakeItem ConcreteNSurface where
---     canonicalize tr (ConcreteNSurface a b c d)
---         = ConcreteNSurface (f a) (f b) (f c) (f d) 
--- 
---             where
---                 f :: TriangulationDSnakeItem a => [a] -> [a]
---                 f = map (canonicalize tr)
-            
-
-toConcrete :: forall s. StandardCoords s Integer => Admissible s -> ConcreteNSurface
-toConcrete s = 
-        ConcreteNSurface 
-            (f concreteCorners) (f concreteArcs)
-            (f concreteTris)    (f concreteQuads)
-
-    where
-        f :: forall a.
-                    (Show a, TriangulationDSnakeItem a) =>
-                    (Admissible s -> [a]) -> [T a]
-
-        f g = map (pMap (adm_Triangulation s)) (g s) 
-    
-
-instance Vertices (ConcreteNormalArc) where
-    type Verts (ConcreteNormalArc) = Pair (ConcreteNormalCorner)
-    vertices = concreteCornersOfArc
-
-instance Vertices (Concrete OINormalArc) where
-    type Verts (Concrete OINormalArc) = Pair (ConcreteNormalCorner)
-    vertices = defaultVerticesForOrderedFace
-
-instance Vertices (ConcreteNormalTri) where
-    type Verts (ConcreteNormalTri) = Triple (ConcreteNormalCorner)
-    vertices = concreteCornersOfTri
-
-instance Vertices (ConcreteNormalQuad) where
-    type Verts (ConcreteNormalQuad) = Quadruple (ConcreteNormalCorner)
-    vertices = concreteCornersOfQuad
-
-instance Edges (ConcreteNormalTri) where
-    type Eds (ConcreteNormalTri) = Triple (ConcreteNormalArc)
-    edges = concreteArcsOfTri
-
-instance Edges (ConcreteNormalQuad) where
-    type Eds (ConcreteNormalQuad) = Quadruple (ConcreteNormalArc)
-    edges = concreteArcsOfQuad
-
-instance Vertices TConcreteNArc where
-    type Verts TConcreteNArc = Pair (TConcreteNCorner)
-    vertices x =
-        map2 (pMap (getTriangulation x)) (vertices (unT x))
-
-instance Vertices TConcreteNTri where
-    type Verts TConcreteNTri = Triple TConcreteNCorner
-    vertices x =
-        map3 (pMap (getTriangulation x)) (vertices (unT x))
-
-instance Vertices TConcreteNQuad where
-    type Verts TConcreteNQuad = Quadruple TConcreteNCorner
-    vertices x =
-        map4 (pMap (getTriangulation x)) (vertices (unT x))
-
-instance Edges TConcreteNTri where
-    type Eds TConcreteNTri = Triple TConcreteNArc
-    edges x =
-        map3 (pMap (getTriangulation x)) (edges (unT x))
-
-instance Edges TConcreteNQuad where
-    type Eds TConcreteNQuad = Quadruple TConcreteNArc
-    edges x =
-        map4 (pMap (getTriangulation x)) (edges (unT x))
-
--- derive stuff for T-types (ignore the triangulation)
-$(concatMapM (\((cls,meth),ty) -> 
-    sequence [
-    sinstanceD (cxt[]) (cls `sappT` (''T `sappT` (''Concrete `sappT` ty))) 
-        [svalD meth [| \x -> $(varE meth) x . unT |]]
-         
-        ]
-
-        )
-
-         (liftM2 (,)     
-            [(''Show,'showsPrec),(''Pretty,'prettyPrec),(''ShortShow,'shortShowsPrec)]
-            [''INormalTri,''INormalQuad,''INormalArc,''INormalCorner])
-             
-             
-    )
-
-instance RightAction S2 (Concrete OINormalArc) where 
-    x *. g = c_update id (*. g) x 
-
-instance OrderableFace (ConcreteNormalArc) (Concrete OINormalArc) where
-    type VertexSymGroup (ConcreteNormalArc) = S2
-
-    packOrderedFace x g = c_update coercePos (`packOrderedFace` g) x
-    unpackOrderedFace ox =
-        let
-            (y,g) = unpackOrderedFace (c_type ox)
-        in
-            (c_update coercePos (const y) ox, g)
-
-data WhichHalf = Half012 | Half023
-    deriving (Show,Eq,Ord)
-
-instance ShortShow WhichHalf where
-    shortShow = drop 4 . show
-
-instance Pretty WhichHalf where
-    pretty = text . show
-
-newtype TConcreteNQuadHalf = CNQH (WhichHalf, TConcreteNQuad) 
-    deriving(Show,ShortShow,Eq,Ord,Pretty)
-
-type instance L NArcOrNQuadDiagonal = TConcreteNArc
-type instance R NArcOrNQuadDiagonal = TConcreteNQuad
-
-newtype NArcOrNQuadDiagonal = 
-        NArcOrNQuadDiagonal (Either TConcreteNArc TConcreteNQuad)
-    deriving (Show,ShortShow,Eq,Ord,Pretty,SubSumTy,SuperSumTy)
-
-type instance L NTriOrNQuadHalf = TConcreteNTri
-type instance R NTriOrNQuadHalf = TConcreteNQuadHalf
-
-newtype NTriOrNQuadHalf = 
-        NTriOrNQuadHalf (Either TConcreteNTri TConcreteNQuadHalf)
-    deriving (Show,ShortShow,Eq,Ord,Pretty,SubSumTy,SuperSumTy)
-
-cnqh_quad :: TConcreteNQuadHalf -> TConcreteNQuad
-cnqh_quad (CNQH (_,q)) = q
-
-cnqh_which :: TConcreteNQuadHalf -> WhichHalf
-cnqh_which (CNQH (w,_)) = w
-
-instance Vertices TConcreteNQuadHalf where
-    type Verts TConcreteNQuadHalf = Triple TConcreteNCorner
-    vertices qh = case cnqh_which qh of
-                       Half012 -> (v0,v1,v2)
-                       Half023 -> (v0,v2,v3)
-        where
-            (v0,v1,v2,v3) = vertices (cnqh_quad qh)
-
-
-instance Edges TConcreteNQuadHalf where
-    type Eds TConcreteNQuadHalf = Triple NArcOrNQuadDiagonal
--- instance Edges CNAO
-
-    edges qh = case cnqh_which qh of
-                            -- no particular order
-                       Half012 -> (left' e01,left' e12, right' q)
-                       Half023 -> (left' e03,left' e23, right' q)
-        where
-            (e03,e01,e12,e23) = edges q
-            q = (cnqh_quad qh)
-
-instance Vertices NArcOrNQuadDiagonal where
-    type Verts NArcOrNQuadDiagonal = Pair TConcreteNCorner
-
-    vertices = either' vertices 
-        (\q -> 
-            let
-                (v0,_,v2,_) = vertices q
-            in
-                (v0,v2))
-
-instance Vertices NTriOrNQuadHalf where
-    type Verts NTriOrNQuadHalf = Triple TConcreteNCorner
-    vertices = either' vertices vertices
-
-instance Edges NTriOrNQuadHalf where
-    type Eds NTriOrNQuadHalf = Triple NArcOrNQuadDiagonal
-    edges = either' (map3 left' . edges) edges
-                
-
-instance Vertices ConcreteNSurface where
-    type Verts ConcreteNSurface = [TConcreteNCorner]
-    vertices = c_corners
-
-instance Edges ConcreteNSurface where
-    type Eds ConcreteNSurface = [NArcOrNQuadDiagonal]
-    edges s = (++) (map left' . c_arcs $ s) (map right' . c_quads $ s)
-
-instance Triangles ConcreteNSurface where
-    type Tris ConcreteNSurface = [NTriOrNQuadHalf]
-    triangles s = (++)
-                    (map left' . c_tris $ s) 
-                    [right' (CNQH (w,q))
-                        | w <- [Half012,Half023]
-                        , q <- c_quads s ]
-
-
-
-
-
-trisOfSameType :: ConcreteNormalTri -> Integer
-trisOfSameType c = triCount (c_surf c) (c_type c)
-
-quadsOfSameType :: ConcreteNormalQuad -> Integer
-quadsOfSameType c = quadCount (c_surf c) (c_type c)
-
-arcsOfSameType :: Concrete INormalArc -> Integer
-arcsOfSameType c = numberOfArcsOfType (c_surf c) (c_type c)
-
-cornersOfSameType :: Concrete INormalCorner -> Integer
-cornersOfSameType c = numberOfCornersOfType (c_surf c) (c_type c)
-
-instance DeltaSet1 ConcreteNSurface
-
-isRegardedAsSimplexByDisjointUnionDeriving ''DIM0 [t|TConcreteNCorner|]
-isRegardedAsSimplexByDisjointUnionDeriving ''DIM1 [t|TConcreteNArc|]
-isRegardedAsSimplexByDisjointUnionDeriving ''DIM1 [t|NArcOrNQuadDiagonal|]
-isRegardedAsSimplexByDisjointUnionDeriving ''DIM2 [t|TConcreteNTri|]
-isRegardedAsSimplexByDisjointUnionDeriving ''DIM2 [t|TConcreteNQuad|]
-isRegardedAsSimplexByDisjointUnionDeriving ''DIM2 [t|TConcreteNQuadHalf|]
-isRegardedAsSimplexByDisjointUnionDeriving ''DIM2 [t|NTriOrNQuadHalf|]
-
-instance MapTIndices ia => MapTIndices (Concrete ia) where
-    mapTIndices f (Concrete s p ia) = Concrete s (coercePos p) (mapTIndices f ia)
-    mapTIndicesStrictlyMonotonic f (Concrete s p ia) = Concrete s (coercePos p) (mapTIndicesStrictlyMonotonic f ia)
-
-instance HasTIndex ia a => HasTIndex (Concrete ia) (Concrete a) where
-    viewI (Concrete s p (viewI -> (I i a))) = I i (Concrete s (coercePos p) a) 
-    i ./ Concrete s p a = Concrete s (coercePos p) (i ./ a)
-
 

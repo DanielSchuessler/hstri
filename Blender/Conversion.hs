@@ -18,6 +18,8 @@ module Blender.Conversion(
     -- * Class
     ToBlenderable(..),
     defaultScene,
+    makeTrisInvisible,
+    setTrisTransp
 
 
     ) where
@@ -311,13 +313,14 @@ fromSpqwcAndIntegerNormalSurface spqwc s =
     fromIntegerNormalSurface spqwc s 
 
 
-makeTrisAlmostInvisible :: Blenderable s -> Blenderable s
-makeTrisAlmostInvisible =
+setTrisTransp
+  :: Maybe TransparencySettings -> Blenderable s -> Blenderable s
+setTrisTransp t =
     modL ba_triangleInfoL 
         (fmap 
             (setL 
                 (faceMatL >>> ma_transparencyL) 
-                (Just (defaultTrans 0.05))))
+                t))
 
 makeTrisInvisible :: Blenderable s -> Blenderable s
 makeTrisInvisible = modL ba_prL (pr_setTriVisibility (const OnlyLabels))  

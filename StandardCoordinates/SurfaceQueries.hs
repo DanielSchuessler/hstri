@@ -3,6 +3,7 @@ module StandardCoordinates.SurfaceQueries where
 
 import StandardCoordinates.MatchingEquations
 import ConcreteNormal
+import ConcreteNormal.Identification
 import Control.Applicative
 import TriangulationCxtObject
 import HomogenousTuples
@@ -82,8 +83,8 @@ isClosedSurface s =
 surfaceBoundary
   :: StandardCoords s Integer =>
      Admissible s
-     -> (Numbering TConcreteNCorner,
-         Gr TConcreteNCorner TConcreteNArc)
+     -> (Numbering TNmCorner,
+         Gr TNmCorner TNmArc)
 surfaceBoundary s = 
     let
         c = toConcrete s
