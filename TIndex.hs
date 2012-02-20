@@ -127,7 +127,7 @@ instance (Show a) => Show (I a) where
     showsPrec _ (I i x) = shows i . showString "./" . shows x
     
 instance (ShortShow a) => ShortShow (I a) where 
-    shortShowsPrec _ (I i x) = shortShows i . showChar '.' . shortShows x
+    shortShowsPrec _ (I i x) = shortShows x . shortShows i
 
 instance Quote TIndex where
     quotePrec _ (TIndex i) = show i

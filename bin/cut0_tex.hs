@@ -13,177 +13,8 @@ import Latexable
 import qualified Data.Vector.Generic as VG
 import Math.SparseVector
 import Blender.Conversion
-
-tr' :: Triangulation
-tr' = mkTriangulation 3
-        [   gluing (0./tACD) (2./oBDA) -- G1
-        ,   gluing (1./tABD) (2./oDBC) -- F1
-        ,   gluing (0./tABC) (0./oABD) -- F2 
-
-
-        ,   gluing (0./tBCD) (1./oBCD)
-        ,   gluing (1./tABC) (2./oABC)
-        ]
-
-
-
-imm0 ::  Floating a => Tup3 a -> SolidTorusPoint a
-imm0 (unitToStd3 -> Tup4 (a,b,c,d)) = STP {
-        long = 2*pi*b, 
-        lat = if boundaryness == 0
-                 then 0
-                 else 2*pi*c/boundaryness,
-
-        boundaryness
-    }
-
-        where boundaryness = c+d
-
--- ACD1 -> boundary
--- ACD2 -> boundary
--- CD1 = DA2
-
-imm1 ::  Floating a => Tup3 a -> SolidTorusPoint a
-imm1 (unitToStd3 -> Tup4 (a,b,c,d)) = STP {
-        long = 2*pi*(a+b), 
-        lat = if boundaryness == 0
-                 then 0
-                 else 2*pi*c/boundaryness,
-        boundaryness
-
-    }
-
-        where boundaryness = a+c+d
-
-
-imm2 ::  Floating a => Tup3 a -> SolidTorusPoint a
-imm2 (unitToStd3 -> Tup4 (a,b,c,d)) = STP {
-        long = 2*pi*(a+b+d), 
-        lat = if boundaryness == 0
-                 then 0
-                 else 2*pi*(c+d)/boundaryness,
-        boundaryness
-    }
-
-        where boundaryness = a+c+d
-
-
-
-getTetImm i = GTetE (text"it") res (torusCoords' major minor . ([imm0,imm1,imm2]!!fi i)) 
-    where
-        major = 1.5
-        minor = 1
-
-pr' = mkPreRenderableFromTetImmersions (getTetImm . unT) tr'
-
-
-
-
--- cam for major=1.5 torus
-birdView = (1600,1600,readCam "(Vector((1.107737421989441, -3.3140807151794434, 4.970339298248291)), Euler((0.5687100887298584, 6.7056621446681675e-06, 0.32061710953712463), 'XYZ'), 0.8575560591178853)")
-
--- cam for major=3 torus
--- cam = readCam "(Vector((2.1319010257720947, -6.1500420570373535, 10.139385223388672)), Euler((0.5280014872550964, 2.1189225662965328e-06, 0.32922065258026123), 'XYZ'), 0.8575560591178853)"
---
-
-frontView = (1920,1080, readCam "(Vector((0.4581758975982666, -6.223918914794922, 0.42777082324028015)), Euler((1.488981008529663, 5.444458565762034e-06, 0.07584881782531738), 'XYZ'), 0.8575560591178853)")
-
-midView = (1920,1300, readCam "(Vector((3.9005279541015625, -4.038114547729492, 2.9004249572753906)), Euler((1.0373719930648804, 9.68077529250877e-06, 0.7680635452270508), 'XYZ'), 0.8575560591178853)")
-
-
-midView2 = (1920,1300, 
-
- readCam "(Vector((-5.481293678283691, 1.214869499206543, 2.9004249572753906)), Euler((1.0373719930648804, 9.68077529250877e-06, 4.4942708015441895), 'XYZ'), 0.8575560591178853)"
-
-
-    )
-        
-lamp = defaultLamp {
-    lamp_eulers = eulerAnglesXYZ (70*pi/180) 0 (-pi/6)
-}
-
-
-
-
-
-hideAllBut i = pr_hide (not . flip isSubface (tindex i))
-
-ddr :: DDResult QuadCoordSys
-ddr = dd tr'
-
-qVertSols = case ddr of
-                 DDResult{_ddr_final=xs} -> VG.map (qd_fromVector . ipr_value) xs 
-
-
-sscr :: SolSetConversionResult Rational
-sscr = quadToStandardSolSet' ddr
-
-res = 
-    60  
---     120
-
-go fp (w,h,_cam) =
-    blenderMain JustLook 
-    . setRenderRes w h
-    . setRenderFilepath fp
-    . setCam _cam
-    . setLamps [lamp]
-    . defaultScene 
-    . setHelpLineN 19
-    . setHelpLineThickness 0.002
-    . disableHelpLines 
-
-
-
-goPM fp view = go fp view . mkBlenderable pseudomanifoldStyle
-
-
-mainRender = do
-    forM_ 
-        [
-            ("",midView)
-            ,
-            ("B",midView2)
-        ] 
-        $ \(suf,view) -> do
-
---             goPM ("/h/dipl/pictures/cut0torus"++suf++".png") view pr'
---             forM_ [0,1,2] 
---                 (\i -> goPM 
---                     ("/h/dipl/pictures/cut0torus"++suf++show i++".png") 
---                     view 
---                     (hideAllBut i pr'))
-                
-            case sscr of
-                 SolSetConversionResult { sscr_finalVerbose = fv } ->
-                    VG.forM_ fv
-                        (renderSol suf view)
-
-
-
-renderSol suf view (sol :: SolSetConversionResultItem Rational) = do
-
-    let fundEdgeSolution = standard_toFundEdgeSol (sscri_value sol)
-
-    go ("/h/dipl/pictures/cut0torus"++suf++"_v"++show (toInteger (sscri_index sol)) ++".png")
-        view
-
-        (setTrisTransp
-                    (Just (defaultTrans 0.1) {
-                        _fresnel = 2.5,
-                        _fresnel_factor = 1.25
-                    })
-            (mkBlenderable pseudomanifoldStyle (pr_mapDs gds2 pr'))
-            `disjointUnion`
-         mkBlenderable normalSurfaceStyle 
-            (prnsFromTetImmersions getTetImm (gds2 (toConcrete fundEdgeSolution))))
-
-
-                
-                
-
-        
-
+import Control.Arrow
+import Cut0
 
 
 weightedVertexLinkGraphs :: Latex
@@ -193,7 +24,7 @@ weightedVertexLinkGraphs =
        makeFunboxCommand "1.5em" "\\small $#1$" ++ "\n" 
     ++ makeSemicolonBoxCommand ++ "\n"
     ++ concat (
-     case (ddr,sscr) of 
+     case (ddr_cut0,sscr_cut0) of 
       ( DDResult { _ddr_final = finals }, 
         SolSetConversionResult { sscr_canonExtsOfInput = theCanonExts } ) -> do
         (ipr,theCanonExt) <- zip (VG.toList finals) (VG.toList theCanonExts) 
@@ -202,7 +33,7 @@ weightedVertexLinkGraphs =
                 ++mathmode (ipr_index ipr)++":}\n"++
             let ?layout = sgl
             in 
-                tikzStructureGraph tr' 
+                tikzStructureGraph tr_cut0 
                     sgee { way = QuadGiven (qd_fromVector . ipr_value $ ipr) } 
                 ++ "\nLösung: "++mathmode (
                         toLatex (ddrep_index theCanonExt) 
@@ -222,30 +53,27 @@ weightedVertexLinkGraphs =
             ))
 
 
+mainTex ::  IO ()
 mainTex = do
---     writeFile "/h/dipl/tex/cut0QMES.tex" (latexifyQMatchingEquations "0.7em" "0.5em" tr')
-    writeFile "/h/dipl/tex/cut0DD.tex" . latexifyDDResults "2.2em" $ ddr
+    writeFile "/h/dipl/tex/cut0QMES.tex" (latexifyQMatchingEquations "0.7em" "0.5em" tr_cut0)
+    writeFile "/h/dipl/tex/cut0DD.tex" . latexifyDDResults "2.2em" $ ddr_cut0
 
     let ?layout = sgl
-    writeFile "/h/dipl/graphs/cut0vl.tex" (tikzStructureGraph tr' sgee) 
+    writeFile "/h/dipl/graphs/cut0vl.tex" (tikzStructureGraph tr_cut0 sgee) 
     writeFile "/h/dipl/graphs/cut0weightedvls.tex" weightedVertexLinkGraphs
 
-    writeFile "/h/dipl/tex/cut0SolSetConversion.tex"  . latexifySolSetConversionResult "1.5em" $ sscr
+    writeFile "/h/dipl/tex/cut0SolSetConversion.tex"  . latexifySolSetConversionResult "1.5em" $ sscr_cut0
 
 
---     putStrLn (latexifyEns tr')
---     previewAutoEns tr' defaultSGEE
-    putStrLn "Done"
 
-
-editsgl = let ?outfilePrefix = "/tmp/cut0" in let ?tr = tr' in interactiveLayoutMainWith sgl
+editsgl = let ?outfilePrefix = "/tmp/cut0" in let ?tr = tr_cut0 in interactiveLayoutMainWith sgl
 
 viewsgl = do
     let texfile = "/tmp/cut0.tex"
     writeFile texfile 
         (wrapTikzAsDoc 
             (let ?layout = sgl
-                in tikzStructureGraph tr' sgee))
+                in tikzStructureGraph tr_cut0 sgee))
     runPdfLatexSilentS texfile
 --     (runOkularAsync "/tmp/cut0.pdf")
 
@@ -344,6 +172,3 @@ sgl = SGL{sgl_verts =
         offsetx = 140
         offsety = 200
 
-
-
-main = mainRender

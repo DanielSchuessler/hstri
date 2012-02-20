@@ -60,6 +60,7 @@ import Data.Tuple.Index
 import Control.DeepSeq.TH
 import Language.Haskell.TH.Lift
 import Data.Typeable
+import Data.Vect.Double.Base((*&))
 
 data Vertex = A | B | C | D
     deriving(Eq,Ord,Bounded,Ix,Typeable)
@@ -177,7 +178,7 @@ instance Arbitrary IVertex where
 
 -- | Embeds the abstract tetrahedron into R^3 symmetrically
 vertexDefaultCoords :: Vertex -> Vec3
-vertexDefaultCoords = (\x -> f x &- center_) . viewVertex 
+vertexDefaultCoords = (\x -> 1.5 *& (f x &- center_)) . viewVertex 
     where
         f A = vec3X
         f B = vec3Y

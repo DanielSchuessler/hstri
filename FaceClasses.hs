@@ -10,7 +10,6 @@ import PrettyUtil
 import qualified Data.Vector.Generic as VG
 import Language.Haskell.TH
 import THUtil
-import THBuild
 import Util
 
 data DIMMINUS1

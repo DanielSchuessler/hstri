@@ -50,9 +50,10 @@ import Data.AdditiveGroup((^+^))
 import Data.VectorSpace((^*))
 import PrettyUtil(docToString)
 import PrettyUtil(prettyEqs)
-import PrettyUtil(pretty,text)
+import PrettyUtil(pretty,text,prettyString)
 import Data.AdditiveGroup((^-^))
 import Blender.Build
+import Text.Groom
 
 #define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), PreDeltaSet2 s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
 #define CONSTRAINTS(s) ?sceneE::Python(),?scene::Scene s, CONSTRAINTS0(s) 
@@ -65,25 +66,28 @@ import Blender.Build
 
 -- Absolute units
 decoConeLength :: BlenderUnits
-decoConeLength = 0.07 
+decoConeLength = 0.12
 
-conegap :: BlenderUnits
-conegap = 0.07
 
 cylLength :: BlenderUnits
 cylLength = 0.15*decoConeLength
 
+gapfactor = 2
+
+conegap :: BlenderUnits
+conegap = 0.07 * gapfactor
+
 -- | Gap between the last cone and the first cyl
 ccgap :: BlenderUnits
-ccgap = 0.08
+ccgap = 0.08 * gapfactor
 
 cylgap :: BlenderUnits
-cylgap = 0.025
+cylgap = 0.025 * gapfactor
 
 
 -- | Deco cone width at the base, as a multiple of edge width
 decoConeWidthFactor :: Double
-decoConeWidthFactor = 2.5
+decoConeWidthFactor = 2.5 * (decoConeLength/0.07)
                 
 -- End of Edge-deco-related constants
 
@@ -289,7 +293,7 @@ dhE :: DimensionHandler s (Ed s)
 dhE    ba e =
     when (ba_visibility ba e' == Visible) $ do 
         awhen (getL ba_edgeDecoL ba e) 
-            (\d -> mkEdgeDecos ee d name (bfi_labelMat bfi) thickness)
+            (\d -> mkEdgeDecos ee d name (bfi_labelMat bfi) (bfi_labelMat2 bfi) thickness)
 
         let _objVar = pyv "cylObj"
 
@@ -327,14 +331,16 @@ dhE    ba e =
                             
 
                             
-mkEdgeDecos :: (?scene::Scene s,?sceneE::Python ()) => EdgeImmersion -> EdgeDeco -> String -> Maybe Material -> BlenderUnits -> Python ()
-mkEdgeDecos ee (EdgeDeco n dir) edgeName mat edgeThickness = do
+mkEdgeDecos :: (?scene::Scene s,?sceneE::Python ()) => EdgeImmersion -> EdgeDeco -> String -> Maybe Material -> Maybe Material -> BlenderUnits -> Python ()
+mkEdgeDecos ee (EdgeDeco n dir) edgeName coneMat cylMat edgeThickness = do
 
     let 
         width = decoConeWidthFactor * edgeThickness 
 
         ee' :: UF Tup3 Double
-        ee' = evalEdgeImmersion ee
+        ee' = evalEdgeImmersion ee . (case dir of
+                                        NoFlip -> id
+                                        Flip -> (\x -> 1-x))
 
     
         -- in absolute distance on the edge, from the midpoint of the edge
@@ -345,10 +351,12 @@ mkEdgeDecos ee (EdgeDeco n dir) edgeName mat edgeThickness = do
                     let (d,m) = divMod n 3 in if m==0 then (d-1,3) else (d,m)
 
                 _len = conegap * fi (ncones-1) 
-                      + if ncyls == 0 then 0 else ccgap + cylgap * fi (ncyls-1) 
+                      + if ncyls == 0 then 0 else (ccgap + cylgap * fi (ncyls-1)) 
 
-                cone_u i = - _len/2 + fi i * conegap
-                cyl_u i = cone_u (ncones-1) + ccgap + fi i * cylgap
+                cyl_u i = - _len/2 + fi i * cylgap
+                cone_u i =    cyl_u (ncyls - 1) 
+                            + (if ncyls == 0 then 0 else ccgap)
+                            + fi i * conegap
             in
                 ( map cone_u [0..ncones-1]
                 , map cyl_u [0..ncyls-1] )
@@ -369,15 +377,11 @@ mkEdgeDecos ee (EdgeDeco n dir) edgeName mat edgeThickness = do
         in
             coneAlongCurve 
                 ((\(t :: AD s Double) -> 
-                        ee' (interpolU t (lift u_min) (lift u_max)))
-
-                    . case dir of
-                           NoFlip -> id
-                           Flip -> (\x -> 1-x))
+                        ee' (interpolU t (lift u_min) (lift u_max))))
 
                 width
-                ("DecoConeOf "++edgeName) 
-                mat
+                ("DC"++edgeName) 
+                coneMat
 
 
 
@@ -395,7 +399,7 @@ mkEdgeDecos ee (EdgeDeco n dir) edgeName mat edgeThickness = do
                 128
                 False
 
-            objCommon var [] ("DecoCylOf "++edgeName) mat
+            objCommon var [] ("DecoCylOf "++edgeName) cylMat
 
 
 
@@ -406,6 +410,10 @@ coneAlongCurve (c :: UF Tup3 Double) width name mat =
     $(assrt [| areKindaOrthogonal other0 other1  |] ['tangent,'other0,'other1]) $ 
     $(assrt [| areKindaOrthogonal tangent other0 |] ['tangent,'other0,'other1]) $ 
     $(assrt [| areKindaOrthogonal tangent other1 |] ['tangent,'other0,'other1]) $ 
+
+
+--     trace ("meshName = " ++ name) $
+--     trace ("meshVertices =\n" ++ prettyString meshVertices) $
 
 --     trace 
 --         (docToString $ 
@@ -422,11 +430,8 @@ coneAlongCurve (c :: UF Tup3 Double) width name mat =
                     meshSmooth = True,
                     meshMats = maybeToList mat,
                     uv_textures = [],
-                    meshVertices = apex : map baseVertex [0..n-1],
-                    meshFaces = [ (0,i,j)
-                                    
-                                  | let is = n:[1..n], 
-                                    (i,j) <- zip is (drop 1 is) ]
+                    meshVertices,
+                    meshFaces
                 }
 
 
@@ -435,6 +440,13 @@ coneAlongCurve (c :: UF Tup3 Double) width name mat =
 
 
   where
+        meshVertices = apex : map baseVertex [0..n-1]
+
+        meshFaces = [ (0,i,j)
+                        
+                        | let is = n:[1..n], 
+                        (i,j) <- zip is (drop 1 is) ]
+
         tangent,other0,other1,valueAt0 :: Tup3 Double
         tangent = twoNormalize (diffF c 0)
         other0 = twoNormalize (anyOrthT3 tangent) -- low-priority fixme: will lead to ugly results if we move over a discontinuity of anyOrthT3 as 'u' varies 
@@ -621,8 +633,8 @@ blenderMain doRender s = do
     endtime <- getCurrentTime
     putStrLn ("toBlender took "++show (endtime `diffUTCTime` starttime)) 
     putStrLn ("Scene creation script written to " ++ fn++"; launching Blender")
-    args <- getArgs
-    rawSystem "blender" ("-P":fn:args)
+    -- args <- getArgs
+    rawSystem "blender" ("-P":fn:[]) -- :fn:args)
 
 
 meshVar ::  Python ()
@@ -677,7 +689,7 @@ newTriangularSurfaceObj = memo prepare
         prepare (steps :: Int) = 
             let
                 m = steps - 1
-                vertexNumbering = nuFromDistinctList vertices_intUV 
+                vertexNumbering = nuFromDistinctUnboxList vertices_intUV 
                 toi = toInt vertexNumbering
 
                 (vertices_intUV,tris_intUV) = 

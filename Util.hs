@@ -389,3 +389,5 @@ teller = tell . return
 
 sortWith :: Ord a1 => (a -> a1) -> [a] -> [a]
 sortWith = sortBy . comparing
+
+dont _ = return ()

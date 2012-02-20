@@ -18,6 +18,7 @@ import Data.Semigroupoid
 import Control.Monad
 import Data.Semigroupoid.Static
 import Text.Groom
+import Data.Semigroup(Semigroup(..))
 
 data FiniteFunc a b = FiniteFunc {
         ff_domain :: [a],
@@ -105,4 +106,8 @@ ff_compose  ff2 ff1 = FiniteFunc (ff_domain ff1) (ff_func ff2 <=< ff_func ff1)
 instance Semigroupoid FiniteFunc where
     o = ff_compose 
 
+instance Semigroup (FiniteFunc a a) where
+    (<>) = ff_compose
 
+ff_empty :: FiniteFunc a b
+ff_empty = FiniteFunc [] (const ($failureStr' "ff_empty")) 

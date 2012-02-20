@@ -18,7 +18,7 @@ module ConcreteNormal(
     coercePos,
 
     -- * Concrete normal faces
-    Concrete,c_surf,c_pos,c_type,c_questionableUpdate,
+    Concrete(..),c_surf,c_pos,c_type,c_questionableUpdate,
     NmCorner,
     NmArc,
     NmTri,
@@ -132,7 +132,7 @@ instance Pretty a => Pretty (Concrete a) where
         prettyPrecApp prec "Concrete" [anyPretty (c_pos x), anyPretty (c_type x)] 
 
 instance ShortShow v => ShortShow (Concrete v) where
-    shortShow c = shortShow (c_type c) ++ shortShow (c_pos c)
+    shortShow c = shortShow (c_type c) ++ "#" ++ shortShow (c_pos c)
 
 
 

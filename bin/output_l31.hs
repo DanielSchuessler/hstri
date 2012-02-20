@@ -10,9 +10,13 @@ import Data.Lens.Common
 import Triangulation.AbstractNeighborhood
 import Data.Maybe
 import Util
+import Latexable
+import Tikz.Gen
+import Math.SparseVector
+import Blender.Blenderable
 
 
-bcmd = JustLook
+bcmd = DoRender
 
 tr = tr_l31
 spqwc = spqwc_l31
@@ -20,16 +24,29 @@ spqwc = spqwc_l31
 smes :: IO ()
 smes = putStr (latexifyStandardMatchingEquations tr)
 
-qmes = putStr (latexifyQMatchingEquations tr)
+qmes = putStr (latexifyQMatchingEquations "0.7em" "0.5em" tr)
 
-go fp ba = (blenderMain bcmd . setCams [twoTetCam] . setRenderFilepath fp . setRenderRes 1200 1200)
-        (defaultScene $ ba)
+go fp ba = 
+    blenderMain bcmd . setCams [twoTetCam] . setRenderFilepath fp . setRenderRes 1200 1200
+    . defaultScene
+    .
+            setTrisTranspJust 
+                        (defaultTrans 1) {
+                            _fresnel = 1.5,
+                            _fresnel_factor = 1.25,
+                            _translucency = 0.8
+                        }
+
+            
+        
+    $ ba
 
 
 main = do
 --     go "/h/dipl/pictures/L31.png" (fromSpqwc spqwc)
     go "/h/dipl/pictures/L31vertexLinkD0.png" baVertexLinkD0
     go "/h/dipl/pictures/L31vertexLinkA0.png" baVertexLinkA0
+    putStrLn "Done"
     
 
 p = pMap tr
@@ -65,6 +82,8 @@ writeFileOrPreview = const previewTikz
 #endif
 
 
+iverts= tIVertices tr
+
 vl_A0 way =  
     let 
         v = p (head triOrder)
@@ -79,13 +98,14 @@ vl_A0 way =
 
         tikz = 
             let ?layout = 
-                    SGL 
-                        (funToMap (tIVertices tr) (ptcToIVertex_fromS3s nodePerm))
-                        (funToMap (tIVertices tr) (regularPolygonLocs triOrder))
+                    SGL iverts []
+                        (funToMap iverts (ptcToIVertex_fromS3s nodePerm))
+                        (funToMap iverts (regularPolygonLocs triOrder))
                         $undef
+                        sparse_empty
             in
-                tikzStructureGraphForVertexLink 
-                    v 
+                tikzStructureGraph
+                    tr 
                     (SGEE
                         ["x=3cm","y=3cm","scale=0.8","scale="++show scaleTweak]
                         noExtraEdgeStyles
@@ -106,13 +126,14 @@ vl_D0 way =
 
         tikz = 
             let ?layout = 
-                    SGL
-                        (funToMap (tIVertices tr) (ptcToIVertex_fromS3s nodePerm))
-                        (funToMap (tIVertices tr) (regularPolygonLocs triOrder))
+                    SGL iverts []
+                        (funToMap iverts (ptcToIVertex_fromS3s nodePerm))
+                        (funToMap iverts (regularPolygonLocs triOrder))
                         $undef
+                        sparse_empty
             in
-                tikzStructureGraphForVertexLink 
-                    v 
+                tikzStructureGraph
+                    tr 
                     (SGEE
                         [ "x=3cm","y=3cm","shift={(0.5,2)}","scale=0.4","scale="++show scaleTweak ]
                         (\x -> if x == 0 ./ tABD then ["looseness=2"] else []) 
@@ -140,6 +161,6 @@ graphs = do
 
 ens =
           unlines
-        . map ((++"\\\\") . either toLatex toLatex . someEdgeNeighborhood tr)
+        . map ((++"\\\\") . either toLatex toLatex . someEdgeNeighborhood)
         . edges $ tr
         

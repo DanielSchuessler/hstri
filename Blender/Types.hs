@@ -31,13 +31,14 @@ data TransparencySettings = Trans {
     _alpha :: Double,
     _spec_alpha :: Double,
     _fresnel :: Double,
-    _fresnel_factor :: Double
+    _fresnel_factor :: Double,
+    _translucency :: Double
 }
     deriving Show
 
 defaultTrans :: Double -- ^ alpha 
     -> TransparencySettings
-defaultTrans _alpha = Trans {_alpha, _spec_alpha = _alpha, _fresnel = 1, _fresnel_factor = 1.25 }
+defaultTrans _alpha = Trans {_alpha, _spec_alpha = _alpha, _fresnel = 1, _fresnel_factor = 1.25, _translucency=1-_alpha }
 
 data BlenderImage = BImg {
     bimg_name :: String,
@@ -118,19 +119,6 @@ defaultFOV = 0.8575560591178853
 
 
 
-transparency :: TransparencySettings -> [([Char], Python ())]
-transparency Trans{..} =
-                [
-                "use_transparency" & True,
-                "transparency_method" & str "RAYTRACE",
-                -- "transparency_method" & "'Z_TRANSPARENCY'",
-                "alpha" & (_alpha),
-                "specular_alpha" & (_spec_alpha),
-                "translucency" & (1-_alpha),
-                "raytrace_transparency.fresnel" & (_fresnel),
-                "raytrace_transparency.fresnel_factor" & _fresnel_factor,
-                "raytrace_transparency.depth" & (15::Int)
-                ]
 
 -- | Read the result of printing @(cam.location,cam.rotation_euler,cam.data.angle)@ in Blender-python
 readCam :: String -> Cam

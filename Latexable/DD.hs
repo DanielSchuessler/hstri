@@ -385,11 +385,14 @@ latexifySolSetConversionResult columnWidth (SolSetConversionResult tr _ steps fi
 
             safeUnlines [
                     "\\itemNL{Ergebnis:}",      
+                    latexEnv "center" (
                     tabular ("l@{\\hspace{0.1em}}" : solSetConversionVectorColumns)
                         (slashes 
                             (map    
                                 (amps . toList4 . goSSCRI ) 
                                 (VG.toList final)))
+                        )
+                                      
                 ]
 
             where

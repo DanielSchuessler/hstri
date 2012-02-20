@@ -11,7 +11,7 @@ import Data.Lens.Common
 import ShortShow
 import PrettyUtil
 import Simplicial.SimplicialComplex
-import ConcreteNormal.PreRenderable(Corn)
+import ConcreteNormal.PreRenderable(Corn,noCornPosOverride)
 
 viewFundEdgeSolutionsInBlender
   :: (Ord v, Show v, Pretty v, ShortShow v) =>
@@ -47,7 +47,7 @@ viewFundEdgeSolutionsInBlender spqwc initialSelection = do
                     . defaultScene 
                         $
                         
-                        (fromSpqwcAndIntegerNormalSurface
+                        (fromSpqwcAndIntegerNormalSurface noCornPosOverride
                             spqwc
                             s)
 

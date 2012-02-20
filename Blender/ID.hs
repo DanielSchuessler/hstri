@@ -101,7 +101,25 @@ instance BlenderID Material where
     id_collectUniqueThings = nubOn ma_name . concatMap f . ba_allFaceInfos
         where
             f x = faceMat x
-                    : catMaybes [ (helpLineMat <=< bfi_helpLineSettings) x, bfi_labelMat x ]
+                    : catMaybes [ (helpLineMat <=< bfi_helpLineSettings) x
+                                , bfi_labelMat x 
+                                , bfi_labelMat2 x 
+                                ]
+
+transparency :: TransparencySettings -> [([Char], Python ())]
+transparency Trans{..} =
+                [
+                "use_transparency" & True,
+                "transparency_method" & str "RAYTRACE",
+                -- "transparency_method" & "'Z_TRANSPARENCY'",
+                "alpha" & (_alpha),
+                "specular_alpha" & (_spec_alpha),
+                "translucency" & _translucency,
+                "raytrace_transparency.fresnel" & (_fresnel),
+                "raytrace_transparency.fresnel_factor" & _fresnel_factor,
+                "raytrace_transparency.depth" & (15::Int)
+                ]
+
 
 
 mts_init :: Python () -> MaterialTextureSlot -> Python ()

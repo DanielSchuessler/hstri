@@ -27,57 +27,15 @@ module Blender.Conversion(
 
 
 import Blender.Blenderable
-    ( Scene,
-      HelpLineSettings(helpLineMat),
-      Blenderable(..),
-      BaFaceInfo(BaFaceInfo, bfi_groups, bfi_helpLineSettings,
-                 bfi_labelMat, faceMat),
-      triangleUVLayerName,
-      faceMatL,
-      defaultScene0,
-      defaultHLS,
-      ba_triangleInfoL,
-      ba_prL )
 import Blender.Types
-    ( TransparencySettings(_fresnel, _fresnel_factor),
-      Texture(..),
-      MaterialTextureSlot(..),
-      Material(ma_name, ma_specular_hardness, ma_specular_intensity,
-               ma_transparency),
-      BlenderUnits,
-      BlenderImage(BImg, bimg_filepath, bimg_name),
-      BlenderGroup(BlenderGroup),
-      ma_transparencyL,
-      defaultTrans,
-      basicMaterial )
 import PreRenderable
-    ( Visibility(OnlyLabels),
-      PreRenderable,
-      pr_setTriVisibility,
-      pr_popDimension,
-      pr_generalTriangleImmersionL )
 import SimplicialPartialQuotient ( SPQWithCoords, toPreRenderable )
 import Simplicial.SimplicialComplex
     ( Triple, foldAnySimplex2, disjointUnion, Asc3, Asc2, SC2, DJSC2 )
 import ConcreteNormal.PreRenderable
-    ( Corn, normalSurfaceToPreRenderable )
-import Control.Category ( (>>>) )
-import Data.Function ( id, const, (.) )
-import Data.Lens.Common ( setL, modL, getL )
-import Data.List ( (++) )
+    ( Corn, normalSurfaceToPreRenderable, CornPosOverride )
+import Data.Lens.Common
 import NormalEverything ( StandardCoords )
-import Prelude
-    ( Integral,
-      Functor(fmap),
-      Num((*)),
-      Ord,
-      Show,
-      Char,
-      Double,
-      Int,
-      Integer,
-      Maybe(Just, Nothing) )
-
 import PrettyUtil ( Pretty )
 import ShortShow ( ShortShow )
 import StandardCoordinates.MatchingEquations ( Admissible )
@@ -106,7 +64,7 @@ data Style = Style {
    -- | Blender groups to which all objects having this style should be added
     style_groups :: [BlenderGroup],
     style_helpLineMat :: Material,
-    style_labelMat :: Material
+    style_labelMat, style_labelMat2 :: Material
 }
 
 mkBlenderable
@@ -129,6 +87,7 @@ mkBlenderable Style{..} pr_ = Blenderable {
                     asi,
             bfi_groups = style_groups,
             bfi_labelMat = Just style_labelMat,
+            bfi_labelMat2 = Just style_labelMat2,
             bfi_helpLineSettings = Just (defaultHLS { helpLineMat = Just style_helpLineMat })
         },
 
@@ -172,7 +131,8 @@ pseudomanifoldStyle = Style {
     style_vertexThickness = pmVertThickness,
     style_groups = [threeMFGroup],
     style_helpLineMat = mat1 { ma_name = "pmHelpLine" },
-    style_labelMat = triLabelMat
+    style_labelMat = triLabelMat "" (let r = 0.015 in (r,r,r)),
+    style_labelMat2 = triLabelMat "2" (let r = 0.1 in (0.5,r,r))
  }
 
 
@@ -196,8 +156,7 @@ pseudomanifoldStyle = Style {
                 
                 
 
-    triLabelMat ::  Material
-    triLabelMat = (basicMaterial "triLbl" (let r = 0.015 in (r,r,r))) {
+    triLabelMat suf col = (basicMaterial ("pmLabelMat"++suf) col) {
             ma_specular_hardness = 200,
             ma_specular_intensity = 0.5
 
@@ -228,11 +187,13 @@ mkNormalSurfaceStyle suf col0 col1 col2 = Style {
     style_vertexThickness = nsurfVertThickness,
     style_groups = [normalGroup],
     style_helpLineMat = mat1 { ma_name = "nsurfHelpLine" },
-    style_labelMat = mat0
+    style_labelMat = mat0,
+    style_labelMat2 = basicMaterial ("nsurfLabelMat2"++suf) (0.8,0.317,0)
   }
 
   where
     mat0 = basicMaterial ("nsurfMat0"++suf) col0
+
     mat1 = (basicMaterial ("nsurfMat1"++suf) col1) {
                 ma_specular_hardness = 100,
                 ma_specular_intensity = 0.8
@@ -282,12 +243,13 @@ fromSpqwc = mkBlenderable pseudomanifoldStyle . pr_popDimension . toPreRenderabl
 
 fromNormalSurface
   :: (i ~ Integer, Integral i, Ord v, Pretty i, ShortShow v, StandardCoords s i, Show v) =>
-     SPQWithCoords v -> Admissible s -> Blenderable (SC2 (Corn v))
-fromNormalSurface spqwc stc = mkBlenderable normalSurfaceStyle (normalSurfaceToPreRenderable spqwc stc) 
+     CornPosOverride v -> SPQWithCoords v -> Admissible s -> Blenderable (SC2 (Corn v))
+fromNormalSurface posOverride spqwc stc = mkBlenderable normalSurfaceStyle 
+    (normalSurfaceToPreRenderable posOverride spqwc stc) 
 
 fromIntegerNormalSurface
   :: (Ord v, ShortShow v, StandardCoords s Integer, Show v) =>
-     SPQWithCoords v -> Admissible s -> Blenderable (SC2 (Corn v))
+     CornPosOverride v -> SPQWithCoords v -> Admissible s -> Blenderable (SC2 (Corn v))
 fromIntegerNormalSurface = fromNormalSurface
 
 
@@ -297,7 +259,8 @@ fromSpqwcAndIntegerNormalSurface
       Pretty v,
       ShortShow v,
       StandardCoords s Integer) =>
-     SPQWithCoords v
+        CornPosOverride v
+     -> SPQWithCoords v
      -> Admissible s
      -> Blenderable
           (DJSC2
@@ -306,24 +269,12 @@ fromSpqwcAndIntegerNormalSurface
              (Asc3 v) (Asc3 (Corn v))
              )
 
-fromSpqwcAndIntegerNormalSurface spqwc s = 
+fromSpqwcAndIntegerNormalSurface posOverride spqwc s = 
     makeTrisInvisible
         (fromSpqwc spqwc) 
     `disjointUnion`
-    fromIntegerNormalSurface spqwc s 
+    fromIntegerNormalSurface posOverride spqwc s 
 
-
-setTrisTransp
-  :: Maybe TransparencySettings -> Blenderable s -> Blenderable s
-setTrisTransp t =
-    modL ba_triangleInfoL 
-        (fmap 
-            (setL 
-                (faceMatL >>> ma_transparencyL) 
-                t))
-
-makeTrisInvisible :: Blenderable s -> Blenderable s
-makeTrisInvisible = modL ba_prL (pr_setTriVisibility (const OnlyLabels))  
 
 
 defaultScene :: ToBlenderable a s => a -> Scene s

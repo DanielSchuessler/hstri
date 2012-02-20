@@ -2,14 +2,18 @@
 {-# OPTIONS -Wall #-}
 
 module ConcreteNormal.PreRenderable(
+    module Data.FiniteFunc,
     module ConcreteNormal.Identification,
     module SimplicialPartialQuotient,
     module Simplicial.SimplicialComplex,
     Corn,corn,cornVerts,cornPos,cornCount,
+    CornPosOverride,
+    noCornPosOverride,
     normalSurfaceToPreRenderable,
     CornerPosition',CornerCount,
-    prnsFromTetImmersions
-
+    prnsFromTetImmersions,
+--     NmCornerPosOverride,
+--     noPosOverride
     ) where
 
 import ConcreteNormal.Identification
@@ -37,6 +41,7 @@ import Numeric.AD.Vector
 import Numeric.AD as AD
 import TriangulationCxtObject
 import R3Immersions
+import Data.FiniteFunc
 
 type CornerPosition' = Int
 type CornerCount = Int
@@ -80,18 +85,24 @@ data NormalSurfacePreRenderableOpts = NSPRO {
 defaultNSPRO :: NormalSurfacePreRenderableOpts
 defaultNSPRO = NSPRO True 
 
+type CornPosOverride v = (Int,v,v) -> Maybe Double
+
+noCornPosOverride :: CornPosOverride v
+noCornPosOverride = const Nothing
+
 normalSurfaceToPreRenderable
   :: (Ord v, Show v, ShortShow v, StandardCoords s Integer) =>
-     SPQWithCoords v -> Admissible s -> PreRenderable (SC2 (Corn v))
+    CornPosOverride v -> SPQWithCoords v -> Admissible s -> PreRenderable (SC2 (Corn v))
 normalSurfaceToPreRenderable = normalSurfaceToPreRenderableWithOpts defaultNSPRO
 
 normalSurfaceToPreRenderableWithOpts
   :: forall s v i. (i ~ Integer, Integral i, Show v, Ord v, Pretty i, ShortShow v, StandardCoords s i) =>
         NormalSurfacePreRenderableOpts
+     -> CornPosOverride v
      -> SPQWithCoords v
      -> Admissible s
      -> PreRenderable (SC2 (Corn v))
-normalSurfaceToPreRenderableWithOpts opts (SPQWithCoords spq coords _) ns =  
+normalSurfaceToPreRenderableWithOpts opts posOverride (SPQWithCoords spq coords _) ns =  
     let
 
         tris :: [Triple (Corn v)]
@@ -130,7 +141,11 @@ normalSurfaceToPreRenderableWithOpts opts (SPQWithCoords spq coords _) ns =
 
 
         cornerCoords (Corn pos n v0 v1) = 
-                interpolate (fi (1+pos) / fi (1+n)) (coords v0) (coords v1)
+                interpolate t (coords v0) (coords v1)
+            where
+                t = case posOverride (pos, v0, v1) of
+                         Nothing -> (fi (1+pos) / fi (1+n))
+                         Just t' -> t'
 
 
         isVisible = 
@@ -229,3 +244,8 @@ prnsFromTetImmersions (getTetImm :: TIndex -> GeneralTetImmersion) cns =
 
 
     
+type NmCornerPosOverride = FiniteFunc TNmCorner Rational 
+
+
+noPosOverride :: NmCornerPosOverride
+noPosOverride = ff_empty

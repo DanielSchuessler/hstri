@@ -62,6 +62,8 @@ data BaFaceInfo = BaFaceInfo {
     bfi_groups :: [BlenderGroup],
     -- | For triangle labels or edge decos (Nothing = no material, not no label/deco)
     bfi_labelMat :: Maybe Material,
+    -- | Secondary label/deco material color
+    bfi_labelMat2 :: Maybe Material,
     bfi_helpLineSettings :: Maybe HelpLineSettings
 }
 
@@ -311,3 +313,20 @@ setHelpLineN n = modL ba_faceInfoL (modL bfi_helpLineSettingsL (fmap (setL helpL
 setHelpLineThickness
   :: BlenderUnits -> Blenderable s -> Blenderable s
 setHelpLineThickness x = modL ba_faceInfoL (modL bfi_helpLineSettingsL (fmap (setL helpLineThicknessL x)) .)
+
+
+setTrisTransp
+  :: Maybe TransparencySettings -> Blenderable s -> Blenderable s
+setTrisTransp t =
+    modL ba_triangleInfoL 
+        (fmap 
+            (setL 
+                (faceMatL >>> ma_transparencyL) 
+                t))
+
+makeTrisInvisible :: Blenderable s -> Blenderable s
+makeTrisInvisible = modL ba_prL (pr_setTriVisibility (const OnlyLabels))  
+
+setTrisTranspJust
+  :: TransparencySettings -> Blenderable s -> Blenderable s
+setTrisTranspJust = setTrisTransp . Just

@@ -145,6 +145,7 @@ newMeshObj var m =
         indent $ do
             editmode_toggle
             normals_make_consistent
+        editmode_toggle
 
 
 
