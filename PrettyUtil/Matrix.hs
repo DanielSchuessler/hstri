@@ -99,7 +99,7 @@ blankingZeros :: (Eq a, Num a) => (a -> [Char]) -> a -> [Char]
 blankingZeros _ 0 = ""
 blankingZeros f x = f x
 
-showRational :: Integral a => Ratio a -> String
+showRational :: (Show a, Eq a, Integral a) => Ratio a -> String
 showRational x = 
         let 
             n = numerator x

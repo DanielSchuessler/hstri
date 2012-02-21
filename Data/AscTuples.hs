@@ -4,7 +4,6 @@
 module Data.AscTuples where
 
 import Control.Applicative
-import Control.Monad
 import Data.Maybe
 import Data.Tuple.Index
 import Data.Typeable

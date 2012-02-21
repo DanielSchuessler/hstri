@@ -57,7 +57,6 @@ Library
     FaceClasses
     FaceIx
     FaceLattice
-    Graph
     GraphUtil
     HomogenousTuples
     HsTri
@@ -144,9 +143,12 @@ Library
     Data.BitVector.Adaptive
     Data.FiniteFunc
     Blender.Mesh
+    Blender.Init
+    Blender.AsGlobal
     QuadCoordinates.SolSetConversion
     NormalSurfaceBasic
     R3Immersions
+    R3Immersions.Simplices
 
 
   Build-depends: ad, 

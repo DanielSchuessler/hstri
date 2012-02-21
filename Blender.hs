@@ -54,6 +54,7 @@ import PrettyUtil(pretty,text,prettyString)
 import Data.AdditiveGroup((^-^))
 import Blender.Build
 import Text.Groom
+import Data.Proxy
 
 #define CONSTRAINTS0(s) Show (Vert s), Show (Ed s), Show (Tri s), PreDeltaSet2 s, Ord (Ed s), Ord (Vert s), Ord (Tri s)
 #define CONSTRAINTS(s) ?sceneE::Python(),?scene::Scene s, CONSTRAINTS0(s) 
@@ -102,7 +103,7 @@ toBeSelectedVar = py "toBeSelected"
 
 
 ma_var ::  Material -> Python ()
-ma_var = id_globalVar
+ma_var = blenderGlobalVarFor
 
 
 
@@ -155,9 +156,9 @@ extraGrps = [
 data BCommand = DoRender | JustLook
     deriving (Show,Eq)
 
-toBlender :: (CONSTRAINTS0(s)) => Scene s -> BCommand -> Python ()
+-- toBlender :: (CONSTRAINTS0(s)) => Scene s -> BCommand -> Python ()
 toBlender scene@Scene{
-        scene_worldProps,
+        scene_world,
         scene_blenderable = ba@Blenderable{..},
         scene_cams} bcmd = do
 
@@ -187,20 +188,18 @@ toBlender scene@Scene{
 
             -- Make a new world, assign it to the scene, set world properties
             let worldVar = pyv "world" in do
-                worldVar .= methodCallExpr1 (bpy_dat "worlds") "new" (str "TheWorld")
-                mapM_ (setProp' worldVar) scene_worldProps
+                blenderInit worldVar scene_world
                 ?sceneE <.> "world" .= worldVar
 
             -- cameras
             forM_ (zip [0::Integer ..] scene_cams) (\(i, (Cam pos eulers fov)) -> do
                 let objVar = pyv "camObj"
-                let camVar = pyv "cam"
-                let nam = "cam"++show i
-                camVar .= methodCallExpr1 (bpy_dat "cameras") "new" (str nam)
-                camVar <.> "angle" .= fov
-                newObj objVar nam camVar
-                objVar <.> "location" .= pos
-                objVar <.> "rotation_euler" .= eulers
+                newCamObj objVar 
+                    (BObj 
+                        ("CamObj"++show i) 
+                        (BCamD { bcamd_name = "Cam"++show i, bcamd_FOV = fov }) 
+                        (LocAndEulers pos eulers))
+
                 when (i==0) (?sceneE <.> "camera" .= objVar))
 
             let objVar = pyv "lightObj" in 
@@ -238,10 +237,11 @@ toBlender scene@Scene{
 
         idDefs = do
                 -- order matters here!
-            mapM_ id_initGlobalVar (id_collectUniqueThings ba :: [BlenderImage])
-            mapM_ id_initGlobalVar (id_collectUniqueThings ba :: [Texture])
-            mapM_ id_initGlobalVar (id_collectUniqueThings ba :: [Material]) 
-            mapM_ id_initGlobalVar (extraGrps ++ id_collectUniqueThings ba :: [BlenderGroup]) 
+            blenderInitGlobalVars scene (undefined :: Proxy BlenderImage)
+            blenderInitGlobalVars scene (undefined :: Proxy Texture)
+            blenderInitGlobalVars scene (undefined :: Proxy Material)
+            blenderInitGlobalVars scene (undefined :: Proxy BlenderGroup)
+            mapM_ blenderInitGlobalVar extraGrps
 
 
 
@@ -354,9 +354,11 @@ mkEdgeDecos ee (EdgeDeco n dir) edgeName coneMat cylMat edgeThickness = do
                       + if ncyls == 0 then 0 else (ccgap + cylgap * fi (ncyls-1)) 
 
                 cyl_u i = - _len/2 + fi i * cylgap
-                cone_u i =    cyl_u (ncyls - 1) 
-                            + (if ncyls == 0 then 0 else ccgap)
-                            + fi i * conegap
+                cone_u i =
+                    if ncyls == 0 
+                       then - _len/2 + fi i * conegap 
+                       else cyl_u (ncyls - 1) + ccgap + fi i * conegap
+
             in
                 ( map cone_u [0..ncones-1]
                 , map cyl_u [0..ncyls-1] )
@@ -440,11 +442,12 @@ coneAlongCurve (c :: UF Tup3 Double) width name mat =
 
 
   where
-        meshVertices = apex : map baseVertex [0..n-1]
+        meshVertices = apex : map baseVertex [0 .. n-1]
 
+        meshFaces :: [Triple MeshVertexIndex]
         meshFaces = [ (0,i,j)
                         
-                        | let is = n:[1..n], 
+                        | let is = n:[1..n] :: [MeshVertexIndex], 
                         (i,j) <- zip is (drop 1 is) ]
 
         tangent,other0,other1,valueAt0 :: Tup3 Double
@@ -455,8 +458,9 @@ coneAlongCurve (c :: UF Tup3 Double) width name mat =
         valueAt0 = lowerUF c 0
         apex = tup3toVec3 $ lowerUF c 1
 
-        n = 20
+        n = 20 :: Int
 
+        baseVertex :: Int -> MeshVertex
         baseVertex i = tup3toVec3 $
             let
                 long = 2 * pi * fi i / fi n
@@ -617,7 +621,7 @@ handleTriLabel ba grpTriLabels t =
 
 
 
-testBlender :: (CONSTRAINTS0(s)) => Scene s -> IO ExitCode
+-- testBlender :: (CONSTRAINTS0(s)) => Scene s -> IO ExitCode
 testBlender = blenderMain JustLook
 
 renderBlender = blenderMain DoRender
@@ -686,6 +690,8 @@ newTriangularSurfaceObj :: (?sceneE::Python ()) =>
     -> Python ()
 newTriangularSurfaceObj = memo prepare
     where
+        prepare :: (?sceneE::Python ()) =>
+                          Int -> PythonVar -> FF Tup2 Tup3 Double -> String -> Python ()
         prepare (steps :: Int) = 
             let
                 m = steps - 1

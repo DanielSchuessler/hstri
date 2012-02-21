@@ -32,6 +32,8 @@ standard_admissible (toTriangulation -> tr) stc = do
     toAttemptC $ satisfiesMatchingEquations tr stc
     return (UnsafeToAdmissible tr stc)
 
+standard_toAdmissible tr = $unEitherC "standard_toAdmissible" . standard_admissible tr
+
 data MatchingEquationViolation s = MatchingEquationViolation {
         mev_vector :: s,
         mev_me :: MatchingEquationReason

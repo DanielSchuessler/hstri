@@ -14,18 +14,19 @@ import Util
 import qualified Data.Vector as V
 import Control.Monad
 import Data.Vect.Double.Base(Vec3(..))
+import Data.Vect.Double.Base(Proj4)
 
 type BlenderUnits = Double
+type TextureName = String
+type MatName = String
+type UVLayerName = String
+type BlenderPropAssoc = (String,Python ())
+type Props = [BlenderPropAssoc]
+type BlenderEnergy = Double
 
 (&) :: ToPython s => t -> s -> (t, Python ())
 x & y = (x, toPython y)
 
-type TextureName = String
-type MatName = String
-type UVLayerName = String
-
-type BlenderPropAssoc = (String,Python ())
-type Props = [BlenderPropAssoc]
 
 data TransparencySettings = Trans {
     _alpha :: Double,
@@ -73,7 +74,9 @@ data Material = Material {
  -- | [0,1]
     ma_specular_intensity :: Double,
 
-    ma_diffuse_color :: Triple Double
+    ma_diffuse_color :: Triple Double,
+
+    ma_ambient :: Double
 }
     deriving Show
 
@@ -87,7 +90,8 @@ basicMaterial ma_name ma_diffuse_color = Material {
     ma_specular_intensity = 0.5,
     ma_transparency = Nothing,
     ma_textureSlots = [],
-    ma_diffuse_color
+    ma_diffuse_color,
+    ma_ambient = 0
 }
 
 
@@ -98,10 +102,11 @@ newtype BlenderGroup = BlenderGroup { bgrp_name :: BlenderGroupName }
     deriving(Eq,Ord,Show)
 
 
-type EulerAnglesXYZ = Vec3
+data EulerAnglesXYZ = EulerAnglesXYZ { euler_x,euler_y,euler_z :: Double }
+    deriving (Show)
 
 eulerAnglesXYZ :: Double -> Double -> Double -> EulerAnglesXYZ
-eulerAnglesXYZ = Vec3
+eulerAnglesXYZ = EulerAnglesXYZ
 
 data Cam = Cam {
     cam_pos :: Vec3,
@@ -124,7 +129,7 @@ defaultFOV = 0.8575560591178853
 readCam :: String -> Cam
 readCam s = 
     case parseFloatLiterals s of
-         [a,b,c,d,e,f,g] -> Cam (Vec3 a b c) (Vec3 d e f) g 
+         [a,b,c,d,e,f,g] -> Cam (Vec3 a b c) (eulerAnglesXYZ d e f) g 
          r -> error ("readCam: no parse "++ $(showExps ['s,'r]))
 
 
@@ -230,33 +235,50 @@ data BlenderLamp = Sun {
 
 nameMakeLens ''BlenderLamp (Just . (++"L"))
 
-data LampObj = LampObj {
-    lamp_lamp :: BlenderLamp,
-    lamp_eulers :: EulerAnglesXYZ,
-    lamp_location :: Vec3
+data BlenderTransform = LocAndEulers {
+    locAndEulers_loc :: Vec3,
+    locAndEulers_eulers :: EulerAnglesXYZ
+}
+    |
+    BProj4 Proj4 -- ^ This matrix is on the right, vectors are on the left. Generally works with the conventions of the /vect/ package.
+
+    deriving Show
+
+nameMakeLens ''BlenderTransform (Just . (++"L"))
+
+btransLocOnly :: Vec3 -> BlenderTransform
+btransLocOnly loc = LocAndEulers loc (eulerAnglesXYZ 0 0 0) 
+
+data BlenderObject a = BObj {
+    bobj_name :: String, 
+    bobj_data :: a,
+    bobj_transform :: BlenderTransform
 }
     deriving Show
 
-nameMakeLens ''LampObj (Just . (++"L"))
+defaultBObj :: String -> a -> BlenderTransform -> BlenderObject a
+defaultBObj = BObj
+
+nameMakeLens ''BlenderObject (Just . (++"L"))
+
+type LampObj = BlenderObject BlenderLamp
+
+
+mkSunObj :: String -> Vec3 -> EulerAnglesXYZ -> BlenderObject BlenderLamp
+mkSunObj name loc eulers = 
+    defaultBObj 
+        (name ++ "Obj")
+        Sun { lamp_name = name }
+        LocAndEulers {
+            locAndEulers_loc = loc,
+            locAndEulers_eulers = eulers
+        }
 
 oldDefaultLamp :: LampObj
-oldDefaultLamp = LampObj {
-    lamp_lamp = Sun { 
-        lamp_name = "TheLamp"
-    },
-    lamp_location = Vec3 (-5) (-10) 8,
-    lamp_eulers = Vec3 (5*pi/12) 0 (-pi/6)
-}              
-
+oldDefaultLamp = mkSunObj "TheSun" (Vec3 (-5) (-10) 8) (eulerAnglesXYZ (5*pi/12) 0 (-pi/6))
 
 defaultLamp :: LampObj
-defaultLamp = LampObj {
-    lamp_lamp = Sun { 
-        lamp_name = "TheLamp"
-    },
-    lamp_location = Vec3 (-5) (-10) 8,
-    lamp_eulers = eulerAnglesXYZ (0.25*pi) 0 (pi/6)
-}
+defaultLamp = mkSunObj "TheSun" (Vec3 (-5) (-10) 8) (eulerAnglesXYZ (0.25*pi) 0 (pi/6))
 
 
 ma_globalVarName :: Material -> [Char]
@@ -269,4 +291,70 @@ appendMaterialsStmt
   :: PythonVar -> [Material] -> Python ()
 appendMaterialsStmt var mats = 
     forM_ mats (\m -> methodCall1 (var <.> "materials") "append" (ma_globalVar m))
+
+
+data BlenderCamData = BCamD {
+    bcamd_name :: String,
+    bcamd_FOV :: Double
+}
+    deriving Show
+
+
+data GatherApprox
+data GatherRaytrace
+data GatherNone
+
+data GatherMethod gm where
+    GatherApprox :: GatherMethod GatherApprox
+    GatherRaytrace :: GatherMethod GatherRaytrace
+    GatherNone :: GatherMethod GatherNone
+
+deriving instance Show (GatherMethod a)
+
+class IsNotGatherNone gm
+instance IsNotGatherNone GatherApprox
+instance IsNotGatherNone GatherRaytrace
+
+defaultGatherApprox :: GatherMethod GatherApprox
+defaultGatherApprox = GatherApprox
+defaultGatherRaytrace :: GatherMethod GatherRaytrace
+defaultGatherRaytrace = GatherRaytrace
+
+data EnvLightSettings gm where
+    NoEnvLight :: EnvLightSettings gm 
+    EnvLight :: IsNotGatherNone gm => BlenderEnergy -> EnvLightSettings gm
+
+deriving instance Show (EnvLightSettings gm)
+
+data WorldLightSettings = forall gm. WorldLightSettings {
+    wls_gatherMethod :: GatherMethod gm,
+    wls_envLight :: EnvLightSettings gm
+}
+
+deriving instance Show WorldLightSettings
+
+data BlenderWorld = BWorld {
+    bworld_light :: WorldLightSettings,
+    bworld_otherProps :: Props
+}
+
+nameMakeLens ''BlenderWorld (Just . (++"L"))
+
+deriving instance Show BlenderWorld
+
+
+
+defaultWorld :: BlenderWorld 
+defaultWorld = 
+    BWorld {
+        bworld_light = WorldLightSettings {
+            wls_gatherMethod = GatherNone,
+            wls_envLight = NoEnvLight
+        },
+        bworld_otherProps =
+            ["use_sky_blend" & False,
+             "use_sky_real" & False,
+             "horizon_color" & ((1,1,1)::(Int,Int,Int))
+            ]
+    }
 

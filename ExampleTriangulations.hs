@@ -49,7 +49,7 @@ octahedronCam1 :: Cam
 octahedronCam1 =
     Cam
         (Vec3 0.217 (-3.091) 2.071)
-        (Vec3 1.0077831745147705 0 0.06999944895505905)
+        (eulerAnglesXYZ 1.0077831745147705 0 0.06999944895505905)
         defaultFOV
 
 tr_oneTet :: Triangulation
@@ -77,7 +77,7 @@ spqwc_l31 = spqwc_twoTetBipyramid tr_l31 (0./tABC)
 twoTetCam' :: Cam
 twoTetCam' = 
  Cam (uncurry3 Vec3 (-0.23205919563770294, -3.6175613403320312, 0.15333208441734314))
-     (uncurry3 Vec3 (1.4570116996765137, -8.902474064598209e-07, -0.0009973797714337707))
+     (uncurry3 eulerAnglesXYZ (1.4570116996765137, -8.902474064598209e-07, -0.0009973797714337707))
      defaultFOV
 
 twoTetCam :: Cam
@@ -89,7 +89,7 @@ twoTetCam =
 oneTetCam :: Cam
 oneTetCam = 
  Cam (uncurry3 Vec3 (-0.23205919563770294+0.2, -3.6175613403320312, 0.15333208441734314+0.28))
-     (uncurry3 Vec3 (1.4570116996765137, -8.902474064598209e-07, -0.0009973797714337707))
+     (uncurry3 eulerAnglesXYZ (1.4570116996765137, -8.902474064598209e-07, -0.0009973797714337707))
      defaultFOV
 
 l41 :: SPQWithCoords Vertex

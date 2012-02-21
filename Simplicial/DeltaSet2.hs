@@ -54,7 +54,6 @@ import Language.Haskell.TH
 import ShortShow
 import MathUtil
 import FileLocation
-import Data.Ord
 import Util
 import THBuild
 import THUtil

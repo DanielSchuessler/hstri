@@ -1,5 +1,5 @@
 {-# LANGUAGE OverlappingInstances, NamedFieldPuns, TemplateHaskell, TransformListComp, ScopedTypeVariables, TypeFamilies, QuasiQuotes, TupleSections, NoMonomorphismRestriction, ViewPatterns, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
-{-# OPTIONS -Wall -fno-warn-unused-binds -fwarn-missing-local-sigs #-}
+{-# OPTIONS -Wall #-}
 module Latexable(
      Latex,Latexable(..),listToLatex,latexSet,mathmode
     ,latexifyStandardMatchingEquations
@@ -13,6 +13,7 @@ module Latexable(
     ,veryBriefDiscType,veryBriefEdge
     ,quad_latex
     ,slashes,amps,newcommand,tabular,array,latexEnv,latexEnvNL,(&),unlineses,align,plus,hspace,vspace
+    ,displaymath
     ,nl
     ,safeUnlines
     
@@ -34,7 +35,6 @@ import Math.SparseVector
 import QuadCoordinates
 import QuadCoordinates.Class
 import StandardCoordinates
-import System.IO as IO
 import System.Process(createProcess,proc,std_out,StdStream(CreatePipe),waitForProcess)
 import Triangulation
 import Triangulation.CanonOrdered

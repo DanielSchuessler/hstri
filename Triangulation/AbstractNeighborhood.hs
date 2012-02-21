@@ -22,7 +22,6 @@ import Data.Function
 import Control.Arrow((&&&))
 import PrettyUtil
 import Data.List(unfoldr)
-import Data.Maybe
 import HomogenousTuples
 import Language.Haskell.TH
 import Util

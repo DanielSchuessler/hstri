@@ -79,8 +79,6 @@ import Control.Exception
 import Control.Monad
 import Data.Binary
 import Data.Binary.Derive
-import Data.List as List
-import Data.Maybe
 import Data.Numbering
 import EitherC
 import Element

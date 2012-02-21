@@ -234,7 +234,7 @@ symmetrizeGluings :: [Gluing] -> [Gluing]
 symmetrizeGluings gls = gls ++ map flipGluing gls
 
 instance ShortShow NormalizedGluing where
-    shortShow = shortShow . ngToGluing
+    shortShow = shortShow . ngDom
 
 glDomOrCodIs :: ITriangle -> Gluing -> Bool
 glDomOrCodIs t gl = glDom gl == t || forgetVertexOrder (glCod gl) == t 

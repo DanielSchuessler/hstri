@@ -21,7 +21,7 @@ module QuadCoordinates.SolSetConversion(
 
 import CheckAdmissibility
 import Control.Applicative
-import Control.Monad.Writer.Lazy
+import Control.Monad.Writer.Class(tell)
 import CoordSys
 import Data.AdditiveGroup
 import Data.BitVector.Adaptive
@@ -257,6 +257,8 @@ quadToStandardSolSet
   :: (ToTriangulation tr,
       Fractional r,
       Pretty r,
+      Show r,
+      Eq r,
       Pretty q,
       Show q,
       Typeable r,
@@ -366,7 +368,7 @@ ppTriStep maxWidth r =
 
 
 ppVecs
-  :: (Num t1,
+  :: (Num t1, Eq t1,
       AsList (t t1),
       VG.Vector v (SolSetConversionVectorRepresentation t t1 t2),
       VG.Vector v Doc,
@@ -376,7 +378,7 @@ ppVecs columnWidth = vcat . VG.toList . VG.map (ppSSCVR columnWidth)
 
 
 ppSSCVR
-  :: (Num t1, AsList (t t1), PrettyScalar t1) =>
+  :: (Num t1, AsList (t t1), PrettyScalar t1, Eq t1) =>
      Int -> SolSetConversionVectorRepresentation t t1 t2 -> Doc
 ppSSCVR columnWidth (SSCVR i x) = 
     text (prettyString i ++ " = (" ++ prettyVectorWithColumnWidth columnWidth x++")")

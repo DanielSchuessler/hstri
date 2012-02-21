@@ -15,13 +15,14 @@ module Tetrahedron.Vertex
     abstractTetrahedronColor,
     vertexToWord8,
     vertexFromWord8,
-    vertexDefaultCoords,
     vertexMemo,
     otherVertices,
     otherIVerticesInSameTet,
     vertexNu,
     index4ToVertex,
     vertexToIndex4,
+    tindexVerticesAsc,
+    allVerticesAsc,
 
     Link(..),
     Star(..),
@@ -41,8 +42,6 @@ import Data.Binary
 import Data.Binary.Derive
 import Data.Maybe
 import Data.Numbering
-import Data.Vect.Double(Vec3(..),vec3X,vec3Y,vec3Z)
-import Data.Vect.Double.Base((&-))
 import DisjointUnion
 import Element
 import FaceClasses
@@ -60,7 +59,7 @@ import Data.Tuple.Index
 import Control.DeepSeq.TH
 import Language.Haskell.TH.Lift
 import Data.Typeable
-import Data.Vect.Double.Base((*&))
+import Data.AscTuples
 
 data Vertex = A | B | C | D
     deriving(Eq,Ord,Bounded,Ix,Typeable)
@@ -119,6 +118,9 @@ allVertices = asList allVertices'
 allVertices' ::  (Vertex, Vertex, Vertex, Vertex)
 allVertices' = (vA,vB,vC,vD)
 
+allVerticesAsc :: Asc4 Vertex
+allVerticesAsc = unsafeAsc allVertices'
+
 
 vertexPrettyColor :: Doc -> Doc
 vertexPrettyColor = cyan
@@ -176,16 +178,6 @@ instance Arbitrary IVertex where
     arbitrary = (./) <$> arbitrary <*> arbitrary
 
 
--- | Embeds the abstract tetrahedron into R^3 symmetrically
-vertexDefaultCoords :: Vertex -> Vec3
-vertexDefaultCoords = (\x -> 1.5 *& (f x &- center_)) . viewVertex 
-    where
-        f A = vec3X
-        f B = vec3Y
-        f C = vec3Z
-        f D = Vec3 1 1 1
-
-        center_ = Vec3 0.5 0.5 0.5
 
 
 
@@ -244,4 +236,7 @@ instance Show a => Show (Vertex -> a) where show = showFiniteFunc "v"
 
 instance QuoteConstPat Vertex where
     quoteConstPat = show
+
+tindexVerticesAsc :: TIndex -> Asc4 IVertex
+tindexVerticesAsc i = mapAscMonotonic (i ./) allVerticesAsc 
 

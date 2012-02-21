@@ -5,14 +5,15 @@
 module VerboseDD.Types where
 import PrettyUtil
 import Data.BitVector.Adaptive
-import Control.Monad.Writer.Lazy
-import Control.Monad.State.Strict
+import Control.Monad.State.Strict(MonadState(..),State,evalState,lift)
 import qualified Data.Vector.Generic as VG
 import Data.DList
 import CoordSys
 import Data.Function
 import Control.Arrow(second)
 import Control.Applicative
+import Control.Monad.Writer.Lazy(WriterT(..),MonadWriter(..))
+import Control.Monad
 
 newtype VectorIndex = VectorIndex Int
     deriving(Eq,Enum,Ord,Real,Num,Integral)

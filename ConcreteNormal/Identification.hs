@@ -209,4 +209,8 @@ instance Triangles ConcreteNSurface where
 
 
 
+tc_type :: (Show a, TriangulationDSnakeItem a) => T (Concrete a) -> T a
+tc_type = mapT c_type
 
+isInnerNmArc :: TNmArc -> Bool
+isInnerNmArc = isInnerNormalArc . tc_type

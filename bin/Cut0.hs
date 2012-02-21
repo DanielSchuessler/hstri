@@ -3,6 +3,7 @@
 module Cut0 where
 import HsTri
 import qualified Data.Vector.Generic as VG
+import qualified Data.Vector as V
 
 
 -- gluings realised in the linear illustration 
@@ -26,6 +27,7 @@ tr_cut0 = mkTriangulation 3
 ddr_cut0 :: DDResult QuadCoordSys
 ddr_cut0 = dd tr_cut0
 
+qVertSols_cut0 :: V.Vector (QuadDense V.Vector Rational)
 qVertSols_cut0 = case ddr_cut0 of
                  DDResult{_ddr_final=xs} -> VG.map (qd_fromVector . ipr_value) xs 
 

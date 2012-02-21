@@ -107,7 +107,7 @@ instance Coords (Blenderable s) where
 
 data Scene s = Scene {
     scene_blenderable :: Blenderable s,
-    scene_worldProps :: Props,
+    scene_world :: BlenderWorld,
     scene_cams :: [Cam],
     scene_setLongLabelCustomProperties :: Bool,
     scene_initialSelection :: Maybe (AnySimplex2Of s),
@@ -151,7 +151,7 @@ setRenderRes x y =
 defaultScene0 :: Blenderable s -> Scene s
 defaultScene0 s = Scene {
     scene_blenderable = s,
-    scene_worldProps = defaultWorldProps,
+    scene_world = defaultWorld,
     scene_cams = [defaultCam],
     scene_setLongLabelCustomProperties = False,
     scene_initialSelection = Nothing,
@@ -163,11 +163,6 @@ defaultCam :: Cam
 defaultCam = Cam (Vec3 0.66 (-2.3) 0.52) (eulerAnglesXYZ (pi/2) 0 0) defaultFOV
 
 
-defaultWorldProps :: Props
-defaultWorldProps = ["use_sky_blend" & False,
-                     "use_sky_real" & False,
-                     "horizon_color" & ((1,1,1)::(Int,Int,Int))
-                     ]
 
 
 
@@ -330,3 +325,20 @@ makeTrisInvisible = modL ba_prL (pr_setTriVisibility (const OnlyLabels))
 setTrisTranspJust
   :: TransparencySettings -> Blenderable s -> Blenderable s
 setTrisTranspJust = setTrisTransp . Just
+
+setWorld :: BlenderWorld -> Scene s -> Scene s
+setWorld = setL scene_worldL
+
+setWorldLighting
+  :: GatherMethod gm -> EnvLightSettings gm -> Scene s -> Scene s
+setWorldLighting gm el = 
+    setL (scene_worldL >>> bworld_lightL)
+            (WorldLightSettings
+                { 
+
+                    wls_envLight = el,
+                    wls_gatherMethod = gm
+                }) 
+
+
+

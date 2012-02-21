@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, RecordWildCards, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, FlexibleContexts, TypeFamilies, NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables, RecordWildCards, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, FlexibleContexts, TypeFamilies, NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
 module Blender.Conversion(
 
@@ -39,6 +39,7 @@ import NormalEverything ( StandardCoords )
 import PrettyUtil ( Pretty )
 import ShortShow ( ShortShow )
 import StandardCoordinates.MatchingEquations ( Admissible )
+import Data.Lens.Template
 
 
 
@@ -66,6 +67,8 @@ data Style = Style {
     style_helpLineMat :: Material,
     style_labelMat, style_labelMat2 :: Material
 }
+
+nameMakeLens ''Style (Just . (++"L"))
 
 mkBlenderable
   :: forall s. 
@@ -188,7 +191,7 @@ mkNormalSurfaceStyle suf col0 col1 col2 = Style {
     style_groups = [normalGroup],
     style_helpLineMat = mat1 { ma_name = "nsurfHelpLine" },
     style_labelMat = mat0,
-    style_labelMat2 = basicMaterial ("nsurfLabelMat2"++suf) (0.8,0.317,0)
+    style_labelMat2 = orangeMat
   }
 
   where
@@ -208,6 +211,11 @@ mkNormalSurfaceStyle suf col0 col1 col2 = Style {
                     ma_specular_hardness = surfaceSpecularHardness, 
                     ma_specular_intensity = 0.8
                 }
+
+    orangeMat = (basicMaterial ("nsurfLabelMat2"++suf) (0.8,0.317,0))
+                    {
+                        ma_ambient = 0.5
+                    }
 
 normalSurfaceStyle :: Style
 normalSurfaceStyle = mkNormalSurfaceStyle ""

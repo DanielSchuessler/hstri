@@ -260,6 +260,18 @@ iTriangleEqv tr =
             (\t -> ecMap f <$> pMap_safe tr t)
             (fmap (ecMap f) (triangles tr)) 
         
+type instance Element TNormalCorner = INormalCorner
+instance AsList TNormalCorner where
+    asList c = 
+    
+        map iNormalCorner $ 
+        eqvEquivalents (iEdgeEqv (getTriangulation c)) 
+                       (iNormalCornerGetContainingEdge (unT c)) 
+
+type instance Element TNormalArc = INormalArc
+
+instance AsList TNormalArc where
+    asList = asList . normalArcPreimage
 
 
 class MakeTVertex a where tvertex :: a -> TVertex
@@ -343,16 +355,19 @@ instance Show TNormalTri where showsPrec = prettyShowsPrec
 instance Show TNormalQuad where showsPrec = prettyShowsPrec
 instance Show TNormalDisc where showsPrec = prettyShowsPrec
 
+
+shortShowMinimalPreimage = shortShow . minimum . asList
+
 instance ShortShow TVertex where 
-    shortShow = shortShowAsSet
+    shortShow = shortShowMinimalPreimage
 instance ShortShow TEdge where 
-    shortShow = shortShowAsSet
+    shortShow = shortShowMinimalPreimage
 instance ShortShow TTriangle where 
-    shortShow = shortShowAsSet
+    shortShow = shortShowMinimalPreimage
 instance ShortShow TNormalCorner where 
-    shortShow = shortShow . unT
+    shortShow = shortShowMinimalPreimage
 instance ShortShow TNormalArc where 
-    shortShow = shortShow . unT
+    shortShow = shortShowMinimalPreimage
 instance ShortShow TNormalTri where 
     shortShow = shortShow . unT
 instance ShortShow TNormalQuad where 

@@ -73,7 +73,7 @@ data Located e = Located LocationString e
     deriving (Typeable)
 
 instance Show e => Show (Located e) where
-    show (Located l e) = l ++ ": " ++ show e
+    show (Located l e) = l ++ ":\n" ++ show e
 
 instance Exception e => Exception (Located e)
 
@@ -103,8 +103,11 @@ failureStr = withCurrentLoc 'failureStrWithLoc
 data CommentedException e = CommentedException String e 
     deriving Typeable
 
+indentStr :: String -> String
+indentStr = unlines . map ("  "++) . lines
+
 instance Show e => Show (CommentedException e) where
-    show (CommentedException c e) = c++"\n\tInner error: "++show e
+    show (CommentedException c e) = c++"\nInner error:\n"++indentStr (show e)
 
 instance (Show e, Typeable e) => Exception (CommentedException e)
 

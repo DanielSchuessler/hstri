@@ -2,7 +2,7 @@
 {-# LANGUAGE PolymorphicComponents, ExistentialQuantification #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall -fno-warn-unused-imports #-}
+{-# OPTIONS -Wall #-}
 module VerboseDD 
     (module VerboseDD.Types,
      module InnerProductRepresentation,
@@ -34,20 +34,15 @@ module VerboseDD
 
 import CheckAdmissibility
 import Control.Applicative
-import Control.Monad.State.Strict
-import Control.Monad.Writer.Lazy
+import Control.Monad.Writer.Class(tell)
 import CoordSys
 import Data.BitVector.Adaptive
-import Data.Function
 import Data.List as L
 import Data.Ord
 import Data.Proxy
-import Data.Ratio
 import Data.Vector(Vector)
 import InnerProductRepresentation
-import MathUtil
 import PrettyUtil.Matrix
-import QuadCoordinates
 import QuadCoordinates.CanonExt
 import QuadCoordinates.Class
 import QuadCoordinates.Dense
@@ -55,7 +50,6 @@ import QuadCoordinates.MatchingEquations
 import StandardCoordinates.Dense
 import StandardCoordinates.MatchingEquations
 import Triangulation.Class
-import Util
 import VectorUtil
 import VerboseDD.Types
 import qualified Data.Vector as V

@@ -7,6 +7,7 @@ import Data.AscTuples
 import DisjointUnion
 import Data.List(partition)
 import EitherC
+import Control.Monad
 
 -- | Edges that have two distinct vertices, and are uniquely determined by them.
 class (Vertices e, Ord (Vert e), EdgeLike e) => SimplicialEdge e where {
@@ -69,7 +70,7 @@ sEdge = sEdgeAsc . asc2
 sTriangle :: (SimplicialTriangle c) => (Vert c, Vert c, Vert c) -> c
 sTriangle = sTriangleAsc . asc3
 sTet :: ( SimplicialTet c) => (Vert c, Vert c, Vert c, Vert c) -> c
-sTet = sTetAsc . asc4
+sTet = sTetAsc . $unEitherC "sTet" . asc4total
 
 
 -- sEdgeVertsAsc :: (Ord v, Vertices e, Verts e ~ (v, v)) => e -> Asc2 v
@@ -158,8 +159,8 @@ instance (SimplicialTriangle a, SimplicialTriangle b) => SimplicialTriangle (DJS
 instance (SimplicialTet a, SimplicialTet b) => SimplicialTet (DJSimp DIM3 a b) where
     sTetAscTotal (asList -> vs) =
         case partition isLeft vs of
-             (_,[]) -> (fmap left' . sTetAscTotal . asc4 . fromList4 . map fromLeft') vs
-             ([],_) -> (fmap right' . sTetAscTotal . asc4 . fromList4 . map fromRight') vs
+             (_,[]) -> (fmap left' . sTetAscTotal <=< asc4total . fromList4 . map fromLeft') vs
+             ([],_) -> (fmap right' . sTetAscTotal <=< asc4total . fromList4 . map fromRight') vs
              _ -> $failureStr djErrMsg
 
     sTetVerts = 

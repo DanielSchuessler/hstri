@@ -6,25 +6,17 @@ module PreRenderable(
     -- * Reex
     module Math.Groups.S3,
     module Numeric.AD,
+    module R3Immersions.Simplices,
     Vec2(..),Vec3(..),(&+),(&-),(&*),(*&),
     TriangleLabel(..),
     defaultTriangleLabelUpDisplacement,
 
-    -- * Edge\/triangle immersions
-    GeneralTriangleImmersion(..),
-    EdgeImmersion(..),
-    TriangleImmersion(..),
-    GeneralEdgeImmersion(..),
-    evalEdgeImmersion,
-    GeneralTetImmersion(..),
-    Resolution,
 
     -- * Main
     EdgeDeco(..),
     Visibility(..),
     FaceName,mkFaceName,unFaceName,
     PreRenderable(..),
-    Coords(..),
 --     rotateAngleAxis,
     mkPreRenderable,
     mkPreRenderableWithTriangleLabels,
@@ -51,6 +43,7 @@ module PreRenderable(
     pr_setTriangleImmersion,
     pr_setGeneralTriangleImmersion,
     pr_edgeDecoL,
+    pr_edgeDeco,
     pr_setEdgeDecoAssocs,
     pr_triangleLabel,
     pr_triangleLabelL,
@@ -76,14 +69,11 @@ module PreRenderable(
 import Control.Applicative
 import Control.Arrow
 import Control.Exception(assert)
-import Control.Monad
-import Data.AdditiveGroup
 import Data.AscTuples
 import Data.Lens.Common
 import Data.Lens.Template
 import Data.String
 import Data.Vect.Double.Base hiding((*.),(.*),(.*.),Vector)
-import Data.VectorSpace
 import DisjointUnion
 import GHC.Generics(Generic)
 import Language.Haskell.TH.Lift
@@ -103,95 +93,16 @@ import Data.Maybe
 import THBuild
 import PrettyUtil hiding(pr)
 import Text.Groom
+import R3Immersions.Simplices
 
 data EdgeDeco = EdgeDeco { edgeDecoConeCount :: Int, edgeDecoDir :: S2 } 
     deriving (Show)
 
-type Resolution = Int
+instance Pretty EdgeDeco where
+    prettyPrec prec (EdgeDeco i NoFlip) = parensIf (prec>0) (pretty i <> space <> cyan (text "->"))
+    prettyPrec prec (EdgeDeco i Flip) = parensIf (prec>0) (cyan (text "<-") <> space <> pretty i)
 
-data GeneralTriangleImmersion = 
-    -- | SEMANTICS: 
-    --
-    -- Let (e0,e1,e2) = edges t
-    --
-    -- The arc from zero to vec2X corresponds to e0 
-    --
-    -- The arc from zero to vec2Y corresponds to e1 
-    --
-    -- The arc from vec2X to vec2Y corresponds to e2 
-    GTE Doc Resolution (FF Tup2 Tup3 Double)
 
-instance Show GeneralTriangleImmersion where
-    showsPrec = prettyShowsPrec
-
-instance Pretty GeneralTriangleImmersion where
-    prettyPrec = prettyRecordPrec
-            (\(GTE s _ e) ->
-                let
-                    f = pretty . lowerFF e . stdToUnit2
-                in
-                    ("GTE",
-                        [("doc", s)
-                        ,("im (1,0,0)",f tup3X)
-                        ,("im (0,1,0)",f tup3Y)
-                        ,("im (0,0,1)",f tup3Z)
-                        ])) 
-
-instance Coords GeneralTriangleImmersion where
-    transformCoords f (GTE s res g) = GTE s res (f . g)
-
-data TriangleImmersion = 
-        FlatTriangle Vec3 Vec3 Vec3
-    |   GeneralTriangle GeneralTriangleImmersion
-    deriving Show
-
-instance Pretty TriangleImmersion where
-    prettyPrec prec (FlatTriangle a b c) = prettyPrecApp prec "FlatTriangle" [a,b,c] 
-    prettyPrec prec (GeneralTriangle a) = prettyPrecApp prec "GeneralTriangle" [a] 
-
-data GeneralEdgeImmersion = 
-    -- | SEMANTICS: 
-    --
-    -- Let (v0,v1) = vertices e
-    --
-    -- 0 corresponds to v0
-    --
-    -- 1 corresponds to v1
-    --
-    GEE Doc Resolution (UF Tup3 Double)
-
-instance Show GeneralEdgeImmersion where
-    showsPrec = prettyShowsPrec
-
-instance Pretty GeneralEdgeImmersion where
-    prettyPrec = prettyRecordPrec
-            (\(GEE s _ e) ->
-                let
-                    f = pretty . lowerUF e . stdToUnit1
-                in
-                    ("GEE",
-                        [("doc", s)
-                        ,("im (1,0)",f tup2X)
-                        ,("im (0,1)",f tup2Y)
-                        ])) 
-
-instance Coords GeneralEdgeImmersion where
-    transformCoords f (GEE s res g) = GEE s res (f . g)
-
-data EdgeImmersion =
-        FlatEdge Vec3 Vec3
-    |   GeneralEdge GeneralEdgeImmersion
-    deriving Show
-
-instance Pretty EdgeImmersion where
-    prettyPrec prec (FlatEdge a b) = prettyPrecApp prec "FlatEdge" [a,b] 
-    prettyPrec prec (GeneralEdge a) = prettyPrecApp prec "GeneralEdge" [a] 
-
-class Coords t where
-    transformCoords :: (FF Tup3 Tup3 Double) -> t -> t
-
--- rotateAngleAxis :: Coords t => Double -> Vec3 -> t -> t
--- rotateAngleAxis = (.) transformCoords  . rotate3
 
 
 data Visibility = Invisible | OnlyLabels | Visible
@@ -514,6 +425,7 @@ instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
                     (second (fmap (const "<<function>>")) . pr_triangleInfo) (triangles pr))
             , ("pr_coords",prettyFunction (pr_coords pr) (vertices pr))
             , ("pr_edgeImmersion",prettyFunction (pr_edgeImmersion pr) (edges pr))
+            , ("pr_edgeDeco",prettyFunction (pr_edgeDeco pr) (edges pr))
             , ("pr_triangleImmersion",prettyFunction (pr_triangleImmersion pr) (triangles pr))
             ]
 
@@ -521,6 +433,8 @@ instance (Pretty s, Pretty (Vert s), Pretty (Ed s), Pretty (Tri s)
 pr_visibility :: PreRenderable s -> AnySimplex2Of s -> Visibility
 pr_visibility = getL pr_visibilityL
 
+pr_edgeDeco :: PreRenderable s -> Ed s -> Maybe EdgeDeco
+pr_edgeDeco = getL pr_edgeDecoL
 
 
 -- instance Lift TriangleImmersion where
@@ -604,47 +518,6 @@ pr_makeImmersionsGeneral triRes pr_ =
  $       pr_
 
 
-evalFlatTriangleImmersion
-  :: Vec3 -> Vec3 -> Vec3 -> FF Tup2 Tup3 Double
-evalFlatTriangleImmersion a au av =
-                            (\(Tup2 (u, v) :: Tup2 (AD s Double)) -> 
-                                ((1-u-v) *^ liftVec3 a) 
-                                ^+^ 
-                                (u *^ liftVec3 au) 
-                                ^+^ 
-                                (v *^ liftVec3 av)
-
-                                :: Tup3 (AD s Double)
-                                )
-
-evalEdgeImmersion :: EdgeImmersion -> UF Tup3 Double
-evalEdgeImmersion (FlatEdge a0 a1) = 
-    \u -> 
-        let 
-            res = interpol u (liftVec3 a0) (liftVec3 a1) 
-        in $(assrt [| allReal res |] ['u, 'a0, 'a1]) res
-
-evalEdgeImmersion (GeneralEdge (GEE _ _ f)) = f
-
-data GeneralTetImmersion = GTetE Doc Resolution (FF Tup3 Tup3 Double)
-
-instance Show GeneralTetImmersion where
-    showsPrec = prettyShowsPrec
-
-instance Pretty GeneralTetImmersion where
-    prettyPrec =
-        prettyRecordPrec
-            (\(GTetE s _ e) ->
-                let
-                    f = pretty . lowerFF e . stdToUnit3
-                in
-                    ("GTetE",
-                        [("doc", s)
-                        ,("im (1,0,0,0)",f tup4X)
-                        ,("im (0,1,0,0)",f tup4Y)
-                        ,("im (0,0,1,0)",f tup4Z)
-                        ,("im (0,0,0,1)",f tup4A)
-                        ]))
 
 
 mkPreRenderableFromTetImmersions

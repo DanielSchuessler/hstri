@@ -8,6 +8,7 @@ import Tetrahedron.Vertex
 import Tetrahedron.Edge
 import ConcreteNormal
 import Util
+import R3Immersions.Simplices
 
 
 
@@ -80,33 +81,6 @@ torusCoords' major minor (STP long lat boundaryness) =
         tup3 (cos long * r) (sin long * r) (sin lat * minor') 
 
 
-standardTet (Tup4 (a,b,c,d)) =
-        f a A ^+^ f b B ^+^ f c C ^+^ f d D
-    where
-        f x v = x *^ (liftVec3 . vertexDefaultCoords $ v)
-
-    
-
-embedVert :: Num a => Vertex -> Tup4 a
-embedVert = stdBasisVector4 . toEnum . fromEnum 
-
-embedEd
-  :: (Num a1, Vertices a, Verts a ~ (Vertex, Vertex)) =>
-     a -> Tup2 a1 -> Tup4 a1
-embedEd (vertices -> (v0,v1)) (Tup2 (x0,x1)) = 
-    x0 *^ embedVert v0 
-    ^+^
-    x1 *^ embedVert v1 
-
-embedTri
-  :: (Num a1, Vertices a, Verts a ~ (Vertex, Vertex, Vertex)) =>
-     a -> Tup3 a1 -> Tup4 a1
-embedTri (vertices -> (v0,v1,v2)) (Tup3 (x0,x1,x2)) = 
-    x0 *^ embedVert v0 
-    ^+^
-    x1 *^ embedVert v1 
-    ^+^
-    x2 *^ embedVert v2 
 
 
 embedNCorner :: Fractional a1 => NmCorner -> Tup4 a1

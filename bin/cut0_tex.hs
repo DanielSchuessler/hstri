@@ -53,8 +53,7 @@ weightedVertexLinkGraphs =
             ))
 
 
-mainTex ::  IO ()
-mainTex = do
+main = do
     writeFile "/h/dipl/tex/cut0QMES.tex" (latexifyQMatchingEquations "0.7em" "0.5em" tr_cut0)
     writeFile "/h/dipl/tex/cut0DD.tex" . latexifyDDResults "2.2em" $ ddr_cut0
 
@@ -63,6 +62,8 @@ mainTex = do
     writeFile "/h/dipl/graphs/cut0weightedvls.tex" weightedVertexLinkGraphs
 
     writeFile "/h/dipl/tex/cut0SolSetConversion.tex"  . latexifySolSetConversionResult "1.5em" $ sscr_cut0
+
+    putStrLn "Done"
 
 
 

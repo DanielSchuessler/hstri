@@ -85,9 +85,20 @@ prettyAssocs ::  (Pretty a1, Pretty a) => [(a, a1)] -> Doc
 prettyAssocs = docAssocs . fmap (pretty *** pretty)
 
 docAssocs :: [(Doc, Doc)] -> Doc
-docAssocs xs =  spacedEncloseSep lbrace rbrace comma 
+docAssocs xs =  
+    lbrace </>
+
+        (nest 2 
+            . sep
+            . punctuate (comma <> space)
+            $
                     [ hang 2 (k </> string "->" </> v)
                         | (k,v) <- xs ]
+
+                        )
+
+
+    <> rbrace
 
 prettyString ::  Pretty a => a -> String
 prettyString = ($"") . docToShowS . pretty
@@ -100,7 +111,6 @@ pr = putStrLn . prettyString
 
 prettyRecord :: String -> [(String, Doc)] -> Doc
 prettyRecord name fields =
-    align $
          vsep ( (text name <+> lbrace)
                : [indent 2 (text x <+> nest 2 (char '=' </> y)) | (x,y) <- fields ]
                ++ [rbrace] )

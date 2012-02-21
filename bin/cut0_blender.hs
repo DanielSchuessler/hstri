@@ -17,14 +17,11 @@ import Control.Arrow
 import Cut0
 
 
-
-spq_toOtherTriangulation tr0 tr1 = 
-    SimplicialPartialQuotient
-        tr0
-        (pMap tr1)
-        (map vertices . tetrahedra $ tr1) 
+tr_linear = mkTriangulation 3 gluings_cut0_linear
+p_linear = pMap tr_linear
 
 
+spqwc_linear :: SPQWithCoords TVertex
 spqwc_linear = (SPQWithCoords spq coords_linear glab)   
     where
 
@@ -35,9 +32,8 @@ spqwc_linear = (SPQWithCoords spq coords_linear glab)
 
         spq = spq_toOtherTriangulation tr_cut0 tr_linear
 
-        tr_linear = mkTriangulation 3 gluings_cut0_linear
 
-        p = pMap tr_linear
+        p = p_linear 
 
         coords_linear :: TVertex -> Vec3
         coords_linear =
@@ -159,7 +155,8 @@ res =
 
 
 go _lamp fp BView{..} =
-    blenderMain DoRender 
+      void
+    . blenderMain DoRender 
     . setRenderRes bview_w bview_h
     . setRenderFilepath (fp bview_suf)
     . setCam bview_cam
@@ -188,7 +185,7 @@ mainRender = do
                         view 
                         (hideAllBut i pr'))
 
-                
+
     case sscr_cut0 of
                  SolSetConversionResult { sscr_finalVerbose = fv } ->
                     VG.forM_ 
@@ -242,7 +239,11 @@ renderSol_torus sol_ix fundEdgeSolution = do
 
 
 
-renderSol_linear sol_ix fundEdgeSolution = do
+renderSol_linear sol_ix fundEdgeSolution = 
+
+--         when (sol_ix/=35) $ 
+        do
+
     let
 
 
@@ -267,10 +268,45 @@ renderSol_linear sol_ix fundEdgeSolution = do
         view_lineartop = BView "" 1700 1300 (readCam "(Vector((0.0, 0.0, 0.9873046875)), Euler((-5.802452296421734e-09, -1.5250842366754114e-08, 2.3561954498291016), 'XYZ'), 0.8575560591178853)") 
 
         view_lineartop_lowfov = 
-            BView "" 1700 1300 
+            BView "" 
+                1700 1300 
+--                 850 650
                 (readCam "(Vector((0.0, 0.0, 23.016773223876953)), Euler((0.0, 0.0, 2.3561954498291016), 'XYZ'), 0.17453298961278452)")
 
-        posOverride = flip lookup []
+        posOverride = flip lookup $
+            case sol_ix of
+                 35 -> bc0 0 1 0.7 ++ ad0 0 1 0.7 ++ sn 1 2 0.55
+                 39 -> bottom 0 1 0.55
+                 40 -> bottom 0 1 0.33
+                 _ -> []
+
+
+          where
+            go i n tet0 v0 tet1 v1 r = 
+                let
+                    iv0 = tet0./v0
+                    iv1 = tet1./v1
+                in
+                    ( corn i n (p_linear iv0) (p_linear iv1) 
+                    , if iv0 < iv1 then r else 1-r)
+
+            -- bottom east to bottom west
+            bottom i n r = [go i n 0 A 0 B r] 
+
+            -- south to north (on top)
+            sn i n r =  [go i n 0 C 0 D r, go i n 2 D 2 A r] 
+
+            -- west to east (on top)
+            we i n r = [go i n 2 A 0 D r, go i n 2 D 0 C r]  
+
+            -- bottom east to northeast
+            ad0 i n r = [ go i n 0 A 0 D r, go i n 0 B 2 A r ] 
+
+            -- bottom east to southeast
+            ac0 i n r = [ go i n 0 A 0 C r, go i n 0 B 2 D r ] 
+
+            -- bottom west to top east
+            bc0 i n r = [ go i n 0 B 0 C r, go i n 0 B 0 D r ] 
 
         ba1 = 
             setTrisTransp pmTriTransp
@@ -286,6 +322,7 @@ renderSol_linear sol_ix fundEdgeSolution = do
         (\suf -> "/h/dipl/pictures/cut0"++suf++"_v"++show (toInteger sol_ix) ++".png")
         view_lineartop_lowfov
         (ba1 `disjointUnion` ba2)
+
         
                 
                 
@@ -299,6 +336,5 @@ renderSol_linear sol_ix fundEdgeSolution = do
 
 
 main = do
-    mainTex
-    dont mainRender
+    mainRender
     putStrLn "Done"

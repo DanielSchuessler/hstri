@@ -384,7 +384,7 @@ latexifySolSetConversionResult columnWidth (SolSetConversionResult tr _ steps fi
         goFinal =
 
             safeUnlines [
-                    "\\itemNL{Ergebnis:}",      
+                    "\\itemNL{Ergebnis (Standard-Ecklösungsmenge):}",      
                     latexEnv "center" (
                     tabular ("l@{\\hspace{0.1em}}" : solSetConversionVectorColumns)
                         (slashes 

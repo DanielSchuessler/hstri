@@ -28,6 +28,7 @@ qmes = putStr (latexifyQMatchingEquations "0.7em" "0.5em" tr)
 
 go fp ba = 
     blenderMain bcmd . setCams [twoTetCam] . setRenderFilepath fp . setRenderRes 1200 1200
+    . setWorldLighting defaultGatherRaytrace (EnvLight 1)
     . defaultScene
     .
             setTrisTranspJust 
@@ -58,13 +59,13 @@ baVertexLinkA0 =
 
     `disjointUnion`
 
-    fromIntegerNormalSurface spqwc (vertexLinkingSurface (p (0./ vA)))
+    fromIntegerNormalSurface noCornPosOverride spqwc (vertexLinkingSurface (p (0./ vA)))
 
 
 
 
 baVertexLinkD0 = 
-        fromSpqwcAndIntegerNormalSurface 
+        fromSpqwcAndIntegerNormalSurface noCornPosOverride 
             spqwc
             (vertexLinkingSurface (p (0./ vD)))
 

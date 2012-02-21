@@ -13,6 +13,7 @@ import Data.Tuple.OneTuple
 import Simplicial.DeltaSet3
 import TupleTH
 import Control.Exception
+import EitherC
 
 instance HasTIndex TIndex AbsTet where
     viewI = flip I AbsTet 
@@ -112,7 +113,7 @@ instance (SatisfiesSimplicialIdentities3 tet) =>
 
 instance SimplicialTet AbsTet where
     sTetAscTotal = const . return $ AbsTet
-    sTetVerts = asc4 . vertices -- could skip check
+    sTetVerts = $unEitherC "AbsTet/sTetVerts" . asc4total . vertices -- could skip check
 
 instance SimplicialTet TIndex where
     sTetAscTotal (unAsc4 -> xs) = 
@@ -121,5 +122,5 @@ instance SimplicialTet TIndex where
             assert (all3 ((== (getTIndex x)) . getTIndex) ($(dropTuple 4 1) xs)) $
             return (getTIndex x)
 
-    sTetVerts = asc4 . vertices -- could skip check
+    sTetVerts = $unEitherC "TIndex/sTetVerts" . asc4total . vertices -- could skip check
 

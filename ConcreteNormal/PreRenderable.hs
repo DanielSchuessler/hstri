@@ -18,7 +18,6 @@ module ConcreteNormal.PreRenderable(
 
 import ConcreteNormal.Identification
 import ConcreteNormal
-import Data.Function
 import qualified Data.Set as S
 import Data.Vect.Double(interpolate)
 import DisjointUnion
@@ -34,7 +33,6 @@ import SimplicialPartialQuotient
 import StandardCoordinates.MatchingEquations
 import Util
 import Triangulation
-import Control.Applicative
 import Data.Lens.Common
 import FileLocation
 import Numeric.AD.Vector
@@ -42,6 +40,7 @@ import Numeric.AD as AD
 import TriangulationCxtObject
 import R3Immersions
 import Data.FiniteFunc
+import Debug.Trace
 
 type CornerPosition' = Int
 type CornerCount = Int
@@ -62,7 +61,8 @@ cornCount (Corn _ n _ _) = n
 
 
 instance ShortShow v => ShortShow (Corn v) where
-    shortShow (Corn cp _ v0 v1) = shortShow (v0,v1) ++ show cp
+    shortShow (Corn cp _ v0 v1) = 
+        "(" ++ shortShow v0 ++ shortShow v1 ++ (if cp == 0 then "" else "#" ++ show cp) ++ ")"
 
 
 instance Pretty v => Pretty (Corn v) where
@@ -85,7 +85,7 @@ data NormalSurfacePreRenderableOpts = NSPRO {
 defaultNSPRO :: NormalSurfacePreRenderableOpts
 defaultNSPRO = NSPRO True 
 
-type CornPosOverride v = (Int,v,v) -> Maybe Double
+type CornPosOverride v = Corn v -> Maybe Double
 
 noCornPosOverride :: CornPosOverride v
 noCornPosOverride = const Nothing
@@ -140,10 +140,10 @@ normalSurfaceToPreRenderableWithOpts opts posOverride (SPQWithCoords spq coords 
             in (y,g <> g')
 
 
-        cornerCoords (Corn pos n v0 v1) = 
+        cornerCoords c@(Corn pos n v0 v1) = 
                 interpolate t (coords v0) (coords v1)
             where
-                t = case posOverride (pos, v0, v1) of
+                t = case posOverride c of
                          Nothing -> (fi (1+pos) / fi (1+n))
                          Just t' -> t'
 
@@ -162,11 +162,18 @@ normalSurfaceToPreRenderableWithOpts opts posOverride (SPQWithCoords spq coords 
             (((corns,g),(corns',g')),i) <- 
                 zip
                     [(cg,cg') |
-                        arc <- toOrderedFace <$> concreteArcs ns,
-                        let arc' = canonicalize tr arc,
-                        let cg = concreteONormalArcToCorns arc,
-                        let cg' = concreteONormalArcToCorns arc',
-                        cg /= cg' ]
+                        arc <- concreteArcs ns,
+                        let oarc = toOrderedFace arc,
+                        let oarc' = canonicalize tr oarc,
+                        let cg = concreteONormalArcToCorns oarc,
+                        let cg' = concreteONormalArcToCorns oarc',
+                        if cg/=cg'
+                           then True
+                           else if oarc/=oarc'
+                           then trace ("normalSurfaceToPreRenderableWithOpts:\n"++show (oarc,oarc',cg)) 
+                                False
+                           else False 
+                        ]
                     [1..]
 
 

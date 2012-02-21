@@ -75,7 +75,7 @@ makeEdgeNeighborhoodMap tr oiEdge =
 
 
     in
-        fromMap tr res (L.map (map4 snd) theAssocs) 
+        spq_fromMap tr res (L.map (asc4 . (map4 snd)) theAssocs) 
 
 
 edgeNeighborhoodVertexCoords :: 

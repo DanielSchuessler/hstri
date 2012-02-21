@@ -4,7 +4,6 @@
 module Util where
 import Control.Monad
 import Data.Bits
-import Data.Function
 import Data.Int
 import Data.List as List
 import Data.Word
@@ -390,4 +389,5 @@ teller = tell . return
 sortWith :: Ord a1 => (a -> a1) -> [a] -> [a]
 sortWith = sortBy . comparing
 
+dont :: Monad m => m a -> m ()
 dont _ = return ()

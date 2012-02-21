@@ -343,8 +343,8 @@ equidistantPoints lmode rmode from to nIntervals =
                 Closed -> nIntervals)
            ]
 
--- floating-point-retardant sqrt
-sqrt' :: (Floating a, Ord a) => a -> a
+-- floating-point-retardant sqrt for arguments which are supposed to be >= 0
+sqrt' :: (Show a, Floating a, Ord a) => a -> a
 sqrt' x = case compare x 0 of
                LT -> trace ("sqrt' "++show x) 0 
                EQ -> 0

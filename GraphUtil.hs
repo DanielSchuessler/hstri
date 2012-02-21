@@ -7,7 +7,6 @@ import Control.Arrow
 import Data.GraphViz
 import Data.GraphViz.Printing(printIt)
 import Data.GraphViz.Commands.IO
-import Control.Monad
 import Data.Text.Lazy.IO
 import Data.Numbering
 import qualified Data.Graph.Inductive.PatriciaTree as Pat

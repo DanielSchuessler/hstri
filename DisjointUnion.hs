@@ -7,7 +7,6 @@
 {-# OPTIONS -Wall #-}
 module DisjointUnion(module Data.SumType, DisjointUnion(..), DisjointUnionable(..), disjointUnion, GDisjointUnionable, defaultDisjointUnion, CoDisjointUnionable(..), isRegardedAsSimplexByDisjointUnionDeriving, djZapUnits, DJSimp(..),DJSimps(..),DJSimpsH(..)) where
 
-import Control.Monad
 import Simplicial.DeltaSet3
 import GHC.Generics hiding(prec)
 import Language.Haskell.TH

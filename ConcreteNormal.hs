@@ -65,7 +65,6 @@ import Tetrahedron.INormalDisc
 import Control.Arrow
 import Data.Function
 import StandardCoordinates.MatchingEquations
-import Control.Monad
 import QuadHalf
 
 firstDisjointEdge :: NormalQuad -> Edge
@@ -414,4 +413,5 @@ instance TriangulationDSnakeItem NmTri where
 -- | Identity
 instance TriangulationDSnakeItem NmQuad where
     canonicalize_safe = const return
+
 

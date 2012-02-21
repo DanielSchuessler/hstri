@@ -8,7 +8,8 @@ import Math.Groups.S3
 import Data.Word
 import THUtil
 
--- | This class is for stringifying things (for humans) in contexts where characters are at a premium, e.g. Blender object names
+-- | This class is for stringifying things (for humans) in contexts where characters are at a premium, e.g. Blender object names. It's generally only intended to differentiate the @a@ from other @a@s 
+-- occuring in the same "context" (e.g. Blender scene), not to uniquely determine it.
 class ShortShow a where
     shortShowsPrec :: Int -> a -> ShowS 
     shortShow :: a -> String

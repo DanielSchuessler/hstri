@@ -1,4 +1,5 @@
 {-# LANGUAGE ImplicitParams, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module Blender.Build where
 
 import Blender.Types
@@ -12,6 +13,7 @@ import Control.Monad.IfElse
 import Blender.Mesh
 import Blender.ID
 import Control.Monad
+import Data.Vect.Double.Util.Projective(translateAfter4)
 
 
 contextObject :: Python ()
@@ -70,8 +72,40 @@ cylinderTransform from to radius =
 matrix_basis ::  [Char]
 matrix_basis = "matrix_basis"
 
+newFlatTriangleObj
+  :: (?sceneE::Python ()) =>
+     PythonVar
+     -> MeshVertex -> MeshVertex -> MeshVertex -> String -> Python ()
 newFlatTriangleObj var p0 p1 p2 name =
-    newMeshObj var (Mesh name [p0,p1,p2] [(0,1,2)] False [] [])
+    let
+        v1 = p1 &- p0
+        l1 = norm v1
+        u1 = v1&/l1
+
+        v2_0 = p2 &- p0
+        a = dotprod u1 v2_0
+        v2 = v2_0 &- a *& u1
+        l2 = norm v2
+        u2 = v2&/l2
+    in
+        if l1==0 || l2==0
+        then
+            -- fallback
+            newMeshObj var (Mesh name [p0,p1,p2] [(0,1,2)] False [] [])
+        else do
+            -- use an orthogonal transformation so we get a nice local coordinate system
+            newMeshObj var 
+                (Mesh name [    zero
+                           ,    l1*&vec3X
+                           ,    l2 *& vec3Y &+ (a *& vec3X) ] 
+                    [(0,1,2)] False [] [])
+            applyBlenderTransform var (BProj4
+                (translateAfter4 p0 (safeOrthogonal (Mat3 u1 u2 (crossprod u1 u2)))))
+
+
+                
+
+        
 
 
 safeOrthogonal :: Mat3 -> Proj4
@@ -85,24 +119,34 @@ newTextObj
 newTextObj var txt = do
     let txtVar = pyv "txt" 
     textCurve_init txtVar txt 
-    newObj var (id_name txt) txtVar
+    newObj var (blenderName txt) txtVar
 
+newCurveObj :: (?sceneE::Python ()) => PythonVar -> BlenderCurve -> Python ()
 newCurveObj var (cu :: BlenderCurve) = do
     let curveVar = pyv "curve"
     curve_init curveVar cu
-    newObj var (id_name cu) curveVar
+    newObj var (blenderName cu) curveVar
 
+
+applyBlenderTransform :: ToPython a => a -> BlenderTransform -> Python ()
+applyBlenderTransform objVar tf =
+    case tf of
+         LocAndEulers loc (EulerAnglesXYZ x y z) -> do
+            objVar <.> "rotation_euler" .= (x,y,z)
+            objVar <.> "location" .= loc
+
+         BProj4 m -> objVar <.> "matrix_basis" .= m
+
+bobj_applyTransform :: ToPython a => a -> BlenderObject a1 -> Python ()
+bobj_applyTransform objVar = applyBlenderTransform objVar . bobj_transform
 
 
 newLampObj
   :: (?sceneE::Python ()) => PythonVar -> LampObj -> Python ()
-newLampObj objVar LampObj{..} = do
-    lamp_init lampVar lamp_lamp
-    newObj objVar (lamp_name lamp_lamp) lampVar
-    objVar <.> "rotation_euler" .= lamp_eulers 
-    objVar <.> "location" .= lamp_location 
-
-    
+newLampObj objVar BObj{..} = do
+    lamp_init lampVar bobj_data
+    newObj objVar (lamp_name bobj_data) lampVar
+    applyBlenderTransform objVar bobj_transform
     
     where
         lampVar = pyv "lamp"
@@ -129,6 +173,7 @@ newEmptyObj var name = newObj var name none
 grpLink :: BlenderGroup -> Python () -> Python ()
 grpLink gr obj = methodCall1 (bgrp_objectsE gr) "link" obj
 
+newMeshObj :: (?sceneE::Python ()) => PythonVar -> Mesh -> Python ()
 newMeshObj var m =
     do 
         let _meshVar = pyv "decoConeMesh"
@@ -183,3 +228,12 @@ setMaterial m obj = obj <.> "active_material" .= m
 
 quit_blender :: Python ()
 quit_blender = methodCall (bpy_ops "wm") "quit_blender" ()
+
+newCamObj :: (?sceneE::Python ()) =>PythonVar -> BlenderObject BlenderCamData -> Python ()
+newCamObj objVar BObj{..} = do
+    let camVar = pyv "cam"
+    blenderInit camVar (bobj_data :: BlenderCamData)
+    newObj objVar bobj_name camVar
+    applyBlenderTransform objVar bobj_transform
+
+

@@ -44,9 +44,7 @@ module Simplicial.SimplicialComplex(
 --import Simplicial.Labels
 import Tetrahedron
 import Control.Exception
-import Control.Monad
 import Data.AscTuples
-import Data.List
 import Data.Set as Set hiding(map)
 import DisjointUnion
 import HomogenousTuples
@@ -56,10 +54,13 @@ import Util
 import Simplicial.SimplicialComplex.Class
 import Language.Haskell.TH.Lift
 import OrphanInstances()
+import EitherC
 
 fromTets
-  :: (Ord v, Show v) => [Quadruple v] -> SC3 v
-fromTets = fromOrderedTets . fmap asc4
+  :: (Ord v, Show v) =>
+     [Quadruple v] -> EitherC (LCommentedException LErrorCall) (SC3 v)
+fromTets = fmap fromOrderedTets . mapM 
+    (\tet -> $commentIfException ("fromTets: tet "++show tet) . asc4total $ tet)
 
 -- | The -1-dimensional simplicial complex
 data SCMinus1 = SCMinus1
@@ -173,7 +174,7 @@ abstractTri :: SC2 Vertex
 abstractTri = fromTris [(vA,vB,vC)]
 
 abstractTet :: SC3 Vertex
-abstractTet = fromTets [allVertices']
+abstractTet = $unEitherC "abstractTet" $ fromTets [allVertices']
 
 
 
