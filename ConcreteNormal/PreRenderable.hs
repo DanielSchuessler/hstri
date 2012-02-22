@@ -169,8 +169,13 @@ normalSurfaceToPreRenderableWithOpts opts posOverride (SPQWithCoords spq coords 
                         let cg' = concreteONormalArcToCorns oarc',
                         if cg/=cg'
                            then True
-                           else if oarc/=oarc'
-                           then trace ("normalSurfaceToPreRenderableWithOpts:\n"++show (oarc,oarc',cg)) 
+                           else if True
+                           then trace ("normalSurfaceToPreRenderableWithOpts:\n"
+                                        ++show oarc
+                                        ++"\n"
+                                        ++show oarc'
+                                        ++"\n"
+                                        ++show cg) 
                                 False
                            else False 
                         ]

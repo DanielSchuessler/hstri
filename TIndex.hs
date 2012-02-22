@@ -124,7 +124,7 @@ traverseI map_ f (viewI -> I i x) = map_ (i ./) (f x)
 
 instance (Show a) => Show (I a) where 
 --    showsPrec prec (I i x) = showParen (prec >= 1) (showsPrec 10 i . showString " ./ " . showsPrec 10 x)
-    showsPrec _ (I i x) = shows i . showString "./" . shows x
+    showsPrec prec (I i x) = showParen (prec>9) (shows i . showString "./" . shows x)
     
 instance (ShortShow a) => ShortShow (I a) where 
     shortShowsPrec _ (I i x) = shortShows x . shortShows i
@@ -140,9 +140,15 @@ instance Finite a => Enum (I a) where
     fromEnum (I a b) = fromEnum (EnumPair a b)
 
 instance (Pretty a) => Pretty (I a) where
-    pretty (I x y) = 
+    prettyPrec prec (I x y) = 
+
+        parensIf (prec >= 9) (
         
-        dullcyan (pretty x) <> dot <> pretty y
+            pretty y
+        <>  black (char '_')
+        <>  dullcyan (pretty x)
+
+        )
 
 instance (Arbitrary a) => Arbitrary (I a) where
     arbitrary = I <$> arbitrary <*> arbitrary

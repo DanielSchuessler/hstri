@@ -246,7 +246,10 @@ instance Vertices NormalArc where
 
 -- | Ordered 'NormalArc'
 newtype ONormalArc = ONormalArc (Pair NormalCorner) 
-    deriving(RightAction S2, MakeNormalArc, Eq, Ord, Pretty, Show,Typeable)
+    deriving(RightAction S2, MakeNormalArc, Eq, Ord, Pretty, Typeable)
+
+instance Show ONormalArc where
+    showsPrec prec (ONormalArc (v0,v1)) = showParen (prec >= 10) (showsPrec 11 v0 . showChar ',' . showsPrec 11 v1)
 
 class MakeONormalArc a where
     oNormalArc :: a -> ONormalArc 

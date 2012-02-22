@@ -466,4 +466,21 @@ spqwc_fullQuotient tr coords =
         (\_ -> $err' ("The result of spqwc_fullQuotient does not have a GluingLabeller because there aren't supposed to be any gluings leftover to be labelled. Maybe you got here through record updates?"))
 
 
+spq_to_tr :: Eq b => SimplicialPartialQuotient b -> Triangulation
+spq_to_tr spq = mkTriangulation n
+
+        -- O(n^2) algo, OPTIMIZEME
+    [ (tri,otri) |  tri <- liftM2 (./) tets allTriangles
+                 , otri <- liftM2 (./) tets allOTriangles
+                 , spq_mapTri spq tri == spq_mapTri spq otri 
+                 ]
+
+    where
+        tets = [0..fi n-1]
+        n = tNumberOfTetrahedra_ (spq_tr spq) 
+
+
+
+
+
 
