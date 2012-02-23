@@ -55,7 +55,8 @@ import Control.Monad.State.Class(put)
 import VerboseDD
 import Control.Arrow(second)
 
-data SolSetConversionVectorRepresentation v r w = SSCVR VectorIndex (StandardDense v r) 
+data SolSetConversionVectorRepresentation v r w = 
+    SSCVR {-# UNPACK #-} !VectorIndex !(StandardDense v r) 
 
 unSSCVR (SSCVR _ x) = x
 
@@ -174,7 +175,8 @@ data SolSetConversionResult r =
             sscr_inputTriangulation :: Triangulation,
             sscr_canonExtsOfInput :: Vector ( SolSetConversionVectorRepresentation Vector r w ),  
             sscr_steps :: [VertexStepResult r w],
-            sscr_finalVerbose :: Vector (SolSetConversionResultItem r) 
+            sscr_finalVerbose :: Vector (SolSetConversionResultItem r),
+            sscr_generatedVectorCount :: Int
         }
 
 sscr_final :: SolSetConversionResult r -> Vector (Admissible (StandardDense Vector r))
@@ -268,12 +270,14 @@ quadToStandardSolSet (toTriangulation -> tr) quadSolSet =
     let     t = 7*tNumberOfTetrahedra tr
     in let  ?tr = tr
     in withBitVectorType t (\p ->
-        let ((canonExtsOfInput, final),steps) = runVerboseDD (quadToStandardSolSet_core quadSolSet p)
+        let (((canonExtsOfInput, final),steps),finalVI) = 
+                runVerboseDD (quadToStandardSolSet_core quadSolSet p)
         in SolSetConversionResult {
                 sscr_inputTriangulation = tr,
                 sscr_canonExtsOfInput = canonExtsOfInput,
                 sscr_steps = steps,
-                sscr_finalVerbose = final
+                sscr_finalVerbose = final,
+                sscr_generatedVectorCount = (fi finalVI :: Int)
              })
 
 

@@ -2,6 +2,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module CoordSys where
 
 import StandardCoordinates.Dense()
@@ -60,7 +61,9 @@ instance CoordSys StdCoordSys where
                 | me <- matchingEquationReasons tr ]
 
         quadIndexOffsets _ tr = 
-                        [ (fromEnum . iNormalQuadToINormalDisc) (tindex i ./ minBound)
+                        [ 
+--                             (fromEnum . iNormalQuadToINormalDisc) (tindex i ./ minBound)
+                            7*i+4
                                 | i <- [0.. tNumberOfTetrahedra tr - 1] ]
 
         discIndexToDisc _ = toEnum
@@ -96,6 +99,9 @@ newtype ZeroSet coords w = ZeroSet { unZeroSet :: w}
     deriving(Eq,Ord,Show,BitVector,FixedBitVector)
 
 
+{-# INLINABLE zeroSetSatisfiesQuadConstraintsAtOffset #-}
+zeroSetSatisfiesQuadConstraintsAtOffset
+  :: BitVector w => w -> BitVectorPosition -> Bool
 zeroSetSatisfiesQuadConstraintsAtOffset z i = 
                     atLeastTwo
                         (bvUnsafeIndex z i)

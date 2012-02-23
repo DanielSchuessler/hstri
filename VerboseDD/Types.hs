@@ -1,11 +1,11 @@
 {-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module VerboseDD.Types where
 import PrettyUtil
 import Data.BitVector.Adaptive
-import Control.Monad.State.Strict(MonadState(..),State,evalState,lift)
+import Control.Monad.State.Strict(MonadState(..),State,runState,lift)
 import qualified Data.Vector.Generic as VG
 import Data.DList
 import CoordSys
@@ -14,6 +14,9 @@ import Control.Arrow(second)
 import Control.Applicative
 import Control.Monad.Writer.Lazy(WriterT(..),MonadWriter(..))
 import Control.Monad
+import Control.Arrow(first)
+import Data.Word
+import qualified Data.Vector as V
 
 newtype VectorIndex = VectorIndex Int
     deriving(Eq,Enum,Ord,Real,Num,Integral)
@@ -32,7 +35,7 @@ prettyVI (VectorIndex i) = dullyellow . text . show $ i
 data PairFate v = 
     PairFate {
         pf_fst, pf_snd :: v,
-        pf_kind :: PairFateKind v
+        pf_kind :: !(PairFateKind v)
     }
 
 
@@ -42,7 +45,7 @@ data PairFate v =
 data PairFateKind v =     
         Incompatible
     |   NotAdjacent v
-    |   OK VectorIndex
+    |   OK {-# UNPACK #-} !VectorIndex
 
     deriving(Show)
 
@@ -59,8 +62,8 @@ nextIndex = do
     return i
 
 
-runVerboseDD :: VerboseDD stepLog d -> (d, [stepLog])
-runVerboseDD (VerboseDD x) = second toList (evalState (runWriterT x) 0)
+runVerboseDD :: VerboseDD a d -> ((d, [a]), VectorIndex)
+runVerboseDD (VerboseDD x) = (first . second) toList (runState (runWriterT x) 0)
 
 
 -- | Runs a VerboseDD computation which logs 'innerSteps' inside a computation which logs 'outerSteps'. The inner computation uses the same 'VectorIndex' supply as the outer one.
@@ -83,7 +86,16 @@ class (BitVector w, CoordSys co) => VerboseDDVectorRepresentation a co w | a -> 
 
 
 
-
+{-# INLINE findVectorsWithZeroSetAtLeast #-}
+-- {-# SPECIALIZE findVectorsWithZeroSetAtLeast :: 
+--         VerboseDDVectorRepresentation Rational co (BitVectorSingle Word) => 
+--             ZeroSet co (BitVectorSingle Word) -> V.Vector Rational -> V.Vector Rational #-}
+-- {-# SPECIALIZE findVectorsWithZeroSetAtLeast :: 
+--         VerboseDDVectorRepresentation Rational co BitVector64 => 
+--             ZeroSet co BitVector64 -> V.Vector Rational -> V.Vector Rational #-}
+-- {-# SPECIALIZE findVectorsWithZeroSetAtLeast :: 
+--         VerboseDDVectorRepresentation Rational co BitVector128 => 
+--             ZeroSet co BitVector128 -> V.Vector Rational -> V.Vector Rational #-}
 findVectorsWithZeroSetAtLeast
   :: (VG.Vector v a, VerboseDDVectorRepresentation a co w) =>
      ZeroSet co w -> v a -> v a

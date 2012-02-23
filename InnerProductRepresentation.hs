@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, CPP, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE BangPatterns, MultiParamTypeClasses, CPP, FlexibleInstances, FlexibleContexts, ViewPatterns, RecordWildCards, NamedFieldPuns, ScopedTypeVariables, TypeSynonymInstances, NoMonomorphismRestriction, TupleSections, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
 {-# OPTIONS -Wall #-}
 module InnerProductRepresentation where
 
@@ -34,8 +34,9 @@ ipr_head = V.head . innerProducts
 ipr_tail :: IPR co w -> IPR co w
 ipr_tail x = x { innerProducts = V.tail (innerProducts x) }
 
+{-# INLINE ipr_combine #-}
 ipr_combine :: BitVector w => IPR co w -> IPR co w -> VectorIndex -> IPR co w
-ipr_combine x y index = 
+ipr_combine !x !y !index = 
     let
         ipsx = innerProducts x
         ipsy = innerProducts y
@@ -43,10 +44,10 @@ ipr_combine x y index =
         hx = V.head ipsx
         hy = V.head ipsy
 
-        c = (\xi yi -> (hy*xi-hx*yi)    
-                             /(hy-hx))
+        c !xi !yi = (hy*xi-hx*yi)    
+                             /(hy-hx)
     in
-        assert (hx > 0 && hy < 0) $
+        assert (hx > 0 && hy < 0) $!
         IPR  
             index
             (bvIntersection (zeroSet x) (zeroSet y)) 

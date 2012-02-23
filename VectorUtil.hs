@@ -12,16 +12,11 @@ import HomogenousTuples
 import Element
 
 
+{-# INLINABLE vectorMapMaybe #-}
 vectorMapMaybe
-  :: (VG.Vector v a, VG.Vector v1 a1) =>
-     (a1 -> Maybe a) -> v1 a1 -> v a
-vectorMapMaybe f xs = VG.unfoldrN (VG.length xs) u 0
-    where
-        u i = case xs VG.!? i of
-                   Nothing -> Nothing
-                   Just x -> case f x of
-                                  Nothing -> u (i+1)
-                                  Just y -> Just (y,i+1)
+  :: (VG.Vector v (Maybe b), VG.Vector v b, VG.Vector v a) =>
+     (a -> Maybe b) -> v a -> v b
+vectorMapMaybe f = VG.map fromJust . VG.filter isJust . VG.map f
 
 prop_mapMaybe :: Blind (Int -> Maybe Bool) -> [Int] -> Property
 prop_mapMaybe (Blind (f :: Int -> Maybe Bool)) xs =
@@ -54,8 +49,14 @@ partitionBySign f _Vp = PartitioningBySign {_Sneg,_S0,_Spos}
                 (_S0  ,_Spos) = V.partition ((==0) . f) _Snn
 
 
+{-# INLINABLE vectorCart #-}
 vectorCart :: (VG.Vector v t, VG.Vector v a, VG.Vector v (t, a)) => v t -> v a -> v (t, a)
-vectorCart v w = VG.concatMap (\x -> VG.map (x,) w) v
+vectorCart v w = 
+    let
+        m = VG.length w
+    in
+        VG.generate (VG.length v * m)
+            (\i -> case divMod i m of (j,k) -> (VG.unsafeIndex v j, VG.unsafeIndex w k)) 
 
 vectorAdjustAt :: VG.Vector v a => v a -> (a -> a) -> Int -> v a
 vectorAdjustAt v f i = v VG.// [(i,f (v VG.! i))]

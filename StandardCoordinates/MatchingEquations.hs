@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, TypeFamilies, ScopedTypeVariables, MultiParamTypeClasses, FlexibleInstances, ViewPatterns, TemplateHaskell, NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-orphans #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
+{-# OPTIONS -Wall -fno-warn-orphans #-}
 module StandardCoordinates.MatchingEquations where
 
 import QuadCoordinates.MatchingEquations
@@ -32,6 +33,9 @@ standard_admissible (toTriangulation -> tr) stc = do
     toAttemptC $ satisfiesMatchingEquations tr stc
     return (UnsafeToAdmissible tr stc)
 
+standard_toAdmissible
+  :: (Show r, Show a, ToTriangulation tr, StandardCoords a r) =>
+     tr -> a -> Admissible a
 standard_toAdmissible tr = $unEitherC "standard_toAdmissible" . standard_admissible tr
 
 data MatchingEquationViolation s = MatchingEquationViolation {
@@ -65,10 +69,12 @@ satisfiesMatchingEquations tr stc =
 
 
 
-data MatchingEquationReason = MatchingEquationReason ITriangle OITriangle Vertex Vertex
+data MatchingEquationReason = 
+    MatchingEquationReason ITriangle OITriangle Vertex Vertex
+        INormalTri INormalQuad INormalTri INormalQuad
 
 instance Show MatchingEquationReason where
-    show (MatchingEquationReason x x' v v')
+    show (MatchingEquationReason x x' v v' _ _ _ _)
         = unwords [ "Gluing", show x, "to", show x', 
                     "identifies the normal arcs",
                     show (iNormalArc (x, v)),
@@ -81,6 +87,10 @@ matchingEquationReasons
 matchingEquationReasons t =
       [
          MatchingEquationReason x x' (forgetTIndex v) (forgetTIndex v')
+                            (iNormalTri v)
+                            (iNormalQuadByVertexAndITriangle (forgetTIndex v) x)
+                            (iNormalTri v')
+                            (iNormalQuadByVertexAndITriangle (forgetTIndex v') (forgetVertexOrder x'))
                
         |
             (x,x') <- tGluingsIrredundant t,
@@ -92,25 +102,21 @@ matchingEquationReasons t =
 
 evalMatchingEquation
   :: StandardCoords s r => MatchingEquationReason -> s -> r
-evalMatchingEquation (MatchingEquationReason x x' v v') stc =
-                              (triCount stc (iNormalTri $ getTIndex x ./ v)
-                          + quadCount stc (iNormalQuadByVertexAndITriangle v x))
+evalMatchingEquation (MatchingEquationReason _ _ _ _ t1 q1 t2 q2) stc =
+                            triCount stc t1
+                          + quadCount stc q1
 
-                          - triCount stc (iNormalTri $ getTIndex x' ./ v')
-                          - quadCount stc (iNormalQuadByVertexAndITriangle v' (forgetVertexOrder x'))
+                          - triCount stc t2
+                          - quadCount stc q2
 
     
 
 matchingEquationSupport
   :: MatchingEquationReason
      -> (INormalTri, INormalQuad, INormalTri, INormalQuad)
-matchingEquationSupport (MatchingEquationReason x x' v v') =
+matchingEquationSupport (MatchingEquationReason _ _ _ _ t1 q1 t2 q2) =
                         
-                          (iNormalTri $ getTIndex x ./ v
-                          ,iNormalQuadByVertexAndITriangle v x
-                          ,iNormalTri $ getTIndex x' ./ v'
-                          ,iNormalQuadByVertexAndITriangle v' (forgetVertexOrder x')
-                          )
+                          (t1,q1,t2,q2)
 
 matchingEquationSupportDiscs
   :: MatchingEquationReason

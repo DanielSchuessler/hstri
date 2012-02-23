@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeFamilies #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, TemplateHaskell, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeFamilies #-}
 {-# OPTIONS -Wall #-}
 module Math.Groups.S3(module Math.Group, module Math.Groups.S2, S3(..),allS3,sort3WithPermutation,
     transpositions,
@@ -179,12 +179,13 @@ instance Quote S3 where
     quotePrec _ = show
 
 
+{-# INLINABLE sort3WithPermutation #-}
 -- | 
 -- Property: @xs == uncurry ('*.') (sort3WithPermutation xs)@ 
 --
 -- Property: @fst (sort3WithPermutation)@ is sorted
 sort3WithPermutation :: Ord t => (t, t, t) -> ((t, t, t),S3)
-sort3WithPermutation xs@(x0,x1,x2) =
+sort3WithPermutation xs@(!x0,!x1,!x2) =
     if x0<=x1
        then 
         if x1<=x2

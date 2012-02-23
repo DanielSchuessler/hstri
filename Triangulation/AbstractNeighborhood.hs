@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, TypeFamilies, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns, TupleSections, TypeFamilies, FlexibleInstances, MultiParamTypeClasses, RecordWildCards, TemplateHaskell, ScopedTypeVariables #-}
 {-# OPTIONS -Wall #-}
 module Triangulation.AbstractNeighborhood(
     EdgeNeighborhoodTet,
@@ -18,8 +18,6 @@ module Triangulation.AbstractNeighborhood(
     someEdgeNeighborhood
     ) where
 import TriangulationCxtObject
-import Data.Function
-import Control.Arrow((&&&))
 import PrettyUtil
 import Data.List(unfoldr)
 import HomogenousTuples
@@ -28,21 +26,53 @@ import Util
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty(NonEmpty(..))
 import Data.SumType
+import Data.Bits
+import Control.Applicative
 
-data EdgeNeighborhoodTet = 
-    ENTet {
-        ent_top, ent_bot, ent_left, ent_right :: Vertex
+newtype EdgeNeighborhoodTet = 
+    ENTet Word8 
+    -- msb to lsb: top,bot,left,right
+
+        deriving(Eq,Ord)
+
+enTet
+  :: Vertex -> Vertex -> Vertex -> Vertex -> EdgeNeighborhoodTet
+enTet t b l r = ENTet (     shiftL (vertexToWord8 t) 6 .|. shiftL (vertexToWord8 b) 4 
+                        .|. shiftL (vertexToWord8 l) 2 .|. (vertexToWord8 r))
+
+ent_top :: EdgeNeighborhoodTet -> Vertex
+ent_top (ENTet w)   = vertexFromWord8 (shiftR w 6) 
+ent_bot :: EdgeNeighborhoodTet -> Vertex
+ent_bot (ENTet w)   = vertexFromWord8 (shiftR w 4 .&. 3) 
+ent_left :: EdgeNeighborhoodTet -> Vertex
+ent_left (ENTet w)  = vertexFromWord8 (shiftR w 2 .&. 3) 
+ent_right :: EdgeNeighborhoodTet -> Vertex
+ent_right (ENTet w) = vertexFromWord8 (       w   .&. 3) 
+
+
+data EdgeNeighborhoodTetView = ENTetView {
+        entv_top, entv_bot, entv_left, entv_right :: Vertex
     }
     deriving Show
+
+viewENTet :: EdgeNeighborhoodTet -> EdgeNeighborhoodTetView
+viewENTet = ENTetView <$> ent_top <*> ent_bot <*> ent_left <*> ent_right
+unviewENTet :: EdgeNeighborhoodTetView -> EdgeNeighborhoodTet
+unviewENTet (ENTetView t b l r) = enTet t b l r
+
+
+instance Show EdgeNeighborhoodTet where
+    showsPrec prec = showsPrec prec . viewENTet
+
 
 trivialHasTIndexInstance [t| EdgeNeighborhoodTet |]                
 type IEdgeNeighborhoodTet = I EdgeNeighborhoodTet
 
-instance Eq EdgeNeighborhoodTet where
-    (==) = (==) `on` (ent_top &&& ent_bot &&& ent_left) 
+-- instance Eq EdgeNeighborhoodTet where
+--     (==) = (==) `on` (ent_top &&& ent_bot &&& ent_left) 
 
 instance Pretty EdgeNeighborhoodTet where
-    prettyPrec prec (ENTet a b c d) = prettyPrecApp prec (text "ENTet") [a,b,c,d] 
+    prettyPrec prec (viewENTet -> ENTetView a b c d) = prettyPrecApp prec (text "ENTet") [a,b,c,d] 
 
 instance Vertices EdgeNeighborhoodTet where
     type Verts EdgeNeighborhoodTet = Quadruple Vertex
@@ -65,7 +95,8 @@ ent_lowerTri :: EdgeNeighborhoodTet -> OTriangle
 ent_lowerTri ent = otriangle (ent_bot ent, ent_left ent, ent_right ent)
 
 ent_mirrorLR :: EdgeNeighborhoodTet -> EdgeNeighborhoodTet
-ent_mirrorLR ent = ent { ent_left = ent_right ent, ent_right = ent_left ent } 
+ent_mirrorLR (viewENTet -> ent) = 
+    unviewENTet (ent { entv_left = entv_right ent, entv_right = entv_left ent })
 
 -- generate i-variants of accessors
 $(concatMapM 
@@ -104,10 +135,10 @@ edgeNeighborhoodTetStream tr dir ie =
         I i0 e = viewI ie        
 
 
-        ient0 = i0 ./ ENTet {..}
+        ient0 = i0 ./ enTet _top _bot _left _right
             where
-                (ent_bot,ent_top) = vertices e
-                (ent_left,ent_right) = (vertices . oppositeEdge . forgetVertexOrder) e
+                (_bot,_top) = vertices e
+                (_left,_right) = (vertices . oppositeEdge . forgetVertexOrder) e
                                         *. dir
     in 
         ient0 :|
@@ -119,13 +150,8 @@ edgeNeighborhoodTetStream tr dir ie =
 
                             (v0,v1,v2) = vertices _S'
 
-                            this = i ./ ENTet {
-                                            ent_top = v0
-                                        ,   ent_bot = v1
-                                        ,   ent_left = v2 
-                                        ,   ent_right = oTriangleDualVertex _S'
+                            this = i ./ enTet v0 v1 v2 (oTriangleDualVertex _S')
 
-                                        }
                             
                         Just (this,this))
 

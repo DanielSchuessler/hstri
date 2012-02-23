@@ -117,6 +117,7 @@ mapI
   :: (HasTIndex ia a, HasTIndex ib b) => (a -> b) -> ia -> ib
 mapI f (viewI -> I i x) = i ./ f x 
 
+{-# INLINE traverseI #-}
 traverseI
   :: (HasTIndex ia a, HasTIndex ib b) =>
      ((b -> ib) -> fa -> fib) -> (a -> fa) -> ia -> fib

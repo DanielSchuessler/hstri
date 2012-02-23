@@ -93,9 +93,11 @@ instance (VU.Unbox r, Show r) => Show (StandardDense VU.Vector r) where
     showsPrec prec x = showString "sd_fromListU" . showsPrec prec (VU.toList (unwrapVector x))
 
 
+{-# INLINE sd_zeroSet #-}
 sd_zeroSet
   :: (Eq a1, Num a1, VG.Vector v a1, BitVector w) => StandardDense v a1 -> w
 sd_zeroSet (sd_toVector -> v) =   
+    v `seq`
     foldl'  (\r i -> if VG.unsafeIndex v i == 0
                        then bvSetBit r i
                        else r) 

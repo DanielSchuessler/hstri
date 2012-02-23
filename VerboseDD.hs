@@ -1,7 +1,8 @@
-{-# LANGUAGE StandaloneDeriving, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, ScopedTypeVariables, RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
+{-# LANGUAGE BangPatterns, StandaloneDeriving, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, ScopedTypeVariables, RecordWildCards, TemplateHaskell, NamedFieldPuns, PatternGuards, ViewPatterns, TupleSections, NoMonomorphismRestriction #-}
 {-# LANGUAGE PolymorphicComponents, ExistentialQuantification #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# OPTIONS -Wall #-}
 module VerboseDD 
     (module VerboseDD.Types,
@@ -55,6 +56,7 @@ import VerboseDD.Types
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import HomogenousTuples
+import Util
 
 dontTrace :: a -> b -> b
 dontTrace = const id
@@ -65,7 +67,8 @@ data DDResult co =
         DDResult {
             ddr_inputTriangulation :: Triangulation,
             ddr_steps :: [DDStepResult (IPR co w)],
-            ddr_final :: Vector (IPR co w)
+            ddr_final :: Vector (IPR co w),
+            ddr_generatedVectorCount :: Int
         }
 
 ddr_lastIndex :: DDResult t -> Maybe VectorIndex
@@ -133,7 +136,7 @@ ddWith coordSys tr bitvectorTypeProxy =
 
             loop 1 _V0
 
-        loop i _Vp 
+        loop i !_Vp 
             | i == g+1 = return _Vp 
             | otherwise =
 
@@ -153,7 +156,7 @@ ddWith coordSys tr bitvectorTypeProxy =
                             V.++
                             vectorMapMaybe (\pf -> 
                                 case pf of
-                                    PairFate x y (OK i_) -> Just (ipr_combine x y i_)
+                                    PairFate x y (OK i_) -> Just $! (ipr_combine x y i_)
                                     _ -> Nothing)
 
                                 ddsr_pairFates
@@ -163,8 +166,8 @@ ddWith coordSys tr bitvectorTypeProxy =
 
             
 
-        (_final,_steps) = dontTrace ("ddWith: d = "++show d++"; g = "++show g) $
-                            runVerboseDD go
+        ((_final,_steps),finalVI) = dontTrace ("ddWith: d = "++show d++"; g = "++show g) $
+                                        runVerboseDD go
         
 
     in 
@@ -172,7 +175,8 @@ ddWith coordSys tr bitvectorTypeProxy =
             {
             ddr_inputTriangulation = tr,
             ddr_steps = _steps,
-            ddr_final = _final
+            ddr_final = _final,
+            ddr_generatedVectorCount = fi finalVI
             }
         
 
@@ -209,7 +213,7 @@ vsepVec :: Vector Doc -> Doc
 vsepVec = vsep . V.toList
 
 ppDDRes :: CoordSys c => DDResult c -> Doc
-ppDDRes (DDResult tr steps res) =
+ppDDRes (DDResult tr steps res _) =
            vsep (zipWith ppStep [1..] steps)
         <> line <> text "Result"
         <> line <> indent 2 (ppVecs' tr res)
@@ -260,8 +264,14 @@ ddWrapSolutions
   :: (CheckAdmissibility c (WrappedVector c Vector Rational) Rational) =>
         DDResult c -> Vector (AdmissibleFor c (WrappedVector c Vector Rational))
 
-ddWrapSolutions (DDResult tr _ x :: DDResult c) = 
-    V.map ($unEitherC _err . admissible (undefined :: Proxy c) tr . WrappedVector . reconstruct) x
+ddWrapSolutions DDResult{ddr_final,ddr_inputTriangulation} =
+    V.map ($unEitherC _err 
+            . admissible (undefined :: Proxy c) ddr_inputTriangulation
+            . WrappedVector 
+            . reconstruct)
+
+          ddr_final
+            
 
     where
         _err =

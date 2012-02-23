@@ -175,7 +175,6 @@ Library
         , file-location
         , filepath
         , ghc-prim
-        , GLFW-b
         , graphviz
         , groom 
         , hashable
