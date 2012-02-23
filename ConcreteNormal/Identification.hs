@@ -28,6 +28,7 @@ import QuadHalf
 
 type TNmCorner = T NmCorner
 type TNmArc = T NmArc
+type TONmArc = T ONmArc
 type TNmTri = T NmTri
 type TNmQuad = T NmQuad
 type TNmQuadHalf = T NmQuadHalf
@@ -70,7 +71,8 @@ $(concatMapM (\((cls,meth),ty) ->
             [(''Show,'showsPrec),(''Pretty,'prettyPrec),(''ShortShow,'shortShowsPrec)]
              
             [''TNmCorner, ''TNmArc, ''TNmTri, ''TNmQuad
-            , ''TNmQuadHalf, ''TNmTriOrQuadHalf, ''TNmAdjoinQuadDiags ])
+            , ''TNmQuadHalf, ''TNmTriOrQuadHalf, ''TNmAdjoinQuadDiags,
+             ''TONmArc])
              
     )
 

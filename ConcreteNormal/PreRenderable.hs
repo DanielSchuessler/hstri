@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, TemplateHaskell, FlexibleContexts, CPP, RecordWildCards, NoMonomorphismRestriction, FlexibleInstances, StandaloneDeriving, GADTs, ViewPatterns, ScopedTypeVariables #-}
-{-# OPTIONS -Wall #-}
+{-# OPTIONS -Wall -fno-warn-unused-imports #-}
 
 module ConcreteNormal.PreRenderable(
     module Data.FiniteFunc,
@@ -167,17 +167,18 @@ normalSurfaceToPreRenderableWithOpts opts posOverride (SPQWithCoords spq coords 
                         let oarc' = canonicalize tr oarc,
                         let cg = concreteONormalArcToCorns oarc,
                         let cg' = concreteONormalArcToCorns oarc',
-                        if cg/=cg'
-                           then True
-                           else if True
-                           then trace ("normalSurfaceToPreRenderableWithOpts:\n"
-                                        ++show oarc
-                                        ++"\n"
-                                        ++show oarc'
-                                        ++"\n"
-                                        ++show cg) 
-                                False
-                           else False 
+                        cg /= cg'
+--                         if cg/=cg'
+--                            then True
+--                            else if True
+--                            then trace ("normalSurfaceToPreRenderableWithOpts:\n"
+--                                         ++show oarc
+--                                         ++"\n"
+--                                         ++show oarc'
+--                                         ++"\n"
+--                                         ++show cg) 
+--                                 False
+--                            else False 
                         ]
                     [1..]
 

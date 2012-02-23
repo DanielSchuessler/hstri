@@ -147,6 +147,9 @@ type TNormalCorner = T INormalCorner
 -- | Normal arc in the quotient space of a triangulation
 type TNormalArc = T INormalArc
 
+-- | Ordered normal arc in the quotient space of a triangulation
+type TONormalArc = T OINormalArc
+
 -- | N.B. normal tris are never identified; this type just carries the triangulation along
 type TNormalTri = T INormalTri
 
@@ -351,6 +354,7 @@ instance Show TEdge where showsPrec = prettyShowsPrec
 instance Show TTriangle where showsPrec = prettyShowsPrec
 instance Show TNormalCorner where showsPrec = prettyShowsPrec
 instance Show TNormalArc where showsPrec = prettyShowsPrec
+instance Show TONormalArc where showsPrec = prettyShowsPrec
 instance Show TNormalTri where showsPrec = prettyShowsPrec
 instance Show TNormalQuad where showsPrec = prettyShowsPrec
 instance Show TNormalDisc where showsPrec = prettyShowsPrec
@@ -389,6 +393,9 @@ instance  Pretty TNormalCorner where
 
 instance  Pretty TNormalArc where
     pretty = prettyListAsSet . asList . normalArcPreimage
+
+instance Pretty TONormalArc where
+    pretty = pretty . unT
 
 instance  Pretty TNormalTri where
     pretty = pretty . unT

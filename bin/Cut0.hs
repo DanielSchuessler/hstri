@@ -29,7 +29,7 @@ ddr_cut0 = dd tr_cut0
 
 qVertSols_cut0 :: V.Vector (QuadDense V.Vector Rational)
 qVertSols_cut0 = case ddr_cut0 of
-                 DDResult{_ddr_final=xs} -> VG.map (qd_fromVector . ipr_value) xs 
+                 DDResult{ddr_final=xs} -> VG.map (qd_fromVector . ipr_value) xs 
 
 
 sscr_cut0 :: SolSetConversionResult Rational

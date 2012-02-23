@@ -13,7 +13,7 @@ import qualified Data.Vector.Generic as VG
 import Data.SumType
 import Control.Applicative
 import Data.Maybe
-import Math.NumberTheory.Primes.Factorisation
+-- import Math.NumberTheory.Primes.Factorisation
 
 cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
 cart = liftM2 (,)
@@ -133,14 +133,14 @@ generateUntilJust :: Gen (Maybe b) -> Gen b
 generateUntilJust g = fromJust <$> (g `suchThat` isJust)
 
 
-arbitraryDivisor :: Integer -> Gen Integer
-arbitraryDivisor i =
-    let
-        factorisation = factorise i
-    in
-        do
-            powers <- mapM (\n -> choose (0,n)) (map snd factorisation)
-            return (product [ p ^ k | (p,k) <- zip (map fst factorisation) powers ])
+-- arbitraryDivisor :: Integer -> Gen Integer
+-- arbitraryDivisor i =
+--     let
+--         factorisation = factorise i
+--     in
+--         do
+--             powers <- mapM (\n -> choose (0,n)) (map snd factorisation)
+--             return (product [ p ^ k | (p,k) <- zip (map fst factorisation) powers ])
 
 
 -- arbitraryConvexCombination v 

@@ -281,7 +281,7 @@ quadToStandardSolSet (toTriangulation -> tr) quadSolSet =
 -- | Convenience wrapper taking a 'DDResult'
 quadToStandardSolSet'
   :: DDResult QuadCoordSys -> SolSetConversionResult Rational
-quadToStandardSolSet' DDResult { _ddr_inputTriangulation = tr, _ddr_final = final } =
+quadToStandardSolSet' DDResult { ddr_inputTriangulation = tr, ddr_final = final } =
     quadToStandardSolSet 
         tr
         (VG.map 

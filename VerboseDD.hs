@@ -63,13 +63,13 @@ dontTrace = const id
 data DDResult co =
     forall w. BitVector w => 
         DDResult {
-            _ddr_inputTriangulation :: Triangulation,
-            _ddr_steps :: [DDStepResult (IPR co w)],
-            _ddr_final :: Vector (IPR co w)
+            ddr_inputTriangulation :: Triangulation,
+            ddr_steps :: [DDStepResult (IPR co w)],
+            ddr_final :: Vector (IPR co w)
         }
 
 ddr_lastIndex :: DDResult t -> Maybe VectorIndex
-ddr_lastIndex DDResult {_ddr_final = f } 
+ddr_lastIndex DDResult {ddr_final = f } 
     | VG.null f = Nothing
     | otherwise = Just (ipr_index . VG.last $ f)
 
@@ -168,7 +168,13 @@ ddWith coordSys tr bitvectorTypeProxy =
         
 
     in 
-        DDResult tr _steps _final
+        DDResult 
+            {
+            ddr_inputTriangulation = tr,
+            ddr_steps = _steps,
+            ddr_final = _final
+            }
+        
 
 
 

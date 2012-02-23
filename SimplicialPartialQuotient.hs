@@ -336,7 +336,7 @@ oneTetWithDefaultCoords tr gluingLabeller =
 
 
 spq_twoTetBipyramid
-  :: Triangulation -> ITriangle -> SimplicialPartialQuotient (T IVertex)
+  :: Triangulation -> ITriangle -> SimplicialPartialQuotient TVertex
 spq_twoTetBipyramid tr theTri = 
 
         if getTIndex theTri == getTIndex theGluedTri
@@ -363,16 +363,25 @@ twoTetBipyramid theTri theGluedTri =
 -- | Creates a partial quotient for the given 2-tetrahedron triangulation which implements the gluing of the given triangle (and no others) 
 spqwc_twoTetBipyramid
   :: Triangulation
-     -> ITriangle -> GluingLabeller -> SPQWithCoords (T IVertex)
-spqwc_twoTetBipyramid tr theTri gluingLabeller = 
-    assert (tNumberOfTetrahedra tr == (2::Integer)) $
-    trace (prettyString m) $
+     -> ITriangle -> GluingLabeller -> SPQWithCoords TVertex
+spqwc_twoTetBipyramid = (fmap . fmap) fst . spqwc_twoTetBipyramid'
 
+spqwc_twoTetBipyramid'
+  :: Triangulation
+     -> ITriangle
+     -> GluingLabeller
+     -> (SPQWithCoords TVertex, Triangulation)
+spqwc_twoTetBipyramid' tr theTri gluingLabeller = 
+    assert (tNumberOfTetrahedra tr == (2::Integer)) $
+
+        (
         SPQWithCoords {
             spqwc_spq = spq_twoTetBipyramid tr theTri,
             spqwc_coords = (flip $(indxShow) m),
             spqwc_gluingLabeller = gluingLabeller
-        }
+        },
+        mkTriangulation 2 [(theTri,theGluedTri)]
+        )
 
 
     where

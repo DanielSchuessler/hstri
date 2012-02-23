@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts, TypeFamilies, ScopedTypeVariables, ViewPatterns, FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses, TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module Tetrahedron.INormalDisc where
@@ -48,9 +48,7 @@ instance MakeINormalArc (Triangle,IVertex) where
     iNormalArc (t,viewI -> I i v) = (./) i (normalArc (t, v))
 
 instance MakeINormalArc (ITriangle,IVertex) where
-    iNormalArc (viewI -> I i0 t,viewI -> I i v) = 
-        assert (i0==i) $
-        (./) i (normalArc (t, v))
+    iNormalArc = uncurry liftMakeNormalArc
 
 instance MakeINormalArc (OITriangle,IVertex) where
     iNormalArc (t,v) = iNormalArc (forgetVertexOrder t,v)
@@ -148,11 +146,20 @@ oiNormalArcGetTriangle = mapI oNormalArcGetTriangle
 instance MakeITriangle INormalArc where
     iTriangle = iNormalArcGetTriangle
 
+
+liftMakeNormalArc
+  :: (HasTIndex ia t, HasTIndex ia1 t1, MakeNormalArc (t, t1)) =>
+     ia -> ia1 -> I NormalArc
+liftMakeNormalArc (viewI -> I ti t) (viewI -> I ti' v) = 
+    assert(ti==ti') $
+    ti ./ normalArc (t, v) 
+
 iNormalArcByTriangleAndVertex
   :: ITriangle -> IVertex -> INormalArc
-iNormalArcByTriangleAndVertex (viewI -> I ti t) (viewI -> I ti' v) = 
-    assert(ti==ti') $
-    ti ./ normalArcByTriangleAndVertex t v 
+iNormalArcByTriangleAndVertex = liftMakeNormalArc
+
+iNormalArcByNormalCorners :: INormalCorner -> INormalCorner -> I NormalArc
+iNormalArcByNormalCorners = liftMakeNormalArc
 
 iNormalArcByOTriangleAndVertex
   :: OITriangle -> IVertex -> I NormalArc
@@ -251,3 +258,6 @@ iNormalQuadGetNormalCornersInOrder = traverseI map4 normalQuadGetNormalCornersIn
 iNormalQuadGetNormalArcsInOrder
   :: INormalQuad -> Quadruple INormalArc
 iNormalQuadGetNormalArcsInOrder = traverseI map4 normalQuadGetNormalArcsInOrder
+
+
+

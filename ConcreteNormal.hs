@@ -19,8 +19,10 @@ module ConcreteNormal(
 
     -- * Concrete normal faces
     Concrete(..),c_surf,c_pos,c_type,c_questionableUpdate,
+    concrete,
     NmCorner,
     NmArc,
+    ONmArc,
     NmTri,
     NmQuad,
 
@@ -102,6 +104,7 @@ instance Show a => Show (Concrete a) where
 
 type NmCorner = Concrete INormalCorner
 type NmArc = Concrete INormalArc
+type ONmArc = Concrete OINormalArc
 type NmTri = Concrete INormalTri
 type NmQuad = Concrete INormalQuad
 
@@ -402,7 +405,7 @@ canonicalizeConcreteArc (tr :: Triangulation) x =
 instance TriangulationDSnakeItem NmArc where
     canonicalize_safe = (return .) . canonicalizeConcreteArc
 
-instance TriangulationDSnakeItem (Concrete OINormalArc) where
+instance TriangulationDSnakeItem ONmArc where
     canonicalize_safe = (return .) . canonicalizeConcreteArc
 
 
@@ -414,4 +417,6 @@ instance TriangulationDSnakeItem NmTri where
 instance TriangulationDSnakeItem NmQuad where
     canonicalize_safe = const return
 
-
+concrete
+  :: StandardCoords s Integer => s -> Pos a -> a -> Concrete a
+concrete = Concrete . AnyStandardCoords

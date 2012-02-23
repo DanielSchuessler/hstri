@@ -25,7 +25,7 @@ weightedVertexLinkGraphs =
     ++ makeSemicolonBoxCommand ++ "\n"
     ++ concat (
      case (ddr_cut0,sscr_cut0) of 
-      ( DDResult { _ddr_final = finals }, 
+      ( DDResult { ddr_final = finals }, 
         SolSetConversionResult { sscr_canonExtsOfInput = theCanonExts } ) -> do
         (ipr,theCanonExt) <- zip (VG.toList finals) (VG.toList theCanonExts) 
         return (

@@ -156,7 +156,6 @@ Library
           void
         , comonads-fd
         , ansi-wl-pprint
-        , arithmoi
         , base >= 4 && < 5
         , binary
         , binary-derive

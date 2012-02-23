@@ -320,8 +320,12 @@ pr_edgeDecoL = pr_edgeInfoL >>> firstLens
 pr_generalEdgeImmersionL :: Lens (PreRenderable s) (Ed s -> Maybe GeneralEdgeImmersion)
 pr_generalEdgeImmersionL = pr_edgeInfoL >>> secondLens
 
-pr_setEdgeDecoAssocs :: Ord (Element (Eds s)) =>[(Ed s, EdgeDeco)] -> PreRenderable s -> PreRenderable s
-pr_setEdgeDecoAssocs = setL pr_edgeDecoL . flip M.lookup . M.fromList 
+pr_setEdgeDecoAssocs :: (Show (Ed s), Ord (Ed s)) =>[(Ed s, EdgeDeco)] -> PreRenderable s -> PreRenderable s
+pr_setEdgeDecoAssocs = 
+    setL pr_edgeDecoL 
+    . flip M.lookup 
+    . M.fromListWithKey (\k d1 d2 -> trace ("pr_setEdgeDecoAssocs: Warning: Conflicting decos "++
+        prettyString d1++" and "++prettyString d2++" for "++show k++"; using second.") d2)
 
 triResolutionToEdgeResolution ::  Num a => a -> a
 triResolutionToEdgeResolution = (*10)
