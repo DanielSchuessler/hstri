@@ -5,8 +5,10 @@ import QuadCoordinates.SolSetConversion
 import qualified Data.Vector.Generic as VG
 import Control.Exception
 import Triangulation
+import Data.List
+import Control.DeepSeq(force)
 
-trs = readRgaZip "/usr/share/regina-normal/examples/closed-or-census.rga"
+readTrs = readRgaZip "/usr/share/regina-normal/examples/closed-or-census-large.rga"
 
 
 go tr =
@@ -23,8 +25,12 @@ go tr =
                                         VG.length sscr_finalVerbose) $
 
             putStrLn 
-                (intercalate "\t" [show tNumberOfTetrahedra_ tr,show nq,show nqs,show ns,show nout])
+                (intercalate "," [show (tNumberOfTetrahedra_ tr),show nq,show nqs,show ns,show nout])
         
 
 
-main = mapM_ (go . snd) . take 600 =<< trs
+main = do
+    trs <- readTrs 
+    putStrLn ("ntets,nq,nqs,ns,nout")
+    mapM_ (go . snd) (force trs)
+

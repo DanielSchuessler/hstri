@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, ExistentialQuantification, StandaloneDeriving, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts, ViewPatterns, ExistentialQuantification, StandaloneDeriving, ScopedTypeVariables, TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS -Wall -fno-warn-unused-imports #-}
 module Tests.Gens where
@@ -34,6 +34,8 @@ import Triangulation.Class
 import StandardCoordinates.SurfaceQueries
 import Util
 import Control.Applicative
+import Data.Typeable
+import Data.SumType
 
 data TriangulationWithUnrestrictedStandardCoords r
     = 
@@ -57,7 +59,7 @@ arbitraryStandardDense :: Arbitrary r => Triangulation -> Gen (StandardDense V.V
 arbitraryStandardDense tr = sd_fromList <$> vector (tNumberOfNormalDiscTypes tr)
 
 
-arbitraryStandardSparse :: (Num r, Arbitrary r) => Triangulation -> Gen (SparseVector INormalDisc r)
+arbitraryStandardSparse :: (Eq r, Num r, Arbitrary r) => Triangulation -> Gen (SparseVector INormalDisc r)
 arbitraryStandardSparse tr =
                     do
                         k <- choose (0,tNumberOfTetrahedra tr)
@@ -65,7 +67,7 @@ arbitraryStandardSparse tr =
                             <$> vectorOf k
                                     ((,) <$> arbitraryINormalDisc tr <*> arbitrary) 
 
-instance (Num r, Show r, Ord r, Arbitrary r) => Arbitrary (TriangulationWithUnrestrictedStandardCoords r) 
+instance (Num r, Show r, Ord r, Arbitrary r, Typeable r) => Arbitrary (TriangulationWithUnrestrictedStandardCoords r) 
     where
 
         arbitrary = do
@@ -88,10 +90,10 @@ forAllClosedCensusTriangulations p =
 
 
 eitherFuncToProp
-  :: Show a => (a -> Either String b) -> a -> Property
+  :: (Show a, Show (L ab), SubSumTy ab) => (a -> ab) -> a -> Property
 eitherFuncToProp f x =
     printTestCase (show x) $
-    either (\e -> printTestCase e False) (const (property True)) (f x)
+    either' (\e -> printTestCase (show e) False) (const (property True)) (f x)
 
 data FundamentalEdgeSolution tr = 
         FundamentalEdgeSolution tr (Admissible StandardDenseI)

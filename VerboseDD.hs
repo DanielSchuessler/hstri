@@ -26,7 +26,6 @@ module VerboseDD
      qVertexSolutionExts,
      DDStepResult(..),
      DDResult(..),
-     ddr_lastIndex
      
      )
 
@@ -70,12 +69,6 @@ data DDResult co =
             ddr_final :: Vector (IPR co w),
             ddr_generatedVectorCount :: Int
         }
-
-ddr_lastIndex :: DDResult t -> Maybe VectorIndex
-ddr_lastIndex DDResult {ddr_final = f } 
-    | VG.null f = Nothing
-    | otherwise = Just (ipr_index . VG.last $ f)
-
 
 
 ipr_init :: BitVector w => Proxy w -> Int -> Int -> [Rational] -> VectorIndex -> (IPR co w)

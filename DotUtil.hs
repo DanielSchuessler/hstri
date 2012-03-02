@@ -4,6 +4,7 @@ module DotUtil(
     -- * Reex
     module Data.GraphViz,
     module Data.GraphViz.Attributes.Complete,
+    module DotUtil.Lenses,
     PrintDot,
 
     -- * Misc
@@ -57,6 +58,7 @@ import Util
 import qualified Data.Map as M
 import qualified Data.Text.Lazy as Text
 import Data.Vect.Double(Vec2(..))
+import DotUtil.Lenses
 
 testDot :: PrintDot a => (Triangulation -> a) -> IO ExitCode
 testDot mkdotGraph_ = do
@@ -115,7 +117,7 @@ viewDotCore useDot2tex dotGraph0 = do
              rawSystemS "dot" ["-Tpdf","-o",pdffile,dotfile]
 
     rawSystemS "ln" ["-sf",pdffile,"/tmp/it.pdf"]
-    runOkularAsync pdffile
+    rawSystemS "pdf-viewer" [pdffile]
 
     return ExitSuccess
 

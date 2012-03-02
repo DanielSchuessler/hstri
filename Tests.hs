@@ -48,12 +48,12 @@ prop_quadToStandardSolSet :: Property
 prop_quadToStandardSolSet =
     forAllCensusTriangulations (\(_,tr) ->
         let
-            qs = qVertexSolutions tr
+            qs = dd tr
             expected = sVertexSolutions tr
         in
-            case quadToStandardSolSet tr qs of
-                 SolSetConversionResult { sscr_final = actual } -> 
-                    setEq expected actual)
+            case quadToStandardSolSet' qs of
+                 sscr ->
+                    setEq expected (sscr_final sscr))
         
 
 
@@ -164,7 +164,7 @@ prop_eulerCharViaConcrete = mapSize (`div` 2) $
             ctris = concreteTris surf
             cquads = concreteQuads surf
 
-            distinctsAfterPMap :: (Ord a, TriangulationDSnakeItem a) => [a] -> Int
+            distinctsAfterPMap :: (Ord a, TriangulationDSnakeItem a, Show a) => [a] -> Int
             distinctsAfterPMap = S.size . S.fromList . map (pMap tr)
         in
             eulerC surf .=. 

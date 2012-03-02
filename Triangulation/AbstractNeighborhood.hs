@@ -15,7 +15,9 @@ module Triangulation.AbstractNeighborhood(
     innerEdgeNeighborhood',
     innerEdgeNeighborhood,
     edgeNeighborhood,
-    someEdgeNeighborhood
+    someEdgeNeighborhood,
+
+    unsafeEdgeNeighborhoodTetExportedOnlyForTesting
     ) where
 import TriangulationCxtObject
 import PrettyUtil
@@ -231,3 +233,9 @@ ben_length :: BoundaryEdgeNeighborhood -> Int
 ben_length = length . ben_toList
 ien_length :: InnerEdgeNeighborhood -> Int
 ien_length = length . ien_toList
+
+
+unsafeEdgeNeighborhoodTetExportedOnlyForTesting
+  :: Vertex -> Vertex -> Vertex -> Vertex -> EdgeNeighborhoodTet
+unsafeEdgeNeighborhoodTetExportedOnlyForTesting = enTet
+

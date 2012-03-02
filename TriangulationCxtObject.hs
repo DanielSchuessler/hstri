@@ -163,6 +163,14 @@ type TNormalDisc = T INormalDisc
 --     preimage :: T a -> pre
 
 
+traverseT
+  :: (Show a, TriangulationDSnakeItem a) =>
+     ((a -> T a) -> t1 -> t) -> (a1 -> t1) -> T a1 -> t
+traverseT _map f x = _map (pMap (getTriangulation x)) (f (unT x))
+
+mapT
+  :: (Show a, TriangulationDSnakeItem a) => (a1 -> a) -> T a1 -> T a
+mapT f x = pMap (getTriangulation x) (f (unT x))
 
 preimageList :: IsEquivalenceClass (T a) => T a -> [Element (T a)]
 preimageList = asList
@@ -313,10 +321,14 @@ instance Edges Triangulation where
     edges t = fmap (UnsafeMakeT t . canonicalRep) 
                 (eqvClasses (iEdgeEqv t))
 
+
+tTTriangles :: Triangulation -> [T ITriangle]
+tTTriangles t = nub' (pMap t <$> tITriangles t)
+
 instance Triangles Triangulation where
     type Tris Triangulation = [TTriangle] 
 
-    triangles t = nub' (pMap t <$> tITriangles t)
+    triangles = tTTriangles 
 
 instance Tetrahedra Triangulation where
     type Tets Triangulation = [ TTet ]
@@ -327,7 +339,7 @@ instance NormalCorners Triangulation [TNormalCorner] where
     normalCorners t = tnormalCorner <$> edges t
 
 instance NormalArcs Triangulation [TNormalArc] where
-    normalArcs t = concatMap normalArcList $ triangles t
+    normalArcs t = concatMap normalArcList $ tTTriangles t
 
 instance NormalTris Triangulation [T INormalTri] where
     normalTris t = fmap (UnsafeMakeT t) . concatMap normalTriList . tTetrahedra_ $ t
@@ -351,6 +363,7 @@ equivalentIEdges = fmap unCanonOrdered . preimageList
 
 instance Show TVertex where showsPrec = prettyShowsPrec
 instance Show TEdge where showsPrec = prettyShowsPrec
+instance Show TOEdge where showsPrec = prettyShowsPrec
 instance Show TTriangle where showsPrec = prettyShowsPrec
 instance Show TNormalCorner where showsPrec = prettyShowsPrec
 instance Show TNormalArc where showsPrec = prettyShowsPrec
@@ -384,6 +397,9 @@ instance  Pretty TVertex where
 
 instance  Pretty TEdge where
     pretty x = prettyListAsSet (eqvEquivalents (iEdgeEqv (getTriangulation x)) (unT x))
+
+instance  Pretty TOEdge where
+    pretty x = prettyListAsSet (eqvEquivalents (oEdgeEqv (getTriangulation x)) (unT x))
 
 instance  Pretty TTriangle where
     pretty = prettyListAsSet . preimageList
@@ -545,7 +561,7 @@ instance NormalArcs (T INormalDisc) [TNormalArc] where
     normalArcs = eitherTND normalArcList normalArcList
 
 instance NormalArcs TTriangle (Triple TNormalArc) where
-    normalArcs (UnsafeMakeT t x) = map3 (UnsafeMakeT t) (normalArcs x)
+    normalArcs = traverseT map3 normalArcs
 
 
 
@@ -720,11 +736,3 @@ isRegardedAsSimplexByDisjointUnionDeriving ''DIM3 [t|TTet|]
 
 
 
-traverseT
-  :: (Show a, TriangulationDSnakeItem a) =>
-     ((a -> T a) -> t1 -> t) -> (a1 -> t1) -> T a1 -> t
-traverseT _map f x = _map (pMap (getTriangulation x)) (f (unT x))
-
-mapT
-  :: (Show a, TriangulationDSnakeItem a) => (a1 -> a) -> T a1 -> T a
-mapT f x = pMap (getTriangulation x) (f (unT x))

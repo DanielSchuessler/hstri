@@ -36,6 +36,7 @@ Library
     Blender.Conversion
     ClosedNorCensus8
     ClosedOrCensus6
+    ClosedOrCensus7To10
     Collections
     ConcreteNormal
     ConcreteNormal.Identification
@@ -47,6 +48,7 @@ Library
     Data.Tuple.Index
     DisjointUnion
     DotUtil
+    DotUtil.Lenses
     EdgeCentered
     EitherC
     Element

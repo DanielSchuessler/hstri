@@ -7,6 +7,7 @@ import Test.QuickCheck
 import Control.Exception
 import Control.DeepSeq
 import PrettyUtil
+import PrettyUtil.Matrix
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector as V
@@ -32,7 +33,7 @@ import QuickCheckUtil
 import Data.Char
 
 
-isEchelon :: (Num a, VG.Vector v a) => Vector (v a) -> Bool
+isEchelon :: (Eq a, Num a, VG.Vector v a) => Vector (v a) -> Bool
 isEchelon mtx = adjacentsSatisfy rel (V.map leftmostNonzero mtx) 
 
     where
@@ -75,7 +76,7 @@ instance (Num r, Arbitrary r) => Arbitrary (BMatrix r) where
 
 prop_toEchelon :: Property
 prop_toEchelon = 
-    forAll arbMatrix' 
+    forAll (arbMatrix':: Gen (PrettyMatrix (BMatrix Rational)))
         (\(PrettyMatrix mtx) -> case toReducedEchelon mtx of
                       (mtx',erts,_) ->
                           printTestCase ("mtx' =\n"++prettyMatrix mtx') $

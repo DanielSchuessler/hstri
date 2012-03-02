@@ -22,6 +22,9 @@ import Data.Function
 import Data.SumType
 import Quote
 import Simplicial.DeltaSet3
+import Triangulation.AbstractNeighborhood
+import Triangulation.PreTriangulation(lookupO)
+import Text.Groom
 
 
 
@@ -182,6 +185,65 @@ prop_closedTriangulationGenGeneratesClosed
   :: ClosedTriangulation -> Bool
 prop_closedTriangulationGenGeneratesClosed (ClosedTriangulation tr) =
     isClosedTriangulation tr
+
+
+prop_edgeNeighborhood (ManifoldTriangulation tr) =
+    forAllElements (tOIEdges tr)
+        (\e ->
+            let
+                en = (edgeNeighborhood tr e)
+            in
+                printTestCase ("en = "++groom en) $
+                        either (ben_valid tr e) (ien_valid tr e) en) 
+
+ben_valid :: Triangulation -> OIEdge -> BoundaryEdgeNeighborhood -> Property
+ben_valid tr e (ben_toList -> ients) = 
+    en_valid_common tr e ients
+    .&&.
+    let
+        b = isBoundaryTriangle . pMap tr . forgetVertexOrder
+    in
+        b (ient_leftTri (head ients))
+        .&&.
+        b (ient_rightTri (last ients))
+
+ien_valid :: Triangulation -> OIEdge -> InnerEdgeNeighborhood -> Property
+ien_valid tr e (ien_toList -> ients) = 
+    en_valid_common tr e ients
+    .&&.
+    lookupO (ient_leftTri (head ients)) tr .=. Just (ient_rightTri (last ients))
+
+en_valid_common
+  :: Triangulation -> OIEdge -> [IEdgeNeighborhoodTet] -> Property
+en_valid_common tr e ients =
+    printTestCase "en_valid_common1"
+    (conjoin [ pMap tr e .=. pMap tr (oiEdgeByVertices (ient_bot ient, ient_top ient)) 
+                    | ient <- ients ])
+    .&&.
+    printTestCase "en_valid_common2"
+    (
+    conjoin
+    [
+    lookupO (ient_rightTri ient0) tr .=. Just (ient_leftTri ient1)
+    |
+        (ient0,ient1) <- zip ients (tail ients)
+    ]
+    )
+
+
+prop_ient
+  :: TIndex -> Vertex -> Vertex -> Vertex -> Vertex -> Property
+prop_ient i a b c d =
+    let
+        go f v = f (i ./ unsafeEdgeNeighborhoodTetExportedOnlyForTesting a b c d) .=. i ./ v
+    in
+        conjoin [
+            go ient_top a,
+            go ient_bot b,
+            go ient_left c,
+            go ient_right d
+        ]
+
 
 
 -- prop_SatisfiesSimplicialIdentities2_TTriangle
