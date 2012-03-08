@@ -62,7 +62,7 @@ import Data.AscTuples
 import Data.FormalOps
 import Data.Vector(Vector)
 import DisjointUnion
-import DotUtil(viewDot)
+import DotUtil(viewDot,PrintDot)
 import EdgeCentered
 import EqvGraphs
 import ExampleTriangulations

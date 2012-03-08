@@ -15,6 +15,9 @@ import qualified Data.Vector as V
 import Control.Monad
 import Data.Vect.Double.Base(Vec3(..))
 import Data.Vect.Double.Base(Proj4)
+import Data.Lens.Common
+import Control.Category((>>>))
+import MathUtil
 
 type BlenderUnits = Double
 type TextureName = String
@@ -36,6 +39,8 @@ data TransparencySettings = Trans {
     _translucency :: Double
 }
     deriving Show
+
+nameMakeLens ''TransparencySettings (Just . (++"L") . drop 1)
 
 defaultTrans :: Double -- ^ alpha 
     -> TransparencySettings
@@ -105,6 +110,8 @@ newtype BlenderGroup = BlenderGroup { bgrp_name :: BlenderGroupName }
 data EulerAnglesXYZ = EulerAnglesXYZ { euler_x,euler_y,euler_z :: Double }
     deriving (Show)
 
+nameMakeLens ''EulerAnglesXYZ (Just . (++"L"))
+
 eulerAnglesXYZ :: Double -> Double -> Double -> EulerAnglesXYZ
 eulerAnglesXYZ = EulerAnglesXYZ
 
@@ -116,11 +123,19 @@ data Cam = Cam {
 }
     deriving(Show)
 
+nameMakeLens ''Cam (Just . (++"L"))
+
 defaultFOV :: Double
 defaultFOV = 0.8575560591178853
 
+cam_normL :: Lens Cam Double
+cam_normL = cam_posL >>> normL
 
+cam_norm :: Cam -> Double
+cam_norm = getL cam_normL
 
+cam_withNormOf :: Cam -> Cam -> Cam
+cam_withNormOf cam1 cam2 = setL cam_normL (cam_norm cam2) cam1
 
 
 
@@ -139,8 +154,6 @@ readCam s =
 --         DisjointUnion 
 --             (nubBy ((==) `on` ma_name) (ma++ma'))
 --             () () ()
--- 
-
 
 
 data BlenderCurveBase = BlenderCurveBase {
@@ -264,21 +277,29 @@ nameMakeLens ''BlenderObject (Just . (++"L"))
 type LampObj = BlenderObject BlenderLamp
 
 
-mkSunObj :: String -> Vec3 -> EulerAnglesXYZ -> BlenderObject BlenderLamp
-mkSunObj name loc eulers = 
+mkSunObj :: EulerAnglesXYZ -> BlenderObject BlenderLamp
+mkSunObj eulers = 
     defaultBObj 
         (name ++ "Obj")
         Sun { lamp_name = name }
         LocAndEulers {
-            locAndEulers_loc = loc,
+            locAndEulers_loc = (Vec3 (-5) (-10) 8), -- doesn't really matter for sun lamps
             locAndEulers_eulers = eulers
         }
 
-oldDefaultLamp :: LampObj
-oldDefaultLamp = mkSunObj "TheSun" (Vec3 (-5) (-10) 8) (eulerAnglesXYZ (5*pi/12) 0 (-pi/6))
+    where
+        name = "TheSun"
 
+oldDefaultLamp :: LampObj
+oldDefaultLamp = mkSunObj (eulerAnglesXYZ (5*pi/12) 0 (-pi/6))
+
+defaultSun :: BlenderObject BlenderLamp
+defaultSun = mkSunObj (eulerAnglesXYZ (0.25*pi) 0 (pi/6))
+
+-- | = 'defaultSun'
 defaultLamp :: LampObj
-defaultLamp = mkSunObj "TheSun" (Vec3 (-5) (-10) 8) (eulerAnglesXYZ (0.25*pi) 0 (pi/6))
+defaultLamp = defaultSun
+
 
 
 ma_globalVarName :: Material -> [Char]

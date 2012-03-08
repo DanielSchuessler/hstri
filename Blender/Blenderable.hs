@@ -309,15 +309,26 @@ setHelpLineThickness
   :: BlenderUnits -> Blenderable s -> Blenderable s
 setHelpLineThickness x = modL ba_faceInfoL (modL bfi_helpLineSettingsL (fmap (setL helpLineThicknessL x)) .)
 
+modTris
+  :: (BaFaceInfo -> BaFaceInfo) -> Blenderable s -> Blenderable s
+modTris f = modL ba_triangleInfoL (fmap f)
+
+modTrisMat
+  :: (Material -> Material) -> Blenderable s -> Blenderable s
+modTrisMat = modTris . modL faceMatL
+
+modTrisTransp
+  :: (Maybe TransparencySettings -> Maybe TransparencySettings)
+     -> Blenderable s -> Blenderable s
+modTrisTransp =
+    modTrisMat . modL ma_transparencyL
 
 setTrisTransp
   :: Maybe TransparencySettings -> Blenderable s -> Blenderable s
-setTrisTransp t =
-    modL ba_triangleInfoL 
-        (fmap 
-            (setL 
-                (faceMatL >>> ma_transparencyL) 
-                t))
+setTrisTransp = modTrisTransp . const
+
+
+
 
 makeTrisInvisible :: Blenderable s -> Blenderable s
 makeTrisInvisible = modL ba_prL (pr_setTriVisibility (const OnlyLabels))  

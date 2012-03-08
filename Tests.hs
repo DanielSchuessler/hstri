@@ -43,6 +43,8 @@ import VerboseDD
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
+import Data.List.NonEmpty(NonEmpty(..))
+import Control.Arrow(second)
 
 prop_quadToStandardSolSet :: Property
 prop_quadToStandardSolSet =
@@ -204,5 +206,26 @@ prop_partialCanonicalPart_commute (TriangulationWithUnrestrictedStandardCoords t
 
 
 --prop_quad_admissible_no_change 
+
+
+
+prop_edgeNeighborhoodTetStream1 tr s = 
+    forAllElementsN (tOIEdges tr) "e" (\e -> p (edgeNeighborhoodTetStream tr s e))
+
+    where
+        p xxs@(x:|xs) = 
+            
+            printTestCase ("xxs = "++show xxs) $
+
+            f (==x)
+            .=. 
+            f (\y -> ient_centralEdge x == ient_centralEdge y)
+
+            where
+                f breakPred =
+                    second (take 1) (break breakPred xs)
+
+
+
 
 

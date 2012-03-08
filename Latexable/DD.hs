@@ -28,6 +28,7 @@ import VerboseDD
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import HomogenousTuples
+import Util
 
 
 renderPartitionBySignVariable :: Char -> Maybe Int -> [Char]
@@ -93,6 +94,14 @@ textBeforePairFates =
                         ++"$:"
                         ++nl
 
+zeroSetComplElementsToLatex
+  :: (BitVector w, CoordSys c) =>
+     Proxy c -> Triangulation -> w -> [ Latex ]
+zeroSetComplElementsToLatex co tr zs = 
+    map (toLatex . discIndexToDisc co) $ zeroSetComplElements co tr zs 
+
+maximum0 = maximum . (0:)
+
 
 latexifyDDResults :: CoordSys co => 
        String -- ^ Column width
@@ -120,13 +129,21 @@ latexifyDDResults columnWidth (DDResult tr steps final _ :: DDResult co) =
 
         mkZeroSetBoxCmd ddreps = 
             let
-                maxZeroSetComplSize = 
-                    maximum (0:map (length . zeroSetComplElements co tr . ddrep_zeroSet) ddreps) 
+                braceswidth_em = 1 :: Double
+                commawidth_em = 1
+                qwidth_em = 2.5
 
-                w = show (1+maxZeroSetComplSize) ++ "em" 
+                _width = show width_em ++ "em" 
+                    where
+                        width_em = braceswidth_em + maximum0 (
+                                do
+                                    ddrep <- ddreps
+                                    let qs = zeroSetComplElementsToLatex co tr . ddrep_zeroSet $ ddrep
+                                        n = fi (length qs)
+                                    return (qwidth_em * n  + commawidth_em * (n-1)))
             in
                 newcommand "\\zerosetbox" 1 
-                    (makebox w "c" "$#1$" ++ "\n")
+                    (makebox _width "c" "$#1$" ++ "\n")
 
         ddStepResultItem (DDSR pbs pairFates) i =
 
@@ -196,7 +213,7 @@ latexifyDDResults columnWidth (DDResult tr steps final _ :: DDResult co) =
 
 
         goZeroSet = 
-            op1 "zerosetbox" . op1 "overline" . latexSet . zeroSetComplElements co tr
+            op1 "zerosetbox" . op1 "overline" . latexSet . zeroSetComplElementsToLatex co tr
                 
 
         goInnerProducts = concat . enfunboxen

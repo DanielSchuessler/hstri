@@ -4,9 +4,9 @@ module Triangulation.AbstractNeighborhood(
     EdgeNeighborhoodTet,
     IEdgeNeighborhoodTet,
     ent_top,ent_bot,ent_left,ent_right,ent_leftTri,ent_rightTri,ent_upperTri,ent_lowerTri,
-    ent_mirrorLR,
+    ent_mirrorLR,ent_centralEdge,
     ient_top,ient_bot,ient_left,ient_right,ient_leftTri,ient_rightTri,ient_upperTri,ient_lowerTri,
-    ient_mirrorLR,
+    ient_mirrorLR,ient_centralEdge,
 
     InnerEdgeNeighborhood,
     ien_toList, ien_toNonEmpty, ien_length,
@@ -17,7 +17,11 @@ module Triangulation.AbstractNeighborhood(
     edgeNeighborhood,
     someEdgeNeighborhood,
 
-    unsafeEdgeNeighborhoodTetExportedOnlyForTesting
+    -- * Testing
+    unsafeEdgeNeighborhoodTetExportedOnlyForTesting,
+    edgeNeighborhoodTetStream
+
+
     ) where
 import TriangulationCxtObject
 import PrettyUtil
@@ -64,7 +68,8 @@ unviewENTet (ENTetView t b l r) = enTet t b l r
 
 
 instance Show EdgeNeighborhoodTet where
-    showsPrec prec = showsPrec prec . viewENTet
+    showsPrec _ (viewENTet -> ENTetView a b c d) = 
+        shows (a,b,c,d)
 
 
 trivialHasTIndexInstance [t| EdgeNeighborhoodTet |]                
@@ -100,6 +105,9 @@ ent_mirrorLR :: EdgeNeighborhoodTet -> EdgeNeighborhoodTet
 ent_mirrorLR (viewENTet -> ent) = 
     unviewENTet (ent { entv_left = entv_right ent, entv_right = entv_left ent })
 
+ent_centralEdge :: EdgeNeighborhoodTet -> OEdge
+ent_centralEdge ent = oedge (ent_bot ent, ent_top ent)
+
 -- generate i-variants of accessors
 $(concatMapM 
     (\(t,f) -> 
@@ -120,7 +128,8 @@ $(concatMapM
     (
         map ([t| IVertex |],)    ['ent_top,'ent_bot,'ent_left,'ent_right] ++
         map ([t| OITriangle |],) ['ent_leftTri,'ent_rightTri,'ent_lowerTri,'ent_upperTri] ++
-        map ([t| IEdgeNeighborhoodTet |],) ['ent_mirrorLR] 
+        map ([t| IEdgeNeighborhoodTet |],) ['ent_mirrorLR] ++
+        map ([t| OIEdge |],)     ['ent_centralEdge]
     ))
 
 

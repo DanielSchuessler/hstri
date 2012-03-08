@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies, TemplateHaskell, FlexibleContexts, ViewPatterns, NoMonomorphismRestriction #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies, TypeFamilies, TemplateHaskell, FlexibleContexts, ViewPatterns, NoMonomorphismRestriction #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -Wall -fno-warn-orphans #-}
 module QuickCheckUtil where
 
@@ -18,6 +19,32 @@ import Data.Maybe
 cart ::  Monad m => m a1 -> m a2 -> m (a1, a2)
 cart = liftM2 (,)
 
+data ShowWithVarName a = ShowWithVarName String a
+
+instance Show a => Show (ShowWithVarName a) where
+    showsPrec _ (ShowWithVarName vn a) = showString vn . showString " = " . shows a 
+
+unShowWithVarName :: ShowWithVarName t -> t
+unShowWithVarName (ShowWithVarName _ a) = a
+
+forAllShrinkN
+  :: (Show b, Testable prop) =>
+     Gen b
+     -> (ShowWithVarName b -> [ShowWithVarName b])
+     -> String
+     -> (b -> prop)
+     -> Property
+forAllShrinkN gen shr name p =
+    forAllShrink (ShowWithVarName name <$> gen) shr (p . unShowWithVarName)
+
+forAllN
+  :: (Show b, Testable prop) =>
+     Gen b -> String -> (b -> prop) -> Property
+forAllN gen name p =
+    forAll (ShowWithVarName name <$> gen) (p . unShowWithVarName)
+
+
+
 forAllElements
   :: (Show (Element xs), AsList xs, Testable prop) =>
      xs -> (Element xs -> prop) -> Property
@@ -25,6 +52,14 @@ forAllElements (asList -> xs) p =
     if null xs
        then label "Vacuously true (empty domain)" True
        else forAll (elements xs) p
+
+forAllElementsN
+  :: (Show (Element xs), AsList xs, Testable prop) =>
+     xs -> String -> (Element xs -> prop) -> Property
+forAllElementsN elts name p = 
+    forAllElements 
+        (ShowWithVarName name <$> asList elts) 
+        (p . unShowWithVarName)
 
 -- | Shrinks the index in the given list
 forAllElementsShrink

@@ -206,7 +206,8 @@ mkNormalSurfaceStyle suf col0 col1 col2 = Style {
                     ma_transparency = Just 
                         (defaultTrans 1) {
                             _fresnel = 2.5,
-                            _fresnel_factor = 1.25
+                            _fresnel_factor = 1.25,
+                            _translucency = 0.75
                         },
                     ma_specular_hardness = surfaceSpecularHardness, 
                     ma_specular_intensity = 0.8

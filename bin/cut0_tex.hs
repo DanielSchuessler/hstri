@@ -29,7 +29,7 @@ weightedVertexLinkGraphs =
         SolSetConversionResult { sscr_canonExtsOfInput = theCanonExts } ) -> do
         (ipr,theCanonExt) <- zip (VG.toList finals) (VG.toList theCanonExts) 
         return (
-            "\\itemNL{Gewichteter \\eckenlink-Graph für "
+            "\\itemNL{Gewichteter Eckenlink-Graph für "
                 ++mathmode (ipr_index ipr)++":}\n"++
             let ?layout = sgl
             in 

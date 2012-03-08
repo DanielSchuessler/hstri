@@ -32,6 +32,8 @@ import OrphanInstances()
 import qualified Data.Foldable as Fold
 import THUtil
 import PrettyUtil
+import Data.Lens.Common
+import Control.Comonad.Store.Lazy(store)
 
 anyOrth :: Vec3 -> Vec3
 anyOrth (Vec3 x y z) = anyOrthG Vec3 x y z
@@ -349,3 +351,16 @@ sqrt' x = case compare x 0 of
                LT -> trace ("sqrt' "++show x) 0 
                EQ -> 0
                GT -> sqrt x
+
+
+normL :: (Vect.Vector v, DotProd v) => Lens v Double
+normL = Lens (\v -> let x = norm v 
+                    in store 
+                        (\x' -> if x==0
+                                   then error ("normL: Can't set norm for the zero vector") 
+                                   else v &* (x'/x)) 
+                        x)
+
+-- | @'getL' (vectTranslateL v w) = v &+ w@
+vectTranslateL :: AbelianGroup b => b -> Lens b b
+vectTranslateL v = iso (v &+) (v &-)
