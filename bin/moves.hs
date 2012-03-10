@@ -21,6 +21,12 @@ import Data.AdditiveGroup
 import Data.VectorSpace
 import Numeric.AD.Vector
 import R3Immersions
+import R3Immersions.Simplices
+import PreRenderable
+import Simplicial.DeltaSet2
+import Util
+import Control.Applicative
+import Simplicial.SimplicialComplex
 
 bcmd = DoRender
 
@@ -39,9 +45,10 @@ pachner32 =
         after = 
             
             setL (spqwc_spqL >>> spq_tetsL) 
+                 (asc4 <$>
                  [ $(catTuples 1 3) Bottom  (map3 EquatorVertex (0,1,2)) 
                  , $(catTuples 1 3) Top     (map3 EquatorVertex (0,1,2)) 
-                 ]
+                 ])
                  before
         
             --mkPreRenderableWithTriangleLabels (const Nothing)
@@ -104,8 +111,8 @@ vertex20 =
         gtes = flip M.lookup
                 (M.fromList $ 
                     [
-                        (p (0./tBCD), GTE res (dome tup3Z))
-                      , (p (1./tBCD), GTE res (dome (negateV tup3Z)))
+                        (p (0./tBCD), GTE mempty res (dome tup3Z))
+                      , (p (1./tBCD), GTE mempty res (dome (negateV tup3Z)))
 
                     ])
 
@@ -194,13 +201,13 @@ edge20 =
         gtes = flip M.lookup
                 (M.fromList $ 
                     [
-                        (p (0./tACD), GTE res (sphericalTriangle (-1) 1))
-                      , (p (0./tBCD), GTE res (sphericalTriangle (-1) (-1)))
-                      , (p (1./tACD), GTE res (sphericalTriangle 1 1))
-                      , (p (1./tBCD), GTE res (sphericalTriangle 1 (-1)))
+                        (p (0./tACD), GTE mempty res (sphericalTriangle (-1) 1))
+                      , (p (0./tBCD), GTE mempty res (sphericalTriangle (-1) (-1)))
+                      , (p (1./tACD), GTE mempty res (sphericalTriangle 1 1))
+                      , (p (1./tBCD), GTE mempty res (sphericalTriangle 1 (-1)))
 
-                      , (p (0./tABC), GTE res (semidisk (-1)))
-                      , (p (0./tABD), GTE res (semidisk 1))
+                      , (p (0./tABC), GTE mempty res (_semidisk (-1)))
+                      , (p (0./tABD), GTE mempty res (_semidisk 1))
 
                     ])
 
@@ -225,7 +232,7 @@ edge20 =
 
         ythickness = 0.5 -- 1 = sphere 
 
-        semidisk xdir (Tup2 (bness, cness {- cness is representative for cness or dness #-})) = 
+        _semidisk xdir (Tup2 (bness, cness {- cness is representative for cness or dness #-})) = 
             let
                 aness = 1-bness-cness 
 
@@ -245,15 +252,23 @@ edge20 =
 
 
         after = 
-            let
-                t0 = p (0./tABC)
-                t1 = p (0./tABD)
-            in
-                pr_hide 
-                    ( foldAnySimplex2 
-                                (\x -> not (x `isSubface` t0 || x `isSubface` t1))
-                                (\x -> not (x `isSubface` t0 || x `isSubface` t1))
-                                (\x -> not (x `elem` [t0,t1])))
+            pr_setGeneralTriangleImmersion 
+                (flip lookup 
+                        [(asc3 (A,C,D),
+                            GTE mempty res (semidisk (negateV tup3Z) tup3X (negateV tup3X))
+                        
+                            )
+                        ,(asc3 (B,C,D),
+                            GTE mempty res (semidisk (tup3Z) tup3X (negateV tup3X))
+                        
+                            )
+                        ])
+
+            
+                $
+
+            mkPreRenderable $undef
+                (fromTris [(A,C,D),(B,C,D)])
 
                 
 
@@ -261,7 +276,6 @@ edge20 =
 --                 . pr_setTriangleImmersion (flip lookup [ (t, GTE 2 . dome $ zero) ]) 
 
 
-                    $ before
                 
         cam_edge20 = readCam "(Vector((2.3236193656921387, -0.9150908589363098, 0.6221537590026855)), Euler((1.331398844718933, 4.063907454110449e-06, 1.168649673461914), 'XYZ'), 0.8575560591178853)"
 --         cam_edge20 = readCam "(Vector((4.056652069091797, -1.6806788444519043, 1.085201621055603)), Euler((1.3310924768447876, 1.799694018700393e-06, 1.1548134088516235), 'XYZ'), 0.8575560591178853)"
@@ -277,7 +291,7 @@ edge20 =
 
 
     in do
-        go "/h/dipl/pictures/edge20Before.png" before
+        dont $ go "/h/dipl/pictures/edge20Before.png" before
         go "/h/dipl/pictures/edge20After.png" after
 
 

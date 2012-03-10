@@ -68,6 +68,7 @@ module TriangulationCxtObject(
 
     -- * Normal arcs
     TNormalArc,
+    TONormalArc,
     -- ** Construction
     MakeTNormalArc(..),
     boundaryNormalArcs,

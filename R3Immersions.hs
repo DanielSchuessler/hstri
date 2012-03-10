@@ -10,7 +10,34 @@ import ConcreteNormal
 import Util
 import R3Immersions.Simplices
 
+semidisk
+  :: (RealFloat (Scalar v), Show (Scalar v), VectorSpace v) =>
+     v -> v -> v -> Tup2 (Scalar v) -> v
+semidisk im00 im01 im10 ab =
+    let
+        Tup2 (x,y) = standardSemidisk ab
 
+        -- (x,y) = c00 (1,0) + c01 * (0,-1) + c10 * (0,1)
+        -- c00 + c01 + c10 = 1
+
+        -- <=>
+        -- x = c00
+        -- y = c10 - c01 
+        -- c00 + c01 + c10 = 1
+
+        c00 = x
+        c01 = (1 - x - y)/2
+        c10 = y + c01
+    in
+        c00 *^ im00
+        ^+^
+        c01 *^ im01
+        ^+^
+        c10 *^ im10
+        
+
+    
+        
 
 -- | Maps:
 --

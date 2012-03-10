@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, ViewPatterns, ExistentialQuantification, StandaloneDeriving, ScopedTypeVariables, TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-unused-imports #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-unused-imports -fno-warn-orphans #-}
 module Tests where
 
 --import QuadCoordinates.Class
@@ -45,6 +45,8 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Generic as VG
 import Data.List.NonEmpty(NonEmpty(..))
 import Control.Arrow(second)
+import R3Immersions
+import Numeric.AD.Vector
 
 prop_quadToStandardSolSet :: Property
 prop_quadToStandardSolSet =
@@ -227,5 +229,21 @@ prop_edgeNeighborhoodTetStream1 tr s =
 
 
 
+instance Arbitrary a => Arbitrary (Tup3 a) where arbitrary = Tup3 <$> arbitrary
 
+prop_semidisk (im00 :: Tup3 Float) im01 im10 =
+    let
+        f = semidisk im00 im01 im10
+
+        a .~. b = 
+            printTestCase ("a = "++show a)$
+            printTestCase ("b = "++show b)$
+            twoNorm (a ^-^ b) < 1E-5
+        infix 4 .~.
+    in
+        f zeroV .~. im00
+        .&.
+        f (Tup2 (1,0)) .~. im10
+        .&.
+        f (Tup2 (0,1)) .~. im01
 

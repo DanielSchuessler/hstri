@@ -1,5 +1,5 @@
 Name:                hstri
-Version:             0.2
+Version:             0.3
 -- Synopsis:            
 -- Description:         
 License:             GPL-3
@@ -161,7 +161,6 @@ Library
         , base >= 4 && < 5
         , binary
         , binary-derive
-        , bitset
         , bytestring
         , colour
         , containers
@@ -184,10 +183,8 @@ Library
         , IfElse 
         , Interpolation
         , MemoTrie 
-        , MissingH
         , mtl
         , OneTuple
-        , parallel
         , parsec
         , Printf-TH
         , process
@@ -200,7 +197,6 @@ Library
         , syb
         , tagged
         , template-haskell
-        , Tensor
         , text
         , th-lift
         , time
@@ -212,7 +208,6 @@ Library
         , vect
         , vector
         , vector-space >= 0.8.0
-        , xml
         , xml-monad
         , xmlgen
         , zlib

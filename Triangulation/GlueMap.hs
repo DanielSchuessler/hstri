@@ -53,6 +53,9 @@ data GlueMap =
         --
         -- INVARIANT: The 'getTIndex' of all triangles is less than 'gm_numberOfTetrahedra'.
         gm_map :: Map ITriangle OITriangle
+
+
+        -- performance-TODO: could use IntMap or maybe a vector
     }
     deriving (Show,Eq,Ord)
 
