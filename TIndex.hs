@@ -7,7 +7,7 @@ import Language.Haskell.TH
 import Util
 import Test.QuickCheck
 import Control.Applicative
-import PrettyUtil -- Pretty Word orphan instance
+import PrettyUtil
 import Quote
 import ShortShow
 import Data.Binary
