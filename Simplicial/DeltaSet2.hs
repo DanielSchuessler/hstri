@@ -55,7 +55,7 @@ import ShortShow
 import MathUtil
 import FileLocation
 import Util
-import THBuild
+import Language.Haskell.TH.Build
 import THUtil
 import Data.Lens.Common
 

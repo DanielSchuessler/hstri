@@ -24,7 +24,7 @@ import Language.Haskell.TH
 import MathUtil
 import Prelude hiding((<=))
 import PrettyUtil(Pretty)
-import THBuild
+import Language.Haskell.TH.Build
 import THUtil
 import TupleTH
 import qualified Data.Foldable as Fold
@@ -51,20 +51,20 @@ $(liftM concat $ forM WANTED_DIMS (\n ->
 
         , instanceD (cxt []) (''Applicative `appT'` thetype) 
             [
-                valD' 'pure 
+                svalD 'pure 
                     ("_x" \-> (ctorname `appE'` (tupE' (replicate n "_x"))))
-            ,   valD' '(<*>)
+            ,   svalD '(<*>)
                     (conP' ctorname (tupP' (n_vars "f")) \->
                      conP' ctorname (tupP' (n_vars "x")) \->
                      appE' ctorname (tupE (zipWith appE' (n_vars "f") (n_vars "x"))))
             ]
 
 
-        , valD' ("tup"++show n) (n_vars "x" \-> ctorname `appE'` (tupE' (n_vars "x")))
+        , svalD ("tup"++show n) (n_vars "x" \-> ctorname `appE'` (tupE' (n_vars "x")))
 
-        , valD' ("untup"++show n) (getFieldE ctorname 1 0)
+        , svalD ("untup"++show n) (getFieldE ctorname 1 0)
 
-        , valD' ("foldT"++show n) 
+        , svalD ("foldT"++show n) 
             (   "_k" \-> 
                 conP' ctorname (tupP' (n_vars "x")) \-> 
                 foldl appE' (expQ "_k") (n_vars "x"))
@@ -73,9 +73,9 @@ $(liftM concat $ forM WANTED_DIMS (\n ->
         , instanceD 
             (cxt [classP' ''Num "a"])
             (''AdditiveGroup `appT'` (thetype `appT'` "a"))
-            [ valD' 'zeroV ('pure `appE'` integerL 0)
-            , valD' '(^+^) ('liftA2 `appE'` '(+)) 
-            , valD' 'negateV ('fmap `appE'` 'negate)
+            [ svalD 'zeroV ('pure `appE'` integerL 0)
+            , svalD '(^+^) ('liftA2 `appE'` '(+)) 
+            , svalD 'negateV ('fmap `appE'` 'negate)
             ]
 
         , instanceD 
@@ -83,14 +83,14 @@ $(liftM concat $ forM WANTED_DIMS (\n ->
             (''VectorSpace `appT'` (thetype `appT'` "a"))
             [ 
               tySynInstD' ''Scalar [thetype `appT'` "a"] "a" 
-            , valD' '(*^) ("p" \-> 'fmap `appE'` ("x" \-> '(*) `appE'` "p" `appE'` "x"))
+            , svalD '(*^) ("p" \-> 'fmap `appE'` ("x" \-> '(*) `appE'` "p" `appE'` "x"))
             ]
 
         , instanceD 
             (cxt [classP' ''Num "a"])
             (''InnerSpace `appT'` (thetype `appT'` "a"))
             [ 
-              valD' '(<.>) 'innerProductForFoldableApplicative
+              svalD '(<.>) 'innerProductForFoldableApplicative
             ]
 
 

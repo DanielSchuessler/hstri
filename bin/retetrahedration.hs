@@ -13,7 +13,7 @@ import CheckAdmissibility
 import Data.Cross
 import Numeric.AD.Classes(Mode)
 import Text.Groom
-import THBuild
+import Language.Haskell.TH.Build
 import Control.Monad
 import MathUtil
 import Util

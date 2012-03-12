@@ -19,7 +19,7 @@ import PrettyUtil
 import QuickCheckUtil
 import ShortShow
 import Simplicial.DeltaSet3
-import THBuild
+import Language.Haskell.TH.Build
 import Test.QuickCheck
 import TupleTH
 import Util
@@ -87,10 +87,10 @@ $(flip concatMapM [2,3,4] (\i -> do
             [''Show,''Eq,''Ord,''Typeable,''Fold.Foldable,''ShortShow,''Pretty]
 
      , sigD  unAsciName (forall_a (cxt[]) [t| $asciTy_a -> $tupTy_a |]) 
-     , valD' unAsciName (getFieldE ctorName 1 0)
+     , svalD unAsciName (getFieldE ctorName 1 0)
 
      , sigD  smartCtorTotalName (forall_a (cxt[ord_a]) [t| $tupTy_a -> EitherC LErrorCall $asciTy_a |]) 
-     , valD' smartCtorTotalName [|
+     , svalD smartCtorTotalName [|
             \as -> let as' = $(sortTuple i) as
                    in
                             case $(findSuccessiveElementsSatisfying i) (>=) as' of
@@ -102,17 +102,17 @@ $(flip concatMapM [2,3,4] (\i -> do
          |]
 
      , sigD  smartCtorName (forall_a (cxt[ord_a]) [t| $tupTy_a -> $asciTy_a |]) 
-     , valD' smartCtorName [| $unEitherC $(lift (nameBase smartCtorName)) . $(varE smartCtorTotalName) |]
+     , svalD smartCtorName [| $unEitherC $(lift (nameBase smartCtorName)) . $(varE smartCtorTotalName) |]
 
      , tySynInstD ''Element [asciTy_a] aTy 
 
      , instanceD (cxt[]) 
             (''AsList `appT'` asciTy_a)
-            [ valD' 'asList 'Fold.toList]
+            [ svalD 'asList 'Fold.toList]
 
      , instanceD (cxt [])
             (''AscTuple1 `appT'` asciTy)
-            [ valD' 'mapAscTotal 
+            [ svalD 'mapAscTotal 
                 [| \f -> 
                         $(varE smartCtorTotalName) 
                         . $(mapTuple' i (varE 'f)) 
@@ -124,13 +124,13 @@ $(flip concatMapM [2,3,4] (\i -> do
             (cxt [classP ''Ord [aTy]]) 
             (''AscTuple `appT'` tupTy_a `appT` asciTy `appT` aTy)
 
-            [valD' 'asc ((varE . mkName $ "asc"++show i))
+            [svalD 'asc ((varE . mkName $ "asc"++show i))
 
-            ,valD' 'ascTotal smartCtorTotalName
+            ,svalD 'ascTotal smartCtorTotalName
 
-            ,valD' 'unAsc unAsciName
+            ,svalD 'unAsc unAsciName
 
-            ,valD' 'unsafeAsc (
+            ,svalD 'unsafeAsc (
                 
                 [| \xs ->
                         let 

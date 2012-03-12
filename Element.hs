@@ -9,7 +9,7 @@ import qualified Data.Vector.Unboxed as VU
 import Data.Tuple.OneTuple
 import Data.Vect.Double.Base
 import Data.Vector.Unboxed(Unbox)
-import THBuild
+import Language.Haskell.TH.Build
 import TupleTH
 import Data.Sequence(Seq)
 import qualified Data.DList as DL
@@ -67,10 +67,10 @@ $(let
             sequence [
 
                 instanceD (cxt []) (''AsList `appT'` theTupleType aT)
-                    [ valD' (varP 'asList) (lam1E (tupP' xs) (listE' xs)) ]
+                    [ svalD (varP 'asList) (lam1E (tupP' xs) (listE' xs)) ]
 
               , instanceD (cxt []) (''Mapable `appT'` theTupleType aT `appT'` theTupleType bT)
-                    [ valD' (varP 'yamap) (mapTuple n) ]
+                    [ svalD (varP 'yamap) (mapTuple n) ]
 
               ]
             where

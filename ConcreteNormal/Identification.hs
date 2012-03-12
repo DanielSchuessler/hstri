@@ -17,7 +17,7 @@ import Control.Arrow
 import Data.Function
 import StandardCoordinates.MatchingEquations
 import Language.Haskell.TH
-import THBuild
+import Language.Haskell.TH.Build
 import Control.Monad
 import Data.SumType
 import Simplicial.DeltaSet1
@@ -61,7 +61,7 @@ instance SubSumTy TNmAdjoinQuadDiags where
 $(concatMapM (\((cls,meth),ty) -> 
     sequence [
     instanceD' (cxt[]) (cls `appT'` ty) 
-        [valD' meth [| \x -> $(varE meth) x . unT |]]
+        [svalD meth [| \x -> $(varE meth) x . unT |]]
          
         ]
 

@@ -48,7 +48,7 @@ import Data.Maybe
 import FileLocation
 import qualified Data.Vector.Generic as VG
 import EitherC
-import THBuild
+import Language.Haskell.TH.Build
 import Control.Monad
 
 atType ::  TypeQ -> ExpQ
@@ -211,7 +211,7 @@ inherit cls methods asstysyns (typeQ -> sub) (typeQ -> super) accessor = do
             (return (foldl AppT (ConT cls_n) cls_tys))
             (
             [
-                valD' (varP m) ('(.) `appE'` varE m `appE'` accessor)
+                svalD (varP m) ('(.) `appE'` varE m `appE'` accessor)
 
                 | m <- methods
             

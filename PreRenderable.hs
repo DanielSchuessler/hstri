@@ -90,7 +90,7 @@ import Tetrahedron.Vertex
 import Util
 import qualified Data.Map as M
 import Data.Maybe
-import THBuild
+import Language.Haskell.TH.Build
 import PrettyUtil hiding(pr)
 import Text.Groom
 import R3Immersions.Simplices
