@@ -60,8 +60,8 @@ instance SubSumTy TNmAdjoinQuadDiags where
  -- derive stuff for T-types (ignore the triangulation)
 $(concatMapM (\((cls,meth),ty) -> 
     sequence [
-    sinstanceD (cxt[]) (cls `sappT` ty) 
-        [svalD meth [| \x -> $(varE meth) x . unT |]]
+    instanceD' (cxt[]) (cls `appT'` ty) 
+        [valD' meth [| \x -> $(varE meth) x . unT |]]
          
         ]
 

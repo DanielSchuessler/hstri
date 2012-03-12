@@ -87,10 +87,10 @@ $(flip concatMapM [2,3,4] (\i -> do
             [''Show,''Eq,''Ord,''Typeable,''Fold.Foldable,''ShortShow,''Pretty]
 
      , sigD  unAsciName (forall_a (cxt[]) [t| $asciTy_a -> $tupTy_a |]) 
-     , svalD unAsciName (getFieldE ctorName 1 0)
+     , valD' unAsciName (getFieldE ctorName 1 0)
 
      , sigD  smartCtorTotalName (forall_a (cxt[ord_a]) [t| $tupTy_a -> EitherC LErrorCall $asciTy_a |]) 
-     , svalD smartCtorTotalName [|
+     , valD' smartCtorTotalName [|
             \as -> let as' = $(sortTuple i) as
                    in
                             case $(findSuccessiveElementsSatisfying i) (>=) as' of
@@ -102,17 +102,17 @@ $(flip concatMapM [2,3,4] (\i -> do
          |]
 
      , sigD  smartCtorName (forall_a (cxt[ord_a]) [t| $tupTy_a -> $asciTy_a |]) 
-     , svalD smartCtorName [| $unEitherC $(lift (nameBase smartCtorName)) . $(varE smartCtorTotalName) |]
+     , valD' smartCtorName [| $unEitherC $(lift (nameBase smartCtorName)) . $(varE smartCtorTotalName) |]
 
      , tySynInstD ''Element [asciTy_a] aTy 
 
      , instanceD (cxt[]) 
-            (''AsList `sappT` asciTy_a)
-            [ svalD 'asList 'Fold.toList]
+            (''AsList `appT'` asciTy_a)
+            [ valD' 'asList 'Fold.toList]
 
      , instanceD (cxt [])
-            (''AscTuple1 `sappT` asciTy)
-            [ svalD 'mapAscTotal 
+            (''AscTuple1 `appT'` asciTy)
+            [ valD' 'mapAscTotal 
                 [| \f -> 
                         $(varE smartCtorTotalName) 
                         . $(mapTuple' i (varE 'f)) 
@@ -122,15 +122,15 @@ $(flip concatMapM [2,3,4] (\i -> do
 
      , instanceD 
             (cxt [classP ''Ord [aTy]]) 
-            (''AscTuple `sappT` tupTy_a `appT` asciTy `appT` aTy)
+            (''AscTuple `appT'` tupTy_a `appT` asciTy `appT` aTy)
 
-            [svalD 'asc ((varE . mkName $ "asc"++show i))
+            [valD' 'asc ((varE . mkName $ "asc"++show i))
 
-            ,svalD 'ascTotal smartCtorTotalName
+            ,valD' 'ascTotal smartCtorTotalName
 
-            ,svalD 'unAsc unAsciName
+            ,valD' 'unAsc unAsciName
 
-            ,svalD 'unsafeAsc (
+            ,valD' 'unsafeAsc (
                 
                 [| \xs ->
                         let 
@@ -190,7 +190,7 @@ sort2WithPermutation' (x0,x1) =
 $(flip concatMapM [2,3,4] (\i ->
     isRegardedAsSimplexByDisjointUnionDeriving 
         (dimTName (i-1)) 
-        (("Asc"++show i) `sappT` "v")
+        (("Asc"++show i) `appT'` "v")
     ))
 
 instance Vertices (Asc2 v) where

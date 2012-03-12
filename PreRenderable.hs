@@ -148,8 +148,8 @@ pr_dsL
      Lens (PreRenderable c) c
 pr_dsL = wsl2_underlyingL <<< pr_wsl2L 
 
-inheritToDim2 (''PreRenderable `sappT` "s") "s" 'pr_ds
-inheritSuperfaceLookup2 (''PreRenderable `sappT` "s") (''WithSuperfaceLookup2 `sappT` "s") 'pr_wsl2
+inheritToDim2 (''PreRenderable `appT'` "s") "s" 'pr_ds
+inheritSuperfaceLookup2 (''PreRenderable `appT'` "s") (''WithSuperfaceLookup2 `appT'` "s") 'pr_wsl2
 
 
 pr_quad :: Resolution-> FF Tup2 Tup3 Double -> PreRenderable (SC2 (Bool, Bool))

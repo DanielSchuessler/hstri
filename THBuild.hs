@@ -105,17 +105,17 @@ instance Convertible String [StrictTypeQ] where convert = return . strictTypeQ
 instance Convertible [ DecQ ] [ DecQ ] where convert = id
 instance Convertible DecQ [ DecQ ] where convert = return
 
-svalD
+valD'
   :: (Convertible a PatQ, Convertible a1 ExpQ) => a -> a1 -> DecQ
-svalD p e = valD (patQ p) (normalB (expQ e)) []
+valD' p e = valD (patQ p) (normalB (expQ e)) []
 
-smatch
+match'
   :: (Convertible a PatQ, Convertible a1 ExpQ) => a -> a1 -> MatchQ
-smatch p e = match (patQ p) (normalB (expQ e)) []
+match' p e = match (patQ p) (normalB (expQ e)) []
 
-slamE
+lamE'
   :: (Convertible a [PatQ], Convertible a1 ExpQ) => a -> a1 -> ExpQ
-slamE p e = lamE (patQs p) (expQ e)
+lamE' p e = lamE (patQs p) (expQ e)
 
 getFieldE :: (Convertible a Name) => 
     a       -- ^ Ctor name
@@ -124,46 +124,46 @@ getFieldE :: (Convertible a Name) =>
     -> Q Exp
 getFieldE ctor n i = do
     x <- newName "_x"
-    slamE 
+    lamE' 
         (conP (name ctor) (map (\j -> if i==j then varP x else wildP) [0..n-1]))     
         x
 
-sappT
+appT'
   :: (Convertible a TypeQ, Convertible a1 TypeQ) => a -> a1 -> TypeQ
-sappT x y = typeQ x `appT` typeQ y
+appT' x y = typeQ x `appT` typeQ y
 
 
 (&) ::  Convertible a1 a => a1 -> [a] -> [a]
 a & b = convert a : b
 infixr 5 &
 
-snewtypeD
+newtypeD'
   :: (Convertible a CxtQ,
       Convertible a1 Name,
       Convertible a2 ConQ) =>
      a -> a1 -> [TyVarBndr] -> a2 -> [Name] -> DecQ
-snewtypeD c na bndrs con derivs = newtypeD (cxtQ c) (name na) bndrs (conQ con) derivs
+newtypeD' c na bndrs con derivs = newtypeD (cxtQ c) (name na) bndrs (conQ con) derivs
 
-snormalC
+normalC'
   :: (Convertible a Name, Convertible a1 [StrictTypeQ]) =>
      a -> a1 -> ConQ
-snormalC na _strictTypeQs = normalC (name na) (strictTypeQs _strictTypeQs)
+normalC' na _strictTypeQs = normalC (name na) (strictTypeQs _strictTypeQs)
 
-sappE
+appE'
   :: (Convertible a ExpQ, Convertible a1 ExpQ) => a -> a1 -> ExpQ
-sappE x y = expQ x `appE` expQ y
+appE' x y = expQ x `appE` expQ y
 
 
-stupE :: Convertible a [ExpQ] => a -> ExpQ
-stupE = tupE . expQs
+tupE' :: Convertible a [ExpQ] => a -> ExpQ
+tupE' = tupE . expQs
 
-stupP :: Convertible a [PatQ] => a -> PatQ
-stupP = tupP . patQs
+tupP' :: Convertible a [PatQ] => a -> PatQ
+tupP' = tupP . patQs
 
 (\->) :: forall a a1.
                         (Convertible a [PatQ], Convertible a1 ExpQ) =>
                         a -> a1 -> ExpQ
-(\->) = slamE 
+(\->) = lamE' 
 
 infixr 0 \->
 
@@ -189,31 +189,31 @@ preconvert4
      (b3 -> b2 -> b1 -> b -> c) -> a -> a3 -> a2 -> a1 -> c
 preconvert4 f = preconvert3 . preconvert f
 
-sconP
+conP'
   :: (Convertible a Name, Convertible a1 [PatQ]) => a -> a1 -> PatQ
-sconP = preconvert2 conP
+conP' = preconvert2 conP
 
-sclassP
+classP'
   :: (Convertible a Name, Convertible a1 [TypeQ]) => a -> a1 -> PredQ
-sclassP = preconvert2 classP
+classP' = preconvert2 classP
 
-stySynInstD
+tySynInstD'
   :: (Convertible a Name,
       Convertible a1 [TypeQ],
       Convertible a2 TypeQ) =>
      a -> a1 -> a2 -> DecQ
-stySynInstD = preconvert3 tySynInstD
+tySynInstD' = preconvert3 tySynInstD
 
-slistE :: Convertible a [ExpQ] => a -> ExpQ
-slistE = preconvert listE
+listE' :: Convertible a [ExpQ] => a -> ExpQ
+listE' = preconvert listE
 
-sinstanceD
+instanceD'
   :: (Convertible a1 [DecQ],
       Convertible a2 TypeQ,
       Convertible a CxtQ) =>
      a -> a2 -> a1 -> DecQ
-sinstanceD = preconvert3 instanceD
+instanceD' = preconvert3 instanceD
 
-shtuple :: Convertible a TypeQ => Int -> a -> TypeQ
-shtuple n t = foldl appT (tupleT n) (replicate n (typeQ t))
+htuple' :: Convertible a TypeQ => Int -> a -> TypeQ
+htuple' n t = foldl appT (tupleT n) (replicate n (typeQ t))
 

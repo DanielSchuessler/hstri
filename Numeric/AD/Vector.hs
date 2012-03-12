@@ -46,51 +46,51 @@ $(liftM concat $ forM WANTED_DIMS (\n ->
         n_vars stem = [ mkName ("_"++stem++show i) | i <- [0..n-1] ]
     in
         sequence
-        [ snewtypeD (cxt[]) na (a&[]) (snormalC ctorname (htuple n (varT a))) 
+        [ newtypeD' (cxt[]) na (a&[]) (normalC' ctorname (htuple n (varT a))) 
             [''Functor,''Foldable,''Traversable,''Show,''Eq,''Ord ]
 
-        , instanceD (cxt []) (''Applicative `sappT` thetype) 
+        , instanceD (cxt []) (''Applicative `appT'` thetype) 
             [
-                svalD 'pure 
-                    ("_x" \-> (ctorname `sappE` (stupE (replicate n "_x"))))
-            ,   svalD '(<*>)
-                    (sconP ctorname (stupP (n_vars "f")) \->
-                     sconP ctorname (stupP (n_vars "x")) \->
-                     sappE ctorname (tupE (zipWith sappE (n_vars "f") (n_vars "x"))))
+                valD' 'pure 
+                    ("_x" \-> (ctorname `appE'` (tupE' (replicate n "_x"))))
+            ,   valD' '(<*>)
+                    (conP' ctorname (tupP' (n_vars "f")) \->
+                     conP' ctorname (tupP' (n_vars "x")) \->
+                     appE' ctorname (tupE (zipWith appE' (n_vars "f") (n_vars "x"))))
             ]
 
 
-        , svalD ("tup"++show n) (n_vars "x" \-> ctorname `sappE` (stupE (n_vars "x")))
+        , valD' ("tup"++show n) (n_vars "x" \-> ctorname `appE'` (tupE' (n_vars "x")))
 
-        , svalD ("untup"++show n) (getFieldE ctorname 1 0)
+        , valD' ("untup"++show n) (getFieldE ctorname 1 0)
 
-        , svalD ("foldT"++show n) 
+        , valD' ("foldT"++show n) 
             (   "_k" \-> 
-                sconP ctorname (stupP (n_vars "x")) \-> 
-                foldl sappE (expQ "_k") (n_vars "x"))
+                conP' ctorname (tupP' (n_vars "x")) \-> 
+                foldl appE' (expQ "_k") (n_vars "x"))
 
 
         , instanceD 
-            (cxt [sclassP ''Num "a"])
-            (''AdditiveGroup `sappT` (thetype `sappT` "a"))
-            [ svalD 'zeroV ('pure `sappE` integerL 0)
-            , svalD '(^+^) ('liftA2 `sappE` '(+)) 
-            , svalD 'negateV ('fmap `sappE` 'negate)
+            (cxt [classP' ''Num "a"])
+            (''AdditiveGroup `appT'` (thetype `appT'` "a"))
+            [ valD' 'zeroV ('pure `appE'` integerL 0)
+            , valD' '(^+^) ('liftA2 `appE'` '(+)) 
+            , valD' 'negateV ('fmap `appE'` 'negate)
             ]
 
         , instanceD 
-            (cxt [sclassP ''Num "a"])
-            (''VectorSpace `sappT` (thetype `sappT` "a"))
+            (cxt [classP' ''Num "a"])
+            (''VectorSpace `appT'` (thetype `appT'` "a"))
             [ 
-              stySynInstD ''Scalar [thetype `sappT` "a"] "a" 
-            , svalD '(*^) ("p" \-> 'fmap `sappE` ("x" \-> '(*) `sappE` "p" `sappE` "x"))
+              tySynInstD' ''Scalar [thetype `appT'` "a"] "a" 
+            , valD' '(*^) ("p" \-> 'fmap `appE'` ("x" \-> '(*) `appE'` "p" `appE'` "x"))
             ]
 
         , instanceD 
-            (cxt [sclassP ''Num "a"])
-            (''InnerSpace `sappT` (thetype `sappT` "a"))
+            (cxt [classP' ''Num "a"])
+            (''InnerSpace `appT'` (thetype `appT'` "a"))
             [ 
-              svalD '(<.>) 'innerProductForFoldableApplicative
+              valD' '(<.>) 'innerProductForFoldableApplicative
             ]
 
 
@@ -101,8 +101,8 @@ $(liftM concat $ forM WANTED_DIMS (\n ->
 -- $(concatMapM 
 --     (\n -> 
 --         inheritPretty 
---             (("Tup"++show n) `sappT` "a") 
---             (shtuple n "a")
+--             (("Tup"++show n) `appT'` "a") 
+--             (htuple' n "a")
 --             ("untup"++show n))
 --     WANTED_DIMS) 
 

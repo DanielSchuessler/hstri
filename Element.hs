@@ -66,11 +66,11 @@ $(let
         mkAsList n = 
             sequence [
 
-                instanceD (cxt []) (''AsList `sappT` theTupleType aT)
-                    [ svalD (varP 'asList) (lam1E (stupP xs) (slistE xs)) ]
+                instanceD (cxt []) (''AsList `appT'` theTupleType aT)
+                    [ valD' (varP 'asList) (lam1E (tupP' xs) (listE' xs)) ]
 
-              , instanceD (cxt []) (''Mapable `sappT` theTupleType aT `sappT` theTupleType bT)
-                    [ svalD (varP 'yamap) (mapTuple n) ]
+              , instanceD (cxt []) (''Mapable `appT'` theTupleType aT `appT'` theTupleType bT)
+                    [ valD' (varP 'yamap) (mapTuple n) ]
 
               ]
             where

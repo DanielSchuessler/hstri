@@ -290,7 +290,7 @@ data WithSuperfaceLookup2 s =
 deriving instance (ShowToDim2 s, Show s) => Show (WithSuperfaceLookup2 s)
 instance DeltaSet1 s => DeltaSet1 (WithSuperfaceLookup2 s) 
 
-inheritToDim2 (''WithSuperfaceLookup2 `sappT` "s") "s" 'wsl2_underlying
+inheritToDim2 (''WithSuperfaceLookup2 `appT'` "s") "s" 'wsl2_underlying
 
 instance (ShowToDim1 s, OrdToDim1 s) => SuperfaceLookup2 (WithSuperfaceLookup2 s) where
     edsContainingVert = flip $indxShow . wsl2_ecvc

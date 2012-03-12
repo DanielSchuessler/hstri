@@ -115,8 +115,8 @@ stla_g3 = (sTriangleLabelAssoc "G3" (cor eAD) (cor eAC) d) {stla_scale=_scale}
 
 stlas :: [SimplicialTriangleLabelAssoc PreCutVert]
 stlas = let     
-            fs = $(slistE [ "stla_f"++show i  | i <- [1::Int ..3]])
-            gs = $(slistE [ "stla_g"++show i  | i <- [1::Int ..3]])
+            fs = $(listE' [ "stla_f"++show i  | i <- [1::Int ..3]])
+            gs = $(listE' [ "stla_g"++show i  | i <- [1::Int ..3]])
         in 
             map gluingMapABC fs ++ fs ++
             map gluingMapACD gs ++ gs

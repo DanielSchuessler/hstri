@@ -211,7 +211,7 @@ inherit cls methods asstysyns (typeQ -> sub) (typeQ -> super) accessor = do
             (return (foldl AppT (ConT cls_n) cls_tys))
             (
             [
-                svalD (varP m) ('(.) `sappE` varE m `sappE` accessor)
+                valD' (varP m) ('(.) `appE'` varE m `appE'` accessor)
 
                 | m <- methods
             
